@@ -816,6 +816,30 @@ unchanged corpus took 52s, 60s, 67s and 74s - that spread is host I/O for a
 hundred sequential uploads, not the pipeline. Re-processing all 211 cases
 already in the store, which skips upload entirely, takes **53s**.
 
+**Validating costs store space, and nothing in the app deletes a case.**
+`check_parity.py` uploads the whole corpus on every run and a re-process
+replaces nothing, so a handful of validation runs took one store from ~99 to
+**619 cases** - 547 of them byte-identical re-uploads of 71 files, 4.8 GB on
+disk and a dashboard nobody can read. There is no DELETE endpoint;
+`tools/prune_cases.py` is the cleanup, dry-run by default:
+
+```bash
+docker exec forensic-analyzer-forensic-analyzer-1 python tools/prune_cases.py
+docker exec forensic-analyzer-forensic-analyzer-1 python tools/prune_cases.py --apply --keep-reviewed
+```
+
+It groups cases by **md5 of the preserved raw file**, not by filename - the
+corpus has two different exports both called `log_30_.csv` - and keeps one
+per group, preferring a case with analyst decisions, then one with a cached
+analysis, then the newest. **That order matters and was learned the hard
+way**: keeping merely the newest meant keeping a fresh validation duplicate
+and deleting the older case that held the AI analysis, which destroyed 10
+cached analyses (each a Groq call under a ~1/minute budget). A duplicate has
+identical content by definition, so the copy worth keeping is the one with
+work attached. Always run it without `--apply` first, and pass
+`--keep-reviewed` unless you mean to delete audit logs - a case's
+`review/{case_id}.jsonl` goes with it.
+
 Remaining known ceiling: `.log`/JSON still decode in Python (~15k rows/sec).
 Only worth moving to SQL `regexp_extract` if large syslog files show up;
 CSV (the bulk of real data) already bypasses Python entirely.
