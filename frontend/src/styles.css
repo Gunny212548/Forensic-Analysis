@@ -1,0 +1,259 @@
+/* Ported verbatim from the pre-React static/index.html, minus `.page[hidden]`
+   (React mounts and unmounts pages instead of hiding them).
+
+   Kept as-is on purpose. The palette, the severity buckets, the review
+   stripes and the graph container were all tuned against real cases, and
+   this page gets screenshotted into incident reports - restyling it would
+   have been churn with a chance of making the evidence read worse. */
+:root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-strong: #0ea5e9;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 4px; font-size: 14px; }
+  .layout { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; padding: 28px 20px 80px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 16px; color: var(--text); }
+  form { display: flex; flex-direction: column; gap: 14px; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+  .dropzone {
+    border: 2px dashed var(--panel-border);
+    border-radius: 10px;
+    padding: 28px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .dropzone.drag { border-color: var(--accent); background: rgba(56,189,248,.08); }
+  .dropzone input { display: none; }
+  .dropzone .filename { color: var(--accent); font-weight: 600; margin-top: 6px; }
+  .dropzone .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  textarea, input[type=text], select {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 14px;
+  }
+  textarea { resize: vertical; min-height: 50px; }
+  select { align-self: flex-start; }
+  .filter-bar select { width: auto; padding: 7px 10px; font-size: 13px; }
+  button {
+    background: var(--accent-strong);
+    color: #04121f;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    align-self: flex-start;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+  }
+  .status-line { font-size: 13px; margin-top: 4px; min-height: 18px; }
+  .status-line.ok { color: var(--ok); }
+  .status-line.err { color: var(--danger); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--panel-border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.count-0 { background: rgba(148,163,184,.15); color: var(--muted); }
+  .badge.count-n { background: rgba(74,222,128,.15); color: var(--ok); }
+  .badge.count-fail { background: rgba(248,113,113,.18); color: var(--danger); }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
+  .top-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  code { background: #0f172a; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* Top-level page nav - three routes: Dashboard / Upload / Result.
+     Result has no static nav link, reached from a case row or an upload. */
+  .topnav {
+    position: sticky; top: 0; z-index: 10; display: flex; align-items: center;
+    gap: 24px; padding: 14px 20px; background: rgba(15,23,42,.92);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--panel-border);
+  }
+  .topnav-brand { font-weight: 700; font-size: 15px; }
+  .topnav-links { display: flex; gap: 4px; }
+  .topnav-links a {
+    color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600;
+    padding: 7px 12px; border-radius: 8px;
+  }
+  .topnav-links a:hover { color: var(--text); background: rgba(148,163,184,.08); }
+  .topnav-links a.active { color: var(--accent); background: rgba(56,189,248,.12); }
+  .back-link { color: var(--muted); text-decoration: none; font-size: 12px; display: inline-block; margin-bottom: 8px; }
+  .back-link:hover { color: var(--accent); }
+  .btn-link {
+    display: inline-block; text-decoration: none; background: var(--accent-strong);
+    color: #04121f; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 12px;
+  }
+  .btn-link.disabled { background: var(--panel-border); color: var(--muted); pointer-events: none; }
+
+  /* Case-list severity at a glance - so a critical case is visible without
+     opening it. Bucketed from the rule engine's 0-15 lvl (see db.severity_summary). */
+  .sev-pill {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+    border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .sev-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .sev-pill.sev-critical { background: rgba(248,113,113,.15); color: var(--danger); }
+  .sev-pill.sev-high { background: rgba(251,146,60,.15); color: #fb923c; }
+  .sev-pill.sev-medium { background: rgba(251,191,36,.15); color: var(--warn); }
+  .sev-pill.sev-low { background: rgba(148,163,184,.15); color: var(--muted); }
+  .sev-pill.sev-none { background: rgba(74,222,128,.12); color: var(--ok); }
+  tr.sev-row-critical td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+  tr.sev-row-high td:first-child { box-shadow: inset 3px 0 0 #fb923c; }
+
+  .ai-summary, .ws-overview-summary { line-height: 1.6; margin-bottom: 20px; color: var(--text); }
+  .section-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 10px; }
+  .mitre-tag {
+    display: inline-block; background: rgba(56,189,248,.15); color: var(--accent);
+    font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; margin: 0 3px 3px 0;
+  }
+
+  .chain-flow-wrap { overflow-x: auto; padding: 6px 0 22px; margin-bottom: 6px; }
+  .chain-flow { display: flex; align-items: stretch; gap: 0; width: max-content; }
+  .chain-node {
+    position: relative; background: #0f172a; border: 2px solid var(--accent);
+    border-radius: 10px; padding: 12px 16px; min-width: 150px; max-width: 200px; flex-shrink: 0;
+  }
+  .chain-node .badge-endpoint {
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .chain-node.start { border-color: var(--ok); }
+  .chain-node.start .badge-endpoint { background: var(--ok); color: #04120a; }
+  .chain-node.end { border-color: var(--danger); }
+  .chain-node.end .badge-endpoint { background: var(--danger); color: #2a0a0a; }
+  .chain-node .n-stage { font-weight: 700; font-size: 12.5px; color: var(--accent); text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
+  .chain-node .n-ts { font-size: 10.5px; color: var(--muted); margin-top: 6px; }
+  .chain-node .n-conf { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .chain-connector { display: flex; align-items: center; flex-shrink: 0; padding: 0 6px; color: var(--muted); font-size: 22px; align-self: center; }
+
+  .chain-stage { border-left: 3px solid var(--accent); background: #0f172a; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 10px; }
+  .chain-stage .stage-name { font-weight: 700; color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  .chain-stage .stage-conf { float: right; font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
+  .chain-stage .stage-desc { margin: 6px 0; font-size: 13px; }
+  .chain-stage .stage-meta { font-size: 11px; color: var(--muted); }
+
+  .timeline-item { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--panel-border); font-size: 13px; }
+  .timeline-item .ts { color: var(--muted); white-space: nowrap; min-width: 170px; }
+  .sev-critical { color: #f87171; font-weight: 700; }
+  .sev-high { color: #fb923c; font-weight: 700; }
+  .sev-medium { color: #fbbf24; }
+  .sev-low { color: var(--muted); }
+  .rec-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+  .meta-line { font-size: 11px; color: var(--muted); margin-top: 16px; }
+
+  /* Review. An Unreviewed finding must never read as trustworthy just
+     because its confidence is high (NFR-9), so status - not confidence -
+     carries the strongest visual weight: the left stripe and the badge. */
+  .rv-gate { padding: 10px 12px; border-radius: 6px; margin-bottom: 14px;
+    font-size: 13px; display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: space-between; align-items: center; }
+  .rv-gate.blocked { background: rgba(251,191,36,0.10); border-left: 3px solid var(--warn); }
+  .rv-gate.ok { background: rgba(74,222,128,0.10); border-left: 3px solid var(--ok); }
+  .rv-counts { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rv-item { border-left: 3px solid var(--panel-border); padding: 10px 12px;
+    margin-bottom: 8px; background: rgba(255,255,255,0.02); }
+  .rv-item.rv-unreviewed { border-left-color: var(--warn); }
+  .rv-item.rv-accepted { border-left-color: var(--ok); opacity: .75; }
+  .rv-item.rv-modified { border-left-color: var(--accent); opacity: .85; }
+  .rv-item.rv-rejected { border-left-color: var(--danger); opacity: .55; }
+  .rv-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    font-size: 11px; margin-bottom: 6px; }
+  .rv-status { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .rv-unreviewed .rv-status { color: var(--warn); }
+  .rv-accepted .rv-status { color: var(--ok); }
+  .rv-modified .rv-status { color: var(--accent); }
+  .rv-rejected .rv-status { color: var(--danger); }
+  .rv-conf { color: var(--muted); }
+  .rv-conf-high { color: var(--text); }
+  .rv-flag { border: 1px solid var(--panel-border); border-radius: 3px;
+    padding: 0 5px; color: var(--muted); font-size: 10px; }
+  .rv-rid { font-family: ui-monospace, monospace; color: var(--muted); }
+  .rv-n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rv-desc { font-size: 13px; line-height: 1.5; }
+  .rv-meta, .rv-who { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .rv-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .rv-btn { font-size: 11px; padding: 3px 10px; border-radius: 4px; cursor: pointer;
+    background: transparent; color: var(--text); border: 1px solid var(--panel-border); }
+  .rv-btn:hover { border-color: var(--accent); }
+  .rv-accept:hover { border-color: var(--ok); color: var(--ok); }
+  .rv-reject:hover { border-color: var(--danger); color: var(--danger); }
+  .rv-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .risk-wrap { display: flex; flex-wrap: wrap; gap: 18px; }
+  .risk-block { flex: 1 1 320px; min-width: 0; overflow-x: auto; }
+  .risk-role { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin-bottom: 6px; }
+  .risk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .risk-table th { text-align: left; font-weight: 500; color: var(--muted);
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+    padding: 2px 8px 4px 0; border-bottom: 1px solid var(--panel-border); }
+  .risk-table td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--panel-border);
+    vertical-align: top; }
+  .risk-entity { font-family: ui-monospace, monospace; color: var(--text); }
+  .risk-score { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+  .risk-n { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .meta-warn { font-size: 12px; margin-top: 16px; padding: 8px 10px;
+    border-left: 3px solid var(--warn); background: rgba(251,191,36,0.10);
+    color: var(--text); }
+
+  .graph-wrap { overflow-x: auto; background: #0f172a; border: 1px solid var(--panel-border); border-radius: 10px; padding: 10px; }
+  .graph-wrap svg { display: block; }
+
+  /* Result-page workspace: sidebar tabs + content pane, instead of one long scroll */
+  .ws { display: flex; gap: 20px; align-items: flex-start; }
+  .ws-nav { display: flex; flex-direction: column; gap: 2px; flex: 0 0 196px; position: sticky; top: 72px; }
+  .ws-nav button {
+    all: unset; box-sizing: border-box; cursor: pointer; padding: 9px 12px; border-radius: 8px;
+    font-size: 13px; color: var(--muted); display: flex; justify-content: space-between;
+    align-items: center; gap: 8px; width: 100%;
+  }
+  .ws-nav button:hover { background: rgba(148,163,184,.08); color: var(--text); }
+  .ws-nav button.active { background: rgba(56,189,248,.12); color: var(--accent); font-weight: 600; }
+  .ws-count {
+    font-size: 10.5px; background: rgba(148,163,184,.15); color: var(--muted);
+    padding: 1px 6px; border-radius: 999px; flex-shrink: 0;
+  }
+  .ws-nav button.active .ws-count { background: rgba(56,189,248,.2); color: var(--accent); }
+  .ws-content { flex: 1 1 auto; min-width: 0; }
+  .ws-overview-mini .chain-flow-wrap { padding-bottom: 8px; }
+  .ws-overview-mini .chain-node { min-width: 130px; padding: 9px 12px; }
+
+  @media (max-width: 760px) {
+    .ws { flex-direction: column; }
+    .ws-nav {
+      flex-direction: row; flex-wrap: nowrap; position: static; flex: none;
+      width: 100%; overflow-x: auto; padding-bottom: 4px;
+    }
+    .ws-nav button { width: auto; white-space: nowrap; }
+    .topnav { flex-wrap: wrap; gap: 10px; }
+  }

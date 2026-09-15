@@ -1,0 +1,12 @@
+# Keep the build context small and the image honest.
+metabase/
+frontend/node_modules/
+# static/ is produced by the frontend build stage, never copied from here.
+static/
+legacy/
+tests/
+data/
+.env
+__pycache__/
+**/__pycache__/
+*.pyc

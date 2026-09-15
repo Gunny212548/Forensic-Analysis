@@ -1,0 +1,536 @@
+{
+ "Game_Rules.txt": {
+  "flagged": 0,
+  "md5": "d4deb2333fd0d9a38e9788a01bbd6d02",
+  "rows": 38,
+  "rules": {}
+ },
+ "Header.txt.txt": {
+  "flagged": 0,
+  "md5": "7a9b05031974c6abb809ab3be2fb674f",
+  "rows": 346,
+  "rules": {}
+ },
+ "KM23_ITSupport_InteractiveSignIns_2026-06-04_2026-06-11.csv": {
+  "flagged": 79,
+  "md5": "ffc6a9e77de9b10124b12e79baafd8c3",
+  "rows": 91,
+  "rules": {
+   "R1000": 14,
+   "R1001": 65,
+   "R2005": 14,
+   "R2006": 24
+  }
+ },
+ "KM23_MessageTraceResult-Rev01.csv": {
+  "flagged": 0,
+  "md5": "f51014b75d221841b2da1099f53f6814",
+  "rows": 938,
+  "rules": {}
+ },
+ "Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv": {
+  "flagged": 45201,
+  "md5": "1dd8810976d566023f67083a97961d9f",
+  "rows": 45209,
+  "rules": {
+   "R2001": 42223,
+   "R2003": 42223,
+   "R2004": 2978
+  }
+ },
+ "Mail_itsupport_Header.txt": {
+  "flagged": 0,
+  "md5": "4094b354e008450f8d3edd37d949f928",
+  "rows": 79,
+  "rules": {}
+ },
+ "New_Text_Document.txt": {
+  "flagged": 0,
+  "md5": "ef41e44827f1f98ae1575fd3f612dd57",
+  "rows": 17,
+  "rules": {}
+ },
+ "_root_nohup_tmpesxi_encryptor_qpby.txt": {
+  "flagged": 0,
+  "md5": "2c308ed9b4c18f2d42bf50ca36befa27",
+  "rows": 225,
+  "rules": {}
+ },
+ "ad_ssh.csv": {
+  "flagged": 95,
+  "md5": "f523560b5833fcfae2ae078710e38a89",
+  "rows": 95,
+  "rules": {
+   "R3000": 95
+  }
+ },
+ "auth.log": {
+  "flagged": 329,
+  "md5": "884c2572a65a72b413af840f1dfe8998",
+  "rows": 776,
+  "rules": {
+   "R1000": 39,
+   "R1001": 39,
+   "R1003": 113,
+   "R1004": 138,
+   "R2000": 35,
+   "R2005": 39
+  }
+ },
+ "configRP.log": {
+  "flagged": 0,
+  "md5": "a092ba006fff91ef20be821d1cd0d890",
+  "rows": 309,
+  "rules": {}
+ },
+ "dhclient.log": {
+  "flagged": 0,
+  "md5": "f7041cae6fb5a6e84f6d9fca58b42c57",
+  "rows": 42,
+  "rules": {}
+ },
+ "dst10-8-2-37.csv": {
+  "flagged": 299,
+  "md5": "d0aa0e05e1b09d5ab0099f97d0b20fdb",
+  "rows": 5120,
+  "rules": {
+   "R3000": 217,
+   "R3001": 82
+  }
+ },
+ "dst10-8-3-215.csv": {
+  "flagged": 4990,
+  "md5": "12c363684706c2e217ddfce2dcc586b3",
+  "rows": 11969,
+  "rules": {
+   "R2001": 4990
+  }
+ },
+ "esxupdate.log": {
+  "flagged": 0,
+  "md5": "e922cb2679c93ce8c6433f100369bd20",
+  "rows": 1699,
+  "rules": {}
+ },
+ "fdm.log": {
+  "flagged": 0,
+  "md5": "98a31f1419fc9df294ecd50b90b2bdd0",
+  "rows": 8235,
+  "rules": {}
+ },
+ "hostd-probe.log": {
+  "flagged": 0,
+  "md5": "19e3834e44e5e5bd9849a46a380bdc24",
+  "rows": 7705,
+  "rules": {}
+ },
+ "hostd.log": {
+  "flagged": 0,
+  "md5": "b74af6c0a30353bc47d7bff7358b949b",
+  "rows": 69261,
+  "rules": {}
+ },
+ "lacp.log": {
+  "flagged": 0,
+  "md5": "30b4501b520d681d2117d647bfea8786",
+  "rows": 95,
+  "rules": {}
+ },
+ "log.csv": {
+  "flagged": 33,
+  "md5": "857f3e790f79944a3afec6e4db7194a0",
+  "rows": 35,
+  "rules": {
+   "R3000": 33
+  }
+ },
+ "log_10_.csv": {
+  "flagged": 389,
+  "md5": "436b6d03d628b915f92cf7f3f4f80120",
+  "rows": 7467,
+  "rules": {
+   "R3000": 286,
+   "R3001": 103
+  }
+ },
+ "log_11_.csv": {
+  "flagged": 5908,
+  "md5": "2784103cc4e42ce1fc6fae791217f92e",
+  "rows": 13881,
+  "rules": {
+   "R2001": 5906,
+   "R3000": 2
+  }
+ },
+ "log_12_.csv": {
+  "flagged": 5908,
+  "md5": "2784103cc4e42ce1fc6fae791217f92e",
+  "rows": 13881,
+  "rules": {
+   "R2001": 5906,
+   "R3000": 2
+  }
+ },
+ "log_13_.csv": {
+  "flagged": 11324,
+  "md5": "30783b98503148a14fd697a51648c69c",
+  "rows": 65534,
+  "rules": {
+   "R2001": 11314,
+   "R3000": 10
+  }
+ },
+ "log_14_.csv": {
+  "flagged": 0,
+  "md5": "8c5fad5d12945c662cdb3b916f7bff17",
+  "rows": 172,
+  "rules": {}
+ },
+ "log_15_.csv": {
+  "flagged": 25,
+  "md5": "98ae76e13e59329a8407733fb9230f4e",
+  "rows": 59853,
+  "rules": {
+   "R3000": 25
+  }
+ },
+ "log_16_.csv": {
+  "flagged": 0,
+  "md5": "e2a19e275c75ce515f4a161eeaa64f92",
+  "rows": 146,
+  "rules": {}
+ },
+ "log_17_.csv": {
+  "flagged": 0,
+  "md5": "6abff7fff47cf45e7d25fccc1e18dace",
+  "rows": 125,
+  "rules": {}
+ },
+ "log_18_.csv": {
+  "flagged": 0,
+  "md5": "6abff7fff47cf45e7d25fccc1e18dace",
+  "rows": 125,
+  "rules": {}
+ },
+ "log_19_.csv": {
+  "flagged": 0,
+  "md5": "726910efaf7e5215329df819d8ea8108",
+  "rows": 65534,
+  "rules": {}
+ },
+ "log_1_.csv": {
+  "flagged": 32,
+  "md5": "7cfba2aa8481f396032e4d7319f39bb8",
+  "rows": 34,
+  "rules": {
+   "R3000": 32
+  }
+ },
+ "log_20_.csv": {
+  "flagged": 0,
+  "md5": "0792c81371a7dd89def1ddefe482b4c0",
+  "rows": 78,
+  "rules": {}
+ },
+ "log_21_.csv": {
+  "flagged": 0,
+  "md5": "08bc54fa1263edf46baefde8a5135c02",
+  "rows": 60577,
+  "rules": {}
+ },
+ "log_22_.csv": {
+  "flagged": 14838,
+  "md5": "e12f53cfdfeabcee0e68f6bbd17d31aa",
+  "rows": 20530,
+  "rules": {
+   "R3000": 14514,
+   "R3004": 324
+  }
+ },
+ "log_23_.csv": {
+  "flagged": 14838,
+  "md5": "c82c5160d0090404f2bf6468744944d9",
+  "rows": 20531,
+  "rules": {
+   "R3000": 14514,
+   "R3004": 324
+  }
+ },
+ "log_24_.csv": {
+  "flagged": 14838,
+  "md5": "c82c5160d0090404f2bf6468744944d9",
+  "rows": 20531,
+  "rules": {
+   "R3000": 14514,
+   "R3004": 324
+  }
+ },
+ "log_25_.csv": {
+  "flagged": 1075,
+  "md5": "e1af82c59a4860617421aaad052f01c3",
+  "rows": 1941,
+  "rules": {
+   "R3000": 976,
+   "R3001": 1,
+   "R3004": 100
+  }
+ },
+ "log_26_.csv": {
+  "flagged": 1075,
+  "md5": "e1af82c59a4860617421aaad052f01c3",
+  "rows": 1941,
+  "rules": {
+   "R3000": 976,
+   "R3001": 1,
+   "R3004": 100
+  }
+ },
+ "log_27_.csv": {
+  "flagged": 180,
+  "md5": "9fce9f35e55bd14bb300d728f3c10659",
+  "rows": 1178,
+  "rules": {
+   "R3000": 112,
+   "R3001": 1,
+   "R3004": 68
+  }
+ },
+ "log_28_.csv": {
+  "flagged": 22,
+  "md5": "1749303b6de6a7cba00d299b1f95d96d",
+  "rows": 22,
+  "rules": {
+   "R3000": 22
+  }
+ },
+ "log_29_.csv": {
+  "flagged": 78,
+  "md5": "9c88ac73269f438fe5a46894f55ae00c",
+  "rows": 102,
+  "rules": {
+   "R3000": 78
+  }
+ },
+ "log_2_.csv": {
+  "flagged": 61,
+  "md5": "ab2f73884eed5b04144891d013759a9b",
+  "rows": 63,
+  "rules": {
+   "R3000": 61
+  }
+ },
+ "log_30_.csv": [
+  {
+   "flagged": 78,
+   "md5": "9c88ac73269f438fe5a46894f55ae00c",
+   "rows": 102,
+   "rules": {
+    "R3000": 78
+   }
+  },
+  {
+   "flagged": 78,
+   "md5": "f7046aec183b27bc41fe7a4662f9cdc3",
+   "rows": 102,
+   "rules": {
+    "R3000": 78
+   }
+  }
+ ],
+ "log_3_.csv": {
+  "flagged": 61,
+  "md5": "ab2f73884eed5b04144891d013759a9b",
+  "rows": 63,
+  "rules": {
+   "R3000": 61
+  }
+ },
+ "log_4_.csv": {
+  "flagged": 61,
+  "md5": "ab2f73884eed5b04144891d013759a9b",
+  "rows": 63,
+  "rules": {
+   "R3000": 61
+  }
+ },
+ "log_5_.csv": {
+  "flagged": 46,
+  "md5": "2313e67d66d27e477192f55f3067a5f4",
+  "rows": 48,
+  "rules": {
+   "R3000": 46
+  }
+ },
+ "log_6_.csv": {
+  "flagged": 46,
+  "md5": "e325db0439e505b901c2ec69da9a3f05",
+  "rows": 48,
+  "rules": {
+   "R3000": 46
+  }
+ },
+ "log_7_.csv": {
+  "flagged": 0,
+  "md5": "188f85ec9644e24b3b031fc1acd65af1",
+  "rows": 5,
+  "rules": {}
+ },
+ "log_8_-01.txt": {
+  "flagged": 0,
+  "md5": "b0f5fa30be6ce5d3ea1f429bb09581cd",
+  "rows": 37555,
+  "rules": {}
+ },
+ "log_8_.csv": {
+  "flagged": 14434,
+  "md5": "e32746223b9eabd4767f99be7aea4927",
+  "rows": 18776,
+  "rules": {
+   "R3000": 14434
+  }
+ },
+ "log_9_.csv": {
+  "flagged": 48,
+  "md5": "7c47a4a677e7d74683564e6478a0a7de",
+  "rows": 97,
+  "rules": {
+   "R2001": 48
+  }
+ },
+ "nightfall-auth.log": {
+  "flagged": 19,
+  "md5": "8f27bc39aa9b21498601f0595a262ad8",
+  "rows": 19,
+  "rules": {
+   "R1000": 8,
+   "R1001": 3,
+   "R1002": 3,
+   "R1003": 4,
+   "R1004": 1,
+   "R2000": 8
+  }
+ },
+ "nightfall-firewall.csv": {
+  "flagged": 21,
+  "md5": "8c49ca0e4dedf2374fe6fbfa01a770d2",
+  "rows": 26,
+  "rules": {
+   "R2001": 15,
+   "R2002": 15,
+   "R3000": 6,
+   "R3001": 2,
+   "R3002": 1
+  }
+ },
+ "rhttpproxy.log": {
+  "flagged": 0,
+  "md5": "c74a6720f91ef649dfb76ad0310c9b82",
+  "rows": 4860,
+  "rules": {}
+ },
+ "sdrsinjector.log": {
+  "flagged": 0,
+  "md5": "543ab1e5364d966fbc96d798591d75f7",
+  "rows": 6484,
+  "rules": {}
+ },
+ "shell.log": {
+  "flagged": 0,
+  "md5": "f8785a8225859703fb3239af8de20d36",
+  "rows": 185,
+  "rules": {}
+ },
+ "src10-8-2-37.csv": {
+  "flagged": 6748,
+  "md5": "af57501854c1ceb0ad72723adb8f71a9",
+  "rows": 8702,
+  "rules": {
+   "R2001": 9,
+   "R3000": 6739,
+   "R3001": 2
+  }
+ },
+ "src10-8-3-215.csv": {
+  "flagged": 18888,
+  "md5": "386d3134becb5c4923bc8a4b576459fe",
+  "rows": 25579,
+  "rules": {
+   "R2001": 6607,
+   "R2007": 1167,
+   "R3000": 12281,
+   "R3001": 8
+  }
+ },
+ "storagerm.log": {
+  "flagged": 0,
+  "md5": "cd8d8018cdd157490588f9cebce3492f",
+  "rows": 170,
+  "rules": {}
+ },
+ "sysboot.log": {
+  "flagged": 0,
+  "md5": "7aa6e194676cc3dc5475e9a115d7291c",
+  "rows": 109,
+  "rules": {}
+ },
+ "syslog.log": {
+  "flagged": 0,
+  "md5": "27fca3ffb04fa1a1bb71c14d58854705",
+  "rows": 9580,
+  "rules": {}
+ },
+ "usb.log": {
+  "flagged": 0,
+  "md5": "4087ab91d0745c647b39d86c70470624",
+  "rows": 2764,
+  "rules": {}
+ },
+ "vmauthd.log": {
+  "flagged": 0,
+  "md5": "c88bbf27e75500395705f2948344bb8c",
+  "rows": 5193,
+  "rules": {}
+ },
+ "vmkdevmgr.log": {
+  "flagged": 0,
+  "md5": "61fa2b6c12c10448d177cf9bd89c33af",
+  "rows": 8888,
+  "rules": {}
+ },
+ "vmkernel.log": {
+  "flagged": 0,
+  "md5": "74725d0b5badbe08dee33954a8b2a22a",
+  "rows": 2804,
+  "rules": {}
+ },
+ "vmkeventd.log": {
+  "flagged": 0,
+  "md5": "813d0a8a22b31b1b95eb90d98e8c0af2",
+  "rows": 2322,
+  "rules": {}
+ },
+ "vmksummary.log": {
+  "flagged": 0,
+  "md5": "53bde67cc145b9dfae273358b38b5495",
+  "rows": 834,
+  "rules": {}
+ },
+ "vmkwarning.log": {
+  "flagged": 0,
+  "md5": "34f1cde19cc81c514c413778e390e401",
+  "rows": 3478,
+  "rules": {}
+ },
+ "vobd.log": {
+  "flagged": 0,
+  "md5": "99c45f00175fe12b189b046fa0481349",
+  "rows": 666,
+  "rules": {}
+ },
+ "vpxa.log": {
+  "flagged": 0,
+  "md5": "1d4ef42bc7c0854f426f67f4cb927e40",
+  "rows": 14639,
+  "rules": {}
+ }
+}

@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+
+# Build output. The UI source is frontend/; static/ is what Vite emits into
+# (and what the Dockerfile rebuilds in its own stage), so it is generated,
+# never edited by hand.
+static/
+frontend/node_modules/
+
+# A 2.7GB checkout of an unrelated repo, cloned into the working directory.
+metabase/

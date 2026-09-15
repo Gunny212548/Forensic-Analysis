@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<title>Forensic Analyzer</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-strong: #0ea5e9;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 4px; font-size: 14px; }
+  .layout { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; padding: 28px 20px 80px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 16px; color: var(--text); }
+  form { display: flex; flex-direction: column; gap: 14px; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+  .dropzone {
+    border: 2px dashed var(--panel-border);
+    border-radius: 10px;
+    padding: 28px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .dropzone.drag { border-color: var(--accent); background: rgba(56,189,248,.08); }
+  .dropzone input { display: none; }
+  .dropzone .filename { color: var(--accent); font-weight: 600; margin-top: 6px; }
+  .dropzone .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  textarea, input[type=text], select {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 14px;
+  }
+  textarea { resize: vertical; min-height: 50px; }
+  select { align-self: flex-start; }
+  .filter-bar select { width: auto; padding: 7px 10px; font-size: 13px; }
+  button {
+    background: var(--accent-strong);
+    color: #04121f;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    align-self: flex-start;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+  }
+  .status-line { font-size: 13px; margin-top: 4px; min-height: 18px; }
+  .status-line.ok { color: var(--ok); }
+  .status-line.err { color: var(--danger); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--panel-border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.count-0 { background: rgba(148,163,184,.15); color: var(--muted); }
+  .badge.count-n { background: rgba(74,222,128,.15); color: var(--ok); }
+  .badge.count-fail { background: rgba(248,113,113,.18); color: var(--danger); }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
+  .top-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  code { background: #0f172a; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* Top-level page nav - three routes: Dashboard / Upload / Result.
+     Result has no static nav link, reached from a case row or an upload. */
+  .topnav {
+    position: sticky; top: 0; z-index: 10; display: flex; align-items: center;
+    gap: 24px; padding: 14px 20px; background: rgba(15,23,42,.92);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--panel-border);
+  }
+  .topnav-brand { font-weight: 700; font-size: 15px; }
+  .topnav-links { display: flex; gap: 4px; }
+  .topnav-links a {
+    color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600;
+    padding: 7px 12px; border-radius: 8px;
+  }
+  .topnav-links a:hover { color: var(--text); background: rgba(148,163,184,.08); }
+  .topnav-links a.active { color: var(--accent); background: rgba(56,189,248,.12); }
+  .page[hidden] { display: none; }
+  .back-link { color: var(--muted); text-decoration: none; font-size: 12px; display: inline-block; margin-bottom: 8px; }
+  .back-link:hover { color: var(--accent); }
+  .btn-link {
+    display: inline-block; text-decoration: none; background: var(--accent-strong);
+    color: #04121f; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 12px;
+  }
+  .btn-link.disabled { background: var(--panel-border); color: var(--muted); pointer-events: none; }
+
+  /* Case-list severity at a glance - so a critical case is visible without
+     opening it. Bucketed from the rule engine's 0-15 lvl (see db.severity_summary). */
+  .sev-pill {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+    border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .sev-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .sev-pill.sev-critical { background: rgba(248,113,113,.15); color: var(--danger); }
+  .sev-pill.sev-high { background: rgba(251,146,60,.15); color: #fb923c; }
+  .sev-pill.sev-medium { background: rgba(251,191,36,.15); color: var(--warn); }
+  .sev-pill.sev-low { background: rgba(148,163,184,.15); color: var(--muted); }
+  .sev-pill.sev-none { background: rgba(74,222,128,.12); color: var(--ok); }
+  tr.sev-row-critical td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+  tr.sev-row-high td:first-child { box-shadow: inset 3px 0 0 #fb923c; }
+
+  .ai-summary, .ws-overview-summary { line-height: 1.6; margin-bottom: 20px; color: var(--text); }
+  .section-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 10px; }
+  .mitre-tag {
+    display: inline-block; background: rgba(56,189,248,.15); color: var(--accent);
+    font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; margin: 0 3px 3px 0;
+  }
+
+  .chain-flow-wrap { overflow-x: auto; padding: 6px 0 22px; margin-bottom: 6px; }
+  .chain-flow { display: flex; align-items: stretch; gap: 0; width: max-content; }
+  .chain-node {
+    position: relative; background: #0f172a; border: 2px solid var(--accent);
+    border-radius: 10px; padding: 12px 16px; min-width: 150px; max-width: 200px; flex-shrink: 0;
+  }
+  .chain-node .badge-endpoint {
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .chain-node.start { border-color: var(--ok); }
+  .chain-node.start .badge-endpoint { background: var(--ok); color: #04120a; }
+  .chain-node.end { border-color: var(--danger); }
+  .chain-node.end .badge-endpoint { background: var(--danger); color: #2a0a0a; }
+  .chain-node .n-stage { font-weight: 700; font-size: 12.5px; color: var(--accent); text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
+  .chain-node .n-ts { font-size: 10.5px; color: var(--muted); margin-top: 6px; }
+  .chain-node .n-conf { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .chain-connector { display: flex; align-items: center; flex-shrink: 0; padding: 0 6px; color: var(--muted); font-size: 22px; align-self: center; }
+
+  .chain-stage { border-left: 3px solid var(--accent); background: #0f172a; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 10px; }
+  .chain-stage .stage-name { font-weight: 700; color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  .chain-stage .stage-conf { float: right; font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
+  .chain-stage .stage-desc { margin: 6px 0; font-size: 13px; }
+  .chain-stage .stage-meta { font-size: 11px; color: var(--muted); }
+
+  .timeline-item { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--panel-border); font-size: 13px; }
+  .timeline-item .ts { color: var(--muted); white-space: nowrap; min-width: 170px; }
+  .sev-critical { color: #f87171; font-weight: 700; }
+  .sev-high { color: #fb923c; font-weight: 700; }
+  .sev-medium { color: #fbbf24; }
+  .sev-low { color: var(--muted); }
+  .rec-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+  .meta-line { font-size: 11px; color: var(--muted); margin-top: 16px; }
+
+  /* Review. An Unreviewed finding must never read as trustworthy just
+     because its confidence is high (NFR-9), so status - not confidence -
+     carries the strongest visual weight: the left stripe and the badge. */
+  .rv-gate { padding: 10px 12px; border-radius: 6px; margin-bottom: 14px;
+    font-size: 13px; display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: space-between; align-items: center; }
+  .rv-gate.blocked { background: rgba(251,191,36,0.10); border-left: 3px solid var(--warn); }
+  .rv-gate.ok { background: rgba(74,222,128,0.10); border-left: 3px solid var(--ok); }
+  .rv-counts { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rv-item { border-left: 3px solid var(--panel-border); padding: 10px 12px;
+    margin-bottom: 8px; background: rgba(255,255,255,0.02); }
+  .rv-item.rv-unreviewed { border-left-color: var(--warn); }
+  .rv-item.rv-accepted { border-left-color: var(--ok); opacity: .75; }
+  .rv-item.rv-modified { border-left-color: var(--accent); opacity: .85; }
+  .rv-item.rv-rejected { border-left-color: var(--danger); opacity: .55; }
+  .rv-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    font-size: 11px; margin-bottom: 6px; }
+  .rv-status { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .rv-unreviewed .rv-status { color: var(--warn); }
+  .rv-accepted .rv-status { color: var(--ok); }
+  .rv-modified .rv-status { color: var(--accent); }
+  .rv-rejected .rv-status { color: var(--danger); }
+  .rv-conf { color: var(--muted); }
+  .rv-conf-high { color: var(--text); }
+  .rv-flag { border: 1px solid var(--panel-border); border-radius: 3px;
+    padding: 0 5px; color: var(--muted); font-size: 10px; }
+  .rv-rid { font-family: ui-monospace, monospace; color: var(--muted); }
+  .rv-n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rv-desc { font-size: 13px; line-height: 1.5; }
+  .rv-meta, .rv-who { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .rv-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .rv-btn { font-size: 11px; padding: 3px 10px; border-radius: 4px; cursor: pointer;
+    background: transparent; color: var(--text); border: 1px solid var(--panel-border); }
+  .rv-btn:hover { border-color: var(--accent); }
+  .rv-accept:hover { border-color: var(--ok); color: var(--ok); }
+  .rv-reject:hover { border-color: var(--danger); color: var(--danger); }
+  .rv-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .risk-wrap { display: flex; flex-wrap: wrap; gap: 18px; }
+  .risk-block { flex: 1 1 320px; min-width: 0; overflow-x: auto; }
+  .risk-role { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin-bottom: 6px; }
+  .risk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .risk-table th { text-align: left; font-weight: 500; color: var(--muted);
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+    padding: 2px 8px 4px 0; border-bottom: 1px solid var(--panel-border); }
+  .risk-table td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--panel-border);
+    vertical-align: top; }
+  .risk-entity { font-family: ui-monospace, monospace; color: var(--text); }
+  .risk-score { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+  .risk-n { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .meta-warn { font-size: 12px; margin-top: 16px; padding: 8px 10px;
+    border-left: 3px solid var(--warn); background: rgba(251,191,36,0.10);
+    color: var(--text); }
+
+  .graph-wrap { overflow-x: auto; background: #0f172a; border: 1px solid var(--panel-border); border-radius: 10px; padding: 10px; }
+  .graph-wrap svg { display: block; }
+
+  /* Result-page workspace: sidebar tabs + content pane, instead of one long scroll */
+  .ws { display: flex; gap: 20px; align-items: flex-start; }
+  .ws-nav { display: flex; flex-direction: column; gap: 2px; flex: 0 0 196px; position: sticky; top: 72px; }
+  .ws-nav button {
+    all: unset; box-sizing: border-box; cursor: pointer; padding: 9px 12px; border-radius: 8px;
+    font-size: 13px; color: var(--muted); display: flex; justify-content: space-between;
+    align-items: center; gap: 8px; width: 100%;
+  }
+  .ws-nav button:hover { background: rgba(148,163,184,.08); color: var(--text); }
+  .ws-nav button.active { background: rgba(56,189,248,.12); color: var(--accent); font-weight: 600; }
+  .ws-count {
+    font-size: 10.5px; background: rgba(148,163,184,.15); color: var(--muted);
+    padding: 1px 6px; border-radius: 999px; flex-shrink: 0;
+  }
+  .ws-nav button.active .ws-count { background: rgba(56,189,248,.2); color: var(--accent); }
+  .ws-content { flex: 1 1 auto; min-width: 0; }
+  .ws-overview-mini .chain-flow-wrap { padding-bottom: 8px; }
+  .ws-overview-mini .chain-node { min-width: 130px; padding: 9px 12px; }
+
+  @media (max-width: 760px) {
+    .ws { flex-direction: column; }
+    .ws-nav {
+      flex-direction: row; flex-wrap: nowrap; position: static; flex: none;
+      width: 100%; overflow-x: auto; padding-bottom: 4px;
+    }
+    .ws-nav button { width: auto; white-space: nowrap; }
+    .topnav { flex-wrap: wrap; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="topnav-brand">Forensic Analyzer</div>
+    <div class="topnav-links">
+      <a href="#/dashboard" data-page="dashboard">Dashboard</a>
+      <a href="#/upload" data-page="upload">Upload</a>
+    </div>
+  </nav>
+
+  <div class="layout">
+
+    <!-- ================= DASHBOARD PAGE ================= -->
+    <section id="page-dashboard" class="page">
+      <div class="top-bar">
+        <div>
+          <h1>Dashboard</h1>
+          <div class="subtitle">ภาพรวมทุกเคสที่อัปโหลด พร้อมระดับความเสี่ยงแบบเห็นได้ทันที</div>
+        </div>
+        <div class="filter-bar" style="display:flex; gap:8px; align-items:center;">
+          <select id="company-filter"><option value="">ทุกบริษัท</option></select>
+          <button class="secondary" id="refresh-btn">รีเฟรช</button>
+        </div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>เวลาอัปโหลด</th>
+              <th>ไฟล์</th>
+              <th>บริษัท</th>
+              <th>ชนิด</th>
+              <th>ขนาด</th>
+              <th>สถานะ</th>
+              <th>ความเสี่ยง</th>
+              <th>Findings / แถวทั้งหมด</th>
+              <th>หมายเหตุ</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="cases-body">
+            <tr><td colspan="10" class="empty">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= UPLOAD PAGE ================= -->
+    <section id="page-upload" class="page" hidden>
+      <div class="top-bar">
+        <div>
+          <h1>Upload</h1>
+          <div class="subtitle">อัปโหลด log (syslog/CSV/JSON ใดก็ได้) แล้วติดตามสถานะการประมวลผลได้ที่นี่</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>อัปโหลดไฟล์ log</h2>
+        <form id="upload-form">
+          <div class="dropzone" id="dropzone">
+            <div>ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์</div>
+            <div class="hint">รองรับ .log / .txt (syslog, auth.log ฯลฯ), .csv (firewall export), .json — ตรวจชนิดไฟล์อัตโนมัติจากนามสกุล</div>
+            <div class="filename" id="filename"></div>
+            <input type="file" id="file-input" name="file" />
+          </div>
+          <div>
+            <label for="company-select">บริษัท/ลูกค้า (ไม่บังคับ)</label>
+            <select id="company-select">
+              <option value="">— ไม่ระบุบริษัท —</option>
+              <option value="__new__">+ เพิ่มบริษัทใหม่...</option>
+            </select>
+            <input type="text" id="company-new-name" placeholder="ชื่อบริษัทใหม่" style="margin-top:8px; display:none;" />
+          </div>
+          <div>
+            <label for="note">หมายเหตุ (ไม่บังคับ)</label>
+            <textarea id="note" name="note" placeholder="เช่น ที่มาของ log, เคสที่เกี่ยวข้อง"></textarea>
+          </div>
+          <button type="submit" id="submit-btn">อัปโหลด</button>
+          <div class="status-line" id="upload-status"></div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="top-bar">
+          <h2>สถานะการอัปโหลดล่าสุด</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>เวลาอัปโหลด</th>
+              <th>ไฟล์</th>
+              <th>บริษัท</th>
+              <th>สถานะ</th>
+              <th>ความเสี่ยง</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="upload-status-body">
+            <tr><td colspan="6" class="empty">ยังไม่มีการอัปโหลดจากหน้านี้ในเบราว์เซอร์นี้</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= RESULT PAGE ================= -->
+    <section id="page-result" class="page" hidden>
+      <div class="top-bar">
+        <div>
+          <a href="#/dashboard" class="back-link">&larr; กลับไป Dashboard</a>
+          <h1 id="result-title">Result</h1>
+          <div class="subtitle" id="result-subtitle"></div>
+        </div>
+        <button class="secondary" id="reanalyze-btn" hidden>วิเคราะห์ใหม่</button>
+      </div>
+      <div class="panel">
+        <div id="result-body"><div class="empty">กำลังโหลด...</div></div>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+/* ---------- shared helpers ---------- */
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'medium' });
+}
+
+const STATUS_MAP = {
+  queued:     ['รอประมวลผล', 'count-0'],
+  processing: ['กำลังประมวลผล...', 'count-0'],
+  ready:      ['พร้อม', 'count-n'],
+  failed:     ['ล้มเหลว', 'count-fail'],
+};
+
+const SEV_LABEL = { critical: 'วิกฤต', high: 'สูง', medium: 'ปานกลาง', low: 'ต่ำ', none: 'ไม่พบ' };
+const SEV_CLASS = { critical: 'sev-critical', high: 'sev-high', medium: 'sev-medium', low: 'sev-low' };
+
+function severityPill(sev) {
+  if (!sev) return '<span class="sev-pill sev-low">—</span>';
+  const bucket = sev.critical > 0 ? 'critical'
+    : sev.high > 0 ? 'high'
+    : sev.medium > 0 ? 'medium'
+    : sev.low > 0 ? 'low'
+    : 'none';
+  const title = `critical ${sev.critical || 0} · high ${sev.high || 0} · medium ${sev.medium || 0} · low ${sev.low || 0}`;
+  return `<span class="sev-pill sev-${bucket}" title="${escapeHtml(title)}">${SEV_LABEL[bucket]}</span>`;
+}
+
+function mitreTags(list) {
+  return (list || []).map(m => `<span class="mitre-tag">${escapeHtml(m)}</span>`).join('');
+}
+
+function shortTs(ts) {
+  if (!ts) return '';
+  return String(ts).replace('T', ' ').slice(0, 16);
+}
+
+/* ---------- router: 3 pages, hash-addressed ---------- */
+
+const PAGES = ['dashboard', 'upload', 'result'];
+let pollTimer = null;
+
+function parseHash() {
+  const h = location.hash.replace(/^#\/?/, '');
+  const [page, ...rest] = h.split('/');
+  return { page: PAGES.includes(page) ? page : 'dashboard', param: rest.join('/') };
+}
+
+function router() {
+  const { page, param } = parseHash();
+  document.querySelectorAll('.page').forEach(el => { el.hidden = el.id !== `page-${page}`; });
+  document.querySelectorAll('.topnav-links a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+
+  if (pollTimer) clearInterval(pollTimer);
+
+  if (page === 'dashboard') {
+    loadCases();
+    pollTimer = setInterval(loadCases, 15000);
+  } else if (page === 'upload') {
+    loadCompaniesIntoSelect();
+    renderUploadStatus();
+    pollTimer = setInterval(renderUploadStatus, 5000);
+  } else if (page === 'result') {
+    if (!param) { location.hash = '#/dashboard'; return; }
+    loadResult(param);
+  }
+}
+window.addEventListener('hashchange', router);
+if (!location.hash) location.hash = '#/dashboard';
+
+/* ================= DASHBOARD PAGE ================= */
+
+const casesBody = document.getElementById('cases-body');
+const companyFilter = document.getElementById('company-filter');
+let dashboardCases = [];
+
+async function loadCases() {
+  casesBody.innerHTML = '<tr><td colspan="10" class="empty">กำลังโหลด...</td></tr>';
+  try {
+    const resp = await fetch('/api/cases');
+    dashboardCases = await resp.json();
+    populateCompanyFilter(dashboardCases);
+    renderCasesTable();
+  } catch (err) {
+    casesBody.innerHTML = `<tr><td colspan="10" class="empty">โหลดไม่สำเร็จ: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+/* Filter options are built from the cases actually present, not the full
+   company registry - a company with no uploads yet doesn't clutter the list. */
+function populateCompanyFilter(list) {
+  const current = companyFilter.value;
+  const companies = new Map();
+  let hasNone = false;
+  for (const c of list) {
+    if (c.company_id) companies.set(c.company_id, c.company_name || c.company_id);
+    else hasNone = true;
+  }
+  const sorted = [...companies.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  let html = '<option value="">ทุกบริษัท</option>';
+  for (const [id, name] of sorted) html += `<option value="${id}">${escapeHtml(name)}</option>`;
+  if (hasNone) html += '<option value="__none__">ไม่ระบุบริษัท</option>';
+  companyFilter.innerHTML = html;
+  if ([...companyFilter.options].some(o => o.value === current)) companyFilter.value = current;
+}
+
+function renderCasesTable() {
+  const filter = companyFilter.value;
+  const list = dashboardCases.filter(c => {
+    if (!filter) return true;
+    if (filter === '__none__') return !c.company_id;
+    return c.company_id === filter;
+  });
+
+  if (!list.length) {
+    casesBody.innerHTML = `<tr><td colspan="10" class="empty">${dashboardCases.length ? 'ไม่มีเคสของบริษัทที่เลือก' : 'ยังไม่มีเคสที่อัปโหลด'}</td></tr>`;
+    return;
+  }
+  casesBody.innerHTML = '';
+  for (const c of list) {
+    const tr = document.createElement('tr');
+    const ready = c.status === 'ready';
+    const badgeCls = c.flagged_count > 0 ? 'count-n' : 'count-0';
+    const [statusLabel, statusCls] = STATUS_MAP[c.status] || [c.status, 'count-0'];
+    const countCell = ready
+      ? `<span class="badge ${badgeCls}">${c.flagged_count.toLocaleString()}</span> / ${(c.total_rows || 0).toLocaleString()}`
+      : '—';
+    if (ready && c.severity) {
+      if (c.severity.critical > 0) tr.classList.add('sev-row-critical');
+      else if (c.severity.high > 0) tr.classList.add('sev-row-high');
+    }
+    tr.innerHTML = `
+      <td>${fmtTime(c.uploaded_at)}</td>
+      <td>${escapeHtml(c.original_filename)}<br><code>${c.case_id}</code></td>
+      <td>${escapeHtml(c.company_name || '—')}</td>
+      <td>${c.file_kind}</td>
+      <td>${fmtBytes(c.size_bytes)}</td>
+      <td><span class="badge ${statusCls}" title="${escapeHtml(c.error || '')}">${statusLabel}</span></td>
+      <td>${ready ? severityPill(c.severity) : '—'}</td>
+      <td>${countCell}</td>
+      <td>${escapeHtml(c.note || '')}</td>
+      <td class="actions">
+        <a class="btn-link ${ready ? '' : 'disabled'}" href="${ready ? `#/result/${c.case_id}` : '#'}">ดูผลลัพธ์</a>
+      </td>
+    `;
+    casesBody.appendChild(tr);
+  }
+}
+
+document.getElementById('refresh-btn').addEventListener('click', loadCases);
+companyFilter.addEventListener('change', renderCasesTable);
+
+/* ================= UPLOAD PAGE ================= */
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const filenameEl = document.getElementById('filename');
+const form = document.getElementById('upload-form');
+const submitBtn = document.getElementById('submit-btn');
+const statusEl = document.getElementById('upload-status');
+const uploadStatusBody = document.getElementById('upload-status-body');
+const companySelect = document.getElementById('company-select');
+const companyNewName = document.getElementById('company-new-name');
+
+async function loadCompaniesIntoSelect() {
+  try {
+    const resp = await fetch('/api/companies');
+    const list = await resp.json();
+    const current = companySelect.value;
+    let html = '<option value="">— ไม่ระบุบริษัท —</option>';
+    for (const c of list) html += `<option value="${c.company_id}">${escapeHtml(c.name)}</option>`;
+    html += '<option value="__new__">+ เพิ่มบริษัทใหม่...</option>';
+    companySelect.innerHTML = html;
+    if ([...companySelect.options].some(o => o.value === current)) companySelect.value = current;
+  } catch {}
+}
+
+companySelect.addEventListener('change', () => {
+  companyNewName.style.display = companySelect.value === '__new__' ? 'block' : 'none';
+});
+
+const RECENT_KEY = 'fa_recent_uploads';
+
+function getRecentUploads() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function addRecentUpload(item) {
+  const list = getRecentUploads().filter(i => i.case_id !== item.case_id);
+  list.unshift(item);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 10))); } catch {}
+}
+
+dropzone.addEventListener('click', () => fileInput.click());
+['dragenter', 'dragover'].forEach(evt =>
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag'); })
+);
+['dragleave', 'drop'].forEach(evt =>
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag'); })
+);
+dropzone.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) {
+    fileInput.files = e.dataTransfer.files;
+    filenameEl.textContent = fileInput.files[0].name;
+  }
+});
+fileInput.addEventListener('change', () => {
+  filenameEl.textContent = fileInput.files.length ? fileInput.files[0].name : '';
+});
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!fileInput.files.length) {
+    setStatus('กรุณาเลือกไฟล์ก่อน', 'err');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('note', document.getElementById('note').value);
+  if (companySelect.value === '__new__') {
+    const name = companyNewName.value.trim();
+    if (name) fd.append('company_name', name);
+  } else if (companySelect.value) {
+    fd.append('company_id', companySelect.value);
+  }
+
+  submitBtn.disabled = true;
+  setStatus('กำลังอัปโหลดและประมวลผล...', '');
+  try {
+    const resp = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'อัปโหลดล้มเหลว');
+    setStatus(`สำเร็จ: ${data.case_id} (${data.file_kind})`, 'ok');
+    addRecentUpload({
+      case_id: data.case_id,
+      filename: fileInput.files[0].name,
+      uploaded_at: new Date().toISOString(),
+    });
+    form.reset();
+    filenameEl.textContent = '';
+    companyNewName.style.display = 'none';
+    loadCompaniesIntoSelect();
+    renderUploadStatus();
+  } catch (err) {
+    setStatus(err.message, 'err');
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+function setStatus(msg, cls) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status-line' + (cls ? ' ' + cls : '');
+}
+
+/* Polls the manifest of every upload made from this browser (tracked in
+   localStorage) so the analyst can watch queued -> processing -> ready
+   without leaving the Upload page. */
+async function renderUploadStatus() {
+  const recent = getRecentUploads();
+  if (!recent.length) {
+    uploadStatusBody.innerHTML = '<tr><td colspan="6" class="empty">ยังไม่มีการอัปโหลดจากหน้านี้ในเบราว์เซอร์นี้</td></tr>';
+    return;
+  }
+  const rows = await Promise.all(recent.map(async item => {
+    try {
+      const resp = await fetch(`/api/cases/${item.case_id}`);
+      if (!resp.ok) return { item, manifest: null };
+      return { item, manifest: await resp.json() };
+    } catch {
+      return { item, manifest: null };
+    }
+  }));
+
+  uploadStatusBody.innerHTML = '';
+  for (const { item, manifest } of rows) {
+    const tr = document.createElement('tr');
+    if (!manifest) {
+      tr.innerHTML = `
+        <td>${fmtTime(item.uploaded_at)}</td>
+        <td>${escapeHtml(item.filename)}<br><code>${item.case_id}</code></td>
+        <td colspan="4" class="empty">ไม่พบเคสนี้แล้ว</td>`;
+      uploadStatusBody.appendChild(tr);
+      continue;
+    }
+    const ready = manifest.status === 'ready';
+    const [statusLabel, statusCls] = STATUS_MAP[manifest.status] || [manifest.status, 'count-0'];
+    tr.innerHTML = `
+      <td>${fmtTime(manifest.uploaded_at)}</td>
+      <td>${escapeHtml(manifest.original_filename)}<br><code>${manifest.case_id}</code></td>
+      <td>${escapeHtml(manifest.company_name || '—')}</td>
+      <td><span class="badge ${statusCls}" title="${escapeHtml(manifest.error || '')}">${statusLabel}</span></td>
+      <td>${ready ? severityPill(manifest.severity) : '—'}</td>
+      <td><a class="btn-link ${ready ? '' : 'disabled'}" href="${ready ? `#/result/${manifest.case_id}` : '#'}">ดูผลลัพธ์</a></td>
+    `;
+    uploadStatusBody.appendChild(tr);
+  }
+}
+
+/* ================= RESULT PAGE ================= */
+
+const resultTitle = document.getElementById('result-title');
+const resultSubtitle = document.getElementById('result-subtitle');
+const resultBody = document.getElementById('result-body');
+const reanalyzeBtn = document.getElementById('reanalyze-btn');
+const EVENTS_PAGE_SIZE = 100;
+
+async function loadResult(caseId) {
+  reanalyzeBtn.hidden = true;
+  reanalyzeBtn.onclick = null;
+  resultTitle.textContent = caseId;
+  resultSubtitle.textContent = '';
+  resultBody.innerHTML = '<div class="empty">กำลังโหลด...</div>';
+  try {
+    const resp = await fetch(`/api/cases/${caseId}`);
+    if (!resp.ok) throw new Error('ไม่พบเคสนี้');
+    const manifest = await resp.json();
+
+    resultTitle.textContent = manifest.original_filename;
+    const [statusLabel] = STATUS_MAP[manifest.status] || [manifest.status];
+    resultSubtitle.innerHTML =
+      `<code>${manifest.case_id}</code> · อัปโหลดเมื่อ ${fmtTime(manifest.uploaded_at)} · สถานะ: ${escapeHtml(statusLabel)}` +
+      (manifest.company_name ? ` · บริษัท: ${escapeHtml(manifest.company_name)}` : '') +
+      (manifest.note ? ` · ${escapeHtml(manifest.note)}` : '');
+
+    if (manifest.status !== 'ready') {
+      resultBody.innerHTML = manifest.status === 'failed'
+        ? `<div class="empty">เคสนี้ประมวลผลล้มเหลว: ${escapeHtml(manifest.error || 'ไม่ทราบสาเหตุ')}</div>`
+        : '<div class="empty">เคสนี้ยังไม่พร้อม รอการประมวลผลให้เสร็จก่อน</div>';
+      return;
+    }
+
+    let analysisData = null;
+    const aResp = await fetch(`/api/cases/${caseId}/analysis`);
+    if (aResp.ok) analysisData = await aResp.json();
+
+    renderResultWorkspace(caseId, manifest, analysisData);
+  } catch (err) {
+    resultBody.innerHTML = `<div class="empty">โหลดไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderResultWorkspace(caseId, manifest, data) {
+  const tabs = buildResultTabs(caseId, manifest, data);
+  renderWorkspace(resultBody, tabs, tabs[0].key);
+
+  loadResultEvents(caseId, 0);
+  loadResultReview(caseId);
+
+  const runBtn = resultBody.querySelector('#run-analysis-btn');
+  if (runBtn) runBtn.addEventListener('click', () => runResultAnalysis(caseId, manifest));
+
+  reanalyzeBtn.hidden = false;
+  reanalyzeBtn.onclick = () => runResultAnalysis(caseId, manifest, true);
+}
+
+function buildResultTabs(caseId, manifest, data) {
+  const tabs = [];
+
+  let overviewHtml = `<div class="meta-line" style="margin-top:0">
+    ${severityPill(manifest.severity)} ·
+    findings ${(manifest.flagged_count || 0).toLocaleString()} / ${(manifest.total_rows || 0).toLocaleString()} rows
+  </div>`;
+  if (data) {
+    overviewHtml += `<div class="ws-overview-summary" style="margin-top:14px">${escapeHtml(data.summary || '')}</div>`;
+    if (data.attack_chain && data.attack_chain.length) {
+      overviewHtml += `<div class="ws-overview-mini">${buildChainFlow(data.attack_chain)}</div>`;
+    }
+    overviewHtml += metaHtml(data._meta);
+  } else {
+    overviewHtml += `
+      <div class="empty" style="padding-top:14px">ยังไม่ได้วิเคราะห์เคสนี้ด้วย AI</div>
+      <button class="secondary" id="run-analysis-btn">วิเคราะห์ด้วย AI</button>`;
+  }
+  tabs.push({ key: 'overview', label: 'Overview', html: overviewHtml });
+
+  tabs.push({
+    key: 'events', label: 'Events', count: manifest.flagged_count,
+    html: '<div id="result-events-body"><div class="empty">กำลังโหลด...</div></div>',
+  });
+
+  tabs.push({
+    key: 'review', label: 'Review',
+    html: '<div id="result-review-body"><div class="empty">กำลังโหลด...</div></div>',
+  });
+
+  if (data) {
+    let chainHtml = '';
+    if (data.attack_chain && data.attack_chain.length) {
+      for (const stage of data.attack_chain) {
+        chainHtml += `
+          <div class="chain-stage">
+            <span class="stage-conf">confidence: ${escapeHtml(stage.confidence || '-')}</span>
+            <div class="stage-name">${escapeHtml(stage.stage || '')}</div>
+            <div class="stage-desc">${escapeHtml(stage.description || '')} ${mitreTags(stage.mitre)}</div>
+            <div class="stage-meta">${escapeHtml(stage.timestamp_range || '')}</div>
+          </div>`;
+      }
+    } else {
+      chainHtml = '<div class="empty">ไม่พบรูปแบบการโจมตีหลายขั้นตอนที่ชัดเจน</div>';
+    }
+    tabs.push({ key: 'chain', label: 'Attack Chain', count: (data.attack_chain || []).length, html: chainHtml });
+
+    const graphCount = (data.graph && data.graph.edges && data.graph.edges.length) || 0;
+    if (graphCount) tabs.push({ key: 'graph', label: 'Attack Graph', count: graphCount, html: renderGraph(data.graph) });
+
+    const riskCount = ((data.risk && data.risk.sources) || []).length
+      + ((data.risk && data.risk.destinations) || []).length
+      + ((data.risk && data.risk.accounts) || []).length;
+    if (riskCount) tabs.push({ key: 'risk', label: 'Risk Ranking', count: riskCount, html: renderRisk(data.risk) });
+
+    if (data.timeline && data.timeline.length) {
+      let timelineHtml = '';
+      for (const item of data.timeline) {
+        const sevCls = SEV_CLASS[(item.severity || '').toLowerCase()] || '';
+        timelineHtml += `
+          <div class="timeline-item">
+            <div class="ts">${escapeHtml(item.timestamp || '')}</div>
+            <div>
+              <span class="${sevCls}">[${escapeHtml(item.severity || '?')}]</span>
+              ${escapeHtml(item.event || '')}
+              ${item.source_ip ? ` — <code>${escapeHtml(item.source_ip)}</code>` : ''}
+              ${item.target ? ` → ${escapeHtml(item.target)}` : ''}
+              ${mitreTags(item.mitre)}
+            </div>
+          </div>`;
+      }
+      tabs.push({ key: 'timeline', label: 'Timeline', count: data.timeline.length, html: timelineHtml });
+    }
+
+    if (data.recommendations && data.recommendations.length) {
+      let recHtml = '<ul class="rec-list">';
+      for (const r of data.recommendations) recHtml += `<li>${escapeHtml(r)}</li>`;
+      recHtml += '</ul>';
+      tabs.push({ key: 'recs', label: 'Recommendations', count: data.recommendations.length, html: recHtml });
+    }
+  }
+
+  return tabs;
+}
+
+async function runResultAnalysis(caseId, manifest, force) {
+  const overviewSection = resultBody.querySelector('[data-section="overview"]');
+  if (overviewSection) overviewSection.innerHTML = '<div class="empty">กำลังวิเคราะห์ด้วย AI... (อาจใช้เวลาถึง 1 นาที)</div>';
+  switchWorkspaceTab(resultBody, 'overview');
+  try {
+    const resp = await fetch(`/api/cases/${caseId}/analyze${force ? '?force=true' : ''}`, { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'วิเคราะห์ไม่สำเร็จ');
+    renderResultWorkspace(caseId, manifest, data);
+  } catch (err) {
+    if (overviewSection) overviewSection.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+const REVIEW_CLASS = {
+  Unreviewed: 'rv-unreviewed', Accepted: 'rv-accepted',
+  Modified: 'rv-modified', Rejected: 'rv-rejected',
+};
+let reviewReasonCodes = {};
+
+function analystName() {
+  let name = localStorage.getItem('analyst-name') || '';
+  if (!name) {
+    name = (prompt('ชื่อผู้ตรวจสอบ (บันทึกลง audit log)') || '').trim();
+    if (name) localStorage.setItem('analyst-name', name);
+  }
+  return name;
+}
+
+async function loadResultReview(caseId) {
+  const box = document.getElementById('result-review-body');
+  if (!box) return;
+  try {
+    const resp = await fetch(`/api/cases/${caseId}/findings`);
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'โหลด findings ไม่สำเร็จ');
+    reviewReasonCodes = data.reason_codes || {};
+    renderReview(caseId, data);
+  } catch (err) {
+    box.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderReview(caseId, data) {
+  const box = document.getElementById('result-review-body');
+  if (!box) return;
+  const s = data.review_summary || {};
+  const unreviewed = s.Unreviewed || 0;
+
+  /* The gate is stated up front, not discovered at export time: under a
+     deadline an analyst needs to know what is still blocking them. */
+  let html = `
+    <div class="rv-gate ${data.ready_for_report ? 'ok' : 'blocked'}">
+      ${data.ready_for_report
+        ? 'ตรวจสอบครบทุก finding แล้ว — พร้อมออกรายงานฉบับสมบูรณ์'
+        : `ยังเหลือ ${unreviewed} finding ที่ยังไม่ได้ตรวจสอบ — ยังออกรายงานฉบับสมบูรณ์ไม่ได้`}
+      <span class="rv-counts">
+        Accepted ${s.Accepted || 0} · Modified ${s.Modified || 0} ·
+        Rejected ${s.Rejected || 0} · Unreviewed ${unreviewed}
+      </span>
+    </div>`;
+
+  /* Unreviewed first, whatever its confidence. A high-confidence finding
+     nobody has looked at must never sit above a reviewed one. */
+  const order = { Unreviewed: 0, Modified: 1, Accepted: 2, Rejected: 3 };
+  const findings = (data.findings || []).slice().sort((a, b) => {
+    const d = order[a.review.status] - order[b.review.status];
+    return d !== 0 ? d : (b.lvl - a.lvl) || (b.cnt - a.cnt);
+  });
+
+  for (const f of findings) {
+    const st = f.review.status;
+    const flags = (f.flags || []).map(x => `<span class="rv-flag">${escapeHtml(x)}</span>`).join('');
+    const who = f.review.actor
+      ? `<span class="rv-who">${escapeHtml(f.review.actor)} · ${escapeHtml(shortTs(f.review.ts))}${f.review.reason_code ? ' · ' + escapeHtml(f.review.reason_code) : ''}</span>`
+      : '';
+    html += `
+      <div class="rv-item ${REVIEW_CLASS[st] || ''}" data-key="${escapeHtml(f.key)}">
+        <div class="rv-head">
+          <span class="rv-status">${escapeHtml(st)}</span>
+          <span class="rv-conf rv-conf-${escapeHtml(f.confidence)}">confidence: ${escapeHtml(f.confidence)}</span>
+          ${flags}
+          <span class="rv-rid">${escapeHtml(f.rid)}</span>
+          <span class="rv-n">${f.cnt.toLocaleString()} events</span>
+        </div>
+        <div class="rv-desc">${escapeHtml(f.descr || '')} ${mitreTags(f.mitre)}</div>
+        <div class="rv-meta">${escapeHtml(f.ts_first || '')}${f.ts_last && f.ts_last !== f.ts_first ? ' → ' + escapeHtml(f.ts_last) : ''}</div>
+        ${who}
+        <div class="rv-actions">
+          <button class="rv-btn rv-accept" data-action="accept">Accept</button>
+          <button class="rv-btn rv-modify" data-action="modify">Modified</button>
+          <button class="rv-btn rv-reject" data-action="reject">Reject</button>
+          ${st !== 'Unreviewed' ? '<button class="rv-btn rv-undo" data-action="unreview">Undo</button>' : ''}
+        </div>
+      </div>`;
+  }
+  box.innerHTML = html;
+
+  box.querySelectorAll('.rv-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.rv-item');
+      submitReview(caseId, item.dataset.key, btn.dataset.action);
+    });
+  });
+}
+
+async function submitReview(caseId, key, action) {
+  const actor = analystName();
+  if (!actor) return;
+  let reason_code = '';
+  let note = '';
+  if (action === 'reject') {
+    /* FR-4.6: a rejection carries a structured reason, so mapping quality
+       can be measured later instead of guessed at. */
+    const codes = Object.keys(reviewReasonCodes);
+    const list = codes.map((c, i) => `${i + 1}. ${reviewReasonCodes[c]} (${c})`).join('\n');
+    const pick = prompt(`เหตุผลที่ปฏิเสธ:
+${list}
+
+พิมพ์หมายเลข 1-${codes.length}`);
+    const idx = parseInt(pick, 10) - 1;
+    if (!(idx >= 0 && idx < codes.length)) return;
+    reason_code = codes[idx];
+    note = (prompt('บันทึกเพิ่มเติม (ไม่บังคับ)') || '').trim();
+  }
+  try {
+    const resp = await fetch(`/api/cases/${caseId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ finding_key: key, action, actor, reason_code, note }),
+    });
+    const body = await resp.json();
+    if (!resp.ok) throw new Error(body.detail || 'บันทึกไม่สำเร็จ');
+    loadResultReview(caseId);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function loadResultEvents(caseId, offset = 0) {
+  const box = document.getElementById('result-events-body');
+  if (!box) return;
+  box.innerHTML = '<div class="empty">กำลังโหลด...</div>';
+  try {
+    const resp = await fetch(`/api/cases/${caseId}/events?limit=${EVENTS_PAGE_SIZE}&offset=${offset}`);
+    const data = await resp.json();
+    if (!data.events.length) {
+      box.innerHTML = offset === 0
+        ? '<div class="empty">rule engine ไม่พบเหตุการณ์ที่น่าสนใจในไฟล์นี้</div>'
+        : '<div class="empty">ไม่มีข้อมูลเพิ่มเติม</div>';
+      return;
+    }
+    const from = data.offset + 1;
+    const to = data.offset + data.count;
+    let html = `<div class="empty" style="padding-bottom:8px">แสดง ${from.toLocaleString()}-${to.toLocaleString()} จาก ${data.total.toLocaleString()} findings (ข้อมูลดิบทั้งหมด ${data.total_rows.toLocaleString()} แถว)</div>`;
+    html += '<table><thead><tr><th>เวลา</th><th>rule</th><th>lvl</th><th>description</th><th>mitre</th></tr></thead><tbody>';
+    for (const e of data.events) {
+      html += `<tr>
+        <td>${escapeHtml(e.ts || e.ts_raw || '')}</td>
+        <td>${escapeHtml(e.rid || '')}</td>
+        <td>${e.lvl ?? ''}</td>
+        <td>${escapeHtml(e.descr || '')}</td>
+        <td>${(e.mitre || []).map(m => `<span class="mitre-tag">${escapeHtml(m)}</span>`).join('')}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+
+    const hasPrev = data.offset > 0;
+    const hasNext = to < data.total;
+    html += `<div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="secondary" id="ev-prev" ${hasPrev ? '' : 'disabled'}>&larr; ก่อนหน้า</button>
+      <button class="secondary" id="ev-next" ${hasNext ? '' : 'disabled'}>ถัดไป &rarr;</button>
+    </div>`;
+    box.innerHTML = html;
+
+    const prev = document.getElementById('ev-prev');
+    const next = document.getElementById('ev-next');
+    if (hasPrev) prev.addEventListener('click', () => loadResultEvents(caseId, Math.max(0, offset - EVENTS_PAGE_SIZE)));
+    if (hasNext) next.addEventListener('click', () => loadResultEvents(caseId, offset + EVENTS_PAGE_SIZE));
+  } catch (err) {
+    box.innerHTML = `<div class="empty">โหลดไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+/* ---------- workspace (sidebar tabs) shell, shared by the Result page ---------- */
+
+function renderWorkspace(container, tabs, activeKey) {
+  const navHtml = tabs.map(t => `
+    <button data-tab="${t.key}" class="${t.key === activeKey ? 'active' : ''}">
+      ${escapeHtml(t.label)}
+      ${t.count !== undefined ? `<span class="ws-count">${t.count}</span>` : ''}
+    </button>`).join('');
+  const sectionsHtml = tabs.map(t => `
+    <div class="ws-section" data-section="${t.key}" ${t.key === activeKey ? '' : 'hidden'}>${t.html}</div>`).join('');
+
+  container.innerHTML = `
+    <div class="ws">
+      <div class="ws-nav">${navHtml}</div>
+      <div class="ws-content">${sectionsHtml}</div>
+    </div>`;
+
+  container.querySelectorAll('.ws-nav button').forEach(btn =>
+    btn.addEventListener('click', () => switchWorkspaceTab(container, btn.dataset.tab)));
+}
+
+function switchWorkspaceTab(container, key) {
+  container.querySelectorAll('.ws-nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === key));
+  container.querySelectorAll('.ws-section').forEach(s => { s.hidden = s.dataset.section !== key; });
+}
+
+/* ---------- analysis renderers (chain flow, graph SVG, risk table, meta) ---------- */
+
+function buildChainFlow(chain) {
+  if (!chain || !chain.length) return '';
+  let nodes = '';
+  chain.forEach((stage, i) => {
+    const isStart = i === 0;
+    const isEnd = i === chain.length - 1;
+    const cls = isStart ? 'start' : (isEnd ? 'end' : '');
+    const badge = isStart ? '<span class="badge-endpoint">START</span>' : (isEnd ? '<span class="badge-endpoint">END</span>' : '');
+    const rangeStart = (stage.timestamp_range || '').split(' - ')[0];
+    nodes += `
+      <div class="chain-node ${cls}">
+        ${badge}
+        <div class="n-stage">${escapeHtml(stage.stage || '?')}</div>
+        <div class="n-ts">${escapeHtml(shortTs(rangeStart))}</div>
+        <div class="n-conf">confidence: ${escapeHtml(stage.confidence || '-')}</div>
+      </div>`;
+    if (!isEnd) nodes += `<div class="chain-connector">&#8594;</div>`;
+  });
+  return `<div class="section-label">Attack Chain Flow</div><div class="chain-flow-wrap"><div class="chain-flow">${nodes}</div></div>`;
+}
+
+/* Static SVG attack diagram - no library, no interaction.
+   Nodes are laid out in columns by role: pure sources on the left, pure
+   sinks on the right, anything that both receives and sends in the middle,
+   which matches how these graphs actually look (attacker IPs -> account or
+   service -> destination). */
+function renderGraph(graph) {
+  const edges = (graph && graph.edges) || [];
+  if (!edges.length) return '';
+
+  const NODE_W = 168, NODE_H = 34, COL_GAP = 330, ROW_GAP = 74;
+  const PAD_X = 12, PAD_Y = 24;
+
+  const outDeg = {}, inDeg = {}, names = new Set();
+  for (const e of edges) {
+    names.add(e.from); names.add(e.to);
+    outDeg[e.from] = (outDeg[e.from] || 0) + 1;
+    inDeg[e.to] = (inDeg[e.to] || 0) + 1;
+  }
+
+  const cols = [[], [], []];
+  for (const n of names) {
+    if (!inDeg[n]) cols[0].push(n);
+    else if (!outDeg[n]) cols[2].push(n);
+    else cols[1].push(n);
+  }
+  // If nothing sits in the middle, use two columns so the diagram isn't
+  // stretched across an empty gap.
+  const used = cols.filter(c => c.length);
+  const colOf = {}, pos = {};
+  used.forEach((col, ci) => col.forEach((n, ri) => {
+    colOf[n] = ci;
+    pos[n] = {
+      x: PAD_X + ci * COL_GAP,
+      y: PAD_Y + ri * ROW_GAP + (Math.max(...used.map(c => c.length)) - col.length) * ROW_GAP / 2,
+    };
+  }));
+
+  const width = PAD_X * 2 + (used.length - 1) * COL_GAP + NODE_W + 90;
+  const height = PAD_Y * 2 + Math.max(...used.map(c => c.length)) * ROW_GAP;
+
+  const isIp = n => /^\d{1,3}(\.\d{1,3}){3}$/.test(n);
+
+  /* Labels sit just past the SOURCE node, not at the edge midpoint: these
+     graphs are typically many sources converging on one target, so every
+     midpoint lands in the same spot and the labels pile up on each other.
+     Anchored to the source, each row gets its own space; multiple edges
+     leaving the same source stack downward. */
+  const srcSeen = {};
+  let edgeSvg = '';
+  for (const e of edges) {
+    const a = pos[e.from], b = pos[e.to];
+    if (!a || !b) continue;
+    const nth = (srcSeen[e.from] = (srcSeen[e.from] || 0) + 1) - 1;
+
+    const x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2;
+    const x2 = b.x, y2 = b.y + NODE_H / 2;
+    const mitre = (e.mitre || []).join(' ');
+    const lx = x1 + 14, ly = y1 - 5 + nth * 26;
+    edgeSvg += `
+      <path d="M ${x1} ${y1} C ${x1 + 60} ${y1}, ${x2 - 60} ${y2}, ${x2} ${y2}"
+            fill="none" stroke="#475569" stroke-width="1.4" marker-end="url(#arw)"/>
+      <text x="${lx}" y="${ly}" font-size="10.5" fill="#cbd5e1">${escapeHtml(e.label || '')}</text>
+      ${mitre ? `<text x="${lx}" y="${ly + 11}" font-size="9.5" fill="#38bdf8">${escapeHtml(mitre)}</text>` : ''}`;
+  }
+
+  let nodeSvg = '';
+  for (const n of names) {
+    const p = pos[n];
+    if (!p) continue;
+    const fill = isIp(n) ? '#7f1d1d' : '#155e75';
+    const stroke = isIp(n) ? '#f87171' : '#38bdf8';
+    nodeSvg += `
+      <rect x="${p.x}" y="${p.y}" width="${NODE_W}" height="${NODE_H}" rx="7"
+            fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+      <text x="${p.x + NODE_W / 2}" y="${p.y + NODE_H / 2 + 4.5}" text-anchor="middle"
+            font-size="12.5" font-weight="600" fill="#f1f5f9">${escapeHtml(n).slice(0, 26)}</text>`;
+  }
+
+  return `<div class="graph-wrap">
+      <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img">
+        <defs>
+          <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+          </marker>
+        </defs>
+        ${edgeSvg}${nodeSvg}
+      </svg>
+    </div>`;
+}
+
+/* Risk-based ranking: which entities carry the most accumulated finding
+   severity. Answers "where do I look first" in a case with tens of thousands
+   of findings, which a per-rule list never does. The score dampens repeats,
+   so a busy host doesn't outrank a quiet one implicated by several rules. */
+function renderRisk(risk) {
+  if (!risk) return '';
+  const ROLES = [['sources', 'Sources'], ['destinations', 'Destinations'], ['accounts', 'Accounts']];
+  let blocks = '';
+  for (const [key, label] of ROLES) {
+    const items = risk[key] || [];
+    if (!items.length) continue;
+    let rows = '';
+    for (const i of items.slice(0, 6)) {
+      rows += `
+        <tr>
+          <td class="risk-entity">${escapeHtml(i.entity)}</td>
+          <td class="risk-score">${i.score}</td>
+          <td class="risk-n">${i.findings}</td>
+          <td class="risk-rules">${(i.rules || []).map(r => `<span class="mitre-tag">${escapeHtml(r)}</span>`).join('')}</td>
+        </tr>`;
+    }
+    blocks += `
+      <div class="risk-block">
+        <div class="risk-role">${label}</div>
+        <table class="risk-table">
+          <tr><th>entity</th><th>score</th><th>findings</th><th>rules</th></tr>
+          ${rows}
+        </table>
+      </div>`;
+  }
+  if (!blocks) return '';
+  return `<div class="risk-wrap">${blocks}</div>`;
+}
+
+function metaHtml(meta) {
+  if (!meta) return '';
+  let html = '';
+  if (meta.truncated) {
+    html += '<div class="meta-warn">ผลลัพธ์ถูกตัดกลางคัน (output token limit) - ส่วนท้าย เช่น timeline อาจไม่ครบ ลองวิเคราะห์ใหม่หรือลด MAX_EVENTS_FOR_ANALYSIS</div>';
+  }
+  html += `<div class="meta-line">วิเคราะห์ด้วย ${escapeHtml(meta.provider)}/${escapeHtml(meta.model)} · ใช้ ${meta.events_analyzed}/${meta.events_total} events</div>`;
+  return html;
+}
+
+/* Router runs last - only now do all the page-specific `const` element
+   refs and handler functions above actually exist. Calling it earlier
+   doesn't throw visibly (loadCases/loadResult/etc are async, so a
+   reference error before their first `await` just rejects a promise
+   nobody awaits) but it silently drops the page's first render. */
+router();
+</script>
+</body>
+</html>

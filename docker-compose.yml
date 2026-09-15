@@ -1,0 +1,17 @@
+services:
+  forensic-analyzer:
+    build: .
+    hostname: forensic-analyzer
+    restart: always
+    ports:
+      - "8091:8000"
+    environment:
+      - ANALYSIS_PROVIDER=groq
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
+      - MAX_EVENTS_FOR_ANALYSIS=${MAX_EVENTS_FOR_ANALYSIS:-15}
+    volumes:
+      - forensic-data:/data
+
+volumes:
+  forensic-data:

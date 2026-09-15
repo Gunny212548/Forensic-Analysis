@@ -1,0 +1,20 @@
+{
+  "name": "forensic-analyzer-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "UI for the forensic log analyzer. Built with Vite, output into ../static, which FastAPI serves.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.0"
+  }
+}
