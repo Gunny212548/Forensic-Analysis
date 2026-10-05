@@ -1,7 +1,12 @@
-from fastapi import APIRouter, Body, HTTPException, Query
+import asyncio
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
 from .. import config
 from ..services import analysis, db, review, storage
+from .upload import CHUNK, _run_pipeline
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -19,6 +24,145 @@ async def get_case(case_id: str):
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
+    return manifest
+
+
+def _concat_raw(sources: list, dest) -> int:
+    """Append raw log files byte for byte, returning the bytes written.
+
+    Nothing is parsed: syslog/FortiGate lines are self-delimited by newlines
+    and carry no cross-file state, so concatenation is the whole merge. Copied
+    in chunks because a single source can be ~1GB, and deliberately not bounded
+    by config.MAX_UPLOAD_BYTES - that limit guards the streaming HTTP endpoint
+    against one oversized POST body, and these bytes are already on disk and
+    already ingested.
+    """
+    size = 0
+    tail = b"\n"
+    with open(dest, "wb") as out:
+        for src in sources:
+            # A source not ending in a newline would otherwise glue its last
+            # line onto the next file's first line, losing both to the
+            # decoder. `tail` starts as a newline so nothing leads the file.
+            if tail != b"\n":
+                out.write(b"\n")
+                size += 1
+            with open(src, "rb") as fh:
+                while chunk := fh.read(CHUNK):
+                    out.write(chunk)
+                    size += len(chunk)
+                    tail = chunk[-1:]
+    return size
+
+
+@router.post("/merge")
+async def merge_cases(background_tasks: BackgroundTasks, body: dict = Body(...)):
+    """Concatenate several already-ingested line-log cases into one new case
+    and run the normal pipeline over the whole thing.
+
+    A vendor export tool splitting 29 hours of FortiGate traffic into 15
+    hourly files meant every rule, risk score and narrative only ever saw one
+    hour: sources whose policy-gap violations recurred all day reached no
+    per-file threshold, and only a human cross-reading 15 AI reports noticed.
+    Merging the raw files and re-running the existing single-case machinery
+    buys full-window correlation without a second, cross-case query layer.
+    """
+    case_ids = body.get("case_ids") or []
+    if not isinstance(case_ids, list) or len(case_ids) < 2:
+        raise HTTPException(400, "case_ids must be a list of at least 2 case ids")
+    if len(set(case_ids)) != len(case_ids):
+        # Concatenating a file with itself would double every one of its rows
+        # and invent correlations that never happened.
+        raise HTTPException(400, "case_ids contains the same case more than once")
+
+    sources, unknown = [], []
+    for cid in case_ids:
+        manifest = storage.load_manifest(cid)
+        (sources if manifest else unknown).append(manifest or cid)
+    if unknown:
+        raise HTTPException(404, f"Case not found: {', '.join(unknown)}")
+
+    # Only line logs for now. A CSV would contribute a header row per file
+    # (and two vendors' exports need not even share a column set), and JSON
+    # is either lines or one array - neither concatenates blindly.
+    wrong_kind = [m["case_id"] for m in sources if m.get("file_kind") != "log"]
+    if wrong_kind:
+        raise HTTPException(
+            400,
+            "Only file_kind='log' cases can be merged; these are not: "
+            + ", ".join(wrong_kind),
+        )
+
+    # The raw upload is the audit trail, and it is also the only copy of the
+    # bytes - a case whose raw file went missing cannot contribute.
+    gone = [m["case_id"] for m in sources
+            if not storage.raw_path(m["case_id"], "log").exists()]
+    if gone:
+        raise HTTPException(409, f"Raw file missing for: {', '.join(gone)}")
+
+    # Chronological, not upload order: the merged file must read as one
+    # timeline. Manifests do not carry ts_first, so it comes from the case's
+    # own DuckDB; a case that never processed (or parsed no timestamp at all)
+    # falls back to upload order and is reported rather than rejected.
+    ordered, fallback = [], []
+    for m in sources:
+        ts_first = m.get("ts_first") or db.ts_range(m["case_id"])[0]
+        if not ts_first:
+            fallback.append(m["case_id"])
+        key = (0, ts_first) if ts_first else (1, m.get("uploaded_at") or "")
+        ordered.append((key, ts_first, m))
+    ordered.sort(key=lambda entry: entry[0])
+
+    company_id = body.get("company_id")
+    if company_id:
+        company = storage.load_company(company_id)
+        if company is None:
+            raise HTTPException(404, "Company not found")
+        company_name = company["name"]
+    else:
+        company_id = ordered[0][2].get("company_id")
+        company_name = ordered[0][2].get("company_name")
+    # FR-2.1 applies to a merged case too. Sources uploaded before customers
+    # were required may carry none, and then the caller has to name one.
+    if not company_id:
+        raise HTTPException(400, "A customer is required - pass company_id for the merged case")
+
+    names = [m.get("original_filename") or m["case_id"] for _, _, m in ordered]
+    manifest = storage.create_case(
+        original_filename=f"merged({len(ordered)}): " + "+".join(names),
+        file_kind="log",
+        size_bytes=0,
+        note=body.get("note") or f"Merged {len(ordered)} cases in chronological order",
+        company_id=company_id,
+        company_name=company_name,
+        merged_from=[
+            {"case_id": m["case_id"], "original_filename": m.get("original_filename"),
+             "ts_first": ts_first}
+            for _, ts_first, m in ordered
+        ],
+    )
+    case_id = manifest["case_id"]
+    dest = storage.raw_path(case_id, "log")
+
+    # Byte-level copy in chunks: syslog lines are self-delimited and carry no
+    # cross-file state, so nothing has to be parsed here, and ~1GB sources
+    # must not be read into memory. config.MAX_UPLOAD_BYTES deliberately does
+    # not apply - it guards the streaming HTTP endpoint against one oversized
+    # POST body, and these bytes are already on disk and already ingested.
+    # Off the event loop for the same reason the pipeline is: this is minutes
+    # of blocking disk IO (13GB for the FortiGate set), and running it inline
+    # would stall every other request for the duration.
+    size = await asyncio.to_thread(
+        _concat_raw, [storage.raw_path(m["case_id"], "log") for _, _, m in ordered], dest
+    )
+
+    fields = {"size_bytes": size}
+    if fallback:
+        fields["merge_order_fallback"] = fallback
+    storage.update_case(case_id, **fields)
+    manifest.update(fields)
+
+    background_tasks.add_task(_run_pipeline, case_id, dest, "log")
     return manifest
 
 
@@ -82,9 +226,12 @@ async def get_case_findings(case_id: str):
 
 
 @router.post("/{case_id}/review")
-async def record_review(case_id: str, body: dict = Body(...)):
+async def record_review(case_id: str, request: Request, body: dict = Body(...)):
     """Record one review decision. Appends to the case's audit log; never
-    overwrites an earlier decision."""
+    overwrites an earlier decision.
+
+    The actor is the signed-in account, not whatever the body says: an audit
+    log whose author the client picks is not an audit log (FR-7.6)."""
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
@@ -100,7 +247,7 @@ async def record_review(case_id: str, body: dict = Body(...)):
             case_id,
             finding_key=key,
             action=(body.get("action") or "").strip(),
-            actor=(body.get("actor") or "").strip(),
+            actor=request.state.user["email"],
             reason_code=(body.get("reason_code") or "").strip(),
             note=body.get("note") or "",
         )
@@ -117,50 +264,201 @@ async def get_review_log(case_id: str):
     return {"case_id": case_id, "entries": review.log(case_id)}
 
 
+# A queued map-reduce job that stopped being updated for this long is not
+# running any more - the container was restarted mid-job, and nothing else
+# would ever clear its "running" marker. Every call in the job writes progress,
+# and no single call can take anywhere near this long.
+JOB_STALE_SECONDS = 15 * 60
+
+
+def _job_running(job: dict | None) -> bool:
+    if not job or job.get("status") != "running":
+        return False
+    try:
+        updated = datetime.fromisoformat(job.get("updated_at") or "")
+    except ValueError:
+        return True
+    age = (datetime.now(timezone.utc) - updated).total_seconds()
+    return age < JOB_STALE_SECONDS
+
+
+def _job_view(job: dict) -> dict:
+    """The polling payload. Keys the frontend already renders (summary,
+    attack_chain, timeline, recommendations, graph) are present and empty so
+    an in-progress response cannot make the existing UI throw; `summary`
+    carries the progress text rather than a narrative."""
+    done, total = job.get("chunks_done") or 0, job.get("chunks_total") or 0
+    return {
+        "case_id": job.get("case_id"),
+        "analysis_status": job.get("status"),
+        "analysis_job": job,
+        "summary": job.get("error") or (
+            f"Analysis in progress: {job.get('step') or 'queued'} phase, "
+            f"{done} of {total + 1} model calls done. This case is too large "
+            f"for a single call, so it is narrated in batches (about a minute "
+            f"per call); poll GET /api/cases/{job.get('case_id')}/analysis."
+        ),
+        "attack_chain": [],
+        "recommendations": [],
+        "timeline": [],
+        "graph": None,
+    }
+
+
 @router.get("/{case_id}/analysis")
 async def get_case_analysis(case_id: str):
+    """Poll point for both the fast path and a queued map-reduce job.
+
+    How a caller tells the three states apart:
+      404                                  -> never analysed, none queued
+      200 + analysis_status "ready"        -> the analysis (as before)
+      202 + analysis_status "running"      -> queued, nothing cached yet
+      200 + analysis_status "running"      -> queued, an OLDER analysis is
+                                              being returned meanwhile
+      200 + analysis_status "failed"       -> the queued job gave up; `summary`
+                                              carries the reason
+    """
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
+
+    job = storage.load_analysis_job(case_id)
     result = storage.load_analysis(case_id)
-    if result is None:
-        raise HTTPException(404, "No analysis yet for this case - POST /analyze first")
-    return result
+
+    if result is not None:
+        # Every existing key is untouched; only the status fields are added.
+        result["analysis_status"] = "running" if _job_running(job) else "ready"
+        if _job_running(job):
+            result["analysis_job"] = job
+        return result
+
+    if _job_running(job):
+        return JSONResponse(_job_view(job), status_code=202)
+    if job and job.get("status") == "failed":
+        return _job_view(job)
+
+    raise HTTPException(404, "No analysis yet for this case - POST /analyze first")
+
+
+def _sql_context(case_id: str, events: list[dict]) -> tuple[dict, list[dict], dict]:
+    """Everything the narrative is built around that is NOT the model's job.
+
+    The attack graph is derived from findings in SQL, not asked of the model -
+    exact, complete, and it leaves the whole output budget for the narrative.
+    Source profiles tell a habitual user apart from an intruder, and the risk
+    ranking answers "where do I look first". All three stay complete for the
+    whole case even when the narrative itself has to be batched.
+    """
+    graph = db.build_graph(case_id)
+    ips = list(dict.fromkeys(e["srcip"] for e in events if e.get("srcip")))
+    profiles = db.source_profiles(case_id, ips)
+    risk = db.risk_scores(case_id)
+    return graph, profiles, risk
+
+
+async def _run_map_reduce_job(case_id: str, plan: dict) -> None:
+    """Background worker: N map calls + 1 reduce, paced against the OTPM
+    budget. Mirrors _run_pipeline - the client polls instead of waiting."""
+
+    def progress(step: str, index: int, total: int) -> None:
+        storage.update_analysis_job(
+            case_id, step=step,
+            chunks_done=index - 1 if step == "map" else total,
+        )
+
+    try:
+        # Ranked candidates first, then a pool that spans the rules that
+        # fired: the plain top-N of a huge case is one rule repeated N times,
+        # which makes every batch say the same thing.
+        candidates = db.top_distinct_findings(
+            case_id, plan["pool_size"] * analysis.POOL_CANDIDATE_FACTOR
+        )
+        pool = analysis.diversify_pool(candidates, plan["pool_size"])
+        distinct_total = db.distinct_finding_count(case_id)
+        _, flagged = db.counts(case_id)
+        graph, profiles, risk = _sql_context(case_id, pool)
+
+        result = await analysis.run_map_reduce_analysis(
+            case_id, pool, distinct_total, flagged, graph=graph,
+            profiles=profiles, risk=risk, plan=plan,
+            profiles_for=lambda ips: db.source_profiles(case_id, ips),
+            on_progress=progress,
+            auto_retry_max_wait=analysis.BACKGROUND_RETRY_MAX_WAIT,
+        )
+    except Exception as exc:  # noqa: BLE001 - the job owns its own failure
+        storage.update_analysis_job(
+            case_id, status="failed", error=f"{type(exc).__name__}: {exc}"[:500],
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
+        return
+
+    storage.save_analysis(case_id, result)
+    storage.update_analysis_job(
+        case_id, status="done", chunks_done=plan["chunks"], step="done",
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        groq_calls=result.get("_meta", {}).get("groq_calls"),
+    )
 
 
 @router.post("/{case_id}/analyze")
-async def analyze_case(case_id: str, force: bool = False):
+async def analyze_case(case_id: str, background_tasks: BackgroundTasks, force: bool = False):
+    """Write the narrative for this case.
+
+    Small cases (evidence that fits one model call) are answered inline, 200,
+    exactly as before. A case with more distinct findings than one call can
+    hold is queued instead: N batch calls plus one synthesis call at roughly
+    one call's worth of output budget per minute is minutes of wall clock, far
+    too long to hold an HTTP request open, so it returns 202 immediately and
+    the client polls GET .../analysis.
+    """
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
     if manifest.get("status") != "ready":
         raise HTTPException(409, f"Case is not ready yet (status: {manifest.get('status')})")
 
+    # A job already in flight wins over any new request, force or not: a
+    # second one would race the first for the same per-minute token budget and
+    # both would crawl.
+    job = storage.load_analysis_job(case_id)
+    if _job_running(job):
+        return JSONResponse(dict(_job_view(job), already_running=True), status_code=202)
+
     if not force:
         cached = storage.load_analysis(case_id)
         if cached is not None:
+            cached["analysis_status"] = "ready"
             return cached
 
-    # One SQL query collapses repeats and returns only the most severe
-    # distinct findings - a case with 25k findings costs the same as one
-    # with 20.
-    events = db.top_distinct_findings(case_id, config.MAX_EVENTS_FOR_ANALYSIS)
     distinct_total = db.distinct_finding_count(case_id)
+    plan = analysis.plan_map_reduce(distinct_total)
+
+    if plan["needed"]:
+        job = storage.save_analysis_job(case_id, {
+            "status": "running",
+            "mode": "map_reduce",
+            "step": "queued",
+            "chunks_total": plan["chunks"],
+            "chunks_done": 0,
+            "pool_size": plan["pool_size"],
+            "distinct_total": distinct_total,
+            "map_reduce_capped": plan["capped"],
+            "expected_groq_calls": plan["calls"],
+            # ~1 call's worth of output budget a minute, so N+1 calls is
+            # roughly N+1 minutes. Stated so the caller knows what to expect
+            # from polling rather than inferring it from silence.
+            "estimated_seconds": plan["calls"] * 60,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "error": None,
+        })
+        background_tasks.add_task(_run_map_reduce_job, case_id, plan)
+        return JSONResponse(_job_view(job), status_code=202)
+
+    # Fast path, unchanged: one SQL query collapses repeats and returns only
+    # the most severe distinct findings, and one call writes the narrative.
+    events = db.top_distinct_findings(case_id, config.MAX_EVENTS_FOR_ANALYSIS)
     _, flagged = db.counts(case_id)
-
-    # The attack graph is derived from findings in SQL, not asked of the
-    # model - exact, complete, and it leaves the whole output budget for the
-    # narrative.
-    graph = db.build_graph(case_id)
-
-    # How each source behaved over the whole case - the context that tells a
-    # habitual user apart from an intruder. Computed, not guessed.
-    ips = list(dict.fromkeys(e["srcip"] for e in events if e.get("srcip")))
-    profiles = db.source_profiles(case_id, ips)
-
-    # Which entities carry the most accumulated severity - the answer to
-    # "where do I look first" in a case with tens of thousands of findings.
-    risk = db.risk_scores(case_id)
+    graph, profiles, risk = _sql_context(case_id, events)
 
     try:
         result = await analysis.run_analysis(
@@ -176,4 +474,5 @@ async def analyze_case(case_id: str, force: bool = False):
         raise HTTPException(502, str(exc))
 
     storage.save_analysis(case_id, result)
+    result["analysis_status"] = "ready"
     return result

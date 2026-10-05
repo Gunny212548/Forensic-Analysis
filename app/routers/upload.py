@@ -1,23 +1,54 @@
 import asyncio
-import os
+import shutil
+import zipfile
+import zlib
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 
 from .. import config
-from ..services import pipeline, storage
+from ..services import archive, pipeline, storage
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
 CHUNK = 1024 * 1024  # 1MB
 
 
-def _detect_kind(filename: str) -> str:
-    ext = os.path.splitext(filename or "")[1].lower()
-    if ext == ".csv":
-        return "csv"
-    if ext == ".json":
-        return "json"
-    return "log"
+def _gb(n: float) -> str:
+    return f"{n / 1024**3:.1f} GB"
+
+
+def capacity_problem(size: int) -> tuple[int, str] | None:
+    """FR-2.2's two refusals for a file of `size` bytes, or None if it fits.
+
+    These have to run before the request body is read, not in upload_log():
+    Starlette parses the multipart form - spooling the whole file into a temp
+    file - before the handler is even called, so a check in the handler
+    only fires after 10 GB has already crossed the network and hit the disk.
+    main.py calls this on Content-Length, and the page calls /upload/check
+    before it starts sending."""
+    if size > config.MAX_UPLOAD_BYTES:
+        return 413, f"File is {_gb(size)}; the limit is {_gb(config.MAX_UPLOAD_BYTES)} per file"
+    free = shutil.disk_usage(config.DATA_DIR).free
+    need = size * config.UPLOAD_DISK_FACTOR
+    if free < need:
+        return 507, (f"Not enough disk space: a {_gb(size)} file needs {_gb(need)} free "
+                     f"({config.UPLOAD_DISK_FACTOR:g}x its size), only {_gb(free)} is available")
+    return None
+
+
+@router.get("/upload/check")
+async def upload_check(size: int = Query(0, ge=0)):
+    """Pre-flight for the upload page: limits, and whether `size` would be
+    accepted - so a refusal arrives before the file is sent, not after."""
+    if size:
+        problem = capacity_problem(size)
+        if problem:
+            raise HTTPException(*problem)
+    return {
+        "max_bytes": config.MAX_UPLOAD_BYTES,
+        "free_bytes": shutil.disk_usage(config.DATA_DIR).free,
+        "disk_factor": config.UPLOAD_DISK_FACTOR,
+    }
 
 
 async def _run_pipeline(case_id: str, path, kind: str) -> None:
@@ -36,11 +67,14 @@ async def upload_log(
     company_name: str = Form(""),
 ):
     filename = file.filename or "upload"
-    kind = _detect_kind(filename)
+    # FR-2.3: "fw.csv.gz" is a gzip'd CSV, a .zip is a bundle of logs.
+    kind, compression = archive.detect(filename)
 
     storage.ensure_dirs()
 
-    company = None
+    # FR-2.1: every case belongs to exactly one customer, so an upload without
+    # one is refused here and not only greyed out in the UI - the API is also
+    # called by scripts (tests/check_parity.py).
     if company_id:
         company = storage.load_company(company_id)
         if company is None:
@@ -49,39 +83,84 @@ async def upload_log(
         # Inline "add new company" from the upload form - idempotent by
         # name so re-submitting doesn't fork a duplicate company.
         company = storage.find_company_by_name(company_name) or storage.create_company(company_name.strip())
+    else:
+        raise HTTPException(400, "A customer is required - every case belongs to exactly one customer")
 
     manifest = storage.create_case(
         original_filename=filename,
         file_kind=kind,
         size_bytes=0,
         note=note,
-        company_id=company["company_id"] if company else None,
-        company_name=company["name"] if company else None,
+        company_id=company["company_id"],
+        company_name=company["name"],
     )
     case_id = manifest["case_id"]
-    dest = storage.raw_path(case_id, kind)
+    # The raw copy keeps the analyst's bytes as uploaded - compressed stays
+    # compressed; the pipeline reads it through gzip/zip itself.
+    dest = storage.raw_path(case_id, f"{kind}.gz" if compression == "gz" else kind)
 
-    # Stream to disk in chunks - never hold the whole upload in memory.
-    size = 0
-    with open(dest, "wb") as out:
-        while chunk := await file.read(CHUNK):
-            size += len(chunk)
-            if size > config.MAX_UPLOAD_BYTES:
-                out.close()
-                dest.unlink(missing_ok=True)
-                storage.manifest_path(case_id).unlink(missing_ok=True)
-                raise HTTPException(
-                    413, f"File exceeds max size of {config.MAX_UPLOAD_BYTES} bytes"
-                )
-            out.write(chunk)
-
-    if size == 0:
+    def discard() -> None:
         dest.unlink(missing_ok=True)
         storage.manifest_path(case_id).unlink(missing_ok=True)
+
+    too_large = HTTPException(
+        413, f"File exceeds the limit of {_gb(config.MAX_UPLOAD_BYTES)} per file (after decompression)"
+    )
+
+    # Stream to disk in chunks - never hold the whole upload in memory.
+    # FR-2.2's limit is on the size *after* decompression; the early check in
+    # main.py only sees the compressed Content-Length, so it is enforced here:
+    # a .gz is inflated in memory as it arrives purely to count it (nothing
+    # decompressed is kept), a .zip is judged by its directory below and
+    # again, byte for byte, when the pipeline extracts it.
+    size = 0
+    counter = archive.GzipCounter(config.MAX_UPLOAD_BYTES) if compression == "gz" else None
+    try:
+        with open(dest, "wb") as out:
+            while chunk := await file.read(CHUNK):
+                size += len(chunk)
+                if counter:
+                    counter.feed(chunk)
+                elif size > config.MAX_UPLOAD_BYTES:
+                    raise too_large
+                out.write(chunk)
+        uncompressed = counter.finish() if counter else size
+    except archive.TooLarge:
+        discard()
+        raise too_large
+    except (ValueError, zlib.error) as exc:  # corrupt or truncated gzip
+        discard()
+        raise HTTPException(400, f"Not a valid gzip file: {exc}")
+    except HTTPException:
+        discard()
+        raise
+
+    if size == 0:
+        discard()
         raise HTTPException(400, "Uploaded file is empty")
 
-    storage.update_case(case_id, size_bytes=size)
-    manifest["size_bytes"] = size
+    extra = {}
+    if compression == "zip":
+        try:
+            members, skipped = archive.plan_zip(dest)
+        except zipfile.BadZipFile as exc:
+            discard()
+            raise HTTPException(400, f"Not a valid zip file: {exc}")
+        if not members:
+            discard()
+            raise HTTPException(400, "The zip contains no log files"
+                                + (f" (skipped: {', '.join(s['name'] for s in skipped[:5])})" if skipped else ""))
+        uncompressed = sum(m.size for m in members)
+        if uncompressed > config.MAX_UPLOAD_BYTES:
+            discard()
+            raise too_large
+        extra = {"members": [{"name": m.name, "kind": m.kind, "bytes": m.size} for m in members],
+                 "skipped_members": skipped}
+
+    fields = {"size_bytes": size, "uncompressed_bytes": uncompressed,
+              "compression": compression, **extra}
+    storage.update_case(case_id, **fields)
+    manifest.update(fields)
 
     background_tasks.add_task(_run_pipeline, case_id, dest, kind)
     return manifest

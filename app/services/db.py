@@ -106,6 +106,23 @@ def counts(case_id: str) -> tuple[int, int]:
         con.close()
 
 
+def ts_range(case_id: str) -> tuple[str, str]:
+    """(earliest, latest) event time of a processed case, rendered GMT+7.
+
+    min(ts)/max(ts), never min/max of `ts_raw`: comparing the source text as
+    strings only happens to order correctly for ISO input (gotcha #21).
+    Returns ("", "") when the case has no DuckDB yet or parsed no timestamp.
+    """
+    if not db_path(case_id).exists():
+        return "", ""
+    con = connect(case_id, read_only=True)
+    try:
+        lo, hi = con.execute("SELECT min(ts), max(ts) FROM raw_events").fetchone()
+        return _fmt_ts(lo), _fmt_ts(hi)
+    finally:
+        con.close()
+
+
 def severity_summary(con: duckdb.DuckDBPyConnection) -> dict:
     """Max lvl per row_id (a row can match several rules - gotcha #6), bucketed
     on Wazuh's 0-15 scale so the case list can show severity without a client
@@ -171,7 +188,7 @@ def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
 # A timestamp is only trustworthy if the source said what zone it was in.
 # "2026-06-04T10:21:33+07:00" and "2026-06-04 10:21:33Z" do; Palo Alto's
 # "04/06/2026 10:21:33" does not, and guessing wrong by an hour reorders the
-# incident (FR-1.6).
+# timeline (FR-1.6).
 _TZ_MARKER = re.compile(r"(?:Z|UTC|GMT|[+-]\d{2}:?\d{2})\s*$", re.I)
 
 
@@ -528,7 +545,7 @@ def source_profiles(case_id: str, ips: list[str], limit: int = 20) -> list[dict]
                    -- reset-client, reset-server and block-url, so the deny
                    -- counts in the table handed to the model undercounted
                    -- every Palo Alto reset.
-                   count(*) FILTER (WHERE verdict IN """ + DENY_VERDICTS + """) AS denied,
+                   count(*) FILTER (WHERE verdict IN {DENY_VERDICTS}) AS denied,
                    count(DISTINCT date_trunc('day', ts))           AS days_active,
                    date_diff('day', min(ts), max(ts))              AS span_days,
                    min(ts)::VARCHAR                                AS first_seen,

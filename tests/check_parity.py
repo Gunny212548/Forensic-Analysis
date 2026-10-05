@@ -9,6 +9,8 @@ any drift, so it can gate a change.
     python tests/check_parity.py "D:/forensic system/Logtest"   # full corpus
     python tests/check_parity.py <dir> --update        # rewrite the baseline
 
+Needs FA_EMAIL / FA_PASSWORD for an account made with tools/create_user.py.
+
 The baseline (tests/baseline.json) is keyed by the *sanitised* filename the
 upload API reports back, with rows / flagged / per-rule counts. A filename
 that exists in more than one version in the corpus - log_30_.csv is both a
@@ -18,7 +20,9 @@ by md5, so two different files sharing a name do not read as a regression.
 
 import argparse
 import hashlib
+import http.cookiejar
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -28,12 +32,18 @@ from pathlib import Path
 BASELINE = Path(__file__).with_name("baseline.json")
 LOG_SUFFIXES = {".csv", ".log", ".json", ".txt"}
 DEFAULT_URL = "http://localhost:8091"
+PARITY_CUSTOMER = "Parity check"
 
 
 def _post_file(url: str, path: Path) -> dict:
     """Multipart upload with stdlib only - this script must not need httpx."""
     boundary = "----parity" + hashlib.md5(str(path).encode()).hexdigest()[:16]
     body = b"".join([
+        # Every case needs a customer (FR-2.1). One fixed name, created on
+        # first use, keeps parity runs grouped and out of real customers.
+        f"--{boundary}\r\n".encode(),
+        b'Content-Disposition: form-data; name="company_name"\r\n\r\n',
+        f"{PARITY_CUSTOMER}\r\n".encode(),
         f"--{boundary}\r\n".encode(),
         f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'.encode(),
         b"Content-Type: application/octet-stream\r\n\r\n",
@@ -51,6 +61,28 @@ def _post_file(url: str, path: Path) -> dict:
 def _get(url: str) -> dict:
     with urllib.request.urlopen(url, timeout=60) as resp:
         return json.load(resp)
+
+
+def login(url: str) -> None:
+    """Every /api call needs a session since FR-1. Credentials come from the
+    environment so they never land in shell history or the baseline:
+    FA_EMAIL / FA_PASSWORD, an account made with tools/create_user.py. The
+    cookie is kept by an installed opener, so _get/_post_file need no change."""
+    email, password = os.environ.get("FA_EMAIL"), os.environ.get("FA_PASSWORD")
+    if not (email and password):
+        raise SystemExit("set FA_EMAIL and FA_PASSWORD (see tools/create_user.py)")
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    urllib.request.install_opener(opener)
+    req = urllib.request.Request(
+        f"{url}/api/auth/login",
+        data=json.dumps({"email": email, "password": password}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=30).close()
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(f"login failed: {exc.code} {exc.reason}")
 
 
 def collect(url: str, files: list[Path]) -> tuple[dict, list[str]]:
@@ -168,6 +200,7 @@ def main() -> int:
         return 2
     print(f"{len(files)} files under {root}")
 
+    login(args.url)
     actual, notes = collect(args.url, files)
     for note in notes:
         print(f"note: {note}")

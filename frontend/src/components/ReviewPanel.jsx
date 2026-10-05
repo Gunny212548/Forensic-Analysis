@@ -3,16 +3,6 @@ import { getFindings, postReview } from '../api.js'
 import { REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
 
-const NAME_KEY = 'analyst-name'
-
-function storedName() {
-  try {
-    return localStorage.getItem(NAME_KEY) || ''
-  } catch {
-    return ''
-  }
-}
-
 // Unreviewed first, whatever its confidence: a high-confidence finding
 // nobody has looked at must never sit above a reviewed one (NFR-9).
 const ORDER = { Unreviewed: 0, Modified: 1, Accepted: 2, Rejected: 3 }
@@ -24,8 +14,6 @@ const ORDER = { Unreviewed: 0, Modified: 1, Accepted: 2, Rejected: 3 }
 export default function ReviewPanel({ caseId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
-  const [actor, setActor] = useState(storedName)
-  const [nameDraft, setNameDraft] = useState('')
   const [rejecting, setRejecting] = useState(null) // finding key awaiting a reason
   const [reasonCode, setReasonCode] = useState('')
   const [reasonNote, setReasonNote] = useState('')
@@ -44,23 +32,10 @@ export default function ReviewPanel({ caseId }) {
     load()
   }, [load])
 
-  function saveName(e) {
-    e.preventDefault()
-    const name = nameDraft.trim()
-    if (!name) return
-    try {
-      localStorage.setItem(NAME_KEY, name)
-    } catch {
-      // the decision still records the name server-side; only the
-      // convenience of remembering it is lost
-    }
-    setActor(name)
-  }
-
   async function submit(key, action, extra = {}) {
     setBusyKey(key)
     try {
-      await postReview(caseId, { finding_key: key, action, actor, ...extra })
+      await postReview(caseId, { finding_key: key, action, ...extra })
       setRejecting(null)
       setReasonCode('')
       setReasonNote('')
@@ -74,27 +49,6 @@ export default function ReviewPanel({ caseId }) {
 
   if (error && !data) return <Empty>{error}</Empty>
   if (!data) return <Empty>กำลังโหลด...</Empty>
-
-  // An actor is recorded on every decision (FR-7.6), so it is asked for once
-  // and kept. Inline rather than window.prompt(), which blocks the page and
-  // cannot be corrected once dismissed.
-  if (!actor) {
-    return (
-      <form onSubmit={saveName}>
-        <label htmlFor="analyst-name">ชื่อผู้ตรวจสอบ (บันทึกลง audit log)</label>
-        <input
-          id="analyst-name"
-          type="text"
-          value={nameDraft}
-          onChange={(e) => setNameDraft(e.target.value)}
-          placeholder="เช่น ชื่อ-นามสกุล หรือรหัสพนักงาน"
-        />
-        <button type="submit" disabled={!nameDraft.trim()}>
-          เริ่มตรวจสอบ
-        </button>
-      </form>
-    )
-  }
 
   const s = data.review_summary || {}
   const unreviewed = s.Unreviewed || 0

@@ -136,6 +136,65 @@ export function Recommendations({ items }) {
   )
 }
 
+/** Progress of a queued map-reduce job (CLAUDE.md: a case with more distinct
+ *  findings than one model call can hold is narrated in N batches plus one
+ *  synthesis call, roughly a minute each). The analyst is watching a
+ *  multi-minute job, so it says which call it is on rather than spinning:
+ *  the numbers come straight from the server's job record and nothing here is
+ *  animated, because a screenshot of this panel has to mean something.
+ *
+ *  `stale` is the case where an older finished analysis is still on screen
+ *  below - then this is a non-blocking note, not a placeholder. */
+export function AnalysisProgress({ job, stale, stalled }) {
+  if (!job) return null
+  const total = job.chunks_total || 0
+  const done = job.chunks_done || 0
+  // N map calls + 1 reduce. The server counts a map call as done only once it
+  // returns, so during map step `done` is the number finished behind us.
+  const calls = job.expected_groq_calls || total + 1
+  const step = job.step || 'queued'
+  const at = step === 'reduce' ? calls : Math.min(done + 1, calls)
+  const label =
+    step === 'reduce'
+      ? `กำลังสรุปรวมผลทั้งหมด (ขั้นที่ ${calls} จาก ${calls})`
+      : step === 'map'
+        ? `กำลังวิเคราะห์เป็นชุด: ชุดที่ ${Math.min(done + 1, total)} จาก ${total}`
+        : 'กำลังเข้าคิวรอเริ่มวิเคราะห์'
+  const mins = job.estimated_seconds ? Math.max(1, Math.round(job.estimated_seconds / 60)) : 0
+
+  return (
+    <div className={`job-progress${stale ? ' stale' : ''}`}>
+      <div className="job-head">
+        {stale ? 'กำลังวิเคราะห์ใหม่อยู่เบื้องหลัง — ด้านล่างคือผลวิเคราะห์เดิม' : label}
+      </div>
+      {stale && <div className="job-note">{label}</div>}
+      <div className="job-bar">
+        <span style={{ width: `${Math.round((at / calls) * 100)}%` }} />
+      </div>
+      <div className="job-note">
+        เคสนี้ใหญ่เกินกว่าจะวิเคราะห์ในครั้งเดียว ({job.distinct_total} distinct findings) จึงแบ่งเป็น{' '}
+        {total} ชุด + สรุปรวม 1 ครั้ง รวม {calls} ครั้ง
+        {mins ? ` · ใช้เวลาประมาณ ${mins} นาที` : ''} · หน้านี้อัปเดตสถานะให้เองอัตโนมัติ
+      </div>
+      {job.map_reduce_capped && (
+        <div className="job-note">
+          findings มีมากกว่าที่ narrate ไหว — วิเคราะห์เฉพาะ {job.pool_size} รายการที่รุนแรงที่สุด
+          (attack graph / risk ranking ยังครบทั้งเคส เพราะมาจาก SQL)
+        </div>
+      )}
+      {stalled && (
+        <div className="job-note">
+          เซิร์ฟเวอร์ไม่ได้รายงานความคืบหน้ามาสักพักแล้ว (ตัวเลขด้านบนคือค่าล่าสุดที่ได้รับ) —
+          งานอาจยังทำอยู่แต่ช้ากว่าปกติ หน้านี้ยังถามสถานะต่อเนื่อง
+        </div>
+      )}
+      {job.already_running && (
+        <div className="job-note">มีงานวิเคราะห์ทำงานอยู่แล้ว จึงไม่ได้เริ่มงานใหม่ซ้อน</div>
+      )}
+    </div>
+  )
+}
+
 /** `_meta.truncated` is computed server-side from *missing top-level keys*,
  *  not from finish_reason - the model can spend its last tokens on trailing
  *  whitespace after a complete object (CLAUDE.md gotcha #5). So when this

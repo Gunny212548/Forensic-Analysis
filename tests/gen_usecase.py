@@ -1,4 +1,4 @@
-"""Generate a synthetic incident with known ground truth.
+"""Generate a synthetic attack scenario with known ground truth.
 
 Scenario "Nightfall" - 2026-02-14/15:
   1. 10.20.30.40 port-scans 10.10.1.5 (15 distinct ports, all denied)

@@ -271,9 +271,28 @@ RULES: list[tuple[str, str]] = [
           -- Non-public destinations, all of which are periodic by nature or
           -- not a real endpoint: RFC1918, loopback, link-local, multicast,
           -- 0.0.0.0/8, CGNAT 100.64/10 (turns up in ISP-side logs) and the
-          -- 240-255 reserved range.
+          -- 240-255 reserved range. The last branch (25[0-5]\.) is also what
+          -- already excludes the limited broadcast address 255.255.255.255,
+          -- and 169\.254\. covers the link-local directed broadcast
+          -- 169.254.255.255 - both appear in the FortiGate corpus as DHCP
+          -- and autoconfiguration chatter.
           AND NOT regexp_matches(e.dstip,
               '^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.|22[4-9]\.|23[0-9]\.|24[0-9]\.|25[0-5]\.)')
+          -- Same reasoning applied to the *source*, which had no guard at
+          -- all: 0.0.0.0 is not a host, it is "no address yet" - a DHCP
+          -- client broadcasting DISCOVER on a timer before it has a lease -
+          -- and 255.255.255.255 is never a real sender. 214 rows of
+          -- 0.0.0.0 -> 255.255.255.255 exist in the corpus; they are caught
+          -- today only by the destination branch above, so make the
+          -- intent explicit rather than incidental.
+          AND e.srcip NOT IN ('0.0.0.0', '255.255.255.255')
+          -- Deliberately NOT excluded: a destination merely *ending* in .255.
+          -- Without the subnet mask a flow log cannot say whether that is a
+          -- directed broadcast, and in this corpus the .255 destinations
+          -- R2007 flags (47.246.167.255, 52.123.168.255) are ordinary public
+          -- unicast hosts in /16-or-shorter allocations. Subnet-directed
+          -- broadcast on a genuinely internal /24 is a known residual gap,
+          -- but every internal case of it is already excluded as RFC1918.
     """),
 
     # ---------- R3xxx: single-event, network / firewall ----------
@@ -299,30 +318,83 @@ RULES: list[tuple[str, str]] = [
     # is also why the source and note are quoted into the description: an
     # indicator is only as good as the feed behind it, and the analyst has to
     # be able to weigh that.
-    ("R3003", """
+    #
+    # Split by verdict, for the reason gotcha #23 gives for R2002/R2003: the
+    # rows that are evidence of a *live* channel are the ones the firewall let
+    # through. The original single rule fired at lvl 13 / T1071 regardless of
+    # verdict, and on the FortiGate corpus all 24 of its hits were on denied
+    # traffic (e.g. six NetBIOS UDP/137 queries to 207.90.244.13, all
+    # verdict='deny') - which the AI layer then narrated as hosts that
+    # "communicated with a known-bad external IP", Command and Control,
+    # confidence high. The firewall had stopped every one of them.
+    ("R3003", f"""
         INSERT INTO findings
         SELECT e.row_id, 'R3003', 13,
-               'Traffic to known-bad indicator ' || e.dstip ||
+               'Traffic ALLOWED to known-bad indicator ' || e.dstip ||
                ' [' || i.source ||
                CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
                ['T1071']
         FROM raw_events e
         JOIN ioc i ON e.dstip = i.value AND i.type = 'ip'
+        WHERE e.verdict IS NULL OR e.verdict NOT IN {DENY_VERDICTS}
+    """),
+
+    # Same indicator match, but the firewall refused the connection. Worth
+    # knowing - a host trying to reach malware infrastructure is a host to
+    # look at (malware beaconing attempt, DNS/NetBIOS leakage, stale config) -
+    # but nothing was established, so it is not the emergency R3003 is.
+    # lvl 5 puts it below the ordinary network rules (R3000/R3001 at 8-9) and
+    # above the informational ones.
+    #
+    # Tag kept as T1071 rather than dropped: ATT&CK techniques describe
+    # attempted behaviour, not outcomes, so an attempt to speak C2 protocol is
+    # still T1071 - but the severity and the word "BLOCKED" leading the
+    # description are what the narrative reads, and both now say what actually
+    # happened.
+    ("R3005", f"""
+        INSERT INTO findings
+        SELECT e.row_id, 'R3005', 5,
+               'BLOCKED connection attempt to known-bad indicator ' || e.dstip ||
+               ' (denied by policy) [' || i.source ||
+               CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
+               ['T1071']
+        FROM raw_events e
+        JOIN ioc i ON e.dstip = i.value AND i.type = 'ip'
+        WHERE e.verdict IN {DENY_VERDICTS}
     """),
 
     # Same, inbound: the source of this traffic is a listed attacker. Lower
     # severity than R3003 because feeds like blocklist.de list any host that
     # has ever probed anyone - being scanned by one is routine background
-    # noise, whereas talking *to* C2 infrastructure is not.
-    ("R3004", """
+    # noise, whereas talking *to* C2 infrastructure is not. Split on verdict
+    # for the same reason as R3003, one tier down each: traffic from a listed
+    # host that was let in is the one to look at.
+    ("R3004", f"""
         INSERT INTO findings
         SELECT e.row_id, 'R3004', 7,
-               'Traffic from known-bad indicator ' || e.srcip ||
+               'Traffic ALLOWED from known-bad indicator ' || e.srcip ||
                ' [' || i.source ||
                CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
                ['T1595']
         FROM raw_events e
         JOIN ioc i ON e.srcip = i.value AND i.type = 'ip'
+        WHERE e.verdict IS NULL OR e.verdict NOT IN {DENY_VERDICTS}
+    """),
+
+    # Inbound from a listed host, blocked at the perimeter. This is the most
+    # routine event in the whole rule set - the internet scans everything and
+    # the firewall dropped it - so it is informational only, kept because an
+    # analyst still wants the perimeter's own hit rate visible.
+    ("R3006", f"""
+        INSERT INTO findings
+        SELECT e.row_id, 'R3006', 3,
+               'BLOCKED inbound traffic from known-bad indicator ' || e.srcip ||
+               ' (denied at the perimeter) [' || i.source ||
+               CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
+               ['T1595']
+        FROM raw_events e
+        JOIN ioc i ON e.srcip = i.value AND i.type = 'ip'
+        WHERE e.verdict IN {DENY_VERDICTS}
     """),
 
     ("R3002", """
@@ -364,19 +436,24 @@ RULE_LABELS: dict[str, str] = {
     "R3000": "high-risk app allowed",
     "R3001": "large transfer",
     "R3002": "malware-flagged",
-    "R3003": "known-bad destination",
-    "R3004": "known-bad source",
+    "R3003": "known-bad destination (allowed)",
+    "R3004": "known-bad source (allowed)",
+    "R3005": "known-bad destination (blocked)",
+    "R3006": "known-bad source (blocked)",
 }
 
 
-def apply_rules(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
+def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None) -> dict[str, int]:
     """Runs every rule against the case's raw_events, filling findings.
-    Returns {rule_id: rows_matched} so the pipeline can log/report it."""
+    Returns {rule_id: rows_matched} so the pipeline can log/report it.
+    `on_rule(done, total)` is called after each rule, for progress (FR-2.5)."""
     matched: dict[str, int] = {}
-    for rid, sql in RULES:
+    for i, (rid, sql) in enumerate(RULES, 1):
         before = con.execute("SELECT count(*) FROM findings").fetchone()[0]
         con.execute(sql)
         after = con.execute("SELECT count(*) FROM findings").fetchone()[0]
         if after > before:
             matched[rid] = after - before
+        if on_rule:
+            on_rule(i, len(RULES))
     return matched

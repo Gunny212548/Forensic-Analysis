@@ -20,7 +20,20 @@ EVENT_TZ_OFFSET_HOURS = 7
 # analyst, or the model writing the narrative - has to guess the zone.
 EVENT_TZ_SUFFIX = "+07:00"
 
-MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(2 * 1024 * 1024 * 1024)))  # 2GB
+# Login (FR-1, app/services/auth.py). A session lasts one working shift;
+# SESSION_SECRET signs the cookie and, when unset, is generated once and kept
+# in DATA_DIR so sessions survive a container restart.
+SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "12"))
+# Where "can't sign in?" points on the login page (FR-1.2) - a mailto: or a
+# helpdesk URL. Empty shows the instruction without a link.
+IT_CONTACT_URL = os.environ.get("IT_CONTACT_URL", "")
+
+# FR-2.2: 10 GB per file, measured after decompression (see routers/upload.py).
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024 * 1024)))  # 10GB
+# FR-2.2: refuse an upload unless the data disk has this many times its size
+# free. An upload is on disk twice before it is processed (Starlette's spool
+# file + the raw copy), then DuckDB adds its own, so 2.5x is not padding.
+UPLOAD_DISK_FACTOR = float(os.environ.get("UPLOAD_DISK_FACTOR", "2.5"))
 
 # Cap on rows ingested per file; 0 = no cap. Memory is bounded by the staging
 # CSV and DuckDB's reader, not by this - the BATCH_SIZE knob that used to sit
@@ -39,6 +52,38 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "qwen/qwen3.8-27b")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
+# Which LLM writes the narrative. 'groq' is the hosted qwen3.8-27b every
+# budget note below was measured against; 'ollama' is a local model served on
+# the host through Ollama's OpenAI-compatible surface, which has no API key,
+# no rate limit and no per-minute output-token reservation - so every knob
+# that exists to survive Groq's OTPM cap is bypassed for it (see
+# analysis._chat / _is_local). Defaults to the legacy ANALYSIS_PROVIDER value
+# so an existing deployment behaves exactly as before.
+LLM_PROVIDER = (os.environ.get("LLM_PROVIDER") or ANALYSIS_PROVIDER or "groq").strip().lower()
+
+# Ollama runs on the Docker *host*, not in this container, so the default is
+# the host gateway name Docker Desktop resolves. Verified reachable from the
+# container without any compose network change.
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434").rstrip("/")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b-instruct")
+# Ollama's NATIVE chat endpoint, not its OpenAI-compatible /v1 one, and the
+# reason is not style: /v1/chat/completions has no way to set the context
+# window, ignores an "options" block if you send one anyway, and silently
+# truncates the prompt to the server default of 4096 - measured here as a
+# 12,809-character prompt arriving as 2,050 tokens with the SYSTEM prompt (the
+# first message, so the first thing dropped) gone. The model then answered
+# off-schema and every top-level key went missing. The native endpoint takes
+# options.num_ctx, and _chat maps its response back into the OpenAI shape the
+# rest of this module already parses.
+OLLAMA_API_URL = f"{OLLAMA_BASE_URL}/api/chat"
+# Big enough for the 50-event prompt (~4k tokens) plus the output budget with
+# room to spare. KV cache for qwen2.5-7b at this size is ~1GB, which fits
+# beside the 4.7GB of weights on an 8GB card.
+OLLAMA_NUM_CTX = int(os.environ.get("OLLAMA_NUM_CTX", "16384"))
+# A local 7B on a consumer GPU generates at tens of tokens/sec and has to load
+# the model on the first call, so the 90s that is generous for Groq is not.
+OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_TIMEOUT", "600"))
+
 # How many distinct findings to send the model. Only the OUTPUT side is
 # capped (1000 OTPM), and measurement showed the model writes the same
 # ~950-token object whether it is given 8, 12 or 15 events - the extra
@@ -53,3 +98,58 @@ MAX_EVENTS_FOR_ANALYSIS = int(os.environ.get("MAX_EVENTS_FOR_ANALYSIS", "15"))
 # limit. Asking for more than the cap does not raise it - it just means the
 # response stops mid-JSON with finish_reason=length. Stay under it.
 MAX_COMPLETION_TOKENS = int(os.environ.get("MAX_COMPLETION_TOKENS", "950"))
+
+# --- local (Ollama) budgets ------------------------------------------------
+# The two numbers above are Groq's constraints, not the schema's: 15 events and
+# 950 output tokens are where qwen3.8-27b's 1000 OTPM cap lands. A local model
+# pays no per-minute tax, so both were re-swept against qwen2.5:7b-instruct
+# (see CLAUDE.md gotcha #5). Result: 50 events / 2400 tokens still returns a
+# complete object, and one call takes ~30-60s instead of a minute of waiting
+# for budget. These apply ONLY when LLM_PROVIDER=ollama.
+OLLAMA_MAX_EVENTS_FOR_ANALYSIS = int(os.environ.get("OLLAMA_MAX_EVENTS_FOR_ANALYSIS", "50"))
+OLLAMA_MAX_COMPLETION_TOKENS = int(os.environ.get("OLLAMA_MAX_COMPLETION_TOKENS", "2400"))
+OLLAMA_MAP_COMPLETION_TOKENS = int(os.environ.get("OLLAMA_MAP_COMPLETION_TOKENS", "600"))
+
+# --- map-reduce narrative (large cases only) -------------------------------
+# A case with more distinct findings than MAX_EVENTS_FOR_ANALYSIS cannot be
+# narrated from one slice, and the events-per-call ceiling is already at its
+# measured maximum (raising it just truncates the JSON). So the evidence pool
+# is read in batches, each summarised by a cheap call, and one final call
+# writes the real schema from those summaries plus the SQL-derived context.
+#
+# The pool stays bounded on purpose: top_distinct_findings() has already
+# collapsed and ranked by severity then volume in SQL, so "the top
+# MAX_EVENTS_FOR_ANALYSIS * ANALYSIS_MAP_MAX_CHUNKS findings" is the most
+# important evidence, not an arbitrary prefix. 5 chunks = 5 map calls + 1
+# reduce; at ~1 call/minute that is the ceiling on how long an analyze job may
+# run before an analyst gives up on it.
+ANALYSIS_MAP_MAX_CHUNKS = int(os.environ.get("ANALYSIS_MAP_MAX_CHUNKS", "5"))
+
+# Output budget for ONE map call. The map schema is a chunk note plus at most
+# 4 notable events - far smaller than the full narrative schema - so several
+# map calls fit inside one minute's OTPM reservation where two full analyses
+# never could.
+MAP_COMPLETION_TOKENS = int(os.environ.get("MAP_COMPLETION_TOKENS", "300"))
+
+# The per-minute output-token budget Groq reserves against. Used only to pace
+# the map phase so it asks for a call it can actually get; a 429 is still
+# handled if the estimate is wrong.
+ANALYSIS_OTPM_BUDGET = int(os.environ.get("ANALYSIS_OTPM_BUDGET", "1000"))
+
+
+# --- effective per-provider settings ---------------------------------------
+# Resolved once here rather than branched at every call site, so everything
+# downstream (analysis.plan_map_reduce, the /analyze fast path, the prompt
+# builder) keeps reading the same names and the provider switch stays a
+# one-line config change. LLM_MODEL/LLM_API_URL are what _meta records.
+if LLM_PROVIDER == "ollama":
+    LLM_MODEL = OLLAMA_MODEL
+    LLM_API_URL = OLLAMA_API_URL
+    LLM_TIMEOUT = OLLAMA_TIMEOUT
+    MAX_EVENTS_FOR_ANALYSIS = OLLAMA_MAX_EVENTS_FOR_ANALYSIS
+    MAX_COMPLETION_TOKENS = OLLAMA_MAX_COMPLETION_TOKENS
+    MAP_COMPLETION_TOKENS = OLLAMA_MAP_COMPLETION_TOKENS
+else:
+    LLM_MODEL = GROQ_MODEL
+    LLM_API_URL = GROQ_API_URL
+    LLM_TIMEOUT = float(os.environ.get("GROQ_TIMEOUT", "90"))

@@ -10,3 +10,9 @@ frontend/node_modules/
 
 # A 2.7GB checkout of an unrelated repo, cloned into the working directory.
 metabase/
+
+# Synthetic demo logs (regenerate with the gen_* scripts) - data, not source.
+logtest/
+
+# Functional-spec PDFs are external reference, kept out of the code repo.
+*.pdf

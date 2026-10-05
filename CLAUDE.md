@@ -9,7 +9,7 @@ log file (syslog/auth.log style text, CSV firewall exports, JSON), the app's
 own decoder + rule engine extracts structured fields and flags
 security-relevant events with MITRE ATT&CK technique IDs. The attack graph
 is then built straight from those findings in SQL, and Groq (AI) writes the
-narrative around it — incident summary, attack chain, timeline,
+narrative around it — case summary, attack chain, timeline,
 recommendations.
 
 Formats exercised against real data so far: VMware ESXi `auth.log`,
@@ -27,7 +27,9 @@ even for formats it does support, real-world testing found it silently
 
 ```
 POST /api/upload
+  → size + disk refused from Content-Length first (gotcha #25)
   → stream file to disk in 1MB chunks (never held in memory)
+    .gz / .zip kept compressed in raw/ (services/archive.py, FR-2.3)
   → manifest status=queued, return case_id immediately
   → BackgroundTask → asyncio.to_thread(pipeline.process_case)
 
@@ -40,6 +42,18 @@ pipeline.process_case  (services/pipeline.py)
          staging CSV → DuckDB bulk-loads it (needed for .log regex
          decoding and JSON; also the fallback if a CSV header maps to
          nothing).
+  .gz  → either path, read through gzip as a stream - never extracted.
+  .zip → each log member, one at a time, through the paths above into
+         the SAME raw_events (row ids continue), so rules correlate
+         across files. Member → row_id ranges go on the manifest
+         (`members`, `skipped_members`); raw_events has no source column.
+  progress → manifest `progress: {stage, pct, estimated}` about once a
+         second (FR-2.5; ingest 0-90, intel 90-92, rules 92-100). Measured
+         for line logs/JSON (bytes read), zip members and rules. The CSV fast
+         path is ONE DuckDB statement and 1.1.3 has no query_progress(), so
+         its share is an elapsed-time estimate at ~60 MB/s, held at 95% of
+         the file, flagged `estimated` (the UI prefixes "~"). Manifests are
+         now written tmp-then-rename, since they are rewritten while polled.
   then → rules.apply_rules() = SQL INSERT ... SELECT per rule
        → status=ready (or failed + error/traceback on the manifest)
 
@@ -47,6 +61,15 @@ data/db/{case_id}.duckdb
   raw_events  every row, canonical typed columns
   findings    rule matches, joined back via row_id
 
+POST /api/auth/login | logout, GET /me        session cookie (see *Login*);
+GET  /api/auth/config                        login + config + health are the
+                                             only routes open without a session
+GET  /api/upload/check?size=                 FR-2.2 pre-flight: 413/507 before
+                                             a byte is sent (gotcha #25)
+GET/POST /api/companies                      customers (FR-2.1 requires one)
+GET  /api/companies/summary                  Customers page: open/closed cases,
+                                             highest open severity, last
+                                             activity (overview.customers())
 GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
 GET  /api/cases/{id}/findings                collapsed findings + computed
                                              confidence + review status
@@ -55,13 +78,57 @@ GET  /api/cases/{id}/review-log              full decision history
 POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
                                              graph + SQL top-N distinct → Groq
                                              for the narrative
+GET  /api/overview                           KPIs, severity, techniques, top
+                                             entities, activity + case list
+                                             across all cases (services/
+                                             overview.py; per-case facts cached
+                                             on DuckDB/review-log mtime)
 ```
 
+**The Overview page is interim until findings have a status.** It follows
+`figma-export/Overview.svg`'s layout, but that design is status-shaped
+(open findings, MTTC, an open-findings table), and the finding lifecycle only
+arrives in Sprint 3 (IAI-45..49), with the real Overview stories in Sprint 5
+(IAI-65..70).
+Until then every tile is a case, finding, review or technique number, and the
+table is the case list (IAI-20). No figure is a placeholder. "Top affected"
+ranks by accumulated risk score, not by case count: ranked by count, the
+benign admin account seen in every seeded case came out first (gotcha #16
+again).
+
 Storage layout under `DATA_DIR` (`/data`):
-`cases/` manifests (small JSON) · `db/` per-case DuckDB · `raw/` original
-uploaded files (audit trail) · `analysis/` cached AI output · `tmp/` staging ·
+`cases/` manifests (small JSON) · `companies/` one JSON per customer ·
+`db/` per-case DuckDB · `raw/` original
+uploaded files, compressed ones kept compressed (audit trail) · `analysis/` cached AI output · `tmp/` staging ·
 `intel/` threat-intel feed files (see gotcha #17) · `review/` append-only
-analyst decision logs, one JSONL per case (see gotcha #19).
+analyst decision logs, one JSONL per case (see gotcha #19) · `users.json`
+login accounts + `session_secret` (see *Login* below).
+
+A manifest now carries more than the upload: `company_id`/`company_name`
+(always set since FR-2.1), `compression` (`gz`/`zip`/null), `size_bytes` (as
+uploaded) vs `uncompressed_bytes` (what the 10 GB limit is measured on),
+`members`/`skipped_members` for a zip (with each member's `row_id` range),
+and `progress` while processing. Cases uploaded before these existed simply
+lack the keys - read them with `.get()`.
+
+**Login (FR-1, IAI-13).** Every `/api/*` route needs a signed-in session except
+`/api/health`, `/api/auth/login` and `/api/auth/config` - enforced by one
+middleware in `app/main.py`, so a new router is protected without doing
+anything. The page and its bundle stay public; they hold no data.
+- Accounts are made by an administrator with `tools/create_user.py`
+  (add / list / remove); there is no sign-up page on purpose. Passwords are
+  stdlib `scrypt`, so auth added no dependency.
+- The session is an HMAC-signed cookie (`fa_session`, HttpOnly, 12h), not
+  server state. Every request re-reads the account, so **removing a user
+  ends their sessions at once**; what logout cannot do is revoke a copy of
+  the cookie taken before it expires. There is no login rate limit yet.
+- `role` is a stored display label only. Roles are undefined until IAI-14,
+  so nothing is permitted or denied by it.
+- **The review actor comes from the session, not the request body.** It used
+  to be whatever name the browser sent (typed once, kept in localStorage as
+  `analyst-name`), which let any client write any name into an audit log
+  (FR-7.6). Decisions recorded since carry the account's email; older ones
+  keep the name that was typed.
 
 **Why DuckDB and not Elasticsearch:** this is batch forensic analysis for one
 analyst, not a real-time multi-tenant SIEM. DuckDB is embedded (no server to
@@ -76,18 +143,22 @@ the `/static` mount, so `vite.config.js` sets `base: '/static/'` to match.
 
 ```
 frontend/src/
-  App.jsx              hash router (#/dashboard, #/upload, #/result/<id>)
+  App.jsx              session gate + hash router (#/dashboard, #/upload,
+                       #/result/<id>, and the menu routes of Sidebar.jsx)
   api.js               every call the UI makes, and nothing else
   format.js            fmtBytes/fmtTime/shortTs + the status & severity maps
-  pages/               Dashboard · Upload · Result
-  components/          Workspace (sidebar tabs) · EventsTable · ReviewPanel
+  pages/               Overview (#/dashboard) · Upload · Customers · Result · Login · Placeholder
+                       (menu pages whose story is not built yet)
+  components/          Sidebar (app shell, FR-0) · Workspace (case tabs)
+                       EventsTable · ReviewPanel
                        AttackGraph · analysis.jsx (chain/timeline/risk/meta)
                        common.jsx (severity pill, status badge, MITRE tags)
 ```
 
 It replaced a hand-written 1,212-line `static/index.html`, whose URLs and
-localStorage keys (`fa_recent_uploads`, `analyst-name`) are kept unchanged so
-pasted case links and an analyst's local state survived the rewrite. The
+localStorage key `fa_recent_uploads` were kept unchanged so pasted case links
+and an analyst's recent uploads survived the rewrite (`analyst-name` is no
+longer read - the reviewer is the signed-in account, see *Login*). The
 original is preserved at `legacy/index.html.orig` — this repo is not a git
 checkout, so that copy is the only history it has.
 
@@ -102,6 +173,19 @@ the bundle in its own `node:22-slim` stage rather than copying the host's
 `static/`, so an image can never ship a stale bundle and the output stays
 reproducible - which matters because the output is evidence. Verified: the
 in-image build produced a byte-identical bundle hash to the host build.
+
+**Look and feel follow the SENTRY-IR Figma (since 2026-09-29).** The palette
+in `styles.css` `:root` was sampled from the rendered frames (light
+`#EEF0F3` page, white panels, amber `#B36B00` as the only action colour), and
+the type is IBM Plex Sans / Plex Sans Thai / Plex Mono, bundled via
+`@fontsource` so the nothing-fetched-at-runtime rule above still holds.
+Plex Sans has no Thai glyphs, and most UI text is Thai, which is why the Thai
+cut is there too. Severity, review-status and job colours kept their meanings
+and were only re-mapped onto the Figma tokens. Exception: the attack graph
+keeps a dark canvas (`--graph-bg`), because the colours in `AttackGraph.jsx`
+are drawn for it; it gets the Figma treatment in its own story (IAI-61). The
+login and shell are in English, as the Figma is; page content is still Thai
+until each page's story restyles it.
 
 The attack graph is still a **static SVG** with no library
 (`components/AttackGraph.jsx`), and its geometry is deliberately the same
@@ -124,8 +208,26 @@ Two things the rewrite changed on purpose:
   own `reason_codes`, with the confirm button disabled until one is chosen, so
   FR-4.6 is enforced in the UI instead of discovered as a 400.
 
+**Never gate a form's submit button on React state that autofill feeds.**
+Chrome fills a saved account into the login fields without firing input
+events, so `Login.jsx`'s button - disabled until `email`/`password` state was
+non-empty - sat greyed out beside two visibly filled fields, and the analyst
+could not sign in (found 2026-10-05). The inputs are now uncontrolled and
+`submit()` reads `form.elements` at click time, which is after Chrome releases
+the autofilled values; an empty field is reported as an error instead.
+
 `npm run dev` in `frontend/` serves the UI with hot reload and proxies `/api`
 to the container on 8091, so the UI can be worked on against real cases.
+
+**Two instances on one machine log each other out.** Browsers do not scope
+cookies by port, so a host-run copy (`uvicorn` on e.g. 8097 with its own
+`DATA_DIR`) and the container on 8091 share one `fa_session` cookie on
+`localhost`. Signing in to either overwrites it with a token the other's
+secret rejects, and the other bounces to the login page on its next request -
+which looks exactly like a session bug and is not one (2026-10-05: the
+"logged out ~7s after login" was a sign-in on 8091 in another tab). Test the
+host copy on `127.0.0.1:<port>` instead, a different host name with its own
+cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
@@ -623,6 +725,174 @@ survives, narrowed from 45,209 rows to the 42,223 that were actually refused
 (42,071 drops + 135 prevents + 17 rejects); its 2,978 accepted rows are a
 policy gap, which is `R2004`'s finding and not a sweep.
 
+**24. The workflow threshold matters - the obvious one opens 183 items.**
+Only findings that pass a threshold enter the status workflow (IAI-42); the
+rest stay visible at case level. Measured 2026-09-28 on 27 deduplicated real
+files (no intel feeds loaded), back when findings were to be grouped into
+*incidents* by attack-graph chain - a concept dropped on 2026-10-05 (see
+*Decisions* below). The counts are therefore **chain groups, not findings**;
+re-measure per finding before quoting them for the workflow:
+
+| opening rule | chain groups | files with any |
+|---|---|---|
+| any finding lvl >= 7 (High) **or** >= 2 rule families | 183 | 25 |
+| any finding lvl >= 10 (Critical) **or** >= 2 rule families | **6** | 6 |
+
+The first rule is useless because `R3000` (high-risk app allowed) is lvl 8
+and fires alone on ordinary hosts: `dst10-8-2-37.csv` alone opened 38,
+`log(10).csv` 56. The second leaves exactly the real attacks - the beaconing
+host 10.8.3.215, host 10.8.2.37, the ESXi brute force/spray, the Azure spray,
+and both `gen_usecase` files. The 21 Palo Alto files that carry only `R3000`
+open none; their findings stay visible at case level. Families are the same
+R1/R2/R3 split `db._confidence()` uses (gotcha #20).
+
+The same grouping now defines **related findings** (IAI-43/44), shown on a
+finding rather than merged into a new object. Chain grouping links sources
+**only through pivots** (a target that is also a source). Linking through any
+shared target would relate every scanner hitting one public IP - graphs here
+are many-sources-to-one-target (see the attack-graph notes). But pivot-only
+linking **splits an account-centric attack**: the Azure spray (14 sources, one
+account) became 30 groups. `R2005`/`R2006` rows must instead be related by
+`username`, which
+takes that case to 1 and changes no other case. Pivots also never form
+through accounts - a username is never a `srcip` - so auth chains are
+single-hop by construction.
+
+**25. An upload is fully received and spooled to disk before the handler runs,
+so size and disk checks in `upload_log()` come too late.** Starlette parses the
+multipart form - writing the whole file into a `SpooledTemporaryFile` in `/tmp`
+(1MB in memory, the rest on disk) - before FastAPI calls the handler. The
+"stream to disk in 1MB chunks" in `upload_log()` is true for memory but not for
+disk or time: a 10 GB file has already crossed the network and landed in `/tmp`
+when the handler's size check first sees it, and it sits on disk twice until
+the spool is freed. Verified in the image (starlette 0.38.6,
+`formparsers.spool_max_size = 1MB`).
+
+So FR-2.2's refusals (`upload.capacity_problem()`: > `MAX_UPLOAD_BYTES` = 10
+GB, or free space on `DATA_DIR` < `UPLOAD_DISK_FACTOR` = 2.5x the size) run
+from **Content-Length in the middleware in `main.py`, before the body is
+read**. Measured: an 11 GB upload declared in headers with no body sent gets
+413 in 0.00s. The upload page also calls `GET /api/upload/check?size=` first,
+because a browser that is still sending may report a network error instead of
+the early 413/507. The 2.5x is not padding: spool copy + raw copy + DuckDB.
+The handler's own byte count stays authoritative for the limit, because that
+is the size *after* decompression. IAI-25 (.gz/.zip) must keep counting
+decompressed bytes there, since Content-Length only knows the compressed size.
+
+## SENTRY-IR console (requirements Sept 2026, being built)
+
+The target UI is `figma-export/` (10 screens: login, Upload, Overview,
+Incidents (= the Findings page, see *Decisions*), Timeline, Customers,
+Attack-graph, Attck-map, Reports, Settings).
+Its text is **outlined to paths**, so `grep` finds nothing; render each SVG
+with headless Chrome (`--screenshot --window-size=1728,<height>`) and read the
+image. Use the SVG's own height - `Overview.svg` is 2346px tall and a
+1117px window silently cuts off its bottom half. On Windows pass the output
+and `file:///` paths with forward slashes (`cygpath -m`); backslashes are
+eaten on the way to Chrome and it renders "file couldn't be accessed". The
+agreed functional spec is `AI-Incident-Analysis-Reporting-FR.pdf`
+in the repo root (59 items, FR-0..FR-12); its HTML source was generated, not
+kept in the repo.
+
+**Work is tracked in Jira**, project `IAI` at
+https://titlenattapat.atlassian.net (epics = spec areas, stories labelled
+`IAT-FR-x.y`, six two-week sprints from 2026-09-29). Work the active sprint
+in rank order. When a story needs something a later sprint builds, split the
+dependent criterion into its own story in that sprint rather than leaving
+the story open: IAI-12's open-findings badge became **IAI-78** (Sprint 3) that way.
+
+Built in Sprint 1 (verified in Docker, 2026-09-29):
+- **IAI-12 app shell / IAI-13 login** - grouped sidebar, user + role +
+  logout, English per the Figma. Role is a label until IAI-14 (RBAC, not yet
+  in any sprint) defines roles.
+- **IAI-22/23/25/27 upload** - customer required, 10 GB after
+  decompression, 2.5x disk check, `.gz` streamed, `.zip` → one case,
+  separate upload / processing percentages.
+- **IAI-20 case list** - lives in the interim Overview (see Architecture).
+- **IAI-18/19 Customers** - a customer is added on the Upload page only
+  (see *Decisions*); the Customers page is read-only and shows, per
+  customer, open cases of total / closed /
+  highest open severity / last activity. FR-6.1 defines "open" by finding
+  status, so until Sprint 3 a case is open while any finding group is
+  **unreviewed** and the page footnotes that; the status rule is
+  **IAI-79**. Cases without a customer (pre-FR-2.1) are a "No customer" row
+  so the totals add up.
+- Not yet: **IAI-24 resumable chunked
+  upload** (Sprint 6). The upload is one request, so a dropped connection
+  restarts a 10 GB file from zero.
+
+Pages whose story has not come up render `pages/Placeholder.jsx` and appear
+dimmed in the menu (`ready: false` in `components/Sidebar.jsx`). Flip the flag
+when a page is built. Page *content* is still Thai wherever its story has not
+restyled it yet. The shell, login, upload, overview and customers pages are
+English, as the Figma is.
+
+Decisions the user made, which the Figma does not show:
+- **There is no "incident" - the finding is the only unit (2026-10-05).**
+  The spec and Figma had incidents as groups of findings; they were merged
+  into one concept. The unit is the collapsed finding of gotcha #19
+  (`rid|srcip|username`): it carries the review decision *and* the status
+  workflow. Grouping survives only as **related findings** (IAI-43/44), and
+  the old opening threshold decides which findings enter the workflow
+  (IAI-42). The brand line is "Finding Response Console"; ids are
+  `FD-YYYY-seq`. File names that say Incident (`figma-export/Incidents.svg`,
+  the FR PDF) are left as they are.
+- **Every datum comes from an upload.** No "New finding" button, no live
+  feed, no EDR/SIEM/email integrations, no ingest API key. The Figma's
+  source column (CrowdStrike, Splunk, Proofpoint...) becomes the log type.
+- **A customer is added only on the Upload page (2026-10-05)** - the
+  "+ Add new customer..." option of its customer select. The Customers page
+  is read-only, although the Figma gives it an "Add customer" button. The
+  `POST /api/companies` route predates Sprint 1 and is kept; no page calls it.
+- Uploads up to **10 GB per file, measured after decompression**, with `.gz`
+  and `.zip` (a multi-file zip becomes one case, even with mixed formats),
+  resumable chunked upload, and percentage progress. All built except the
+  resumable upload (IAI-24). A `.gz` *inside* a zip is skipped and listed,
+  because its decompressed size could not be held to the budget. Known gap:
+  `/merge` looks for `raw/<id>.log`, so a line-log case uploaded as `.log.gz`
+  cannot be merged ("Raw file missing").
+- Alerts, Threat Intel, Playbooks and Assets pages are cut.
+- **All UI text is English (2026-10-05)** - the Thai still left in the case
+  (Result) page, review panel, analysis panel, events table, `format.js` labels
+  and `api.js` error messages is to be translated, not kept alongside. Code
+  comments were always English.
+- Findings: created by the rule engine, related and admitted to the
+  workflow per gotcha #24, no time window (the whole case).
+- **Finding lifecycle (FR-4.1, 4.5, 4.7, 4.8).** The Figma has status only
+  (Open → Investigating → Contained → Resolved) and nothing stopped an analyst
+  closing a finding without looking at it. The spec now requires:
+  - A new finding starts **Open with no assignee** - the system created it.
+  - To close: an assignee, and **the finding reviewed** (accept / modify /
+    reject). This reuses `review.py`
+    decisions keyed by `finding_key` (gotcha #19); it is not a second review
+    store.
+  - At close: a classification - true positive / benign true positive /
+    false positive - plus a written summary.
+  - A true positive must pass through Contained, with the containment actions
+    recorded. False and benign positives may close straight from
+    Investigating and are **excluded from MTTC**. Forcing them through
+    Contained would record a containment that never happened and skew the
+    metric.
+  - Every status change is timestamped. MTTC is creation → Contained.
+
+What the data forced onto the Figma, measured on the same corpus:
+- **ATT&CK map:** ~98% of findings are `T1071` (C2, 65,774) and `T1595`
+  (Reconnaissance, 28,889) - neither is among the Figma's 9 tactic columns,
+  nor is Discovery (`T1046`). Show the tactics actually found, out of the
+  14 Enterprise tactics.
+- **Timeline "last 24h" is always empty:** uploaded events are months old
+  (Dec 2025 - Jun 2026 in the corpus). Timelines use the case's event-time
+  range; MTTC and the per-day charts use finding *creation* time.
+- **No asset inventory exists**, so "affected segments" and node roles such
+  as "domain controller" become risk-ranked hosts/accounts (`risk_scores()`)
+  and internal / external / IOC labels.
+- Most of the Figma's sample findings (PsExec, Kerberoasting, AMSI bypass,
+  web shell, phishing, OAuth consent, S3, USB) need EDR / Windows / mail /
+  cloud logs that no decoder reads.
+- The Figma has **no case-detail or review screen**, though both exist in the
+  app today (events, findings, AI narrative, review + export gate). The spec
+  keeps them as FR-11/FR-12; they need designing.
+
 ## Environment / secrets
 
 `.env` (gitignored) holds `GROQ_API_KEY`, `GROQ_MODEL`
@@ -636,13 +906,18 @@ auto-loads it for `${VAR}` substitution in `docker-compose.yml`.
 docker compose up -d --build --force-recreate      # rebuild + restart
                                                    # (also rebuilds the UI)
 docker exec forensic-analyzer-forensic-analyzer-1 python tools/refresh_intel.py
+docker exec -it forensic-analyzer-forensic-analyzer-1 \
+    python tools/create_user.py add you@example.com --name "..." --role analyst
 docker logs forensic-analyzer-forensic-analyzer-1 --tail 50
 
 cd frontend && npm ci && npm run build   # UI only, straight into ../static
 cd frontend && npm run dev               # hot reload, /api proxied to 8091
 
-curl -s "http://localhost:8091/api/cases/{id}/events?limit=100&offset=0"
-curl -s -X POST "http://localhost:8091/api/cases/{id}/analyze?force=true"
+# every /api call needs a session cookie now
+curl -s -c /tmp/fa.jar -H 'Content-Type: application/json' \
+    -d '{"email":"you@example.com","password":"..."}' http://localhost:8091/api/auth/login
+curl -s -b /tmp/fa.jar "http://localhost:8091/api/cases/{id}/events?limit=100&offset=0"
+curl -s -b /tmp/fa.jar -X POST "http://localhost:8091/api/cases/{id}/analyze?force=true"
 
 # poke a case's DuckDB directly
 docker exec forensic-analyzer-forensic-analyzer-1 python -c "
@@ -656,7 +931,7 @@ Unix-style paths in `docker exec`/`docker cp` need `MSYS_NO_PATHCONV=1`.
 
 ## Validating changes
 
-`tests/gen_usecase.py` generates a synthetic incident whose every rule hit is
+`tests/gen_usecase.py` generates a synthetic attack scenario whose every rule hit is
 known in advance (see `tests/README.md` for the expected counts). Run it
 after touching `decode.py`, `rules.py`, or the ingest pipeline - it catches
 both missed detections and false positives, and it is how the R2001 MITRE
@@ -670,6 +945,8 @@ uploads, polls, and diffs per-file `rows / flagged / per-rule` counts against
 `tests/baseline.json`, printing every drift and exiting non-zero:
 
 ```bash
+export FA_EMAIL=you@example.com FA_PASSWORD=...          # an account, see Login
+# uploads go to customer "Parity check" - FR-2.1 refuses a case without one
 python tests/gen_usecase.py /tmp/usecase
 python tests/check_parity.py /tmp/usecase                  # ground truth, ~5s
 python tests/check_parity.py "D:/forensic system/Logtest"  # full corpus, ~3min
@@ -746,7 +1023,8 @@ R2004 policy gap ·
 R3000 high-risk app allowed · R3001 large transfer · R3002 malware category ·
 R2005 password spray (many sources, one account) · R2006 multi-source logins
 within an hour · R2007 beaconing (low-jitter egress intervals) ·
-R3003/R3004 threat-intel match on destination / source.
+R3003/R3004 threat-intel match on destination / source (allowed) ·
+R3005/R3006 the same matches on blocked traffic (lvl 5 / 3).
 
 Three things worth copying when writing new correlation rules:
 - **Get the MITRE tag right — it propagates.** `R2001` was originally tagged
@@ -802,7 +1080,18 @@ third of the corpus is duplicated content: `Data log Firewall paloalto/` (36
 files) and `Virus Dec28-2025/` (33) overlap, several byte-identical, and
 `log(30).csv` exists in two different versions under one name - so
 **dedupe before quoting a corpus total**, and expect 98 cases from 92 usable
-files.
+files. As of 2026-09-28 those folders sit under
+`Logtest/2026-01/2026 SUMMITGROUP info Virus/` (with `log esxi 131/log/`
+for `auth.log`), and the Azure sign-in export is
+`Logtest/2026-02/KM23 ITSupport_InteractiveSignIns_2026-06-04_2026-06-11.csv`.
+
+**Without Docker** the pipeline still runs on the host: `pip install duckdb`,
+set `DATA_DIR` to a scratch folder, then `storage.create_case(...)` +
+`pipeline.process_case(case_id, Path(file), kind)` per file. That
+reproduces the baseline anchors exactly except the intel rules
+(`R3003`-`R3006`), because `DATA_DIR/intel/` is empty - so `log_22_.csv`
+gives 14514, not 14838. It is how gotcha #24 was measured while the Docker
+daemon was down.
 
 Zero-finding files are expected for ESXi system logs (not auth logs) and for
 Palo Alto exports whose every row is `allow`; check with the gotcha #7 query
@@ -842,4 +1131,13 @@ work attached. Always run it without `--apply` first, and pass
 
 Remaining known ceiling: `.log`/JSON still decode in Python (~15k rows/sec).
 Only worth moving to SQL `regexp_extract` if large syslog files show up;
-CSV (the bulk of real data) already bypasses Python entirely.
+CSV (the bulk of real data) already bypasses Python entirely. The 10 GB
+upload requirement makes this real: measured on the host, CSV ran at ~77 MB/s
+(45 MB in 0.59s, so ~2-3 min for 10 GB) and the Python path at ~21 MB/s on a
+28 MB file (~8 min or more for 10 GB). Neither was measured on a GB-sized
+file.
+
+Known, not investigated: the ESXi `auth.log` has no year in its timestamps,
+and its `min(ts)` comes out as **2014-07-02** while the file's max is
+2026-01-10 - the year inference misplaces some rows, which will distort any
+timeline built from that file.

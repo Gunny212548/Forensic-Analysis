@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
-import Dashboard from './pages/Dashboard.jsx'
+import { AUTH_REQUIRED, getMe, logout } from './api.js'
+import Overview from './pages/Overview.jsx'
 import Upload from './pages/Upload.jsx'
+import Customers from './pages/Customers.jsx'
 import Result from './pages/Result.jsx'
+import Placeholder from './pages/Placeholder.jsx'
+import Login from './pages/Login.jsx'
+import Sidebar, { NAV_GROUPS } from './components/Sidebar.jsx'
 
-const PAGES = ['dashboard', 'upload', 'result']
+const MENU = NAV_GROUPS.flatMap((g) => g.items)
+const PAGES = [...MENU.map((it) => it.route), 'result']
 
 function parseHash() {
   const h = window.location.hash.replace(/^#\/?/, '')
@@ -29,33 +35,62 @@ function useHashRoute() {
   return route
 }
 
+/** undefined while the session is being checked, null when signed out. */
+function useSession() {
+  const [user, setUser] = useState(undefined)
+  useEffect(() => {
+    getMe()
+      .then(setUser)
+      .catch(() => setUser(null))
+    const expired = () => setUser(null)
+    window.addEventListener(AUTH_REQUIRED, expired)
+    return () => window.removeEventListener(AUTH_REQUIRED, expired)
+  }, [])
+  return [user, setUser]
+}
+
 export default function App() {
   const { page, param } = useHashRoute()
+  const [user, setUser] = useSession()
 
   // A result route with no case id is a dead end; send it home.
   useEffect(() => {
     if (page === 'result' && !param) window.location.hash = '#/dashboard'
   }, [page, param])
 
-  return (
-    <>
-      <nav className="topnav">
-        <div className="topnav-brand">Forensic Analyzer</div>
-        <div className="topnav-links">
-          <a href="#/dashboard" className={page === 'dashboard' ? 'active' : ''}>
-            Dashboard
-          </a>
-          <a href="#/upload" className={page === 'upload' ? 'active' : ''}>
-            Upload
-          </a>
-        </div>
-      </nav>
+  const placeholder = MENU.find((it) => it.route === page && it.ready === false)
 
-      <div className="layout">
-        {page === 'dashboard' && <Dashboard />}
+  async function signOut() {
+    await logout().catch(() => {})
+    setUser(null)
+  }
+
+  // Nothing renders until the session check answers, so a signed-out user
+  // never sees the shell flash, and a signed-in one never sees the login form.
+  // The hash is left alone: signing in lands on the page the link pointed to.
+  if (user === undefined) return null
+  if (user === null) return <Login onLogin={setUser} />
+
+  return (
+    <div className="app">
+      {/* A case is opened from the Overview list, so that is what stays lit.
+          The open-findings count waits for the finding status workflow
+          (IAI-78); until then it is left unset and the badge does not
+          render. */}
+      <Sidebar
+        active={page === 'result' ? 'dashboard' : page}
+        counts={{ findings: null }}
+        user={user}
+        onLogout={signOut}
+      />
+
+      <main className="layout">
+        {page === 'dashboard' && <Overview />}
         {page === 'upload' && <Upload />}
+        {page === 'customers' && <Customers />}
         {page === 'result' && param && <Result caseId={param} key={param} />}
-      </div>
-    </>
+        {placeholder && <Placeholder title={placeholder.label} />}
+      </main>
+    </div>
   )
 }

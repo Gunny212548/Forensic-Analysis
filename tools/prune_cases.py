@@ -60,6 +60,9 @@ def case_files(data: Path, case_id: str) -> list[Path]:
         data / "cases" / f"{case_id}.json",
         data / "db" / f"{case_id}.duckdb",
         data / "analysis" / f"{case_id}.json",
+        # The map-reduce narrative job's progress sidecar, for cases whose
+        # analysis was too large for a single model call.
+        data / "analysis" / f"{case_id}.job.json",
         data / "review" / f"{case_id}.jsonl",
     ]
     found += list((data / "raw").glob(f"{case_id}.*"))

@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTRY-IR // Incident Response Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0E16;
+  --panel:#111726;
+  --panel-2:#161D2F;
+  --border:#232C42;
+  --border-soft:#1A2136;
+  --text:#E7EAF2;
+  --text-dim:#8891A8;
+  --text-faint:#5B6478;
+  --amber:#E8A33D;
+  --amber-dim:#8A6528;
+  --red:#E5484D;
+  --red-dim:#7A2C2F;
+  --green:#3DD68C;
+  --blue:#4C8CE8;
+  --grey:#6E7891;
+  --radius:3px;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+}
+:root:not([data-theme="light"]){ }
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#0A0E16; --panel:#111726; --panel-2:#161D2F; --text:#E7EAF2; --text-dim:#8891A8;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);height:100%;}
+body{font-size:14px;line-height:1.45;}
+::selection{background:var(--amber-dim);color:#fff;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+
+a{color:inherit;}
+button{font-family:var(--sans);cursor:pointer;}
+
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh;}
+
+/* ---------- Sidebar ---------- */
+.sidebar{background:var(--panel);border-right:1px solid var(--border-soft);padding:20px 14px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.brand{display:flex;align-items:center;gap:10px;padding:0 4px;}
+.brand-mark{width:28px;height:28px;border-radius:6px;background:linear-gradient(155deg,var(--amber),#B67420);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;color:#0A0E16;font-size:13px;flex:none;}
+.brand-name{font-family:var(--mono);font-weight:600;font-size:13.5px;letter-spacing:0.02em;}
+.brand-sub{font-size:10px;color:var(--text-faint);margin-top:1px;}
+
+.nav-group{display:flex;flex-direction:column;gap:1px;}
+.nav-label{font-size:10.5px;color:var(--text-faint);padding:6px 10px 4px;letter-spacing:0.03em;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius);color:var(--text-dim);text-decoration:none;font-size:13px;font-weight:500;}
+.nav-item svg{width:15px;height:15px;flex:none;opacity:0.85;}
+.nav-item.active{background:var(--panel-2);color:var(--text);}
+.nav-item.active svg{color:var(--amber);opacity:1;}
+.nav-item:hover:not(.active){background:#0E1420;color:var(--text);}
+.nav-count{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--text-faint);background:#0A0E16;border:1px solid var(--border-soft);padding:1px 6px;border-radius:20px;}
+.nav-count.hot{color:var(--red);border-color:var(--red-dim);}
+
+.sidebar-foot{margin-top:auto;border-top:1px solid var(--border-soft);padding-top:14px;display:flex;gap:9px;align-items:center;}
+.avatar{width:26px;height:26px;border-radius:50%;background:#1E2A44;color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;font-family:var(--mono);flex:none;}
+.who-name{font-size:12.5px;font-weight:600;}
+.who-role{font-size:10.5px;color:var(--text-faint);}
+
+/* ---------- Main ---------- */
+.main{padding:22px 28px 60px;max-width:1400px;}
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:20px;flex-wrap:wrap;}
+.topbar h1{font-size:19px;margin:0 0 4px;font-weight:600;}
+.topbar .sub{font-size:12.5px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(61,214,140,0.15);flex:none;}
+.topbar-actions{display:flex;gap:10px;}
+.btn{border:1px solid var(--border);background:var(--panel-2);color:var(--text);padding:8px 13px;border-radius:var(--radius);font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:7px;}
+.btn:hover{border-color:#39445E;background:#1B2338;}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#181005;font-weight:600;}
+.btn-primary:hover{background:#F0AD4E;border-color:#F0AD4E;}
+
+/* KPI row */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.kpi{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden;}
+.kpi-top{display:flex;justify-content:space-between;align-items:flex-start;}
+.kpi-label{font-size:11.5px;color:var(--text-dim);font-weight:500;}
+.kpi-trend{font-family:var(--mono);font-size:11px;padding:2px 6px;border-radius:20px;}
+.trend-up{color:var(--red);background:rgba(229,72,77,0.12);}
+.trend-down{color:var(--green);background:rgba(61,214,140,0.12);}
+.trend-flat{color:var(--text-faint);background:rgba(255,255,255,0.04);}
+.kpi-value{font-family:var(--mono);font-size:30px;font-weight:600;margin-top:10px;letter-spacing:-0.01em;}
+.kpi-value .unit{font-size:14px;color:var(--text-faint);font-weight:500;margin-left:3px;}
+.kpi-foot{font-size:11px;color:var(--text-faint);margin-top:6px;}
+.kpi-bar{position:absolute;left:0;bottom:0;height:2.5px;width:100%;background:var(--border-soft);}
+.kpi-bar i{display:block;height:100%;}
+
+/* Content grid */
+.grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:16px;align-items:start;}
+.panel{background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px 20px;}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.panel-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;}
+.panel-title .badge{font-family:var(--mono);font-size:10px;color:var(--text-faint);font-weight:500;}
+.panel-link{font-size:11.5px;color:var(--amber);font-weight:500;text-decoration:none;}
+
+/* Timeline chart (14 days, bars) */
+.chart-wrap{display:flex;align-items:flex-end;gap:6px;height:150px;padding-top:6px;}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:2px;position:relative;}
+.chart-bars{display:flex;flex-direction:column-reverse;width:100%;max-width:26px;border-radius:2px 2px 0 0;overflow:hidden;}
+.chart-bars div{width:100%;}
+.chart-day{font-size:9.5px;color:var(--text-faint);font-family:var(--mono);margin-top:8px;}
+.chart-col:hover .chart-bars{outline:1px solid var(--border);outline-offset:2px;}
+.legend{display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);}
+.legend-dot{width:8px;height:8px;border-radius:2px;flex:none;}
+
+/* Severity donut-ish bars */
+.sev-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.sev-row:last-child{margin-bottom:0;}
+.sev-label{width:64px;font-size:11.5px;color:var(--text-dim);flex:none;}
+.sev-track{flex:1;height:7px;background:#0A0E16;border-radius:20px;overflow:hidden;}
+.sev-fill{height:100%;border-radius:20px;}
+.sev-num{font-family:var(--mono);width:26px;text-align:right;font-size:12px;color:var(--text-dim);flex:none;}
+
+/* Table */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+thead th{text-align:left;font-weight:500;color:var(--text-faint);font-size:10.5px;letter-spacing:0.02em;padding:0 10px 10px;border-bottom:1px solid var(--border-soft);white-space:nowrap;}
+tbody td{padding:11px 10px;border-bottom:1px solid var(--border-soft);vertical-align:middle;white-space:nowrap;}
+tbody tr{cursor:pointer;}
+tbody tr:hover{background:#0E1420;}
+tbody tr:last-child td{border-bottom:none;}
+.id-cell{font-family:var(--mono);color:var(--text-faint);font-size:11.5px;}
+.title-cell{color:var(--text);font-weight:500;white-space:normal;min-width:220px;max-width:320px;}
+.title-sub{color:var(--text-faint);font-weight:400;font-size:11px;margin-top:2px;}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;}
+.pill::before{content:'';width:6px;height:6px;border-radius:50%;}
+.pill-critical{background:rgba(229,72,77,0.12);color:var(--red);}
+.pill-critical::before{background:var(--red);}
+.pill-high{background:rgba(232,163,61,0.14);color:var(--amber);}
+.pill-high::before{background:var(--amber);}
+.pill-medium{background:rgba(76,140,232,0.13);color:var(--blue);}
+.pill-medium::before{background:var(--blue);}
+.pill-low{background:rgba(110,120,145,0.15);color:var(--grey);}
+.pill-low::before{background:var(--grey);}
+.status-chip{font-size:11px;font-weight:500;padding:3px 9px;border-radius:var(--radius);border:1px solid var(--border);color:var(--text-dim);}
+.status-open{color:var(--red);border-color:var(--red-dim);}
+.status-investigating{color:var(--amber);border-color:var(--amber-dim);}
+.status-contained{color:var(--blue);border-color:#2C4874;}
+.status-resolved{color:var(--green);border-color:#276148;}
+.assignee{display:flex;align-items:center;gap:7px;}
+.assignee .avatar{width:20px;height:20px;font-size:9.5px;}
+.filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.filter-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);padding:6px 12px;border-radius:20px;font-size:11.5px;font-weight:500;}
+.filter-btn.active{background:var(--amber);border-color:var(--amber);color:#181005;}
+.filter-btn:not(.active):hover{border-color:#39445E;color:var(--text);}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 11px;margin-left:auto;min-width:220px;}
+.search-box svg{width:13px;height:13px;color:var(--text-faint);flex:none;}
+.search-box input{background:none;border:none;outline:none;color:var(--text);font-size:12.5px;width:100%;font-family:var(--sans);}
+.search-box input::placeholder{color:var(--text-faint);}
+
+/* Feed + techniques */
+.grid-3{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.feed-item{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--border-soft);}
+.feed-item:last-child{border-bottom:none;padding-bottom:0;}
+.feed-dot-wrap{display:flex;flex-direction:column;align-items:center;flex:none;padding-top:3px;}
+.feed-dot{width:7px;height:7px;border-radius:50%;flex:none;}
+.feed-line{width:1px;flex:1;background:var(--border-soft);margin-top:4px;}
+.feed-text{font-size:12px;color:var(--text-dim);}
+.feed-text b{color:var(--text);font-weight:600;}
+.feed-time{font-family:var(--mono);font-size:10px;color:var(--text-faint);margin-top:3px;}
+.tags{display:flex;flex-wrap:wrap;gap:8px;}
+.tag{display:flex;flex-direction:column;gap:2px;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 11px;flex:1;min-width:150px;}
+.tag-id{font-family:var(--mono);font-size:10px;color:var(--amber);}
+.tag-name{font-size:11.5px;font-weight:500;}
+.tag-count{font-size:10px;color:var(--text-faint);margin-top:1px;}
+
+/* Detail drawer */
+.overlay{position:fixed;inset:0;background:rgba(4,6,10,0.6);backdrop-filter:blur(2px);display:none;z-index:40;}
+.overlay.show{display:block;}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:420px;max-width:92vw;background:var(--panel);border-left:1px solid var(--border);z-index:41;transform:translateX(100%);transition:transform 0.25s ease;display:flex;flex-direction:column;}
+.drawer.show{transform:translateX(0);}
+.drawer-head{padding:20px 22px;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.drawer-close{background:none;border:1px solid var(--border);color:var(--text-dim);width:26px;height:26px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;flex:none;}
+.drawer-close:hover{color:var(--text);border-color:var(--grey);}
+.drawer-body{padding:20px 22px;overflow-y:auto;flex:1;}
+.dr-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border-soft);font-size:12.5px;}
+.dr-row span:first-child{color:var(--text-faint);}
+.dr-row span:last-child{color:var(--text);font-weight:500;text-align:right;}
+.dr-section-title{font-size:11px;color:var(--text-faint);letter-spacing:0.03em;margin:18px 0 8px;}
+.dr-desc{font-size:12.5px;color:var(--text-dim);line-height:1.6;}
+
+@media (max-width: 980px){
+  .app{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .grid-2{grid-template-columns:1fr;}
+  .grid-3{grid-template-columns:1fr;}
+  .kpi-row{grid-template-columns:1fr 1fr;}
+  .main{padding:16px;}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">S</div>
+      <div>
+        <div class="brand-name">SENTRY-IR</div>
+        <div class="brand-sub">Incident Response Console</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">MONITOR</div>
+      <a class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Incidents<span class="nav-count hot">14</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Alerts<span class="nav-count">238</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Timeline</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">INVESTIGATE</div>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>Assets</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>ATT&CK Map</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Threat Intel</a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">MANAGE</div>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Playbooks</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>Reports</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Settings</a>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="avatar">RS</div>
+      <div>
+        <div class="who-name">Sabastiaz</div>
+        <div class="who-role">IR Lead · On-call</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <div class="topbar">
+      <div>
+        <h1>Security Operations Overview</h1>
+        <div class="sub"><span class="live-dot"></span> Live feed connected &nbsp;·&nbsp; Last sync 12s ago &nbsp;·&nbsp; 6 data sources</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Refresh</button>
+        <button class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New incident</button>
+      </div>
+    </div>
+
+    <!-- KPI ROW -->
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-top"><span class="kpi-label">Active incidents</span><span class="kpi-trend trend-up">+3 today</span></div>
+        <div class="kpi-value">14</div>
+        <div class="kpi-foot">4 critical · 6 high · 4 medium</div>
+        <div class="kpi-bar"><i style="width:58%;background:var(--red);"></i></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top"><span class="kpi-label">Mean time to contain</span><span class="kpi-trend trend-down">-18%</span></div>
+        <div class="kpi-value">2.4<span class="unit">hrs</span></div>
+        <div class="kpi-foot">Target: under 4 hrs</div>
+        <div class="kpi-bar"><i style="width:70%;background:var(--green);"></i></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top"><span class="kpi-label">SLA compliance</span><span class="kpi-trend trend-flat">stable</span></div>
+        <div class="kpi-value">93<span class="unit">%</span></div>
+        <div class="kpi-foot">28 of 30 within window, 30d</div>
+        <div class="kpi-bar"><i style="width:93%;background:var(--amber);"></i></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top"><span class="kpi-label">Assets under watch</span><span class="kpi-trend trend-up">+12</span></div>
+        <div class="kpi-value">486</div>
+        <div class="kpi-foot">endpoints, servers, cloud workloads</div>
+        <div class="kpi-bar"><i style="width:82%;background:var(--blue);"></i></div>
+      </div>
+    </div>
+
+    <!-- CHART + SEVERITY -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Incident volume <span class="badge">last 14 days</span></div>
+          <a class="panel-link">Export ↗</a>
+        </div>
+        <div class="chart-wrap" id="chartWrap"></div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>Critical</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span>High</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>Medium</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--grey)"></span>Low</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Severity breakdown</div>
+        </div>
+        <div class="sev-row"><span class="sev-label">Critical</span><div class="sev-track"><div class="sev-fill" style="width:29%;background:var(--red);"></div></div><span class="sev-num">4</span></div>
+        <div class="sev-row"><span class="sev-label">High</span><div class="sev-track"><div class="sev-fill" style="width:43%;background:var(--amber);"></div></div><span class="sev-num">6</span></div>
+        <div class="sev-row"><span class="sev-label">Medium</span><div class="sev-track"><div class="sev-fill" style="width:29%;background:var(--blue);"></div></div><span class="sev-num">4</span></div>
+        <div class="sev-row"><span class="sev-label">Low</span><div class="sev-track"><div class="sev-fill" style="width:14%;background:var(--grey);"></div></div><span class="sev-num">2</span></div>
+
+        <div class="dr-section-title" style="margin-top:20px;">TOP AFFECTED SEGMENTS</div>
+        <div class="dr-row" style="padding:8px 0;"><span>Corporate AD domain</span><span>6 incidents</span></div>
+        <div class="dr-row" style="padding:8px 0;"><span>Finance workstations</span><span>4 incidents</span></div>
+        <div class="dr-row" style="padding:8px 0; border-bottom:none;"><span>External web apps</span><span>3 incidents</span></div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-head">
+        <div class="panel-title">Active incidents <span class="badge">14 open</span></div>
+      </div>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="critical">Critical</button>
+        <button class="filter-btn" data-filter="high">High</button>
+        <button class="filter-btn" data-filter="medium">Medium</button>
+        <button class="filter-btn" data-filter="low">Low</button>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" placeholder="Search incidents, hosts, IOCs...">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Incident</th><th>Severity</th><th>Status</th><th>Source</th><th>Assignee</th><th>Detected</th>
+            </tr>
+          </thead>
+          <tbody id="incidentBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FEED + ATT&CK -->
+    <div class="grid-3">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Recent activity</div></div>
+        <div id="feedList"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Techniques observed <span class="badge">MITRE ATT&CK</span></div></div>
+        <div class="tags" id="tagList"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-faint);" id="drId">IR-2026-0142</div>
+      <div style="font-size:15px;font-weight:600;margin-top:4px;" id="drTitle">Incident title</div>
+    </div>
+    <button class="drawer-close" id="drawerClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="dr-row"><span>Severity</span><span id="drSev">-</span></div>
+    <div class="dr-row"><span>Status</span><span id="drStatus">-</span></div>
+    <div class="dr-row"><span>Source</span><span id="drSource">-</span></div>
+    <div class="dr-row"><span>Assignee</span><span id="drAssignee">-</span></div>
+    <div class="dr-row"><span>Detected</span><span id="drTime">-</span></div>
+    <div class="dr-row" style="border-bottom:none;"><span>Affected assets</span><span id="drAssets">-</span></div>
+    <div class="dr-section-title">SUMMARY</div>
+    <div class="dr-desc" id="drDesc">-</div>
+    <div class="dr-section-title">RECOMMENDED ACTIONS</div>
+    <div class="dr-desc" id="drActions">-</div>
+  </div>
+</div>
+
+<script>
+const incidents = [
+  {id:"IR-2026-0142", title:"Lateral movement via PsExec", sub:"DC01 → FIN-WS-014, corporate AD domain", sev:"critical", status:"open", source:"EDR / CrowdStrike", assignee:"Sabastiaz", initials:"RS", time:"08:12", ago:"14 min ago", assets:"3 hosts, 1 domain controller", desc:"EDR flagged repeated PsExec-style service creation from a compromised finance workstation targeting the primary domain controller. Behavior is consistent with lateral movement following initial access via phishing.", actions:"Isolate FIN-WS-014 and DC01 from the network segment, rotate credentials for the service account involved, and review Kerberos ticket activity for signs of Golden Ticket abuse."},
+  {id:"IR-2026-0141", title:"Suspicious PowerShell (AMSI bypass pattern)", sub:"HR-WS-022", sev:"critical", status:"investigating", source:"SIEM / Splunk", assignee:"Nattapat", initials:"NB", time:"07:40", ago:"46 min ago", assets:"1 endpoint", desc:"Encoded PowerShell command matching known AMSI bypass signatures executed shortly after a macro-enabled document was opened. Outbound connection attempt to a newly registered domain followed within seconds.", actions:"Contain the endpoint, extract and detonate the payload in sandbox, and block the destination domain at the perimeter firewall."},
+  {id:"IR-2026-0140", title:"Mass phishing campaign", sub:"Finance department, 34 mailboxes", sev:"high", status:"contained", source:"Email gateway", assignee:"Black", initials:"BL", time:"06:55", ago:"1 hr ago", assets:"34 mailboxes", desc:"Coordinated phishing wave impersonating the payroll provider, containing a credential-harvesting link. 3 users clicked before the campaign was blocked at the gateway.", actions:"Force password reset for affected users, review mailbox rules for persistence, and run a targeted awareness reminder to Finance."},
+  {id:"IR-2026-0139", title:"Anomalous data egress to cloud storage", sub:"DEV-SRV-07", sev:"high", status:"open", source:"DLP", assignee:"Sabastiaz", initials:"RS", time:"05:20", ago:"2 hr ago", assets:"1 server, 1 service account", desc:"Service account associated with a CI/CD pipeline uploaded an unusually large volume of data to an external cloud storage bucket outside of business hours.", actions:"Suspend the service account, review the bucket's access logs, and confirm with the DevOps team whether the transfer was authorized."},
+  {id:"IR-2026-0138", title:"Brute force against VPN gateway", sub:"External-facing VPN concentrator", sev:"medium", status:"investigating", source:"Firewall / Palo Alto", assignee:"Nattapat", initials:"NB", time:"04:10", ago:"3 hr ago", assets:"1 gateway", desc:"Distributed brute force attempts from 40+ source IPs against the VPN gateway, no successful authentications observed so far.", actions:"Enable geo-fencing on the gateway, enforce MFA for all remote access, and add source IPs to the blocklist."},
+  {id:"IR-2026-0137", title:"Web shell detected on public app server", sub:"WEB-APP-03, DMZ segment", sev:"critical", status:"open", source:"WAF / IDS", assignee:"Sabastiaz", initials:"RS", time:"02:55", ago:"4 hr ago", assets:"1 server", desc:"A PHP web shell was uploaded via an unpatched file upload endpoint. Initial triage shows limited command execution before detection.", actions:"Take the server offline for forensic imaging, patch the upload vulnerability, and hunt for similar indicators across other public-facing apps."},
+  {id:"IR-2026-0136", title:"Unusual privileged group membership change", sub:"Domain Admins group", sev:"high", status:"resolved", source:"AD audit logs", assignee:"Black", initials:"BL", time:"Yesterday", ago:"18 hr ago", assets:"1 domain group", desc:"A service account was unexpectedly added to Domain Admins outside of the standard change process. Confirmed to be a misconfigured automation script, not malicious.", actions:"Remove the account from Domain Admins, fix the automation script's scope, and add an alert rule for future privileged group changes."},
+  {id:"IR-2026-0135", title:"Ransomware precursor behavior on file server", sub:"FILE-SRV-02", sev:"critical", status:"resolved", source:"EDR / CrowdStrike", assignee:"Sabastiaz", initials:"RS", time:"Yesterday", ago:"21 hr ago", assets:"1 server, 1 share", desc:"Mass file enumeration and shadow copy deletion attempts were blocked by EDR before encryption began. Root cause traced to a compromised local admin credential.", actions:"Rotate all local admin credentials on the host, review backup integrity, and validate shadow copy protection settings fleet-wide."},
+  {id:"IR-2026-0134", title:"Suspicious OAuth app consent", sub:"M365 tenant", sev:"medium", status:"contained", source:"Cloud app security", assignee:"Nattapat", initials:"NB", time:"2 days ago", ago:"2 days ago", assets:"1 tenant, 2 users", desc:"A newly registered third-party OAuth application requested broad mailbox and file access permissions and was granted consent by two users.", actions:"Revoke the app's consent, review Graph API activity under the granted token, and tighten tenant-wide app consent policies."},
+  {id:"IR-2026-0133", title:"Beaconing to known C2 infrastructure", sub:"IOT-CAM-11 (segmented network)", sev:"medium", status:"open", source:"Threat intel feed", assignee:"Black", initials:"BL", time:"2 days ago", ago:"2 days ago", assets:"1 IoT device", desc:"Periodic outbound beacon pattern matched threat intel indicators for a known botnet C2 domain, originating from an IoT camera on a segmented VLAN.", actions:"Isolate the device, block the C2 domain network-wide, and audit firmware version for known exploited vulnerabilities."},
+  {id:"IR-2026-0132", title:"Credential stuffing against customer portal", sub:"Customer-facing web app", sev:"low", status:"resolved", source:"WAF", assignee:"Sabastiaz", initials:"RS", time:"3 days ago", ago:"3 days ago", assets:"1 web app", desc:"Automated login attempts using a leaked credential list were rate-limited and blocked by the WAF with no successful account takeovers.", actions:"Confirm rate limiting thresholds are appropriately tuned and notify affected users to reset reused passwords as a precaution."},
+  {id:"IR-2026-0131", title:"Insider policy violation - USB exfiltration attempt", sub:"HR-WS-009", sev:"low", status:"resolved", source:"DLP", assignee:"Nattapat", initials:"NB", time:"4 days ago", ago:"4 days ago", assets:"1 endpoint", desc:"An employee attempted to copy a batch of confidential HR files to an unauthorized USB device; the action was blocked by endpoint DLP policy.", actions:"Escalate to HR per policy, confirm device control settings are enforced fleet-wide, and log the case for the quarterly compliance review."},
+  {id:"IR-2026-0130", title:"Exposed misconfigured S3-compatible bucket", sub:"Marketing assets bucket", sev:"medium", status:"investigating", source:"Attack surface monitoring", assignee:"Black", initials:"BL", time:"5 days ago", ago:"5 days ago", assets:"1 cloud bucket", desc:"External scan identified a publicly readable object storage bucket containing internal marketing drafts and one file with embedded API keys.", actions:"Set the bucket to private, rotate the exposed API keys immediately, and add the bucket to continuous exposure monitoring."},
+  {id:"IR-2026-0129", title:"Suspicious Kerberoasting activity", sub:"Corporate AD domain", sev:"high", status:"investigating", source:"SIEM / Splunk", assignee:"Sabastiaz", initials:"RS", time:"5 days ago", ago:"5 days ago", assets:"1 domain, 4 service accounts", desc:"Abnormal volume of TGS ticket requests for accounts with SPNs set was observed from a single workstation, consistent with a Kerberoasting attempt.", actions:"Rotate passwords for the targeted service accounts, enforce strong password policy on SPN accounts, and hunt for the source workstation's other activity."},
+];
+
+const sevRank = {critical:0, high:1, medium:2, low:3};
+
+function pillHtml(sev){
+  const labels = {critical:"Critical", high:"High", medium:"Medium", low:"Low"};
+  return `<span class="pill pill-${sev}">${labels[sev]}</span>`;
+}
+function statusHtml(status){
+  const labels = {open:"Open", investigating:"Investigating", contained:"Contained", resolved:"Resolved"};
+  return `<span class="status-chip status-${status}">${labels[status]}</span>`;
+}
+
+function renderTable(filter, query){
+  const body = document.getElementById('incidentBody');
+  body.innerHTML = '';
+  const q = (query||'').toLowerCase().trim();
+  incidents
+    .filter(i => filter === 'all' || i.sev === filter)
+    .filter(i => !q || i.title.toLowerCase().includes(q) || i.sub.toLowerCase().includes(q) || i.id.toLowerCase().includes(q))
+    .sort((a,b)=> sevRank[a.sev]-sevRank[b.sev])
+    .forEach(inc => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="id-cell">${inc.id}</td>
+        <td class="title-cell">${inc.title}<div class="title-sub">${inc.sub}</div></td>
+        <td>${pillHtml(inc.sev)}</td>
+        <td>${statusHtml(inc.status)}</td>
+        <td style="color:var(--text-dim);">${inc.source}</td>
+        <td><div class="assignee"><div class="avatar">${inc.initials}</div>${inc.assignee}</div></td>
+        <td style="color:var(--text-faint);font-family:var(--mono);font-size:11px;">${inc.ago}</td>
+      `;
+      tr.addEventListener('click', () => openDrawer(inc));
+      body.appendChild(tr);
+    });
+}
+
+function openDrawer(inc){
+  document.getElementById('drId').textContent = inc.id;
+  document.getElementById('drTitle').textContent = inc.title;
+  document.getElementById('drSev').innerHTML = pillHtml(inc.sev);
+  document.getElementById('drStatus').innerHTML = statusHtml(inc.status);
+  document.getElementById('drSource').textContent = inc.source;
+  document.getElementById('drAssignee').textContent = inc.assignee;
+  document.getElementById('drTime').textContent = inc.ago;
+  document.getElementById('drAssets').textContent = inc.assets;
+  document.getElementById('drDesc').textContent = inc.desc;
+  document.getElementById('drActions').textContent = inc.actions;
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('drawer').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('drawer').classList.remove('show');
+}
+document.getElementById('overlay').addEventListener('click', closeDrawer);
+document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+
+document.querySelectorAll('.filter-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable(btn.dataset.filter, document.getElementById('searchInput').value);
+  });
+});
+document.getElementById('searchInput').addEventListener('input', (e)=>{
+  const active = document.querySelector('.filter-btn.active').dataset.filter;
+  renderTable(active, e.target.value);
+});
+
+renderTable('all','');
+
+// ----- Chart (14 days, stacked bars) -----
+const days = ["Sep 5","Sep 6","Sep 7","Sep 8","Sep 9","Sep 10","Sep 11","Sep 12","Sep 13","Sep 14","Sep 15","Sep 16","Sep 17","Sep 18"];
+const chartData = [
+  {c:1,h:2,m:1,l:1},{c:0,h:1,m:2,l:0},{c:2,h:1,m:0,l:1},{c:1,h:2,m:1,l:0},
+  {c:0,h:3,m:1,l:1},{c:1,h:1,m:0,l:0},{c:1,h:2,m:2,l:1},{c:2,h:1,m:1,l:0},
+  {c:0,h:2,m:0,l:1},{c:1,h:1,m:1,l:0},{c:2,h:3,m:1,l:0},{c:1,h:2,m:0,l:1},
+  {c:1,h:1,m:2,l:0},{c:2,h:2,m:1,l:0}
+];
+const maxTotal = Math.max(...chartData.map(d=>d.c+d.h+d.m+d.l));
+const chartWrap = document.getElementById('chartWrap');
+chartData.forEach((d, idx) => {
+  const total = d.c+d.h+d.m+d.l;
+  const colHeightPct = (total / maxTotal) * 100;
+  const col = document.createElement('div');
+  col.className = 'chart-col';
+  const barsHeight = Math.max(colHeightPct, 4);
+  col.innerHTML = `
+    <div class="chart-bars" style="height:${barsHeight}%;" title="${days[idx]}: ${total} incidents">
+      ${d.c ? `<div style="height:${(d.c/total)*100}%;background:var(--red);"></div>`:''}
+      ${d.h ? `<div style="height:${(d.h/total)*100}%;background:var(--amber);"></div>`:''}
+      ${d.m ? `<div style="height:${(d.m/total)*100}%;background:var(--blue);"></div>`:''}
+      ${d.l ? `<div style="height:${(d.l/total)*100}%;background:var(--grey);"></div>`:''}
+    </div>
+    <div class="chart-day">${days[idx].split(' ')[1]}</div>
+  `;
+  chartWrap.appendChild(col);
+});
+
+// ----- Activity feed -----
+const feed = [
+  {c:'var(--red)', text:'<b>IR-2026-0142</b> escalated to Critical after lateral movement confirmed', time:'14 min ago'},
+  {c:'var(--amber)', text:'<b>Nattapat</b> assigned to IR-2026-0141', time:'40 min ago'},
+  {c:'var(--green)', text:'<b>IR-2026-0135</b> marked as Resolved, root cause documented', time:'2 hr ago'},
+  {c:'var(--blue)', text:'New playbook <b>"Kerberoasting Response v2"</b> published', time:'3 hr ago'},
+  {c:'var(--amber)', text:'<b>IR-2026-0140</b> contained, credential resets in progress', time:'1 hr ago'},
+  {c:'var(--grey)', text:'Weekly SOC metrics report generated', time:'6 hr ago'},
+];
+const feedList = document.getElementById('feedList');
+feed.forEach((f,idx)=>{
+  const item = document.createElement('div');
+  item.className = 'feed-item';
+  item.innerHTML = `
+    <div class="feed-dot-wrap">
+      <div class="feed-dot" style="background:${f.c};"></div>
+      ${idx < feed.length-1 ? '<div class="feed-line"></div>' : ''}
+    </div>
+    <div>
+      <div class="feed-text">${f.text}</div>
+      <div class="feed-time">${f.time}</div>
+    </div>
+  `;
+  feedList.appendChild(item);
+});
+
+// ----- MITRE ATT&CK tags -----
+const techniques = [
+  {id:'T1078', name:'Valid Accounts', count:9},
+  {id:'T1059.001', name:'PowerShell', count:7},
+  {id:'T1021.002', name:'SMB / Admin Shares', count:5},
+  {id:'T1566.001', name:'Spearphishing Attachment', count:5},
+  {id:'T1558.003', name:'Kerberoasting', count:4},
+  {id:'T1048', name:'Exfil Over Alt Protocol', count:3},
+  {id:'T1490', name:'Inhibit System Recovery', count:2},
+  {id:'T1110', name:'Brute Force', count:2},
+];
+const tagList = document.getElementById('tagList');
+techniques.forEach(t=>{
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.innerHTML = `<span class="tag-id">${t.id}</span><span class="tag-name">${t.name}</span><span class="tag-count">${t.count} incidents</span>`;
+  tagList.appendChild(tag);
+});
+</script>
+
+</body>
+</html>

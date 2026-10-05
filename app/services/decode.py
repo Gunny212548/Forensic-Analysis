@@ -25,6 +25,35 @@ _SYSLOG_TS_RE = re.compile(r"^(?P<ts>[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}
 # Matches a "program[pid]:" or "program:" token, e.g. "sshd[49289]:"
 _PROG_TOKEN_RE = re.compile(r"^(?P<prog>[\w.\-/]+?)(?:\[(?P<pid>\d+)\])?:$")
 
+# FortiGate (and other Fortinet) logs are flat space-separated key=value
+# lines with no leading timestamp at all - "devname=... date=... time=...
+# ...srcip=1.2.3.4 ...". Neither _ISO_TS_RE nor _SYSLOG_TS_RE match that, so
+# decode_line() used to fall all the way through to the bare _IP_RE scan,
+# which happened to grab srcip= only because it's usually the first
+# IP-shaped substring on the line - dstip/verdict/app/ts all stayed NULL for
+# 621,924 real rows in one customer file. Detected by key, not position:
+# other Fortinet subtypes (utm/event) share the same key=value style with a
+# different key set, so this can't be a fixed field list.
+_FORTIGATE_SIGNATURE_RE = re.compile(r"(?:^|\s)devname=")
+_KV_RE = re.compile(r'(\w+)=("(?:[^"\\]|\\.)*"|\S+)')
+
+
+def _is_fortigate_line(line: str) -> bool:
+    # devname= alone is Fortinet-specific but cheap to check first; srcip=
+    # confirms this is a traffic-shaped record worth decoding by key rather
+    # than something else entirely that merely mentions a device name.
+    return bool(_FORTIGATE_SIGNATURE_RE.search(line)) and "srcip=" in line
+
+
+def _parse_kv(line: str) -> dict[str, str]:
+    out = {}
+    for key, val in _KV_RE.findall(line):
+        if len(val) >= 2 and val[0] == '"' and val[-1] == '"':
+            val = val[1:-1].replace('\\"', '"')
+        out[key] = val
+    return out
+
+
 _TS_FORMATS = [
     "%Y-%m-%dT%H:%M:%S",
     "%Y-%m-%d %H:%M:%S",
@@ -293,7 +322,42 @@ def _blank_event() -> dict:
     }
 
 
+def _decode_fortigate(line: str) -> dict:
+    event = _blank_event()
+    event["raw"] = line[:2000]
+    kv = _parse_kv(line)
+
+    date, time_ = kv.get("date"), kv.get("time")
+    if date and time_:
+        tz = kv.get("tz", "")
+        ts_raw = f"{date}T{time_}{tz}" if tz else f"{date}T{time_}"
+        event["ts_raw"] = ts_raw
+        event["ts"] = parse_ts(ts_raw)
+
+    event["hostname"] = kv.get("devname")
+    event["srcip"] = extract_ip(kv.get("srcip"))
+    event["dstip"] = extract_ip(kv.get("dstip"))
+    event["dstport"] = kv.get("dstport")
+    event["verdict"] = normalize_verdict(kv.get("action"))
+    # service= is on effectively every traffic row; app= only appears on a
+    # minority (application-control-inspected sessions) but is the more
+    # specific signal when present.
+    event["app"] = kv.get("app") or kv.get("service")
+    event["category"] = kv.get("appcat")
+    event["bytes_sent"] = _to_int(kv.get("sentbyte"))
+    # user= is an FSSO/identity-aware-firewall field, not an authentication
+    # outcome - FortiGate traffic logs have no success/failure vocabulary, so
+    # this is never routed through normalize_auth_status()/`action` (gotcha
+    # #11): there is nothing here that could turn a traffic row into a bogus
+    # auth finding.
+    event["username"] = kv.get("user")
+    return event
+
+
 def decode_line(line: str) -> dict:
+    if _is_fortigate_line(line):
+        return _decode_fortigate(line)
+
     event = _blank_event()
     event["raw"] = line[:2000]
 

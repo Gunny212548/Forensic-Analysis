@@ -7,9 +7,29 @@ services:
       - "8091:8000"
     environment:
       - ANALYSIS_PROVIDER=groq
+      # groq (hosted, needs GROQ_API_KEY) or ollama (local, no key, no limits)
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
       - MAX_EVENTS_FOR_ANALYSIS=${MAX_EVENTS_FOR_ANALYSIS:-15}
+      # Ollama runs on the host, not in this container. Docker Desktop
+      # resolves host.docker.internal already; extra_hosts below is what a
+      # plain Linux docker engine needs for the same name.
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      - OLLAMA_MAX_EVENTS_FOR_ANALYSIS=${OLLAMA_MAX_EVENTS_FOR_ANALYSIS:-50}
+      - OLLAMA_MAX_COMPLETION_TOKENS=${OLLAMA_MAX_COMPLETION_TOKENS:-2400}
+      - OLLAMA_MAP_COMPLETION_TOKENS=${OLLAMA_MAP_COMPLETION_TOKENS:-600}
+      # num_ctx is the whole reason the native /api/chat endpoint is used:
+      # the OpenAI-compatible one ignores it and truncates the prompt at 4096.
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-16384}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-600}
+      # Login (FR-1). SESSION_SECRET empty = generated once into /data.
+      - IT_CONTACT_URL=${IT_CONTACT_URL:-}
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      - SESSION_HOURS=${SESSION_HOURS:-12}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - forensic-data:/data
 

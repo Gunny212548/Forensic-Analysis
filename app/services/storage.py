@@ -55,9 +55,13 @@ def manifest_path(case_id: str) -> Path:
 
 def save_manifest(manifest: dict) -> None:
     ensure_dirs()
-    manifest_path(manifest["case_id"]).write_text(
-        json.dumps(manifest, indent=2, default=str), encoding="utf-8"
-    )
+    # Write-then-rename: the pipeline now rewrites a manifest about once a
+    # second to report progress (FR-2.5) while the UI polls it, and a reader
+    # must never catch a half-written file.
+    path = manifest_path(manifest["case_id"])
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def load_manifest(case_id: str) -> dict | None:
@@ -98,6 +102,7 @@ def create_case(
     note: str = "",
     company_id: str | None = None,
     company_name: str | None = None,
+    merged_from: list[dict] | None = None,
 ) -> dict:
     ensure_dirs()
     manifest = {
@@ -113,6 +118,13 @@ def create_case(
         "total_rows": 0,
         "flagged_count": 0,
     }
+    if merged_from:
+        # Provenance for a case built by POST /api/cases/merge: the source
+        # cases in the order their bytes were concatenated. It lives on the
+        # manifest rather than inside `note` because it is structured audit
+        # trail - the same reason the original upload is kept in raw/ - and
+        # `note` is capped at 1000 chars, which a dozen case ids overflow.
+        manifest["merged_from"] = merged_from
     save_manifest(manifest)
     return manifest
 
@@ -189,3 +201,43 @@ def load_analysis(case_id: str) -> dict | None:
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+# ------------------------------------------------------- analysis job state
+# A map-reduce narrative is N+1 Groq calls at roughly one call's worth of
+# output budget a minute, which is minutes of wall clock - too long to hold an
+# HTTP request open, so /analyze queues it the same way /upload queues the
+# pipeline and the client polls. The job lives in its OWN sidecar rather than
+# inside the analysis file, because a force-refresh must not overwrite the
+# last good analysis with a progress stub: while the job runs, the previous
+# narrative is still the best answer available.
+
+def analysis_job_path(case_id: str) -> Path:
+    return analysis_dir() / f"{case_id}.job.json"
+
+
+def save_analysis_job(case_id: str, job: dict) -> dict:
+    ensure_dirs()
+    job = dict(job, case_id=case_id, updated_at=datetime.now(timezone.utc).isoformat())
+    analysis_job_path(case_id).write_text(
+        json.dumps(job, indent=2, default=str), encoding="utf-8"
+    )
+    return job
+
+
+def load_analysis_job(case_id: str) -> dict | None:
+    path = analysis_job_path(case_id)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def update_analysis_job(case_id: str, **fields) -> dict | None:
+    job = load_analysis_job(case_id)
+    if job is None:
+        return None
+    job.update(fields)
+    return save_analysis_job(case_id, job)
