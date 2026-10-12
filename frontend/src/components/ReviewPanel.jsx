@@ -92,6 +92,23 @@ export default function ReviewPanel({ caseId }) {
               )}
               <span className="rv-status">{st}</span>
               <span className={`rv-conf rv-conf-${f.confidence}`}>confidence: {f.confidence}</span>
+              {/* Admiralty Code (confidence.py): letter = how far the log
+                  source as read can be trusted, number = how well-supported
+                  the finding is. The reasons are on hover - one sentence
+                  each, so the grade can be checked rather than believed. */}
+              {f.admiralty && (
+                <span
+                  className="rv-admiralty"
+                  title={
+                    `${f.admiralty.reliability.grade} - ${f.admiralty.reliability.name}: ` +
+                    `${f.admiralty.reliability.why.join('; ')}\n` +
+                    `${f.admiralty.credibility.grade} - ${f.admiralty.credibility.name}: ` +
+                    `${f.admiralty.credibility.why.join('; ')}\n(Admiralty Code / NATO 6x6)`
+                  }
+                >
+                  {f.admiralty.code}
+                </span>
+              )}
               {(f.flags || []).map((x) => (
                 <span className="rv-flag" key={x}>
                   {x}

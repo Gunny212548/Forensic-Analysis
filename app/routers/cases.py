@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Requ
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import analysis, custody, db, review, storage
+from ..services import analysis, confidence, custody, db, review, storage
 from .upload import CHUNK, _run_pipeline
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -290,6 +290,13 @@ async def get_case_findings(case_id: str):
         raise HTTPException(404, "Case not found")
 
     findings = db.collapsed_findings(case_id)
+    # Admiralty grading (confidence.py): source reliability needs the
+    # manifest's mapping and evidence plus the custody log; cross-source
+    # confirmation needs the zip members' row ranges.
+    confidence.annotate(
+        manifest, custody.entries(case_id), findings,
+        db.entity_members(case_id, manifest.get("members") or []),
+    )
     state = review.current(case_id)
     for f in findings:
         r = state.get(f["key"])

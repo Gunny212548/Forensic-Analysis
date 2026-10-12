@@ -20,6 +20,8 @@ import duckdb
 
 from .. import config
 from . import intel
+from . import confidence
+from .rule_meta import RULE_META
 from .rules import DENY_VERDICTS, RULE_LABELS, RULE_LEVEL
 from .severity import PATTERNS, level_of
 
@@ -242,16 +244,20 @@ def _fmt_ts(value) -> str:
     return f"{value.isoformat(sep=' ')}{config.EVENT_TZ_SUFFIX}"
 
 
-def _confidence(row: dict) -> tuple[str, list[str]]:
-    """Deterministic confidence, following section 6 of the requirements.
+def _flags(row: dict) -> list[str]:
+    """Short caveats shown beside a finding's confidence. The grade itself
+    is the Admiralty credibility (confidence.py); these say what held it
+    back. Computed here rather than asked of the model on purpose: every
+    value has to be explainable in one sentence (NFR Explainability), and a
+    model scoring its own output cannot be audited.
 
-    Computed here rather than asked of the model on purpose: every value has
-    to be explainable in one sentence (NFR Explainability), and a model
-    scoring its own output cannot be audited.
-    """
+    Counting distinct rule *ids* would over-credit an entity: R2002 (port
+    scan) and R2003 (service sweep) are the same observation counted twice,
+    and R2005 cannot fire without R1000 already having fired. Rule families
+    (R1 auth / R2 correlation / R3 network) are closer to independent
+    evidence (gotcha #20)."""
     flags: list[str] = []
-    ts_ok = bool(row["ts_parsed"])
-    if not ts_ok:
+    if not row["ts_parsed"]:
         flags.append("no-parsed-timestamp")
     # Tested against the *source* text, never against the rendered ts: ingest
     # gives every row a GMT+7 offset, so checking the rendered value would
@@ -259,24 +265,45 @@ def _confidence(row: dict) -> tuple[str, list[str]]:
     # the source itself never said, and the GMT+7 ingest rule was assumed.
     if not _TZ_MARKER.search(str(row.get("ts_raw_first") or "")):
         flags.append("timezone-unconfirmed")
+    if row["ts_parsed"]:
+        if row["entity_families"] < 2:
+            flags.append("single-source")
+        if row["cnt"] < 5:
+            flags.append("few-events")
+    if RULE_META.get(row["rid"], {}).get("status") == "experimental":
+        flags.append("experimental-rule")
+    return flags
 
-    if not ts_ok:
-        return "low", flags
 
-    # Counting distinct rule *ids* over-credits an entity: R2002 (port scan)
-    # and R2003 (service sweep) are the same observation counted twice, and
-    # R2005 cannot fire without R1000 already having fired. Rule families
-    # (R1 auth / R2 correlation / R3 network) are closer to independent
-    # evidence, which is what section 6 of the requirements is asking for.
-    independent = row["entity_families"] >= 2
-    supported = row["cnt"] >= 5
-    if not independent:
-        flags.append("single-source")
-    if not supported:
-        flags.append("few-events")
-    if independent and supported:
-        return "high", flags
-    return "medium", flags
+def entity_members(case_id: str, members: list[dict]) -> dict[str, set[int]]:
+    """{entity: indexes of the zip members whose findings implicate it}.
+
+    The Admiralty "confirmed by other independent sources" (confidence.py):
+    raw_events has no source column, so a row's file comes from the member
+    row_id ranges on the manifest. Entities are the same ones confidence
+    counts families for - the source address, else the account.
+    Empty for a single-file case: one file cannot confirm itself."""
+    ranges = [(i, m.get("row_id_first"), m.get("row_id_last")) for i, m in enumerate(members or [])
+              if m.get("row_id_first") is not None and m.get("row_id_last") is not None]
+    if len(ranges) < 2 or not db_path(case_id).exists():
+        return {}
+    which = " ".join(f"WHEN r.row_id BETWEEN {lo} AND {hi} THEN {i}" for i, lo, hi in ranges)
+    con = connect(case_id, read_only=True)
+    try:
+        rows = con.execute(
+            f"""
+            SELECT coalesce(r.srcip, r.username) AS entity,
+                   list(DISTINCT CASE {which} END) AS members
+            FROM findings f
+            JOIN raw_events r USING (row_id)
+            WHERE coalesce(r.srcip, r.username) IS NOT NULL
+            GROUP BY 1
+            HAVING count(DISTINCT CASE {which} END) >= 2
+            """
+        ).fetchall()
+    finally:
+        con.close()
+    return {e: {m for m in ms if m is not None} for e, ms in rows}
 
 
 def finding_key(rid: str, srcip: str | None, username: str | None) -> str:
@@ -362,9 +389,13 @@ def collapsed_findings(case_id: str) -> list[dict]:
              "evidence": [{"rid": r, "label": RULE_LABELS.get(r, r)} for r in rids]}
             for p, rids in escalated.get((row["rid"], row["srcip"], row["username"]), [])
         ]
-        confidence, flags = _confidence(row)
-        row["confidence"] = confidence
-        row["flags"] = flags
+        # Admiralty credibility from this case's own evidence; the route adds
+        # source reliability and cross-source confirmation (confidence.py).
+        grade, why = confidence.credibility(row, RULE_META.get(row["rid"], {}).get("status"))
+        row["credibility"] = grade
+        row["credibility_reasons"] = why
+        row["confidence"] = confidence.label(grade)
+        row["flags"] = _flags(row)
         out.append(row)
     return out
 
