@@ -23,7 +23,8 @@ app/routers/             upload.py · cases.py · companies.py
 app/services/
   pipeline.py    process_case: CSV fast path (DuckDB reads+decodes itself)
                  vs Python path (parsers -> decode -> staging CSV -> bulk load)
-  decode.py      vendor columns -> one canonical schema
+  decode.py      log source columns -> one canonical schema
+  logsources.py  documented column mappings per log source (gotcha #27)
   parsers.py     iter_rows generator for .log / JSON
   rules.py       RULES: list of (rule_id, SQL) + RULE_LABELS
   db.py          schema, build_graph, source_profiles, risk_scores, _confidence

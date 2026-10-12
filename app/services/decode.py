@@ -101,7 +101,7 @@ def parse_ts(text: str | None) -> datetime | None:
 
 
 # sshd message patterns: the messages OpenSSH's auth_log() (auth.c) writes,
-# cited in vendors.LINE_PROFILES["openssh-sshd"].
+# cited in logsources.LINE_PROFILES["openssh-sshd"].
 _SSHD_PATTERNS = [
     ("auth_failed", re.compile(
         r"Failed password for (?:invalid user )?(?P<user>\S+) from (?P<ip>[\d.]+) port (?P<port>\d+)"
@@ -190,7 +190,7 @@ _AVOID_SUBSTRINGS = {
     "username": ("agent", "type"),
 }
 
-# Firewall vendors spell the same verdict differently; rules are written
+# Firewall log sources spell the same verdict differently; rules are written
 # against the canonical spellings.
 VERDICT_ALIASES = {
     "accept": "allow",
@@ -320,7 +320,7 @@ def _blank_event() -> dict:
         "username": None, "program": None, "hostname": None, "action": None,
         "verdict": None, "app": None, "risk": None, "bytes_sent": None,
         "category": None, "raw": "",
-        # Which documented line format read this event (vendors.LINE_PROFILES),
+        # Which documented line format read this event (logsources.LINE_PROFILES),
         # or None. Not stored per row - counted for the manifest.
         "profile": None,
     }
@@ -405,7 +405,7 @@ def decode_line(line: str) -> dict:
 
 
 def decode_row(row: dict, kind: str, mapping=None) -> dict:
-    """`mapping` (vendors.Mapping), resolved once from a CSV header, reads
+    """`mapping` (logsources.Mapping), resolved once from a CSV header, reads
     each field from its mapped column(s) - documented or guessed - so this
     path and the SQL fast path decode a file identically. Without one
     (JSON), columns are guessed row by row."""

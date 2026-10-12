@@ -77,7 +77,7 @@ failed logins).
   several rules and produce several findings. `flagged_count` is `DISTINCT
   row_id`, so `R2005`/`R2006` landing left `flagged_count` unchanged while
   findings rose — same rows, more rules per row.
-- A rule firing on a vendor it cannot apply to is a regression even if totals
+- A rule firing on a log source it cannot apply to is a regression even if totals
   look healthy (e.g. an auth finding on firewall traffic, or a beaconing
   finding on 10.x → 10.x internal traffic — the beaconing rule is
   egress-only for that reason; without it, 16,599 Windows Delivery

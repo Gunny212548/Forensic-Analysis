@@ -32,8 +32,8 @@ aggregate · `R3xxx` single-event network/firewall.
    retagging `T1595` fixed the prose. Never leave `mitre` empty on a new rule
    (use `[]::VARCHAR[]` only for genuinely non-adversarial events like
    `R1003`).
-3. **`descr` wording propagates too.** Don't put a vendor or protocol name in
-   it unless the rule can only fire on that vendor. `R1000/R1001/R1002/R2000`
+3. **`descr` wording propagates too.** Don't put a product or protocol name in
+   it unless the rule can only fire on that log source. `R1000/R1001/R1002/R2000`
    deliberately lost the word "SSH" once auth-on-CSV landed, because
    "SSH brute-force" on an Azure AD web sign-in would flow straight into the
    narrative.
@@ -49,7 +49,7 @@ aggregate · `R3xxx` single-event network/firewall.
    many blocks") would fire on any user who hits a few blocked sites, so it
    requires >=20 denies *and* denies >= 3x allows. A new correlation rule
    without such a guard is not finished.
-6. **Check the field you depend on exists across vendors.** Check Point names
+6. **Check the field you depend on exists across log sources.** Check Point names
    services (`http`, `FW1_ica_services`) and has no port column at all, so
    `R2002` (distinct dst ports) can never fire on it — `R2003` counts distinct
    services for the same signal. Prefer a pair of rules over one rule that

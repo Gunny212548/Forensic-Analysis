@@ -1,14 +1,21 @@
-"""Vendor profiles: column mappings taken from each vendor's own documentation.
+"""Log source profiles: column mappings taken from each log source's own
+format documentation.
+
+A *log source* is the product that wrote the log - a PAN-OS firewall's
+traffic log, Microsoft Entra ID's sign-in log, OpenSSH's sshd - in the sense
+of the Sigma specification's `logsource` (product / service). Not the
+company that made it: one company ships several log sources with unrelated
+formats, and the format is what a profile describes.
 
 The decoder has two ways to read a CSV:
 
 - **documented** - the header matches a profile below. Every canonical field
-  is read from the column the vendor's documentation defines for it, and its
-  values are translated with the vocabulary that documentation lists. Each
-  profile cites the page it was built from, so any mapping can be checked
-  against the source instead of taken on trust.
-- **heuristic** - no profile matches (a vendor we have no profile for, or a
-  file whose columns were renamed). The original name-guessing in
+  is read from the column the log source's documentation defines for it, and
+  its values are translated with the vocabulary that documentation lists.
+  Each profile cites the page it was built from, so any mapping can be
+  checked against the source instead of taken on trust.
+- **heuristic** - no profile matches (a log source we have no profile for, or
+  a file whose columns were renamed). The original name-guessing in
   `decode.match_column()` still runs, because refusing an unknown file would
   leave the analyst with nothing; but the case is marked as such, and the UI
   tells the analyst to verify the mapping.

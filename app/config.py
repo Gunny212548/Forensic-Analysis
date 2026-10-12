@@ -5,7 +5,7 @@ DATA_DIR = os.environ.get("DATA_DIR", "/data")
 # Every uploaded log is interpreted and stored in ONE fixed zone: GMT+7.
 # A timestamp carrying an offset ("...Z", "...+00:00") is converted into it;
 # a timestamp carrying none is taken to already be in it. So `raw_events.ts`
-# is always GMT+7 wall-clock time, and comparing two rows from two vendors is
+# is always GMT+7 wall-clock time, and comparing two rows from two log sources is
 # always valid - which is the whole point, because the deliverable is a
 # timeline. `ts_raw` still keeps the source text verbatim, and the
 # `timezone-unconfirmed` flag still records that the source never stated a

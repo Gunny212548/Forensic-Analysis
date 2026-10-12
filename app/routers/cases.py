@@ -60,7 +60,7 @@ async def merge_cases(background_tasks: BackgroundTasks, body: dict = Body(...))
     """Concatenate several already-ingested line-log cases into one new case
     and run the normal pipeline over the whole thing.
 
-    A vendor export tool splitting 29 hours of FortiGate traffic into 15
+    A log export tool splitting 29 hours of FortiGate traffic into 15
     hourly files meant every rule, risk score and narrative only ever saw one
     hour: sources whose policy-gap violations recurred all day reached no
     per-file threshold, and only a human cross-reading 15 AI reports noticed.
@@ -83,7 +83,7 @@ async def merge_cases(background_tasks: BackgroundTasks, body: dict = Body(...))
         raise HTTPException(404, f"Case not found: {', '.join(unknown)}")
 
     # Only line logs for now. A CSV would contribute a header row per file
-    # (and two vendors' exports need not even share a column set), and JSON
+    # (and two log sources' exports need not even share a column set), and JSON
     # is either lines or one array - neither concatenates blindly.
     wrong_kind = [m["case_id"] for m in sources if m.get("file_kind") != "log"]
     if wrong_kind:

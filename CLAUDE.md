@@ -14,7 +14,7 @@ recommendations.
 
 Formats exercised against real data so far: VMware ESXi `auth.log`,
 Palo Alto CSV exports, Check Point SmartLog CSV exports. The decoder is
-heuristic rather than per-vendor — it maps whatever columns a file happens
+heuristic rather than per-log-source — it maps whatever columns a file happens
 to have onto one canonical schema (see gotcha #7 for what that costs).
 
 It started as a spinoff of a separate project (`D:\Wazuh\wazuh-docker`'s
@@ -35,8 +35,8 @@ POST /api/upload
 
 pipeline.process_case  (services/pipeline.py)
   CSV  → fast path: DuckDB reads + decodes the file itself. The column
-         mapping is resolved once from the header - from a vendor profile
-         when one matches (vendors.py, gotcha #27), else guessed by
+         mapping is resolved once from the header - from a log source
+         profile when one matches (logsources.py, gotcha #27), else guessed by
          decode.match_column - and baked into one INSERT ... SELECT
          read_csv(...). No row ever crosses into Python. The manifest's
          `mapping` says which, and the case page shows it.
@@ -346,7 +346,7 @@ counting non-NULL canonical columns before assuming the log is boring:
 SELECT count(ts), count(srcip), count(dstip), count(verdict), count(app) FROM raw_events;
 ```
 
-Vendors differ in three ways that all had to be handled:
+Log sources differ in three ways that all had to be handled:
 - **Address format** — Check Point writes `object-name (1.2.3.4)`, Palo Alto
   writes a bare IP. `decode.extract_ip()` / the SQL `regexp_extract` pull the
   IP out and fall back to the original text so named entities survive.
@@ -362,7 +362,7 @@ Vendors differ in three ways that all had to be handled:
 Check Point names the service (`http`, `FW1_ica_services`) and has no port
 field at all, so `R2002` (distinct destination ports) can never fire on it.
 `R2003` counts distinct *services* for the same signal. When adding rules,
-check whether the field you depend on actually exists across vendors.
+check whether the field you depend on actually exists across log sources.
 
 **9. A filtered export changes which rules can fire.**
 The Check Point sample was exported after filtering SmartLog to one source
@@ -527,7 +527,7 @@ network - `tools/refresh_intel.py` downloads the feeds as a separate step, so
 a case can be worked air-gapped and re-running it over the same feed files
 gives the same findings, which matters when the output is evidence.
 
-- The parser is format-agnostic, not one-per-vendor: comment-prefixed CSV
+- The parser is format-agnostic, not one-per-feed: comment-prefixed CSV
   (abuse.ch Feodo, ThreatFox) or a bare list of addresses (blocklist.de,
   CINS, Tor exit nodes), plus anything a customer hands over in either shape.
   Only IP indicators are kept - the canonical schema has no URL, hash or
@@ -610,7 +610,7 @@ get this wrong in opposite directions.**
 `config.EVENT_TZ_*` is the single policy: a timestamp that states an offset
 (`Z`, `+00:00`, `-03:00`) is **converted** into GMT+7; one that states none is
 **taken to already be** GMT+7. So `raw_events.ts` is always GMT+7 wall-clock
-and two rows from two vendors are directly comparable, which is the whole
+and two rows from two log sources are directly comparable, which is the whole
 point - the deliverable is a timeline. `ts_raw` still keeps the source text
 verbatim.
 
@@ -843,18 +843,23 @@ compromised host attacking onward, so it could not be calibrated.
 summary, and an old DuckDB still holds 0-15 numbers that `level_of()` will
 mis-read.
 
-**27. A column is read from the vendor's documentation when one exists, and
-a guess says it is a guess (2026-10-12).** `decode.match_column()` maps any
-header by substring-matching column names, on purpose, so an unseen export
-still yields something. Gotchas #2, #12 and #22 are all that guessing going
-wrong. `vendors.py` now holds **profiles**: a header signature, then each
-canonical field from the column the vendor documents for it, the value
-vocabulary that documentation lists, and the page it came from. The
+**27. A column is read from the log source's documentation when one exists,
+and a guess says it is a guess (2026-10-12).** `decode.match_column()` maps
+any header by substring-matching column names, on purpose, so an unseen
+export still yields something. Gotchas #2, #12 and #22 are all that guessing
+going wrong. `logsources.py` now holds **profiles**: a header signature, then
+each canonical field from the column the log source documents for it, the
+value vocabulary that documentation lists, and the page it came from. The
 manifest's `mapping` records `documented` / `heuristic` / `unrecognised`
 and the UI states it on the case, with the doc links, so an analyst knows
 which mappings to check.
 
-- Profiles exist only where there is **both a vendor document and a real
+- **Say "log source", not "vendor"** (the user's call: "vendor" misleads).
+  A log source is the product that wrote the log, as in Sigma's `logsource`
+  - PAN-OS traffic log, Entra ID sign-in log, OpenSSH sshd - not the company.
+  Microsoft alone ships the Entra sign-in log and the Exchange message trace,
+  two unrelated formats; the format is what a profile describes.
+- Profiles exist only where there is **both a format document and a real
   file to test against**: PAN-OS traffic log, Microsoft Entra ID sign-in log,
   Exchange Online message trace. Line logs cite the message formats they
   match (OpenSSH `auth.c`, Linux-PAM `pam_unix`, FortiOS Log Message
@@ -1107,12 +1112,12 @@ one source IP (171.6.30.201), 42,071 drops + 135 IPS prevents + 17 rejects,
 2,978 accepted, and the accepted breakdown (https 1,022 / FW1_ica_services
 1,005 / http 910). `R2004` independently flagged exactly those 2,978 rows —
 rediscovering the report's central finding (Check Point's Implied Rule
-overriding an explicit drop) from a vendor-neutral rule that knows nothing
+overriding an explicit drop) from a log-source-neutral rule that knows nothing
 about Check Point.
 
 What the tool could not produce, and a human analyst did: the OSINT pivot
 (the source is a compromised MikroTik RouterOS v6.45.3 on residential 3BB
-broadband, i.e. a botnet node), the vendor mechanism behind the bypass, and
+broadband, i.e. a botnet node), Check Point's own mechanism behind the bypass, and
 the reading that Check Point's "Key Install" action is an IKE Phase 1
 handshake rather than a successful compromise. The system quantifies and
 localises; interpretation still needs an analyst.

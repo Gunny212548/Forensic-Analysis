@@ -6,7 +6,7 @@ feeds are refreshed out-of-band by `tools/refresh_intel.py`, so a case can be
 worked on an air-gapped machine and two runs over the same feed files always
 produce the same findings - which matters when the output is evidence.
 
-Deliberately format-agnostic rather than one parser per vendor. Public feeds
+Deliberately format-agnostic rather than one parser per feed. Public feeds
 come as either a comment-prefixed CSV (abuse.ch Feodo, ThreatFox) or a bare
 list of addresses (blocklist.de, CINS, Tor exit nodes), and an analyst should
 be able to drop in a customer-supplied IOC list without writing code. Anything

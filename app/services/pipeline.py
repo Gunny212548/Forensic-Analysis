@@ -21,7 +21,7 @@ from collections import Counter
 from pathlib import Path
 
 from .. import config
-from . import archive, db, decode, intel, parsers, rules, severity, storage, vendors
+from . import archive, db, decode, intel, logsources, parsers, rules, severity, storage
 
 log = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> tuple[int, dict | None]:
     """Ingest a CSV entirely inside DuckDB: it reads the file, maps source
     columns onto the canonical schema, and inserts - no row ever crosses
     into Python. Column mapping is resolved once from the header - from the
-    vendor's documentation when a profile matches (vendors.py), otherwise by
+    log source's documentation when a profile matches (logsources.py), otherwise by
     guessing from column names. A .csv.gz is read the same way - DuckDB
     decompresses it as it reads.
 
@@ -151,7 +151,7 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> tuple[int, dict | None]:
     if not header:
         return -1, None
 
-    mapping = vendors.resolve(header, decode.match_column)
+    mapping = logsources.resolve(header, decode.match_column)
     if not any(mapping.columns.values()):
         return -1, None
     profile = mapping.profile
@@ -209,9 +209,9 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> tuple[int, dict | None]:
             return "NULL"
         return f"coalesce(nullif(regexp_extract({c}, '[0-9]{{1,3}}(\\.[0-9]{{1,3}}){{3}}'), ''), {c})"
 
-    # Vendors spell verdicts differently (Check Point: accept/drop/reject);
+    # Log sources spell verdicts differently (Check Point: accept/drop/reject);
     # rules are written against the canonical spellings.
-    # A matched profile uses the vocabulary its vendor documents instead.
+    # A matched profile uses the vocabulary its documentation lists instead.
     verdict_col = col("verdict")
     verdict_whens = _sql_values(
         profile.verdict_values if profile and profile.verdict_values else decode.VERDICT_ALIASES)
@@ -295,7 +295,7 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
     mapping = None
     if kind == "csv":
         header = _csv_header(path, parsers.sniff_delimiter(path))
-        mapping = vendors.resolve(header, decode.match_column)
+        mapping = logsources.resolve(header, decode.match_column)
     line_counts: Counter = Counter()
     with open(stage_path, "w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
@@ -311,7 +311,7 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
     if mapping is not None:
         described = mapping.describe()
     elif kind == "log" or any(line_counts):
-        described = vendors.line_mapping(line_counts)
+        described = logsources.line_mapping(line_counts)
     else:
         described = {"method": "heuristic", "profile": None, "fields": {},
                      "heuristic_fields": [], "docs": [], "notes": []}
@@ -332,7 +332,7 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
                  report=_noop, expected_bytes: int | None = None) -> tuple[int, bool, dict]:
     """Decode one file into raw_events with row ids from `start`.
     `report(fraction, estimated)` gets this file's progress (FR-2.5).
-    Returns (rows added, truncated, how its columns were mapped - vendors.py)."""
+    Returns (rows added, truncated, how its columns were mapped - logsources.py)."""
     if kind == "csv" and not config.MAX_ROWS:
         # Fast path: DuckDB reads and decodes the CSV itself.
         stop, th = _estimate_while(report, expected_bytes or path.stat().st_size)
@@ -436,8 +436,9 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             # A .gz is read at its decompressed size; the upload recorded it.
             expected = (storage.load_manifest(case_id) or {}).get("uncompressed_bytes")
             _, truncated, mapping = _ingest_file(con, case_id, path, kind, 0, progress.ingest, expected)
-            # How the columns were read, and from which vendor document - or
-            # that they were guessed and need checking (vendors.py).
+            # How the columns were read, and from which log source's
+            # documentation - or that they were guessed and need checking
+            # (logsources.py).
             extra = {"mapping": mapping}
 
         # Threat-intel indicators are loaded now that the traffic is known,

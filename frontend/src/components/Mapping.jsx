@@ -1,5 +1,7 @@
-/** How a file's columns were read (app/services/vendors.py): from the
- *  vendor's own documentation, guessed from column names, or not at all.
+/** How a file's columns were read (app/services/logsources.py): from the
+ *  log source's own format documentation, guessed from column names, or not
+ *  at all. "Log source" is the product that wrote the log (Sigma's
+ *  `logsource`), never "vendor" - one company ships several log sources.
  *  A guessed mapping is the one thing here an analyst must check before
  *  trusting the findings, so it is stated as a warning, not a footnote. */
 
@@ -69,7 +71,7 @@ function One({ mapping, name }) {
     const guessed = mapping.heuristic_fields || []
     return (
       <div className={`map-note${guessed.length ? ' map-warn' : ''}`}>
-        {label}Columns mapped from vendor documentation: <strong>{mapping.name}</strong>.
+        {label}Columns mapped from the log source's documentation: <strong>{mapping.name}</strong>.
         {guessed.length > 0 && (
           <>
             {' '}
@@ -90,8 +92,8 @@ function One({ mapping, name }) {
   return (
     <div className="map-note map-warn">
       {label}
-      <strong>Column mapping not based on vendor documentation.</strong> No known vendor format
-      matched this file's header, so its columns were guessed from their names. Verify the mapping
+      <strong>Column mapping not based on the log source's documentation.</strong> This file's
+      header matched no known log source, so its columns were guessed from their names. Verify the mapping
       before relying on the findings: {fieldList(mapping.fields) || 'no column was recognised'}.
     </div>
   )

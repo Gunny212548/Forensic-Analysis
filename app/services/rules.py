@@ -150,7 +150,7 @@ RULES: list[tuple[str, str]] = [
 
     # Policy gap: a source the firewall is overwhelmingly blocking still got
     # some traffic through. That is what a bypassed/implied rule looks like
-    # from the logs alone, without knowing the vendor's rule semantics. The
+    # from the logs alone, without knowing the firewall's rule semantics. The
     # ratio guard keeps ordinary users (a few blocked sites, lots of normal
     # browsing) from matching.
     ("R2004", f"""

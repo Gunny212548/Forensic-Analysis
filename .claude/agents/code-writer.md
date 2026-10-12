@@ -38,8 +38,8 @@ can make here.
   `RULES`, a short `RULE_LABELS` entry (it names edges in the attack graph;
   `descr` is a whole sentence and far too long), and a correct `mitre` tag.
   **The MITRE tag propagates into the AI narrative** — `R2001` tagged `T1110`
-  made the model narrate port-scan denies as "brute-force". Also: no vendor or
-  protocol name in `descr` unless the rule can only fire on that vendor.
+  made the model narrate port-scan denies as "brute-force". Also: no product or
+  protocol name in `descr` unless the rule can only fire on that log source.
 - **Guard every aggregate against ordinary behaviour** (gotcha #6 / R2004):
   `>=20 denies AND denies >= 3x allows`, `public destination only` for
   beaconing. An unguarded correlation rule is not finished — it is 16,599
@@ -82,7 +82,7 @@ any of them, your change is wrong.** Host port 8091 (the older Wazuh-based
 app uses 8090 — don't collide). Prefix `docker exec`/`docker cp` with
 `MSYS_NO_PATHCONV=1` on Windows/git-bash.
 
-If your change could move counts on real vendor data, say so explicitly and
+If your change could move counts on real log data, say so explicitly and
 recommend a corpus parity run — don't guess at the impact.
 
 ## Scope discipline

@@ -49,7 +49,7 @@ unconfirmed.
   fire on anyone who hits a few blocked sites.
 - **A missing `RULE_LABELS` entry** degrades attack-graph edges to a bare rule
   id. Silent. Always check a new rule has one.
-- **A wrong `mitre` tag or vendor-specific `descr` propagates into the AI
+- **A wrong `mitre` tag or product-specific `descr` propagates into the AI
   narrative**, which trusts rule labels absolutely. `R2001` tagged `T1110`
   made the model narrate port-scan denies as "brute-force"; "SSH brute-force"
   on an Azure AD web sign-in would be equally wrong.
