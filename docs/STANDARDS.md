@@ -1,0 +1,122 @@
+# Standards traceability
+
+Every step from upload to report, the published standard it follows, where it
+is implemented, and how far it goes. Where no standard exists, the step is
+listed as an **internal method**, with the nearest framework named and the
+method stated so it can be checked rather than believed.
+
+Status: ✅ implemented · ⚠️ partial · ❌ not yet
+
+| # | Step | Standard | Implemented in | Status |
+|---|---|---|---|---|
+| 1 | Evidence acquisition and integrity | ISO/IEC 27037:2012, NIST SP 800-86, RFC 3227 (chain of custody), FIPS 180-4 (SHA-256) | `app/services/custody.py`, `app/routers/upload.py` | ✅ |
+| 2 | Reading each log format | The log source's own format documentation (PAN-OS Traffic Log Fields, Microsoft Entra sign-in log, Exchange Get-MessageTrace, OpenSSH `auth.c`, Linux-PAM `pam_unix`, FortiOS Log Message Reference) | `app/services/logsources.py` | ⚠️ 3 CSV log sources + 3 line formats; others are guessed and flagged |
+| 3 | Time | ISO 8601 / RFC 3339, single zone (GMT+7, FR-10.1) | `app/services/pipeline.py`, `decode.py` | ✅ |
+| 4 | Canonical event schema | OCSF | - | ❌ own schema (`raw_events`) |
+| 5 | Threat intelligence | STIX 2.1 / TAXII 2.1 | `app/services/intel.py` | ❌ CSV and plain-list feeds only |
+| 6 | Detection rules | Sigma rules specification v2.1.0 (metadata), Palantir ADS framework (documentation) | `app/services/rule_meta.py` | ✅ metadata; detection stays SQL |
+| 7 | Technique classification | MITRE ATT&CK, CISA *Best Practices for MITRE ATT&CK Mapping* | `rules.py`, `rule_meta.py` | ✅ |
+| 8 | Severity | Sigma `level`; escalation by ODNI Cyber Threat Framework stage | `app/services/severity.py` | ✅ |
+| 9 | Confidence | Admiralty Code (NATO 6x6) | `app/services/confidence.py` | ✅ |
+| 10 | Attack graph / chain | ATT&CK tactics, ODNI CTF stages | `db.build_graph` | ⚠️ graph exact; stages not labelled on it |
+| 11 | Entity risk ranking | **Internal method** - see below | `db.risk_scores` | ⚠️ documented here |
+| 12 | AI narrative | VERIS (structure), NIST AI RMF (governance) | `app/services/analysis.py` | ❌ |
+| 13 | Analyst review audit trail | ISO/IEC 27001:2022 A.8.15 (logging) | `app/services/review.py` | ⚠️ append-only; not hash-chained like custody |
+| 14 | Finding lifecycle and MTTC | NIST SP 800-61 Rev. 3 | - | ❌ planned with Sprint 3 (IAI-45..49) |
+| 15 | Report export | NIST SP 800-86 (reporting), STIX 2.1, ATT&CK Navigator layers | - | ❌ |
+
+What each implemented step does, and what it does not claim, is recorded in
+`CLAUDE.md` gotchas #26 (severity), #27 (log source mapping), #28 (evidence),
+#29 (rule metadata) and #30 (confidence).
+
+## Where a standard is only "aligned with"
+
+Stated plainly so the claims stay accurate:
+
+- **CISA NCISS.** The severity escalation uses the same *observed activity*
+  stages NCISS takes from the ODNI framework. A full NCISS score also needs
+  functional impact, information impact and recoverability, which logs alone
+  cannot give (there is no asset inventory). The tool is aligned with NCISS
+  observed activity; it does not compute an NCISS score.
+- **ODNI to ATT&CK.** No official crosswalk between ODNI stages and ATT&CK
+  tactics was found. The mapping in `severity.py` is ours, anchored on the
+  intrusion boundary (Engagement | Presence) that ODNI does define.
+- **Sigma.** Rules carry Sigma metadata and levels; their detection logic is
+  SQL over this tool's schema and is not exported as Sigma `detection:`. That
+  needs a shared field taxonomy first (step 4, OCSF).
+- **Admiralty Code.** The grade wording is the published scale. Which facts
+  earn which grade (documented mapping + verified digest = B, and so on) is
+  this tool's rule, written one sentence per grade in `confidence.py`.
+- **Audit trail (A.8.15).** Review decisions are append-only JSON lines with
+  actor and time. Unlike the custody log they are not hash-chained, so an
+  edit would not be detected.
+
+## Internal methods (no standard exists)
+
+### Entity risk ranking (step 11)
+
+**What it answers:** which source, destination or account to look at first
+in a case with thousands of findings.
+
+**Method** (`db.risk_scores`): for each entity, for each rule that implicates
+it, take that rule's level weight `w` (informational 1, low 2, medium 4,
+high 8, critical 16 - each level double the one below) and the number of
+rows `n`; score = `sum over rules of w * (1 + ln n)`. One term per distinct
+rule, with diminishing returns on repeats.
+
+**Why this shape:** a plain sum of severities ranks by traffic volume - on
+the customer's beaconing case it put a scanned host with three noisy rules
+above the actual command-and-control destination. Counting each rule once,
+log-dampened, ranks by *how many different ways* an entity is implicated.
+Measured: the three beaconing destinations rank first (CLAUDE.md gotcha #16,
+re-checked after the Sigma weights).
+
+**Nearest frameworks:** NIST SP 800-30 Rev. 1 defines risk as likelihood x
+impact. This score is a likelihood-side ordering only - impact needs asset
+criticality, which the tool does not have. Commercial SIEMs' risk-based
+alerting accumulates per-entity risk the same way, but no published standard
+fixes a formula.
+
+**Not claimed:** the number is an ordering, not a probability or a risk
+level; it is not comparable across cases.
+
+### Finding classification at close: TP / benign TP / FP (step 14)
+
+**Definitions used** (requirements FR-4.7):
+- *True positive* - the activity happened and was malicious.
+- *Benign true positive* - the activity happened as detected, and it was
+  authorised or harmless (an admin's scan, a sanctioned tool).
+- *False positive* - the detected activity did not happen as the rule
+  describes (a decoding error, a mis-mapped column, a misread verdict).
+
+**Nearest framework:** NIST SP 800-61 Rev. 3 speaks of precursors,
+indicators and incidents but does not define these three outcome classes;
+they are common SOC practice. Only true positives must pass through
+*Contained*, and benign/false positives are excluded from MTTC, so the
+metric measures containment that actually happened.
+
+### Rule validation (supports step 6)
+
+**Method:** a rule's Sigma `status` is earned by evidence -
+`test` when it fired correctly on real data and its false positives were
+examined, `experimental` when it has synthetic hits only or none; `stable`
+is reserved until a rule has proven itself across more than one customer
+environment. Ground truth is `tests/gen_usecase.py`; regression is
+`tests/check_parity.py` against `tests/baseline.json`; metadata consistency
+is `tests/check_rule_meta.py`.
+
+**Nearest frameworks:** Sigma's status definitions; the ADS framework's
+*Validation* section; detection-as-code practice. No standard prescribes a
+validation procedure for detection rules.
+
+### Attack-path escalation patterns (supports step 8)
+
+**Method:** two patterns, each a sentence an analyst can check -
+*credential-compromise* (a source brute-forced an account, then logged in to
+it from that same source) raises to high; *compromised-host* (one source
+shows two different allowed post-intrusion behaviours) raises to critical.
+
+**Nearest frameworks:** ODNI CTF stages and Sigma's definition of critical
+("probability borders certainty"). The patterns themselves - which evidence
+combinations reach which stage - are ours, calibrated on the corpus
+(CLAUDE.md gotcha #26 records the version that was too loose).

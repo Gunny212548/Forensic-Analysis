@@ -973,6 +973,12 @@ positives and blind spots.
 - `date` is 2026-09-15 for every rule - the first commit, the earliest the
   history shows; the rules predate it.
 
+**`docs/STANDARDS.md` is the one-page map** of every pipeline step to its
+standard (or "internal method", with the nearest framework named and the
+method written out - risk ranking, TP/BTP/FP, rule validation, escalation
+patterns). The user's requirement since 2026-10-12 is that every step cite
+one; update that table whenever a step changes.
+
 **30. Confidence is an Admiralty Code grade (2026-10-12).** `confidence.py`
 rates each collapsed finding e.g. `B2`: letter = source reliability (B
 documented mapping + acquisition digest verified; C retroactive/no digest or
