@@ -425,6 +425,7 @@
     padding: 0 5px; color: var(--muted); font-size: 10px; }
   .rv-rid { font-family: var(--mono); color: var(--muted); }
   .rv-escalation { font-size: 12px; color: var(--danger); margin: 4px 0 2px; }
+  .rv-chain { margin: -4px 0 10px; font-size: 12px; }
   .rv-admiralty { font-family: var(--mono); font-size: 11px; padding: 0 5px; border: 1px solid var(--line);
     border-radius: 3px; cursor: help; color: var(--text-2); }
 

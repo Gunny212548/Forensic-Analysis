@@ -21,7 +21,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | 10 | Attack graph / chain | ATT&CK tactics, ODNI CTF stages | `db.build_graph` | ⚠️ graph exact; stages not labelled on it |
 | 11 | Entity risk ranking | **Internal method** - see below | `db.risk_scores` | ⚠️ documented here |
 | 12 | AI narrative | VERIS (structure), NIST AI RMF (governance) | `app/services/analysis.py` | ❌ |
-| 13 | Analyst review audit trail | ISO/IEC 27001:2022 A.8.15 (logging) | `app/services/review.py` | ⚠️ append-only; not hash-chained like custody |
+| 13 | Analyst review audit trail | ISO/IEC 27001:2022 A.8.15 (logging) | `app/services/review.py`, `hashchain.py` | ✅ append-only, hash-chained; pre-chain decisions sealed |
 | 14 | Finding lifecycle and MTTC | NIST SP 800-61 Rev. 3 | - | ❌ planned with Sprint 3 (IAI-45..49) |
 | 15 | Report export | NIST SP 800-86 (reporting), STIX 2.1, ATT&CK Navigator layers | - | ❌ |
 
@@ -47,9 +47,13 @@ Stated plainly so the claims stay accurate:
 - **Admiralty Code.** The grade wording is the published scale. Which facts
   earn which grade (documented mapping + verified digest = B, and so on) is
   this tool's rule, written one sentence per grade in `confidence.py`.
-- **Audit trail (A.8.15).** Review decisions are append-only JSON lines with
-  actor and time. Unlike the custody log they are not hash-chained, so an
-  edit would not be detected.
+- **Audit trails (A.8.15, RFC 3227).** The custody and review logs are
+  append-only and hash-chained (`hashchain.py`): an edit, deletion or
+  reorder is detected. Review decisions made before chaining existed are
+  *sealed* by the first chained decision - protected from then on, with
+  nothing able to vouch for them before it. Anyone with write access could
+  rebuild a whole chain; preventing that needs a digest held elsewhere or an
+  external timestamp, which the tool does not have.
 
 ## Internal methods (no standard exists)
 

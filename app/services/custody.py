@@ -13,7 +13,8 @@ What the standards ask, and where each part lives:
   evidence, when, from where, and what was done to it. One append-only JSON
   line per event in `custody/{case_id}.jsonl` - acquired, derived (merge),
   verified, processed, integrity failure.
-- **Tamper evidence**: each line carries the SHA-256 of the line before it
+- **Tamper evidence** (hashchain.py, shared with the review log): each
+  line carries the SHA-256 of the line before it
   (`prev`) and of itself (`hash`), so editing, reordering or deleting an
   earlier line breaks every hash after it. `verify_chain()` checks that. It
   shows *that* the log was altered, not who did it - anyone who can write
@@ -29,16 +30,13 @@ recorded later is marked `retroactive`: it proves the file has not changed
 """
 
 import hashlib
-import json
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .. import config
+from . import hashchain
 
 CHUNK = 1024 * 1024
-GENESIS = "0" * 64
-_lock = threading.Lock()
 
 # Shown with the evidence so the analyst can cite them.
 STANDARDS = [
@@ -71,65 +69,26 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _digest(entry: dict) -> str:
-    """Hash of an entry without its own `hash` - canonical JSON, so the same
-    entry always hashes the same."""
-    body = {k: v for k, v in entry.items() if k != "hash"}
-    return hashlib.sha256(
-        json.dumps(body, sort_keys=True, ensure_ascii=False, default=str).encode()
-    ).hexdigest()
-
-
 def entries(case_id: str) -> list[dict]:
-    path = custody_path(case_id)
-    if not path.exists():
-        return []
-    out = []
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if line:
-                out.append(json.loads(line))
-    return out
+    return hashchain.entries(custody_path(case_id))
 
 
 def record(case_id: str, action: str, actor: str, **details) -> dict:
-    """Append one custody event. Never rewrites earlier lines.
-
-    Locked because the chain is read-then-append: the pipeline thread and a
-    verify request landing together would otherwise both link to the same
-    previous entry. One lock per process is enough - the app runs a single
-    uvicorn worker."""
-    with _lock:
-        prior = entries(case_id)
-        entry = {
-            "seq": len(prior) + 1,
-            "ts": _now(),
-            "action": action,
-            "actor": actor,
-            **details,
-            "prev": prior[-1]["hash"] if prior else GENESIS,
-        }
-        entry["hash"] = _digest(entry)
-        custody_dir().mkdir(parents=True, exist_ok=True)
-        with open(custody_path(case_id), "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
-    return entry
+    """Append one custody event to the hash-chained log (hashchain.py).
+    Never rewrites earlier lines."""
+    return hashchain.append(custody_path(case_id), {"action": action, "actor": actor, **details})
 
 
 def verify_chain(case_id: str) -> tuple[bool, str | None]:
     """(intact, first problem found). An empty log is intact - there is
-    nothing to contradict - and the UI says separately that it is empty."""
-    prev = GENESIS
-    for i, e in enumerate(entries(case_id), 1):
-        if e.get("seq") != i:
-            return False, f"entry {i}: sequence number is {e.get('seq')}, expected {i}"
-        if e.get("prev") != prev:
-            return False, f"entry {i}: does not follow entry {i - 1}"
-        if _digest(e) != e.get("hash"):
-            return False, f"entry {i}: content does not match its hash"
-        prev = e["hash"]
-    return True, None
+    nothing to contradict - and the UI says separately that it is empty.
+    A custody log is chained from its first line, so any unchained line in
+    it is itself a problem."""
+    v = hashchain.verify(custody_path(case_id))
+    if v["intact"] and v["sealed_legacy"]:
+        return False, f"{v['sealed_legacy']} unchained entr{'y' if v['sealed_legacy'] == 1 else 'ies'} " \
+                      "before the chain - a custody log is chained from its first line"
+    return v["intact"], v["problem"]
 
 
 def evidence(sha256: str, size: int, actor: str, retroactive: bool = False) -> dict:

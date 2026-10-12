@@ -313,6 +313,8 @@ async def get_case_findings(case_id: str):
         # Unreviewed when a final report is produced.
         "ready_for_report": counts.get(review.UNREVIEWED, 0) == 0 and bool(findings),
         "reason_codes": review.REASON_CODES,
+        # Whether the decision history behind these statuses is untampered.
+        "review_chain": review.verify(case_id),
     }
 
 
@@ -352,7 +354,7 @@ async def get_review_log(case_id: str):
     """The full decision history for this case, oldest first (audit trail)."""
     if storage.load_manifest(case_id) is None:
         raise HTTPException(404, "Case not found")
-    return {"case_id": case_id, "entries": review.log(case_id)}
+    return {"case_id": case_id, "entries": review.log(case_id), "chain": review.verify(case_id)}
 
 
 # A queued map-reduce job that stopped being updated for this long is not

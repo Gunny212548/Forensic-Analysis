@@ -17,11 +17,10 @@ rows one at a time is a requirement that cannot be met in practice, while
 six decisions take a couple of minutes.
 """
 
-import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 from .. import config
+from . import hashchain
 
 # Review Status values from the requirements (FR-3 definitions table).
 UNREVIEWED = "Unreviewed"
@@ -54,34 +53,21 @@ def review_path(case_id: str) -> Path:
     return review_dir() / f"{case_id}.jsonl"
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def append(case_id: str, entry: dict) -> dict:
-    """Append one immutable record. Never rewrites earlier lines."""
-    entry = {"ts": _now(), **entry}
-    review_dir().mkdir(parents=True, exist_ok=True)
-    with open(review_path(case_id), "a", encoding="utf-8") as fh:
-        fh.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
-    return entry
+    """Append one immutable record to the hash-chained log (hashchain.py),
+    so an edited or deleted decision is detectable (ISO/IEC 27001 A.8.15).
+    Decisions written before chaining are sealed by the first chained one.
+    Never rewrites earlier lines."""
+    return hashchain.append(review_path(case_id), entry)
 
 
 def log(case_id: str) -> list[dict]:
-    path = review_path(case_id)
-    if not path.exists():
-        return []
-    entries = []
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entries.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue  # a truncated tail must not hide the rest of the history
-    return entries
+    return hashchain.entries(review_path(case_id))
+
+
+def verify(case_id: str) -> dict:
+    """Whether the decision history is intact - see hashchain.verify()."""
+    return hashchain.verify(review_path(case_id))
 
 
 def current(case_id: str) -> dict[str, dict]:

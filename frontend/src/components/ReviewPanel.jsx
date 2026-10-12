@@ -74,6 +74,24 @@ export default function ReviewPanel({ caseId }) {
         </span>
       </div>
 
+      {/* The decisions above are only as good as their history: the review
+          log is hash-chained (hashchain.py), and an edited or deleted
+          decision shows here. Decisions made before chaining existed are
+          sealed by the first chained one, and say so. */}
+      {data.review_chain && data.review_chain.entries > 0 && (
+        <div className={`rv-chain ${data.review_chain.intact ? 'ev-ok' : 'ev-bad'}`}>
+          {!data.review_chain.intact
+            ? `Decision history altered: ${data.review_chain.problem}`
+            : data.review_chain.entries === data.review_chain.sealed_legacy
+              ? `${data.review_chain.entries} decision(s) recorded before the history was hash-chained - ` +
+                'not protected yet; the next decision seals them.'
+              : `Decision history intact: ${data.review_chain.entries} entries, hash-chained` +
+                (data.review_chain.sealed_legacy
+                  ? ` (the first ${data.review_chain.sealed_legacy} predate chaining and are sealed by the next).`
+                  : '.')}
+        </div>
+      )}
+
       {error && <Empty>{error}</Empty>}
 
       {findings.map((f) => {
