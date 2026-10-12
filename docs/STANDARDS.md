@@ -23,7 +23,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | 12 | AI narrative | VERIS (structure), NIST AI RMF (governance) | `app/services/analysis.py` | ❌ |
 | 13 | Analyst review audit trail | ISO/IEC 27001:2022 A.8.15 (logging) | `app/services/review.py`, `hashchain.py` | ✅ append-only, hash-chained; pre-chain decisions sealed |
 | 14 | Finding lifecycle and MTTC | NIST SP 800-61 Rev. 3 | - | ❌ planned with Sprint 3 (IAI-45..49) |
-| 15 | Report export | NIST SP 800-86 (reporting), STIX 2.1, ATT&CK Navigator layers | - | ❌ |
+| 15 | Report export | NIST SP 800-86 (reporting), STIX 2.1, ATT&CK Navigator layers | `app/services/attack_layer.py` | ⚠️ Navigator layer (format 4.5) per case; STIX and the report itself not yet |
 
 What each implemented step does, and what it does not claim, is recorded in
 `CLAUDE.md` gotchas #26 (severity), #27 (log source mapping), #28 (evidence),

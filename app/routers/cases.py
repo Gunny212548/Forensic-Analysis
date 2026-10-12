@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Requ
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import analysis, confidence, custody, db, review, storage
+from ..services import analysis, attack_layer, confidence, custody, db, review, storage
 from .upload import CHUNK, _run_pipeline
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -43,6 +43,24 @@ def _custody_view(case_id: str, manifest: dict) -> dict:
         "chain_problem": problem,
         "entries": custody.entries(case_id),
     }
+
+
+@router.get("/{case_id}/attack-layer")
+async def get_attack_layer(case_id: str):
+    """The case's techniques as an ATT&CK Navigator layer (format 4.5),
+    served as a download (services/attack_layer.py)."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    # A failed case may still hold findings from an earlier run - including
+    # one refused because its evidence changed (custody.py). Exporting those
+    # would hand on findings the tool itself no longer stands behind.
+    if manifest.get("status") != "ready":
+        raise HTTPException(409, f"Case is {manifest.get('status')}, not ready - nothing to export")
+    return JSONResponse(
+        attack_layer.build(case_id, manifest),
+        headers={"Content-Disposition": f'attachment; filename="{case_id}-attack-layer.json"'},
+    )
 
 
 @router.get("/{case_id}/custody")

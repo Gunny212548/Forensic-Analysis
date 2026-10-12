@@ -436,7 +436,7 @@
   .map-note.map-warn { border-left-color: var(--accent); background: rgba(179,107,0,.08); color: var(--text); }
   .map-sub { color: var(--muted); font-size: 12px; }
   .map-docs { margin: 4px 0 0; padding-left: 18px; font-size: 12px; }
-  .map-docs a { color: var(--accent); }
+  .map-docs a, .meta-line a { color: var(--accent); }
 
   /* Evidence tab (components/Evidence.jsx). */
   .ev-facts { display: grid; grid-template-columns: 90px 1fr; gap: 6px 14px; font-size: 13px; margin: 0 0 14px; }

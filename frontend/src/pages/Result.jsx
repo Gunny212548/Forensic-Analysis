@@ -177,6 +177,15 @@ export default function Result({ caseId }) {
             {fmtNum(manifest.flagged_count)} / {fmtNum(manifest.total_rows)} rows
           </div>
           <MappingNote manifest={manifest} />
+          {manifest.flagged_count > 0 && (
+            <div className="meta-line">
+              {/* Same-origin link, so the session cookie goes with it. */}
+              <a href={`/api/cases/${encodeURIComponent(caseId)}/attack-layer`} download>
+                Download ATT&amp;CK Navigator layer
+              </a>{' '}
+              - this case&apos;s techniques, scored by severity, for the MITRE ATT&amp;CK Navigator
+            </div>
+          )}
           {analyzing && (
             <Empty style={{ paddingTop: 14 }}>Analysing with AI... (this can take up to a minute)</Empty>
           )}
