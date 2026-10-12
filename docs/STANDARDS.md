@@ -13,7 +13,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | 2 | Reading each log format | The log source's own format documentation (PAN-OS Traffic Log Fields, Microsoft Entra sign-in log, Exchange Get-MessageTrace, OpenSSH `auth.c`, Linux-PAM `pam_unix`, FortiOS Log Message Reference) | `app/services/logsources.py` | ⚠️ 3 CSV log sources + 3 line formats; others are guessed and flagged |
 | 3 | Time | ISO 8601 / RFC 3339, single zone (GMT+7, FR-10.1) | `app/services/pipeline.py`, `decode.py` | ✅ |
 | 4 | Canonical event schema | OCSF | - | ❌ own schema (`raw_events`) |
-| 5 | Threat intelligence | STIX 2.1 / TAXII 2.1 | `app/services/intel.py` | ❌ CSV and plain-list feeds only |
+| 5 | Threat intelligence | OASIS STIX 2.1 / TAXII 2.1 | `app/services/intel.py` | ⚠️ STIX 2.1 bundles read (IP-equality indicators); no TAXII client - export a collection and drop the bundle in |
 | 6 | Detection rules | Sigma rules specification v2.1.0 (metadata), Palantir ADS framework (documentation) | `app/services/rule_meta.py` | ✅ metadata; detection stays SQL |
 | 7 | Technique classification | MITRE ATT&CK, CISA *Best Practices for MITRE ATT&CK Mapping* | `rules.py`, `rule_meta.py` | ✅ |
 | 8 | Severity | Sigma `level`; escalation by ODNI Cyber Threat Framework stage | `app/services/severity.py` | ✅ |
