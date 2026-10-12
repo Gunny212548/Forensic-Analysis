@@ -425,6 +425,14 @@
     padding: 0 5px; color: var(--muted); font-size: 10px; }
   .rv-rid { font-family: var(--mono); color: var(--muted); }
   .rv-escalation { font-size: 12px; color: var(--danger); margin: 4px 0 2px; }
+
+  /* How the file's columns were read (components/Mapping.jsx). */
+  .map-note { font-size: 12.5px; color: var(--text-2); margin: 10px 0 0; padding: 8px 12px;
+    border-left: 3px solid var(--ok); background: var(--subtle); border-radius: 3px; line-height: 1.5; }
+  .map-note.map-warn { border-left-color: var(--accent); background: rgba(179,107,0,.08); color: var(--text); }
+  .map-sub { color: var(--muted); font-size: 12px; }
+  .map-docs { margin: 4px 0 0; padding-left: 18px; font-size: 12px; }
+  .map-docs a { color: var(--accent); }
   .rv-n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
   .rv-desc { font-size: 13px; line-height: 1.5; }
   .rv-meta, .rv-who { font-size: 11px; color: var(--muted); margin-top: 4px; }

@@ -6,6 +6,7 @@ import Workspace from '../components/Workspace.jsx'
 import EventsTable from '../components/EventsTable.jsx'
 import ReviewPanel from '../components/ReviewPanel.jsx'
 import AttackGraph from '../components/AttackGraph.jsx'
+import MappingNote from '../components/Mapping.jsx'
 import {
   AnalysisMeta,
   AnalysisProgress,
@@ -174,6 +175,7 @@ export default function Result({ caseId }) {
             <SeverityPill severity={manifest.severity} /> · findings{' '}
             {fmtNum(manifest.flagged_count)} / {fmtNum(manifest.total_rows)} rows
           </div>
+          <MappingNote manifest={manifest} />
           {analyzing && (
             <Empty style={{ paddingTop: 14 }}>กำลังวิเคราะห์ด้วย AI... (อาจใช้เวลาถึง 1 นาที)</Empty>
           )}

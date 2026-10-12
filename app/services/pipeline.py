@@ -17,10 +17,11 @@ import tempfile
 import threading
 import time
 import traceback
+from collections import Counter
 from pathlib import Path
 
 from .. import config
-from . import archive, db, decode, intel, parsers, rules, severity, storage
+from . import archive, db, decode, intel, parsers, rules, severity, storage, vendors
 
 log = logging.getLogger(__name__)
 
@@ -122,15 +123,25 @@ def _csv_header(path: Path, delimiter: str) -> list[str]:
             return []
 
 
-def _ingest_csv_sql(con, path: Path, start: int = 0) -> int:
+def _sql_values(mapping: dict[str, str]) -> str:
+    """`WHEN 'a' THEN 'b' ...` for a value vocabulary."""
+    def lit(s: str) -> str:
+        return "'" + s.replace("'", "''") + "'"
+    return " ".join(f"WHEN {lit(k)} THEN {lit(v)}" for k, v in mapping.items())
+
+
+def _ingest_csv_sql(con, path: Path, start: int = 0) -> tuple[int, dict | None]:
     """Ingest a CSV entirely inside DuckDB: it reads the file, maps source
     columns onto the canonical schema, and inserts - no row ever crosses
-    into Python. Column mapping is resolved once from the header. A .csv.gz
-    is read the same way - DuckDB decompresses it as it reads.
+    into Python. Column mapping is resolved once from the header - from the
+    vendor's documentation when a profile matches (vendors.py), otherwise by
+    guessing from column names. A .csv.gz is read the same way - DuckDB
+    decompresses it as it reads.
 
     Row ids continue from `start`, so several files can share one case
-    (a zip, FR-2.3). Returns the number of rows inserted, or -1 if the header
-    carried no recognisable fields (caller falls back to the Python path).
+    (a zip, FR-2.3). Returns (rows inserted, how the columns were mapped), or
+    (-1, None) if the header carried no recognisable fields (caller falls
+    back to the Python path).
     """
     # One sniff, handed to both readers, so the header Python maps and the
     # columns DuckDB returns cannot disagree about the shape of the file
@@ -138,22 +149,39 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> int:
     delimiter = parsers.sniff_delimiter(path)
     header = _csv_header(path, delimiter)
     if not header:
-        return -1
+        return -1, None
 
-    mapping = {
-        field: decode.match_column(header, field)
-        for field in ("ts", "srcip", "dstip", "dstport", "username",
-                      "verdict", "app", "risk", "bytes_sent", "category",
-                      "auth_status")
-    }
-    if not any(mapping.values()):
-        return -1
+    mapping = vendors.resolve(header, decode.match_column)
+    if not any(mapping.columns.values()):
+        return -1, None
+    profile = mapping.profile
 
     def col(field: str) -> str:
-        src = mapping.get(field)
-        return _q(src) if src else "NULL"
+        cols = mapping.columns.get(field)
+        return _q(cols[0]) if cols else "NULL"
 
-    ts_col = col("ts")
+    def raw(column: str) -> str:
+        """A column's value, with any documented "no data" placeholder
+        (e.g. PAN-OS 9.1's 1969 high-res timestamp) read as NULL."""
+        q = _q(column)
+        bad = (profile.null_values.get(column, ()) if profile else ())
+        for prefix in bad:
+            q = f"CASE WHEN {q} LIKE '{prefix}%' THEN NULL ELSE {q} END"
+        return q
+
+    def parse_ts(c: str) -> str:
+        return (
+            f"coalesce("
+            f"try_cast({c} AS TIMESTAMPTZ) AT TIME ZONE '{config.EVENT_TZ_NAME}', "
+            f"try_strptime({c}, '%Y/%m/%d %H:%M:%S'), "
+            f"try_strptime({c}, '%d/%m/%Y %H:%M:%S'), "
+            f"try_strptime({c}, '%d/%m/%Y %H:%M'), "
+            f"try_strptime({c}, '%b %d, %Y %I:%M:%S %p'), "
+            f"try_strptime({c}, '%b %d, %Y %H:%M:%S'))"
+        )
+
+    ts_cols = [raw(c) for c in mapping.columns.get("ts", ())]
+    ts_col = f"coalesce({', '.join(ts_cols)})" if ts_cols else "NULL"
     # ISO/standard first, then Palo Alto's DD/MM/YYYY "Receive Time" shapes,
     # then Check Point's "Jun 23, 2026 10:03:02 PM".
     #
@@ -166,14 +194,10 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> int:
     # Palo Alto "+07:00" export and an Azure "Z" export could not be read on
     # one timeline. The try_strptime fallbacks carry no offset at all, so what
     # they return is already GMT+7 by the ingest rule and needs no conversion.
+    # Where a profile documents several time columns, the first that parses
+    # wins, row by row.
     ts_expr = (
-        "NULL" if ts_col == "NULL" else
-        f"coalesce("
-        f"try_cast({ts_col} AS TIMESTAMPTZ) AT TIME ZONE '{config.EVENT_TZ_NAME}', "
-        f"try_strptime({ts_col}, '%d/%m/%Y %H:%M:%S'), "
-        f"try_strptime({ts_col}, '%d/%m/%Y %H:%M'), "
-        f"try_strptime({ts_col}, '%b %d, %Y %I:%M:%S %p'), "
-        f"try_strptime({ts_col}, '%b %d, %Y %H:%M:%S'))"
+        f"coalesce({', '.join(parse_ts(c) for c in ts_cols)})" if ts_cols else "NULL"
     )
 
     # Check Point writes addresses as "object-name (1.2.3.4)"; Palo Alto
@@ -187,13 +211,13 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> int:
 
     # Vendors spell verdicts differently (Check Point: accept/drop/reject);
     # rules are written against the canonical spellings.
+    # A matched profile uses the vocabulary its vendor documents instead.
     verdict_col = col("verdict")
+    verdict_whens = _sql_values(
+        profile.verdict_values if profile and profile.verdict_values else decode.VERDICT_ALIASES)
     verdict_expr = (
         "NULL" if verdict_col == "NULL" else
-        f"CASE lower(trim({verdict_col})) "
-        f"WHEN 'accept' THEN 'allow' WHEN 'permit' THEN 'allow' "
-        f"WHEN 'allowed' THEN 'allow' WHEN 'denied' THEN 'deny' "
-        f"WHEN 'dropped' THEN 'drop' WHEN 'rejected' THEN 'reject' "
+        f"CASE lower(trim({verdict_col})) {verdict_whens} "
         f"ELSE lower(trim({verdict_col})) END"
     )
 
@@ -211,13 +235,12 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> int:
     # to something that can actually authenticate.
     auth_col = col("auth_status")
     user_col = col("username")
+    auth_whens = _sql_values(
+        profile.auth_values if profile and profile.auth_values else decode.AUTH_STATUS)
     action_expr = (
         "NULL" if auth_col == "NULL" or user_col == "NULL" else
         f"CASE WHEN {user_col} IS NULL OR {user_col} = '' THEN NULL "
-        f"ELSE CASE lower(trim({auth_col})) "
-        f"WHEN 'success' THEN 'auth_success' WHEN 'succeeded' THEN 'auth_success' "
-        f"WHEN 'failure' THEN 'auth_failed' WHEN 'failed' THEN 'auth_failed' "
-        f"WHEN 'fail' THEN 'auth_failed' ELSE NULL END END"
+        f"ELSE CASE lower(trim({auth_col})) {auth_whens} ELSE NULL END END"
     )
 
     # `raw` mirrors the Python decoder: "Col=value" for the first handful of
@@ -256,22 +279,43 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> int:
         """,
         [str(path)],
     )
-    return con.execute("SELECT count(*) FROM raw_events WHERE row_id >= ?", [start]).fetchone()[0]
+    added = con.execute("SELECT count(*) FROM raw_events WHERE row_id >= ?", [start]).fetchone()[0]
+    return added, mapping.describe()
 
 
 def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
-                 progress=None) -> tuple[int, bool]:
+                 progress=None) -> tuple[int, bool, dict]:
+    """Returns (rows, truncated, how the file was mapped)."""
     total = 0
     truncated = False
+    # A CSV is mapped once from its header, the same way the SQL fast path
+    # maps it (documented profile or guess). JSON has no header and is
+    # guessed row by row; line logs count which documented format read
+    # each line.
+    mapping = None
+    if kind == "csv":
+        header = _csv_header(path, parsers.sniff_delimiter(path))
+        mapping = vendors.resolve(header, decode.match_column)
+    line_counts: Counter = Counter()
     with open(stage_path, "w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
         for row in parsers.iter_rows(path, kind, progress):
             if config.MAX_ROWS and total >= config.MAX_ROWS:
                 truncated = True
                 break
-            writer.writerow(_stage_row(start + total, decode.decode(row, kind)))
+            event = decode.decode(row, kind, mapping)
+            if kind != "csv":
+                line_counts[event["profile"]] += 1
+            writer.writerow(_stage_row(start + total, event))
             total += 1
-    return total, truncated
+    if mapping is not None:
+        described = mapping.describe()
+    elif kind == "log" or any(line_counts):
+        described = vendors.line_mapping(line_counts)
+    else:
+        described = {"method": "heuristic", "profile": None, "fields": {},
+                     "heuristic_fields": [], "docs": [], "notes": []}
+    return total, truncated, described
 
 
 def _stage_dir() -> Path:
@@ -285,17 +329,17 @@ def _next_row_id(con) -> int:
 
 
 def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
-                 report=_noop, expected_bytes: int | None = None) -> tuple[int, bool]:
+                 report=_noop, expected_bytes: int | None = None) -> tuple[int, bool, dict]:
     """Decode one file into raw_events with row ids from `start`.
     `report(fraction, estimated)` gets this file's progress (FR-2.5).
-    Returns (rows added, truncated)."""
+    Returns (rows added, truncated, how its columns were mapped - vendors.py)."""
     if kind == "csv" and not config.MAX_ROWS:
         # Fast path: DuckDB reads and decodes the CSV itself.
         stop, th = _estimate_while(report, expected_bytes or path.stat().st_size)
         try:
-            added = _ingest_csv_sql(con, path, start)
+            added, mapping = _ingest_csv_sql(con, path, start)
             if added >= 0:
-                return added, False
+                return added, False, mapping
         except Exception:  # noqa: BLE001
             log.warning("case %s: SQL CSV ingest failed for %s, falling back", case_id,
                         path.name, exc_info=True)
@@ -313,8 +357,8 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
     stage_path = Path(stage_name)
     try:
         # Parsing is most of the work; the bulk load that follows is quick.
-        total, truncated = _write_stage(path, kind, stage_path, start,
-                                        progress=lambda f: report(0.9 * f))
+        total, truncated, mapping = _write_stage(path, kind, stage_path, start,
+                                                 progress=lambda f: report(0.9 * f))
         report(0.9)
         if total:
             cols = ", ".join(f"'{name}': '{typ}'" for name, typ in _STAGE_COLUMNS.items())
@@ -328,7 +372,7 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
                 """,
                 [str(stage_path)],
             )
-        return total, truncated
+        return total, truncated, mapping
     finally:
         stage_path.unlink(missing_ok=True)
 
@@ -357,7 +401,7 @@ def _ingest_zip(con, case_id: str, path: Path, report=_noop) -> tuple[bool, list
             size = archive.extract_member(path, m, tmp, budget)
             budget -= size
             start = _next_row_id(con)
-            added, cut = _ingest_file(
+            added, cut, mapping = _ingest_file(
                 con, case_id, tmp, m.kind, start,
                 report=lambda f, est=False, base=base, width=width: report(base + f * width, est))
             truncated = truncated or cut
@@ -367,7 +411,8 @@ def _ingest_zip(con, case_id: str, path: Path, report=_noop) -> tuple[bool, list
         # so the manifest carries the ranges instead.
         done.append({"name": m.name, "kind": m.kind, "bytes": size, "rows": added,
                      "row_id_first": start if added else None,
-                     "row_id_last": start + added - 1 if added else None})
+                     "row_id_last": start + added - 1 if added else None,
+                     "mapping": mapping})
         log.info("case %s: zip member %s -> %s rows", case_id, m.name, added)
         before += m.size
     return truncated, done, skipped
@@ -390,7 +435,10 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
         else:
             # A .gz is read at its decompressed size; the upload recorded it.
             expected = (storage.load_manifest(case_id) or {}).get("uncompressed_bytes")
-            _, truncated = _ingest_file(con, case_id, path, kind, 0, progress.ingest, expected)
+            _, truncated, mapping = _ingest_file(con, case_id, path, kind, 0, progress.ingest, expected)
+            # How the columns were read, and from which vendor document - or
+            # that they were guessed and need checking (vendors.py).
+            extra = {"mapping": mapping}
 
         # Threat-intel indicators are loaded now that the traffic is known,
         # so only the ones this case can match are stored (see intel.fill).

@@ -100,7 +100,8 @@ def parse_ts(text: str | None) -> datetime | None:
     return None
 
 
-# sshd message patterns (same shape a Wazuh sshd decoder would match)
+# sshd message patterns: the messages OpenSSH's auth_log() (auth.c) writes,
+# cited in vendors.LINE_PROFILES["openssh-sshd"].
 _SSHD_PATTERNS = [
     ("auth_failed", re.compile(
         r"Failed password for (?:invalid user )?(?P<user>\S+) from (?P<ip>[\d.]+) port (?P<port>\d+)"
@@ -191,7 +192,7 @@ _AVOID_SUBSTRINGS = {
 
 # Firewall vendors spell the same verdict differently; rules are written
 # against the canonical spellings.
-_VERDICT_ALIASES = {
+VERDICT_ALIASES = {
     "accept": "allow",
     "permit": "allow",
     "allowed": "allow",
@@ -205,7 +206,7 @@ def normalize_verdict(value: str | None) -> str | None:
     if not value:
         return None
     v = str(value).strip().lower()
-    return _VERDICT_ALIASES.get(v, v) or None
+    return VERDICT_ALIASES.get(v, v) or None
 
 
 # Sign-in outcome vocabulary -> the semantic action the rules match on.
@@ -213,7 +214,7 @@ def normalize_verdict(value: str | None) -> str | None:
 # is not a failed authentication and maps to nothing, and firewall verdicts
 # (allow/deny/drop) are absent, so a firewall Action column can never be
 # misread as an auth outcome.
-_AUTH_STATUS = {
+AUTH_STATUS = {
     "success": "auth_success",
     "succeeded": "auth_success",
     "failure": "auth_failed",
@@ -225,7 +226,7 @@ _AUTH_STATUS = {
 def normalize_auth_status(value: str | None) -> str | None:
     if not value:
         return None
-    return _AUTH_STATUS.get(str(value).strip().lower())
+    return AUTH_STATUS.get(str(value).strip().lower())
 
 
 def extract_ip(value: str | None) -> str | None:
@@ -319,12 +320,16 @@ def _blank_event() -> dict:
         "username": None, "program": None, "hostname": None, "action": None,
         "verdict": None, "app": None, "risk": None, "bytes_sent": None,
         "category": None, "raw": "",
+        # Which documented line format read this event (vendors.LINE_PROFILES),
+        # or None. Not stored per row - counted for the manifest.
+        "profile": None,
     }
 
 
 def _decode_fortigate(line: str) -> dict:
     event = _blank_event()
     event["raw"] = line[:2000]
+    event["profile"] = "fortigate-traffic"
     kv = _parse_kv(line)
 
     date, time_ = kv.get("date"), kv.get("time")
@@ -371,17 +376,18 @@ def decode_line(line: str) -> dict:
     else:
         msg = line
 
-    patterns = []
+    patterns, profile = [], None
     if event["program"] == "sshd":
-        patterns = _SSHD_PATTERNS
+        patterns, profile = _SSHD_PATTERNS, "openssh-sshd"
     elif event["program"] in ("passwd", "pam", "sudo"):
-        patterns = _PAM_PATTERNS
+        patterns, profile = _PAM_PATTERNS, "linux-pam"
 
     for action, pattern in patterns:
         pm = pattern.search(msg)
         if pm:
             gd = pm.groupdict()
             event["action"] = action
+            event["profile"] = profile
             event["srcip"] = gd.get("ip")
             event["username"] = gd.get("user")
             # NOTE: the "port" captured here is the remote client's ephemeral
@@ -398,37 +404,61 @@ def decode_line(line: str) -> dict:
     return event
 
 
-def decode_row(row: dict, kind: str) -> dict:
+def decode_row(row: dict, kind: str, mapping=None) -> dict:
+    """`mapping` (vendors.Mapping), resolved once from a CSV header, reads
+    each field from its mapped column(s) - documented or guessed - so this
+    path and the SQL fast path decode a file identically. Without one
+    (JSON), columns are guessed row by row."""
     if kind == "json" and set(row.keys()) == {"_raw"}:
         return decode_line(row["_raw"])
 
+    profile = mapping.profile if mapping else None
+
+    def get(field: str) -> str | None:
+        if mapping is None:
+            return _find_field(row, field)
+        for col in mapping.columns.get(field, ()):
+            val = row.get(col)
+            bad = profile.null_values.get(col, ()) if profile else ()
+            if val not in (None, "") and not any(str(val).startswith(b) for b in bad):
+                return val
+        return None
+
     event = _blank_event()
-    ts_raw = _find_field(row, "ts")
+    ts_raw = get("ts")
     event["ts_raw"] = ts_raw
     event["ts"] = parse_ts(ts_raw)
-    event["srcip"] = extract_ip(_find_field(row, "srcip"))
-    event["dstip"] = extract_ip(_find_field(row, "dstip"))
-    event["dstport"] = _find_field(row, "dstport")
-    event["username"] = _find_field(row, "username")
+    event["srcip"] = extract_ip(get("srcip"))
+    event["dstip"] = extract_ip(get("dstip"))
+    event["dstport"] = get("dstport")
+    event["username"] = get("username")
     # Only an event with an account attached can be an authentication
     # outcome - see the guard in pipeline._ingest_csv_sql for what happens
     # without this (mail delivery "Failed" read as a failed login).
-    event["action"] = (
-        normalize_auth_status(_find_field(row, "auth_status"))
-        if event["username"] else None
-    )
-    event["verdict"] = normalize_verdict(_find_field(row, "verdict"))
-    event["app"] = _find_field(row, "app")
-    event["risk"] = _to_int(_find_field(row, "risk"))
-    event["bytes_sent"] = _to_int(_find_field(row, "bytes_sent"))
-    event["category"] = _find_field(row, "category")
+    status = get("auth_status")
+    if not event["username"] or not status:
+        event["action"] = None
+    elif profile and profile.auth_values:
+        event["action"] = profile.auth_values.get(str(status).strip().lower())
+    else:
+        event["action"] = normalize_auth_status(status)
+    verdict = get("verdict")
+    if verdict and profile and profile.verdict_values:
+        v = str(verdict).strip().lower()
+        event["verdict"] = profile.verdict_values.get(v, v) or None
+    else:
+        event["verdict"] = normalize_verdict(verdict)
+    event["app"] = get("app")
+    event["risk"] = _to_int(get("risk"))
+    event["bytes_sent"] = _to_int(get("bytes_sent"))
+    event["category"] = get("category")
     event["raw"] = ", ".join(
         f"{k}={v}" for k, v in list(row.items())[:14] if v not in (None, "")
     )[:2000]
     return event
 
 
-def decode(row: dict, kind: str) -> dict:
+def decode(row: dict, kind: str, mapping=None) -> dict:
     if kind == "log":
         return decode_line(row["line"])
-    return decode_row(row, kind)
+    return decode_row(row, kind, mapping)

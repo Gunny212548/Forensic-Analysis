@@ -35,9 +35,11 @@ POST /api/upload
 
 pipeline.process_case  (services/pipeline.py)
   CSV  → fast path: DuckDB reads + decodes the file itself. The column
-         mapping is resolved once from the header (decode.match_column)
-         and baked into one INSERT ... SELECT read_csv(...). No row ever
-         crosses into Python.
+         mapping is resolved once from the header - from a vendor profile
+         when one matches (vendors.py, gotcha #27), else guessed by
+         decode.match_column - and baked into one INSERT ... SELECT
+         read_csv(...). No row ever crosses into Python. The manifest's
+         `mapping` says which, and the case page shows it.
   else → Python path: parsers.iter_rows() generator → decode.decode() →
          staging CSV → DuckDB bulk-loads it (needed for .log regex
          decoding and JSON; also the fallback if a CSV header maps to
@@ -840,6 +842,56 @@ compromised host attacking onward, so it could not be calibrated.
 **A re-process is required after any change here** - manifests carry the
 summary, and an old DuckDB still holds 0-15 numbers that `level_of()` will
 mis-read.
+
+**27. A column is read from the vendor's documentation when one exists, and
+a guess says it is a guess (2026-10-12).** `decode.match_column()` maps any
+header by substring-matching column names, on purpose, so an unseen export
+still yields something. Gotchas #2, #12 and #22 are all that guessing going
+wrong. `vendors.py` now holds **profiles**: a header signature, then each
+canonical field from the column the vendor documents for it, the value
+vocabulary that documentation lists, and the page it came from. The
+manifest's `mapping` records `documented` / `heuristic` / `unrecognised`
+and the UI states it on the case, with the doc links, so an analyst knows
+which mappings to check.
+
+- Profiles exist only where there is **both a vendor document and a real
+  file to test against**: PAN-OS traffic log, Microsoft Entra ID sign-in log,
+  Exchange Online message trace. Line logs cite the message formats they
+  match (OpenSSH `auth.c`, Linux-PAM `pam_unix`, FortiOS Log Message
+  Reference). There is no Check Point profile: its export is not in the
+  corpus any more (see below), and a profile no file has tested is a guess
+  with a citation attached.
+- A documented profile still falls back **per field** when an export lacks
+  a column (the UI names the field). `gen_usecase`'s `nightfall-firewall.csv`
+  is exactly that: it has no `Category`, so its malware marker - written into
+  `Threat/Content Type` - is read by guess, flagged, and R3002 still fires.
+- A line log in which no documented format matched is `unrecognised`, not
+  `heuristic`: nothing was guessed, only timestamps and IPs were taken, and
+  no rule can fire. That is 28 of the corpus files (ESXi `hostd.log` & co.)
+  and it answers gotcha #7's "0 findings - schema mismatch or boring?" on
+  the page itself.
+
+What reading the documentation fixed - no count moved, but the values did:
+- PAN-OS `category` came from `Threat/Content Type`, which PAN-OS documents
+  as the log **subtype** (start/end/drop/deny). The documented `Category` is
+  the URL category - what R3002's `malware|command-and-control` is for.
+- Entra ID `username` came from `User`, the **display name** (an exact match
+  on "user" won). Microsoft documents `Username` as the UPN, the account.
+  **This changes finding keys** (`rid|srcip|username`, gotcha #19): a review
+  recorded against the display name no longer attaches after re-processing.
+- Entra ID `verdict` came from `Status` (a sign-in outcome read as a
+  firewall verdict). The profile maps no verdict for a sign-in.
+
+Measured: host run over 63 distinct corpus files, rows / flagged / every
+per-rule count identical to `tests/baseline.json`; 33 CSVs documented
+(31 PAN-OS - one with a guessed field - 1 Entra, 1 Exchange), 2 line logs
+documented, 28 unrecognised.
+
+**The Check Point benchmark is gone from the store.** *Real-world benchmark*
+below says it lives in `DATA_DIR/raw/<case_id>.csv`; on 2026-10-12 the
+store held 8 cases and none of them was it, and no copy was found under
+`D:/forensic system`. Recover the original export before relying on that
+section.
 
 ## SENTRY-IR console (requirements Sept 2026, being built)
 
