@@ -37,7 +37,11 @@ aggregate · `R3xxx` single-event network/firewall.
    deliberately lost the word "SSH" once auth-on-CSV landed, because
    "SSH brute-force" on an Azure AD web sign-in would flow straight into the
    narrative.
-4. **Severity** is a Sigma level declared in `rules.RULE_LEVEL` (the SQL
+4. **Metadata** for every rule lives in `app/services/rule_meta.py` (Sigma
+   fields + ADS sections, CLAUDE.md gotcha #29). A new or changed rule needs
+   its entry updated - status by evidence, techniques matching the SQL - and
+   `python tests/check_rule_meta.py` must pass.
+5. **Severity** is a Sigma level declared in `rules.RULE_LEVEL` (the SQL
    inserts `lvl` as NULL; see `severity.py` and CLAUDE.md gotcha #26). Pick it
    by the Sigma spec's definitions for the behaviour *on its own*; never make
    a single rule `critical` - that comes only from an attack-path escalation.
@@ -45,19 +49,19 @@ aggregate · `R3xxx` single-event network/firewall.
    infrastructure) is high while `R3004` (being probed *by* a known-bad
    source) is medium, because feeds like blocklist.de list anything that has
    ever scanned anyone — inbound hits are background noise.
-5. **Guard aggregates against ordinary behaviour.** `R2004` ("allowed despite
+6. **Guard aggregates against ordinary behaviour.** `R2004` ("allowed despite
    many blocks") would fire on any user who hits a few blocked sites, so it
    requires >=20 denies *and* denies >= 3x allows. A new correlation rule
    without such a guard is not finished.
-6. **Check the field you depend on exists across log sources.** Check Point names
+7. **Check the field you depend on exists across log sources.** Check Point names
    services (`http`, `FW1_ica_services`) and has no port column at all, so
    `R2002` (distinct dst ports) can never fire on it — `R2003` counts distinct
    services for the same signal. Prefer a pair of rules over one rule that
    quietly no-ops on half the corpus.
-7. **A row matching several rules is correct, not a bug.** Rules INSERT
+8. **A row matching several rules is correct, not a bug.** Rules INSERT
    independently. `flagged_count` counts `DISTINCT row_id` — never change it
    to `count(*)`.
-8. **Regularity vs. threshold.** `R2007` (beaconing) flags low jitter
+9. **Regularity vs. threshold.** `R2007` (beaconing) flags low jitter
    (stddev/mean of inter-connection intervals < 0.6), calibrated on real data:
    true beacons sat at 0.43-0.55, bursty browsing at 0.89-0.94. Its
    **public-IPv4-destination restriction is not optional** — without it the

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getFindings, postReview } from '../api.js'
 import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
+import RuleCard from './RuleCard.jsx'
 
 // Unreviewed first, whatever its confidence: a high-confidence finding
 // nobody has looked at must never sit above a reviewed one (NFR-9).
@@ -18,6 +19,7 @@ export default function ReviewPanel({ caseId }) {
   const [reasonCode, setReasonCode] = useState('')
   const [reasonNote, setReasonNote] = useState('')
   const [busyKey, setBusyKey] = useState('')
+  const [openRule, setOpenRule] = useState('') // finding key whose rule card is open
 
   const load = useCallback(async () => {
     setError('')
@@ -95,12 +97,21 @@ export default function ReviewPanel({ caseId }) {
                   {x}
                 </span>
               ))}
-              <span className="rv-rid">{f.rid}</span>
+              <button
+                type="button"
+                className="rv-rid rv-rid-btn"
+                title="What this rule detects, its false positives and blind spots"
+                aria-expanded={openRule === f.key}
+                onClick={() => setOpenRule(openRule === f.key ? '' : f.key)}
+              >
+                {f.rid} {openRule === f.key ? '▴' : '▾'}
+              </button>
               <span className="rv-n">{fmtNum(f.cnt)} events</span>
             </div>
             <div className="rv-desc">
               {f.descr || ''} <MitreTags list={f.mitre} />
             </div>
+            {openRule === f.key && <RuleCard rid={f.rid} />}
             {/* Why the level is above what the rule says on its own - an
                 attack-path pattern (severity.py) - so the analyst can check
                 the escalation instead of taking it on trust. */}

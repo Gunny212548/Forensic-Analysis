@@ -446,6 +446,24 @@
   .ev-log td { vertical-align: top; }
   .ev-row-bad td { color: var(--danger); }
   .ev-short { white-space: nowrap; }
+
+  /* Rule documentation opened from a finding (components/RuleCard.jsx). */
+  .rv-rid-btn { background: none; border: 1px solid var(--line); border-radius: 3px; padding: 0 6px;
+    cursor: pointer; font-size: inherit; }
+  .rv-rid-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .rule-card { margin: 8px 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--subtle); font-size: 12.5px; }
+  .rule-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .rule-status { font-size: 11px; padding: 1px 7px; border-radius: 3px; border: 1px solid currentColor; }
+  .rule-status-test, .rule-status-stable { color: var(--ok); }
+  .rule-status-experimental { color: var(--accent); }
+  .rule-status-deprecated, .rule-status-unsupported { color: var(--muted); }
+  .rule-warn { color: var(--accent); margin-bottom: 6px; }
+  .rule-ads { display: grid; grid-template-columns: 110px 1fr; gap: 4px 12px; margin: 0; }
+  .rule-ads dt { color: var(--muted); }
+  .rule-ads dd { margin: 0; line-height: 1.45; }
+  .rule-ref { margin-right: 8px; color: var(--accent); }
+  @media (max-width: 640px) { .rule-ads { grid-template-columns: 1fr; } }
   .rv-n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
   .rv-desc { font-size: 13px; line-height: 1.5; }
   .rv-meta, .rv-who { font-size: 11px; color: var(--muted); margin-top: 4px; }

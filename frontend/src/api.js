@@ -93,6 +93,20 @@ export async function getFindings(caseId) {
   )
 }
 
+/** The rule set never changes while the app runs, so it is fetched once. */
+let rulesPromise = null
+export function getRules() {
+  if (!rulesPromise) {
+    rulesPromise = fetch('/api/rules')
+      .then((resp) => jsonOrThrow(resp, 'Could not load the detection rules'))
+      .catch((err) => {
+        rulesPromise = null // let a later open retry
+        throw err
+      })
+  }
+  return rulesPromise
+}
+
 export async function getCustody(caseId) {
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/custody`),

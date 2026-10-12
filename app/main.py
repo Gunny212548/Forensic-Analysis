@@ -8,6 +8,7 @@ from .routers import auth as auth_router
 from .routers import cases as cases_router
 from .routers import companies as companies_router
 from .routers import overview as overview_router
+from .routers import rules as rules_router
 from .routers import upload as upload_router
 from .services import auth, storage
 
@@ -20,6 +21,7 @@ app.include_router(upload_router.router)
 app.include_router(cases_router.router)
 app.include_router(companies_router.router)
 app.include_router(overview_router.router)
+app.include_router(rules_router.router)
 
 
 # Everything under /api needs a signed-in user except what the login page
