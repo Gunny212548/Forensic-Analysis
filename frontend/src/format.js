@@ -8,18 +8,18 @@
 // gone rather than guarded.
 
 export const STATUS_MAP = {
-  queued: ['รอประมวลผล', 'count-0'],
-  processing: ['กำลังประมวลผล...', 'count-0'],
-  ready: ['พร้อม', 'count-n'],
-  failed: ['ล้มเหลว', 'count-fail'],
+  queued: ['Queued', 'count-0'],
+  processing: ['Processing...', 'count-0'],
+  ready: ['Ready', 'count-n'],
+  failed: ['Failed', 'count-fail'],
 }
 
 export const SEV_LABEL = {
-  critical: 'วิกฤต',
-  high: 'สูง',
-  medium: 'ปานกลาง',
-  low: 'ต่ำ',
-  none: 'ไม่พบ',
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  none: 'None',
 }
 
 export const SEV_CLASS = {
@@ -58,11 +58,16 @@ export function fmtBytes(n) {
   return `${(n / 1024 ** 3).toFixed(1)} GB`
 }
 
+/** A system timestamp (upload, review, custody - stored in UTC) shown in
+ *  GMT+7 with the zone written out, like every event time (CLAUDE.md gotcha
+ *  #21). It used to use the browser's locale and zone - a Thai-calendar date
+ *  in whatever zone the analyst's machine was set to, next to event times in
+ *  GMT+7. Asia/Bangkok has no DST, so a fixed offset is exact. */
 export function fmtTime(iso) {
   if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'medium' })
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return String(iso)
+  return `${new Date(t.getTime() + 7 * 3600e3).toISOString().slice(0, 19).replace('T', ' ')} +07:00`
 }
 
 /** Trim an event time to minutes for the narrow spots (chain nodes, review
@@ -85,7 +90,7 @@ export function ago(iso) {
 }
 
 export function fmtNum(n) {
-  return (n || 0).toLocaleString()
+  return (n || 0).toLocaleString('en-US')
 }
 
 export function severityBucket(sev) {

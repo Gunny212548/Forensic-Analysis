@@ -35,7 +35,7 @@ export function ChainFlow({ chain }) {
 
 export function ChainStages({ chain }) {
   if (!chain || !chain.length) {
-    return <Empty>ไม่พบรูปแบบการโจมตีหลายขั้นตอนที่ชัดเจน</Empty>
+    return <Empty>No clear multi-stage attack pattern was found.</Empty>
   }
   return (
     <>
@@ -156,40 +156,40 @@ export function AnalysisProgress({ job, stale, stalled }) {
   const at = step === 'reduce' ? calls : Math.min(done + 1, calls)
   const label =
     step === 'reduce'
-      ? `กำลังสรุปรวมผลทั้งหมด (ขั้นที่ ${calls} จาก ${calls})`
+      ? `Combining the results (step ${calls} of ${calls})`
       : step === 'map'
-        ? `กำลังวิเคราะห์เป็นชุด: ชุดที่ ${Math.min(done + 1, total)} จาก ${total}`
-        : 'กำลังเข้าคิวรอเริ่มวิเคราะห์'
+        ? `Analysing in batches: batch ${Math.min(done + 1, total)} of ${total}`
+        : 'Queued - waiting to start'
   const mins = job.estimated_seconds ? Math.max(1, Math.round(job.estimated_seconds / 60)) : 0
 
   return (
     <div className={`job-progress${stale ? ' stale' : ''}`}>
       <div className="job-head">
-        {stale ? 'กำลังวิเคราะห์ใหม่อยู่เบื้องหลัง — ด้านล่างคือผลวิเคราะห์เดิม' : label}
+        {stale ? 'Re-analysing in the background - the previous analysis is shown below' : label}
       </div>
       {stale && <div className="job-note">{label}</div>}
       <div className="job-bar">
         <span style={{ width: `${Math.round((at / calls) * 100)}%` }} />
       </div>
       <div className="job-note">
-        เคสนี้ใหญ่เกินกว่าจะวิเคราะห์ในครั้งเดียว ({job.distinct_total} distinct findings) จึงแบ่งเป็น{' '}
-        {total} ชุด + สรุปรวม 1 ครั้ง รวม {calls} ครั้ง
-        {mins ? ` · ใช้เวลาประมาณ ${mins} นาที` : ''} · หน้านี้อัปเดตสถานะให้เองอัตโนมัติ
+        This case is too large for one analysis ({job.distinct_total} distinct findings), so it
+        runs as {total} batches + 1 summary, {calls} calls in all
+        {mins ? ` · about ${mins} min` : ''} · this page updates itself
       </div>
       {job.map_reduce_capped && (
         <div className="job-note">
-          findings มีมากกว่าที่ narrate ไหว — วิเคราะห์เฉพาะ {job.pool_size} รายการที่รุนแรงที่สุด
-          (attack graph / risk ranking ยังครบทั้งเคส เพราะมาจาก SQL)
+          More findings than can be narrated - only the {job.pool_size} most severe are analysed
+          (the attack graph and risk ranking still cover the whole case; they come from SQL)
         </div>
       )}
       {stalled && (
         <div className="job-note">
-          เซิร์ฟเวอร์ไม่ได้รายงานความคืบหน้ามาสักพักแล้ว (ตัวเลขด้านบนคือค่าล่าสุดที่ได้รับ) —
-          งานอาจยังทำอยู่แต่ช้ากว่าปกติ หน้านี้ยังถามสถานะต่อเนื่อง
+          The server has not reported progress for a while (the figures above are the last received) -
+          the job may still be running, just slower. This page keeps asking.
         </div>
       )}
       {job.already_running && (
-        <div className="job-note">มีงานวิเคราะห์ทำงานอยู่แล้ว จึงไม่ได้เริ่มงานใหม่ซ้อน</div>
+        <div className="job-note">An analysis is already running, so no second one was started.</div>
       )}
     </div>
   )
@@ -205,12 +205,12 @@ export function AnalysisMeta({ meta }) {
     <>
       {meta.truncated && (
         <div className="meta-warn">
-          ผลลัพธ์ถูกตัดกลางคัน (output token limit) - ส่วนท้าย เช่น timeline อาจไม่ครบ
-          ลองวิเคราะห์ใหม่หรือลด MAX_EVENTS_FOR_ANALYSIS
+          The output was cut off (output token limit) - later parts such as the timeline may be
+          incomplete. Re-run the analysis or lower MAX_EVENTS_FOR_ANALYSIS.
         </div>
       )}
       <div className="meta-line">
-        วิเคราะห์ด้วย {meta.provider}/{meta.model} · ใช้ {meta.events_analyzed}/{meta.events_total}{' '}
+        Analysed with {meta.provider}/{meta.model} · used {meta.events_analyzed}/{meta.events_total}{' '}
         events
       </div>
     </>

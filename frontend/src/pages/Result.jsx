@@ -46,7 +46,7 @@ export function readAnalysis(body) {
   if (!body) return { report: null, job: null, failed: '' }
   const status = body.analysis_status
   if (status === 'failed') {
-    return { report: null, job: null, failed: body.summary || 'การวิเคราะห์ล้มเหลว' }
+    return { report: null, job: null, failed: body.summary || 'The analysis failed' }
   }
   if (status === 'running') {
     // `already_running` sits on the envelope, not the job record, but it is
@@ -154,7 +154,7 @@ export default function Result({ caseId }) {
         // 429 is normal operation here: the model allows about one analysis a
         // minute and says how long to wait (CLAUDE.md gotcha #5). Show the
         // wait rather than a generic failure, and never auto-retry.
-        const wait = err.retryAfter ? ` รออีกประมาณ ${err.retryAfter} วินาที` : ''
+        const wait = err.retryAfter ? ` Try again in about ${err.retryAfter} s.` : ''
         setAnalyzeError(err.status === 429 ? `${err.message}${wait}` : err.message)
       } finally {
         setAnalyzing(false)
@@ -178,7 +178,7 @@ export default function Result({ caseId }) {
           </div>
           <MappingNote manifest={manifest} />
           {analyzing && (
-            <Empty style={{ paddingTop: 14 }}>กำลังวิเคราะห์ด้วย AI... (อาจใช้เวลาถึง 1 นาที)</Empty>
+            <Empty style={{ paddingTop: 14 }}>Analysing with AI... (this can take up to a minute)</Empty>
           )}
           {/* A queued job keeps any older analysis on screen below it - it is
               still valid evidence, only possibly stale. */}
@@ -186,7 +186,7 @@ export default function Result({ caseId }) {
             <AnalysisProgress job={job} stale={!!analysis} stalled={stalled} />
           )}
           {!analyzing && jobFailed && (
-            <Empty style={{ paddingTop: 14 }}>วิเคราะห์ไม่สำเร็จ: {jobFailed}</Empty>
+            <Empty style={{ paddingTop: 14 }}>Analysis failed: {jobFailed}</Empty>
           )}
           {!analyzing && analyzeError && <Empty style={{ paddingTop: 14 }}>{analyzeError}</Empty>}
           {!analyzing && analysis && (
@@ -204,9 +204,9 @@ export default function Result({ caseId }) {
           )}
           {!analyzing && !analysis && !job && !jobFailed && (
             <>
-              <Empty style={{ paddingTop: 14 }}>ยังไม่ได้วิเคราะห์เคสนี้ด้วย AI</Empty>
+              <Empty style={{ paddingTop: 14 }}>This case has not been analysed with AI yet.</Empty>
               <button className="secondary" onClick={() => analyze(false)}>
-                วิเคราะห์ด้วย AI
+                Analyse with AI
               </button>
             </>
           )}
@@ -286,15 +286,15 @@ export default function Result({ caseId }) {
       <div className="top-bar">
         <div>
           <a href="#/dashboard" className="back-link">
-            &larr; กลับไป Overview
+            &larr; Back to Overview
           </a>
           <h1>{manifest ? manifest.original_filename : caseId}</h1>
           <div className="subtitle">
             {manifest && (
               <>
-                <code>{manifest.case_id}</code> · อัปโหลดเมื่อ {fmtTime(manifest.uploaded_at)} ·
-                สถานะ: {statusLabel}
-                {manifest.company_name ? ` · บริษัท: ${manifest.company_name}` : ''}
+                <code>{manifest.case_id}</code> · uploaded {fmtTime(manifest.uploaded_at)} ·
+                status: {statusLabel}
+                {manifest.company_name ? ` · customer: ${manifest.company_name}` : ''}
                 {manifest.note ? ` · ${manifest.note}` : ''}
               </>
             )}
@@ -304,19 +304,19 @@ export default function Result({ caseId }) {
           // A second job would only race the first for the same per-minute
           // token budget, and the server refuses it anyway (already_running).
           <button className="secondary" disabled={analyzing || !!job} onClick={() => analyze(true)}>
-            {job ? 'กำลังวิเคราะห์...' : 'วิเคราะห์ใหม่'}
+            {job ? 'Analysing...' : 'Re-analyse'}
           </button>
         )}
       </div>
 
       <div className="panel">
-        {error && <Empty>โหลดไม่สำเร็จ: {error}</Empty>}
-        {!error && !manifest && <Empty>กำลังโหลด...</Empty>}
+        {error && <Empty>Could not load: {error}</Empty>}
+        {!error && !manifest && <Empty>Loading...</Empty>}
         {!error && manifest && manifest.status === 'failed' && (
-          <Empty>เคสนี้ประมวลผลล้มเหลว: {manifest.error || 'ไม่ทราบสาเหตุ'}</Empty>
+          <Empty>Processing this case failed: {manifest.error || 'unknown cause'}</Empty>
         )}
         {!error && manifest && !['ready', 'failed'].includes(manifest.status) && (
-          <Empty>เคสนี้ยังไม่พร้อม รอการประมวลผลให้เสร็จก่อน</Empty>
+          <Empty>This case is not ready yet - wait for processing to finish.</Empty>
         )}
         {!error && manifest?.status === 'ready' && tabs.length > 0 && (
           <Workspace tabs={tabs} activeKey={tab} onChange={setTab} />

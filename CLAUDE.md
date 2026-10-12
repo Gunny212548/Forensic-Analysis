@@ -196,8 +196,7 @@ cut is there too. Severity, review-status and job colours kept their meanings
 and were only re-mapped onto the Figma tokens. Exception: the attack graph
 keeps a dark canvas (`--graph-bg`), because the colours in `AttackGraph.jsx`
 are drawn for it; it gets the Figma treatment in its own story (IAI-61). The
-login and shell are in English, as the Figma is; page content is still Thai
-until each page's story restyles it.
+whole UI is in English, as the Figma is (since 2026-10-12, see *Decisions*).
 
 The attack graph is still a **static SVG** with no library
 (`components/AttackGraph.jsx`), and its geometry is deliberately the same
@@ -1049,9 +1048,7 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
 
 Pages whose story has not come up render `pages/Placeholder.jsx` and appear
 dimmed in the menu (`ready: false` in `components/Sidebar.jsx`). Flip the flag
-when a page is built. Page *content* is still Thai wherever its story has not
-restyled it yet. The shell, login, upload, overview and customers pages are
-English, as the Figma is.
+when a page is built.
 
 Decisions the user made, which the Figma does not show:
 - **There is no "incident" - the finding is the only unit (2026-10-05).**
@@ -1078,10 +1075,14 @@ Decisions the user made, which the Figma does not show:
   `/merge` looks for `raw/<id>.log`, so a line-log case uploaded as `.log.gz`
   cannot be merged ("Raw file missing").
 - Alerts, Threat Intel, Playbooks and Assets pages are cut.
-- **All UI text is English (2026-10-05)** - the Thai still left in the case
-  (Result) page, review panel, analysis panel, events table, `format.js` labels
-  and `api.js` error messages is to be translated, not kept alongside. Code
-  comments were always English.
+- **All UI text is English (2026-10-05; done 2026-10-12)** - the last Thai
+  strings (case page, review panel, analysis panel, events table, upload
+  history, `format.js`, `api.js`, the review reason codes) were translated,
+  not kept alongside. The only Thai left is `Sidebar.jsx`'s initials helper,
+  which skips Thai leading vowels in *users'* names. Times the app itself
+  records (upload, review, custody) render as `YYYY-MM-DD HH:MM:SS +07:00`
+  via `format.fmtTime` - they used to be a Thai-calendar date in the
+  browser's own zone. Code comments were always English.
 - Findings: created by the rule engine, related and admitted to the
   workflow per gotcha #24, no time window (the whole case).
 - **Finding lifecycle (FR-4.1, 4.5, 4.7, 4.8).** The Figma has status only

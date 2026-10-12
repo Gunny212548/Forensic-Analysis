@@ -34,7 +34,7 @@ const SUPPORTED_FORMATS = [
   'Linux syslog / auth.log',
   'Palo Alto CSV export',
   'Check Point SmartLog CSV',
-  'Azure AD sign-in CSV',
+  'Microsoft Entra ID sign-in CSV',
   'Generic JSON',
   // FR-2.3: any of the above, compressed. A multi-file .zip becomes one case.
   '.gz (streamed)',
@@ -334,16 +334,16 @@ export default function Upload() {
 
       <div className="panel">
         <div className="top-bar">
-          <h2>สถานะการอัปโหลดล่าสุด</h2>
+          <h2>Recent uploads</h2>
         </div>
         <table>
           <thead>
             <tr>
-              <th>เวลาอัปโหลด</th>
-              <th>ไฟล์</th>
-              <th>บริษัท</th>
-              <th>สถานะ</th>
-              <th>ความเสี่ยง</th>
+              <th>Uploaded</th>
+              <th>File</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th>Severity</th>
               <th />
             </tr>
           </thead>
@@ -351,7 +351,7 @@ export default function Upload() {
             {!recent.length && (
               <tr>
                 <td colSpan={6} className="empty">
-                  ยังไม่มีการอัปโหลดจากหน้านี้ในเบราว์เซอร์นี้
+                  No uploads from this browser yet
                 </td>
               </tr>
             )}
@@ -367,7 +367,7 @@ export default function Upload() {
                       <code>{item.case_id}</code>
                     </td>
                     <td colSpan={4} className="empty">
-                      ไม่พบเคสนี้แล้ว
+                      Case no longer exists
                     </td>
                   </tr>
                 )
@@ -394,7 +394,7 @@ export default function Upload() {
                   <td>{ready ? <SeverityPill severity={m.severity} /> : '—'}</td>
                   <td>
                     <ResultLink caseId={m.case_id} ready={ready}>
-                      ดูผลลัพธ์
+                      View result
                     </ResultLink>
                   </td>
                 </tr>

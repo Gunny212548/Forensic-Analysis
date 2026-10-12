@@ -38,10 +38,10 @@ ACTIONS = {
 
 # FR-4.6: a rejection must carry a structured reason, not free text alone.
 REASON_CODES = {
-    "insufficient_evidence": "หลักฐานไม่พอ",
-    "misinterpretation": "ตีความผิด",
-    "better_technique": "มี technique ที่ตรงกว่า",
-    "other": "อื่น ๆ",
+    "insufficient_evidence": "Insufficient evidence",
+    "misinterpretation": "Misinterpretation",
+    "better_technique": "A better-matching technique exists",
+    "other": "Other",
 }
 
 

@@ -4,7 +4,7 @@ export default function Placeholder({ title }) {
   return (
     <div className="panel">
       <h1>{title}</h1>
-      <div className="empty">หน้านี้ยังไม่พร้อมใช้งาน</div>
+      <div className="empty">This page is not available yet.</div>
     </div>
   )
 }

@@ -28,7 +28,7 @@ async function jsonOrThrow(resp, fallback) {
 }
 
 export async function getLoginConfig() {
-  return jsonOrThrow(await fetch('/api/auth/config'), 'โหลดหน้าเข้าสู่ระบบไม่สำเร็จ')
+  return jsonOrThrow(await fetch('/api/auth/config'), 'Could not load the sign-in page')
 }
 
 /** Returns null when nobody is signed in - the normal state on first load,
@@ -36,7 +36,7 @@ export async function getLoginConfig() {
 export async function getMe() {
   const resp = await fetch('/api/auth/me')
   if (resp.status === 401) return null
-  return jsonOrThrow(resp, 'ตรวจสอบการเข้าสู่ระบบไม่สำเร็จ')
+  return jsonOrThrow(resp, 'Could not check the sign-in')
 }
 
 // Not through jsonOrThrow: a 401 here is a wrong password, not a lost session.
@@ -62,11 +62,11 @@ export async function getOverview() {
 }
 
 export async function listCases() {
-  return jsonOrThrow(await fetch('/api/cases'), 'โหลดรายการเคสไม่สำเร็จ')
+  return jsonOrThrow(await fetch('/api/cases'), 'Could not load the case list')
 }
 
 export async function listCompanies() {
-  return jsonOrThrow(await fetch('/api/companies'), 'โหลดรายชื่อบริษัทไม่สำเร็จ')
+  return jsonOrThrow(await fetch('/api/companies'), 'Could not load the customer list')
 }
 
 /** FR-6.1: case load per customer (app/services/overview.py customers()). */
@@ -75,21 +75,21 @@ export async function getCustomerSummary() {
 }
 
 export async function getCase(caseId) {
-  return jsonOrThrow(await fetch(`/api/cases/${encodeURIComponent(caseId)}`), 'ไม่พบเคสนี้')
+  return jsonOrThrow(await fetch(`/api/cases/${encodeURIComponent(caseId)}`), 'Case not found')
 }
 
 export async function getEvents(caseId, { limit, offset }) {
   const q = new URLSearchParams({ limit, offset })
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/events?${q}`),
-    'โหลด events ไม่สำเร็จ',
+    'Could not load events',
   )
 }
 
 export async function getFindings(caseId) {
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/findings`),
-    'โหลด findings ไม่สำเร็จ',
+    'Could not load findings',
   )
 }
 
@@ -150,7 +150,7 @@ export async function runAnalysis(caseId, force) {
   // A case too large for one call answers 202 with a progress stub instead of
   // the narrative - a 2xx, so it lands here as an ordinary body and the caller
   // must read `analysis_status` before rendering it as a report.
-  return jsonOrThrow(resp, 'วิเคราะห์ไม่สำเร็จ')
+  return jsonOrThrow(resp, 'Analysis failed')
 }
 
 export async function postReview(caseId, body) {
@@ -159,7 +159,7 @@ export async function postReview(caseId, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  return jsonOrThrow(resp, 'บันทึกผลการตรวจสอบไม่สำเร็จ')
+  return jsonOrThrow(resp, 'Could not save the review decision')
 }
 
 /** FR-2.2 pre-flight. With no size: the limits, for display. With a size:

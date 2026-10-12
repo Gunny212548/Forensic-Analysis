@@ -50,7 +50,7 @@ export default function ReviewPanel({ caseId }) {
   }
 
   if (error && !data) return <Empty>{error}</Empty>
-  if (!data) return <Empty>กำลังโหลด...</Empty>
+  if (!data) return <Empty>Loading...</Empty>
 
   const s = data.review_summary || {}
   const unreviewed = s.Unreviewed || 0
@@ -66,8 +66,8 @@ export default function ReviewPanel({ caseId }) {
           under a deadline an analyst needs to know what is still blocking. */}
       <div className={`rv-gate ${data.ready_for_report ? 'ok' : 'blocked'}`}>
         {data.ready_for_report
-          ? 'ตรวจสอบครบทุก finding แล้ว — พร้อมออกรายงานฉบับสมบูรณ์'
-          : `ยังเหลือ ${unreviewed} finding ที่ยังไม่ได้ตรวจสอบ — ยังออกรายงานฉบับสมบูรณ์ไม่ได้`}
+          ? 'Every finding has been reviewed - the final report can be issued'
+          : `${unreviewed} finding(s) still unreviewed - the final report cannot be issued yet`}
         <span className="rv-counts">
           Accepted {s.Accepted || 0} · Modified {s.Modified || 0} · Rejected {s.Rejected || 0} ·
           Unreviewed {unreviewed}
@@ -79,7 +79,15 @@ export default function ReviewPanel({ caseId }) {
           decision shows here. Decisions made before chaining existed are
           sealed by the first chained one, and say so. */}
       {data.review_chain && data.review_chain.entries > 0 && (
-        <div className={`rv-chain ${data.review_chain.intact ? 'ev-ok' : 'ev-bad'}`}>
+        <div
+          className={`rv-chain ${
+            !data.review_chain.intact
+              ? 'ev-bad'
+              : data.review_chain.entries === data.review_chain.sealed_legacy
+                ? 'rv-chain-warn'
+                : 'ev-ok'
+          }`}
+        >
           {!data.review_chain.intact
             ? `Decision history altered: ${data.review_chain.problem}`
             : data.review_chain.entries === data.review_chain.sealed_legacy
@@ -185,13 +193,13 @@ export default function ReviewPanel({ caseId }) {
                   submit(f.key, 'reject', { reason_code: reasonCode, note: reasonNote })
                 }}
               >
-                <label htmlFor={`reason-${f.key}`}>เหตุผลที่ปฏิเสธ (บังคับ)</label>
+                <label htmlFor={`reason-${f.key}`}>Reason for rejecting (required)</label>
                 <select
                   id={`reason-${f.key}`}
                   value={reasonCode}
                   onChange={(e) => setReasonCode(e.target.value)}
                 >
-                  <option value="">— เลือกเหตุผล —</option>
+                  <option value="">- choose a reason -</option>
                   {Object.entries(reasonCodes).map(([code, label]) => (
                     <option value={code} key={code}>
                       {label} ({code})
@@ -199,13 +207,13 @@ export default function ReviewPanel({ caseId }) {
                   ))}
                 </select>
                 <textarea
-                  placeholder="บันทึกเพิ่มเติม (ไม่บังคับ)"
+                  placeholder="Note (optional)"
                   value={reasonNote}
                   onChange={(e) => setReasonNote(e.target.value)}
                 />
                 <div className="rv-actions">
                   <button className="rv-btn rv-reject" type="submit" disabled={!reasonCode || busy}>
-                    ยืนยันการปฏิเสธ
+                    Confirm rejection
                   </button>
                   <button
                     className="rv-btn"
@@ -216,7 +224,7 @@ export default function ReviewPanel({ caseId }) {
                       setReasonNote('')
                     }}
                   >
-                    ยกเลิก
+                    Cancel
                   </button>
                 </div>
               </form>

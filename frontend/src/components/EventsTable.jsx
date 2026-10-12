@@ -26,14 +26,14 @@ export default function EventsTable({ caseId }) {
     load()
   }, [load])
 
-  if (error) return <Empty>โหลดไม่สำเร็จ: {error}</Empty>
-  if (!data) return <Empty>กำลังโหลด...</Empty>
+  if (error) return <Empty>Could not load: {error}</Empty>
+  if (!data) return <Empty>Loading...</Empty>
   if (!data.events.length) {
     return (
       <Empty>
         {offset === 0
-          ? 'rule engine ไม่พบเหตุการณ์ที่น่าสนใจในไฟล์นี้'
-          : 'ไม่มีข้อมูลเพิ่มเติม'}
+          ? 'The rule engine flagged nothing in this file'
+          : 'No more events'}
       </Empty>
     )
   }
@@ -46,13 +46,13 @@ export default function EventsTable({ caseId }) {
   return (
     <>
       <Empty style={{ paddingBottom: 8 }}>
-        แสดง {fmtNum(from)}-{fmtNum(to)} จาก {fmtNum(data.total)} findings (ข้อมูลดิบทั้งหมด{' '}
-        {fmtNum(data.total_rows)} แถว)
+        Showing {fmtNum(from)}-{fmtNum(to)} of {fmtNum(data.total)} findings (raw rows in the file:{' '}
+        {fmtNum(data.total_rows)})
       </Empty>
       <table>
         <thead>
           <tr>
-            <th>เวลา</th>
+            <th>time</th>
             <th>rule</th>
             <th>level</th>
             <th>description</th>
@@ -81,14 +81,14 @@ export default function EventsTable({ caseId }) {
           disabled={!hasPrev}
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
         >
-          &larr; ก่อนหน้า
+          &larr; Previous
         </button>
         <button
           className="secondary"
           disabled={!hasNext}
           onClick={() => setOffset(offset + PAGE_SIZE)}
         >
-          ถัดไป &rarr;
+          Next &rarr;
         </button>
       </div>
     </>
