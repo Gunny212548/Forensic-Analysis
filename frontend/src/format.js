@@ -27,6 +27,16 @@ export const SEV_CLASS = {
   high: 'sev-high',
   medium: 'sev-medium',
   low: 'sev-low',
+  informational: 'sev-informational',
+}
+
+// Sigma levels (app/services/severity.py), worst first.
+export const LEVEL_EN = {
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  informational: 'Info',
 }
 
 export const REVIEW_CLASS = {

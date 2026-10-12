@@ -141,7 +141,7 @@
   .sev-tag-critical { background: var(--danger-tint); color: var(--danger); }
   .sev-tag-high { background: rgba(179,107,0,.1); color: var(--accent); }
   .sev-tag-medium { background: var(--info-tint); color: var(--info); }
-  .sev-tag-low, .sev-tag-none { background: var(--subtle); color: var(--text-2); }
+  .sev-tag-low, .sev-tag-none, .sev-tag-informational { background: var(--subtle); color: var(--text-2); }
   .status-pill { font-size: 11.5px; padding: 2px 9px; border-radius: 3px; border: 1px solid currentColor; background: var(--panel); }
   .st-ready { color: var(--ok); }
   .st-failed { color: var(--danger); }
@@ -340,7 +340,7 @@
   .btn-link.disabled { background: var(--subtle); color: var(--muted); pointer-events: none; }
 
   /* Case-list severity at a glance - so a critical case is visible without
-     opening it. Bucketed from the rule engine's 0-15 lvl (see db.severity_summary). */
+     opening it. Bucketed from the findings' Sigma levels (see severity.summary). */
   .sev-pill {
     display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px;
     border-radius: 3px; font-size: 11px; font-weight: 600; white-space: nowrap;
@@ -393,7 +393,7 @@
   .sev-critical { color: var(--danger); font-weight: 700; }
   .sev-high { color: var(--high); font-weight: 700; }
   .sev-medium { color: var(--warn); }
-  .sev-low { color: var(--muted); }
+  .sev-low, .sev-informational { color: var(--muted); }
   .rec-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
   .meta-line { font-size: 11px; color: var(--muted); margin-top: 16px; }
 
@@ -424,6 +424,7 @@
   .rv-flag { border: 1px solid var(--panel-border); border-radius: 3px;
     padding: 0 5px; color: var(--muted); font-size: 10px; }
   .rv-rid { font-family: var(--mono); color: var(--muted); }
+  .rv-escalation { font-size: 12px; color: var(--danger); margin: 4px 0 2px; }
   .rv-n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
   .rv-desc { font-size: 13px; line-height: 1.5; }
   .rv-meta, .rv-who { font-size: 11px; color: var(--muted); margin-top: 4px; }

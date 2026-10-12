@@ -37,11 +37,14 @@ aggregate · `R3xxx` single-event network/firewall.
    deliberately lost the word "SSH" once auth-on-CSV landed, because
    "SSH brute-force" on an Azure AD web sign-in would flow straight into the
    narrative.
-4. **Severity** is Wazuh's 0-15 scale. Asymmetry is intentional and worth
-   copying: `R3003` (talking *to* known-bad infrastructure) is lvl 13 while
-   `R3004` (being probed *by* a known-bad source) is lvl 7, because feeds like
-   blocklist.de list anything that has ever scanned anyone — inbound hits are
-   background noise.
+4. **Severity** is a Sigma level declared in `rules.RULE_LEVEL` (the SQL
+   inserts `lvl` as NULL; see `severity.py` and CLAUDE.md gotcha #26). Pick it
+   by the Sigma spec's definitions for the behaviour *on its own*; never make
+   a single rule `critical` - that comes only from an attack-path escalation.
+   Asymmetry is intentional and worth copying: `R3003` (talking *to* known-bad
+   infrastructure) is high while `R3004` (being probed *by* a known-bad
+   source) is medium, because feeds like blocklist.de list anything that has
+   ever scanned anyone — inbound hits are background noise.
 5. **Guard aggregates against ordinary behaviour.** `R2004` ("allowed despite
    many blocks") would fire on any user who hits a few blocked sites, so it
    requires >=20 denies *and* denies >= 3x allows. A new correlation rule

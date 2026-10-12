@@ -47,7 +47,7 @@ emit under a "graph" key is discarded. Spend the budget on the narrative.
     {
       "timestamp": "the event's ts value, verbatim",
       "event": "short description of what happened",
-      "severity": "low|medium|high|critical",
+      "severity": "the sev of the event(s) described, verbatim",
       "source_ip": "IP address if present, else null",
       "target": "user/host/asset targeted if identifiable, else null",
       "mitre": ["MITRE ATT&CK technique IDs relevant to this event, e.g. T1110.001 - REQUIRED array, use [] only if truly none apply"]
@@ -132,7 +132,7 @@ written before the event list can eat the budget.
     {
       "ts": "the event's ts value, verbatim",
       "event": "short description of what happened",
-      "sev": "low|medium|high|critical",
+      "sev": "the event's sev, verbatim",
       "src": "source IP if present, else null",
       "target": "user/host/asset targeted if identifiable, else null",
       "mitre": ["MITRE ATT&CK technique ids - keep the ones the rule engine already supplied"]
@@ -211,7 +211,7 @@ def _condense(e: dict) -> dict:
     out = {
         "ts": e.get("ts_first"),
         "rid": e.get("rid"),
-        "lvl": e.get("lvl"),
+        "sev": e.get("level"),
         "desc": e.get("descr") or (e.get("raw") or "")[:150],
     }
     if e.get("srcip"):
@@ -453,7 +453,7 @@ def _build_prompt(
         f"case was normalised to that zone at ingest, so they are directly "
         f"comparable. Report times as given - do not convert them.\n\n"
         f"Events (JSON array, chronological, short keys: ts=timestamp, "
-        f"rid=internal rule id, lvl=severity 0-15, desc=description, "
+        f"rid=internal rule id, sev=Sigma level computed by the rule engine (informational/low/medium/high/critical; critical means an attack-path pattern showed the attack succeeded) - copy it, do not re-grade, desc=description, "
         f"srcip, user, mitre=technique ids already tagged by the rule engine "
         f"if any, count/ts_last_seen present when this entry represents "
         f"multiple collapsed repeats):\n"
@@ -860,7 +860,7 @@ async def _run_map_call(
         f"All times are {config.EVENT_TZ_SUFFIX} (GMT+7). Report times as "
         f"given - do not convert them.\n\n"
         f"Events (JSON array, chronological, short keys: ts=timestamp, "
-        f"rid=internal rule id, lvl=severity 0-15, desc=description, srcip, "
+        f"rid=internal rule id, sev=Sigma level computed by the rule engine (informational/low/medium/high/critical; critical means an attack-path pattern showed the attack succeeded) - copy it, do not re-grade, desc=description, srcip, "
         f"user, mitre=technique ids already tagged by the rule engine, "
         f"count/ts_last_seen present when this entry collapses repeats):\n"
         f"{json.dumps(condensed, default=str, separators=(',', ':'))}"

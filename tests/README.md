@@ -68,6 +68,20 @@ findings** — they're the false-positive check.
 A row can match several rules, so per-rule counts sum to more than the
 flagged-row count. `flagged_count` is DISTINCT rows.
 
+## Expected severity (CLAUDE.md gotcha #26)
+
+Not asserted by `check_parity.py` - check the case's `severity` and
+`escalations` on its manifest:
+
+| file | case level | escalation |
+|---|---|---|
+| `nightfall-auth.log` | high | `credential-compromise` (17 findings): `10.20.30.40` brute-forced `root`, then logged in from the same address |
+| `nightfall-firewall.csv` | critical | `compromised-host` (3): `10.10.1.5` has both the malware-flagged and the two >50MB transfers |
+
+`10.10.1.9`'s ordinary logins stay `informational`. If either file stops
+escalating, or the benign host starts, the attack-path patterns in
+`severity.py` have drifted.
+
 ## What the AI layer should say
 
 Not exact-matchable, but the analysis should reconstruct the planted chain:

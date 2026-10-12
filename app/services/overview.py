@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 
 from .. import config
 from . import db, review, storage
+from .severity import level_of
 
 TZ = timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))
 
@@ -47,7 +48,9 @@ _lock = threading.Lock()
 
 
 def bucket(sev: dict | None) -> str | None:
-    """Same buckets as the case list (format.js severityBucket)."""
+    """Same buckets as the case list (format.js severityBucket). A case whose
+    findings are all informational is "none": Sigma defines that level as
+    enrichment that should never raise an alert."""
     if not sev:
         return None
     for name in ("critical", "high", "medium", "low"):
@@ -207,16 +210,8 @@ def build() -> dict:
 
 
 def lvl_bucket(lvl: int | None) -> str | None:
-    """db.severity_summary()'s cut points, for a single lvl."""
-    if lvl is None:
-        return None
-    if lvl >= 12:
-        return "critical"
-    if lvl >= 7:
-        return "high"
-    if lvl >= 4:
-        return "medium"
-    return "low"
+    """The Sigma level of a single stored weight (severity.py)."""
+    return level_of(lvl)
 
 
 def customers() -> dict:

@@ -8,7 +8,11 @@ event in Python.
 
 A single row can match several rules and get several findings - that is
 intentional (a login failure that is also part of a brute-force burst is
-both). Severity ordering is handled at query time, not by overwriting.
+both).
+
+Rules insert lvl as NULL. The level is declared once per rule in RULE_LEVEL
+(a Sigma level) and written by apply_rules(), then raised by
+severity.escalate() for findings on a successful attack path.
 
 Rule id conventions:
   R1xxx  single-event, host/auth logs
@@ -17,6 +21,8 @@ Rule id conventions:
 """
 
 import duckdb
+
+from .severity import WEIGHT
 
 DENY_VERDICTS = (
     "('deny', 'drop', 'block', 'blocked', 'reject', 'prevent', "
@@ -27,7 +33,7 @@ RULES: list[tuple[str, str]] = [
     # ---------- R1xxx: single-event, auth / host logs ----------
     ("R1000", """
         INSERT INTO findings
-        SELECT row_id, 'R1000', 5,
+        SELECT row_id, 'R1000', NULL,
                'Authentication failed for ' || coalesce(username, '?') ||
                ' from ' || coalesce(srcip, '?'),
                ['T1110.001']
@@ -35,7 +41,7 @@ RULES: list[tuple[str, str]] = [
     """),
     ("R1001", """
         INSERT INTO findings
-        SELECT row_id, 'R1001', 3,
+        SELECT row_id, 'R1001', NULL,
                'Login succeeded for ' || coalesce(username, '?') ||
                ' from ' || coalesce(srcip, '?'),
                []::VARCHAR[]
@@ -43,7 +49,7 @@ RULES: list[tuple[str, str]] = [
     """),
     ("R1002", """
         INSERT INTO findings
-        SELECT row_id, 'R1002', 5,
+        SELECT row_id, 'R1002', NULL,
                'Login attempt with invalid user ''' || coalesce(username, '?') ||
                ''' from ' || coalesce(srcip, '?'),
                ['T1110.003', 'T1087']
@@ -51,14 +57,14 @@ RULES: list[tuple[str, str]] = [
     """),
     ("R1003", """
         INSERT INTO findings
-        SELECT row_id, 'R1003', 1,
+        SELECT row_id, 'R1003', NULL,
                'SSH connection opened from ' || coalesce(srcip, '?'),
                []::VARCHAR[]
         FROM raw_events WHERE action = 'connection'
     """),
     ("R1004", """
         INSERT INTO findings
-        SELECT row_id, 'R1004', 3,
+        SELECT row_id, 'R1004', NULL,
                'Password changed for ' || coalesce(username, '?'),
                []::VARCHAR[]
         FROM raw_events WHERE action = 'password_changed'
@@ -67,7 +73,7 @@ RULES: list[tuple[str, str]] = [
     # ---------- R2xxx: correlation ----------
     ("R2000", """
         INSERT INTO findings
-        SELECT e.row_id, 'R2000', 9,
+        SELECT e.row_id, 'R2000', NULL,
                'Repeated brute-force from ' || e.srcip ||
                ' (' || a.n || ' attempts)',
                ['T1110.001']
@@ -82,7 +88,7 @@ RULES: list[tuple[str, str]] = [
     # narrate port-scan denies as "brute-force attempts" in testing.
     ("R2001", f"""
         INSERT INTO findings
-        SELECT e.row_id, 'R2001', 6,
+        SELECT e.row_id, 'R2001', NULL,
                'Repeated blocked connections from ' || e.srcip ||
                ' (' || a.n || ' denies)',
                ['T1595']
@@ -106,7 +112,7 @@ RULES: list[tuple[str, str]] = [
     # counting rows that were allowed was.
     ("R2002", f"""
         INSERT INTO findings
-        SELECT e.row_id, 'R2002', 7,
+        SELECT e.row_id, 'R2002', NULL,
                'Port scan pattern from ' || e.srcip ||
                ' (' || a.n || ' distinct destination ports refused)',
                ['T1046']
@@ -129,7 +135,7 @@ RULES: list[tuple[str, str]] = [
     # are a policy gap, and R2004's finding, not a sweep.
     ("R2003", f"""
         INSERT INTO findings
-        SELECT e.row_id, 'R2003', 7,
+        SELECT e.row_id, 'R2003', NULL,
                'Service sweep from ' || e.srcip ||
                ' (' || a.n || ' distinct services refused)',
                ['T1046']
@@ -149,7 +155,7 @@ RULES: list[tuple[str, str]] = [
     # browsing) from matching.
     ("R2004", f"""
         INSERT INTO findings
-        SELECT e.row_id, 'R2004', 10,
+        SELECT e.row_id, 'R2004', NULL,
                'Traffic ALLOWED from ' || e.srcip ||
                ' despite ' || a.denies || ' blocks from the same source (possible policy gap)',
                ['T1133']
@@ -174,7 +180,7 @@ RULES: list[tuple[str, str]] = [
     # stayed at 1 while the account was plainly under attack.
     ("R2005", """
         INSERT INTO findings
-        SELECT e.row_id, 'R2005', 9,
+        SELECT e.row_id, 'R2005', NULL,
                'Password spray against ' || e.username || ' from ' ||
                a.n || ' distinct sources',
                ['T1110.003']
@@ -194,7 +200,7 @@ RULES: list[tuple[str, str]] = [
     # one GROUP BY and needs no window functions.
     ("R2006", """
         INSERT INTO findings
-        SELECT e.row_id, 'R2006', 8,
+        SELECT e.row_id, 'R2006', NULL,
                'Successful logins for ' || e.username || ' from ' || a.n ||
                ' distinct sources within one hour',
                ['T1078']
@@ -239,7 +245,7 @@ RULES: list[tuple[str, str]] = [
     # therefore the whole app) from importing at all.
     ("R2007", r"""
         INSERT INTO findings
-        SELECT e.row_id, 'R2007', 8,
+        SELECT e.row_id, 'R2007', NULL,
                'Beaconing pattern ' || e.srcip || ' -> ' || e.dstip ||
                ' (' || b.n || ' connections at ~' || cast(round(b.avg_gap) AS INT) ||
                's intervals, jitter ' || cast(round(b.cv * 100) AS INT) || '%)',
@@ -298,7 +304,7 @@ RULES: list[tuple[str, str]] = [
     # ---------- R3xxx: single-event, network / firewall ----------
     ("R3000", """
         INSERT INTO findings
-        SELECT row_id, 'R3000', 8,
+        SELECT row_id, 'R3000', NULL,
                'High-risk application ''' || coalesce(app, 'unknown') ||
                ''' allowed (' || coalesce(srcip, '?') || ' -> ' || coalesce(dstip, '?') || ')',
                ['T1071']
@@ -306,7 +312,7 @@ RULES: list[tuple[str, str]] = [
     """),
     ("R3001", """
         INSERT INTO findings
-        SELECT row_id, 'R3001', 9,
+        SELECT row_id, 'R3001', NULL,
                'Large outbound transfer (' || bytes_sent || ' bytes) ' ||
                coalesce(srcip, '?') || ' -> ' || coalesce(dstip, '?'),
                ['T1041']
@@ -329,7 +335,7 @@ RULES: list[tuple[str, str]] = [
     # confidence high. The firewall had stopped every one of them.
     ("R3003", f"""
         INSERT INTO findings
-        SELECT e.row_id, 'R3003', 13,
+        SELECT e.row_id, 'R3003', NULL,
                'Traffic ALLOWED to known-bad indicator ' || e.dstip ||
                ' [' || i.source ||
                CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
@@ -343,8 +349,7 @@ RULES: list[tuple[str, str]] = [
     # knowing - a host trying to reach malware infrastructure is a host to
     # look at (malware beaconing attempt, DNS/NetBIOS leakage, stale config) -
     # but nothing was established, so it is not the emergency R3003 is.
-    # lvl 5 puts it below the ordinary network rules (R3000/R3001 at 8-9) and
-    # above the informational ones.
+    # Medium, one level below R3003's high (see RULE_LEVEL).
     #
     # Tag kept as T1071 rather than dropped: ATT&CK techniques describe
     # attempted behaviour, not outcomes, so an attempt to speak C2 protocol is
@@ -353,7 +358,7 @@ RULES: list[tuple[str, str]] = [
     # happened.
     ("R3005", f"""
         INSERT INTO findings
-        SELECT e.row_id, 'R3005', 5,
+        SELECT e.row_id, 'R3005', NULL,
                'BLOCKED connection attempt to known-bad indicator ' || e.dstip ||
                ' (denied by policy) [' || i.source ||
                CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
@@ -371,7 +376,7 @@ RULES: list[tuple[str, str]] = [
     # host that was let in is the one to look at.
     ("R3004", f"""
         INSERT INTO findings
-        SELECT e.row_id, 'R3004', 7,
+        SELECT e.row_id, 'R3004', NULL,
                'Traffic ALLOWED from known-bad indicator ' || e.srcip ||
                ' [' || i.source ||
                CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
@@ -387,7 +392,7 @@ RULES: list[tuple[str, str]] = [
     # analyst still wants the perimeter's own hit rate visible.
     ("R3006", f"""
         INSERT INTO findings
-        SELECT e.row_id, 'R3006', 3,
+        SELECT e.row_id, 'R3006', NULL,
                'BLOCKED inbound traffic from known-bad indicator ' || e.srcip ||
                ' (denied at the perimeter) [' || i.source ||
                CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
@@ -399,7 +404,7 @@ RULES: list[tuple[str, str]] = [
 
     ("R3002", """
         INSERT INTO findings
-        SELECT row_id, 'R3002', 12,
+        SELECT row_id, 'R3002', NULL,
                'Traffic flagged ''' || category || ''' (' ||
                coalesce(srcip, '?') || ' -> ' || coalesce(dstip, '?') || ')',
                ['T1105']
@@ -443,6 +448,50 @@ RULE_LABELS: dict[str, str] = {
 }
 
 
+# Each rule's level, as defined by the Sigma rules specification (see
+# severity.py for the definitions quoted). This replaces the hand-picked
+# 0-15 numbers the rules used to carry, which had no standard behind them.
+# Ask of every new rule: on its own, without any other evidence, is this
+# "rarely an incident" (low), "review regularly" (medium) or "alert and
+# review promptly" (high)? Nothing here is critical - see severity.py.
+RULE_LEVEL: dict[str, str] = {
+    # One successful login or one TCP connection is what normal use looks
+    # like; they exist to give the other rules context.
+    "R1001": "informational",
+    "R1003": "informational",
+    # A listed scanner the perimeter refused: the firewall doing its job,
+    # kept only so its hit rate stays visible.
+    "R3006": "informational",
+    # Single failures, typos and password changes happen every day; they
+    # matter in volume, which is what R2000/R2005 measure.
+    "R1000": "low",
+    "R1002": "low",
+    "R1004": "low",
+    # Scanning that the firewall refused: the internet does this to every
+    # public address all day, but a sustained sweep is still worth a look.
+    "R2001": "low",
+    "R2002": "low",
+    "R2003": "low",
+    # A real attack attempt, but nothing says it worked yet.
+    "R2000": "medium",
+    "R2005": "medium",
+    "R3005": "medium",
+    # Risky or unusual on their own, and each has a common innocent reading:
+    # a high-risk app a user is allowed to run, a backup upload, a scanner
+    # the policy happened to let through.
+    "R3000": "medium",
+    "R3001": "medium",
+    "R3004": "medium",
+    # Evidence that something crossed the perimeter or is talking out:
+    # each one deserves an alert and a prompt look.
+    "R2004": "high",
+    "R2006": "high",
+    "R2007": "high",
+    "R3002": "high",
+    "R3003": "high",
+}
+
+
 def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None) -> dict[str, int]:
     """Runs every rule against the case's raw_events, filling findings.
     Returns {rule_id: rows_matched} so the pipeline can log/report it.
@@ -456,4 +505,19 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None) -> dict[str, int]:
             matched[rid] = after - before
         if on_rule:
             on_rule(i, len(RULES))
+
+    whens = " ".join(f"WHEN '{rid}' THEN {WEIGHT[lvl]}" for rid, lvl in RULE_LEVEL.items())
+    con.execute(f"UPDATE findings SET lvl = CASE rid {whens} ELSE {WEIGHT['low']} END")
+    # A refused connection never crossed the intrusion boundary (ODNI CTF:
+    # Engagement, not Presence), so no rule can make it a prompt-review
+    # alert - a C2 beacon denied every time is an attempt, not a channel.
+    con.execute(
+        f"""
+        UPDATE findings SET lvl = {WEIGHT['medium']}
+        FROM raw_events r
+        WHERE findings.row_id = r.row_id
+          AND findings.lvl > {WEIGHT['medium']}
+          AND r.verdict IN {DENY_VERDICTS}
+        """
+    )
     return matched

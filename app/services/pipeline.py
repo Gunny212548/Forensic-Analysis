@@ -20,7 +20,7 @@ import traceback
 from pathlib import Path
 
 from .. import config
-from . import archive, db, decode, intel, parsers, rules, storage
+from . import archive, db, decode, intel, parsers, rules, severity, storage
 
 log = logging.getLogger(__name__)
 
@@ -402,7 +402,8 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
         progress.set("rules", INTEL_END, force=True)
         matched = rules.apply_rules(
             con, on_rule=lambda i, n: progress.set("rules", INTEL_END + (99 - INTEL_END) * i / n))
-        severity = db.severity_summary(con)
+        escalated = severity.escalate(con)
+        sev_summary = severity.summary(con)
         con.close()
         con = None
 
@@ -414,7 +415,8 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             flagged_count=flagged,
             rules_matched=matched,
             truncated=truncated,
-            severity=severity,
+            severity=sev_summary,
+            escalations=escalated,
             error=None,
             progress={"stage": "done", "pct": 100, "estimated": False},
             **extra,

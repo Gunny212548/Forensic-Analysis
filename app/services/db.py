@@ -20,7 +20,8 @@ import duckdb
 
 from .. import config
 from . import intel
-from .rules import DENY_VERDICTS, RULE_LABELS
+from .rules import DENY_VERDICTS, RULE_LABELS, RULE_LEVEL
+from .severity import PATTERNS, level_of
 
 RAW_COLUMNS = [
     "row_id", "ts", "ts_raw", "srcip", "dstip", "dstport", "username",
@@ -54,6 +55,14 @@ CREATE TABLE IF NOT EXISTS findings (
   lvl    INTEGER,
   descr  VARCHAR,
   mitre  VARCHAR[]
+);
+
+-- Findings raised by an attack-path pattern (severity.py). One
+-- row per (finding, pattern); the base level is still rules.RULE_LEVEL[rid].
+CREATE TABLE IF NOT EXISTS escalations (
+  row_id  BIGINT,
+  rid     VARCHAR,
+  pattern VARCHAR
 );
 """
 
@@ -123,25 +132,24 @@ def ts_range(case_id: str) -> tuple[str, str]:
         con.close()
 
 
-def severity_summary(con: duckdb.DuckDBPyConnection) -> dict:
-    """Max lvl per row_id (a row can match several rules - gotcha #6), bucketed
-    on Wazuh's 0-15 scale so the case list can show severity without a client
-    round-trip: 12-15 critical, 7-11 high, 4-6 medium, 0-3 low."""
-    row = con.execute(
+def _escalation_map(con: duckdb.DuckDBPyConnection) -> dict[tuple[str, str | None, str | None], list[str]]:
+    """{(rid, srcip, username): [pattern, ...]} for findings an attack-path
+    pattern raised. Empty for a case processed before the
+    escalations table existed, rather than an error."""
+    exists = con.execute(
+        "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'escalations'"
+    ).fetchone()[0]
+    if not exists:
+        return {}
+    rows = con.execute(
         """
-        SELECT
-          coalesce(max(lvl), 0) AS max_lvl,
-          count(*) FILTER (WHERE lvl >= 12) AS critical,
-          count(*) FILTER (WHERE lvl >= 7 AND lvl < 12) AS high,
-          count(*) FILTER (WHERE lvl >= 4 AND lvl < 7) AS medium,
-          count(*) FILTER (WHERE lvl < 4) AS low
-        FROM (SELECT row_id, max(lvl) AS lvl FROM findings GROUP BY row_id)
+        SELECT e.rid, r.srcip, r.username, list(DISTINCT e.pattern ORDER BY e.pattern)
+        FROM escalations e
+        JOIN raw_events r USING (row_id)
+        GROUP BY e.rid, r.srcip, r.username
         """
-    ).fetchone()
-    return {
-        "max_lvl": row[0], "critical": row[1], "high": row[2],
-        "medium": row[3], "low": row[4],
-    }
+    ).fetchall()
+    return {(rid, src, user): list(p) for rid, src, user, p in rows}
 
 
 FINDING_SELECT = """
@@ -163,7 +171,10 @@ def list_findings(case_id: str, limit: int, offset: int) -> list[dict]:
         ).fetchall()
         cols = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username", "raw",
                 "rid", "lvl", "descr", "mitre"]
-        return [dict(zip(cols, r)) for r in rows]
+        out = [dict(zip(cols, r)) for r in rows]
+        for row in out:
+            row["level"] = level_of(row["lvl"])
+        return out
     finally:
         con.close()
 
@@ -298,6 +309,7 @@ def collapsed_findings(case_id: str) -> list[dict]:
             ORDER BY g.lvl DESC, g.cnt DESC
             """
         ).fetchall()
+        escalated = _escalation_map(con)
     finally:
         con.close()
 
@@ -313,6 +325,15 @@ def collapsed_findings(case_id: str) -> list[dict]:
         row["ts_first"] = _fmt_ts(row["ts_min"]) or row["ts_raw_first"]
         row["ts_last"] = _fmt_ts(row["ts_max"]) or row["ts_raw_first"]
         row["key"] = finding_key(row["rid"], row["srcip"], row["username"])
+        # level is what the finding is now; base_level what its rule says on
+        # its own. They differ when the firewall refused it (capped) or an
+        # attack-path pattern raised it - the latter named in `escalation`.
+        row["level"] = level_of(row["lvl"])
+        row["base_level"] = RULE_LEVEL.get(row["rid"])
+        row["escalation"] = [
+            {"pattern": p, "level": PATTERNS[p][0], "reason": PATTERNS[p][1]}
+            for p in escalated.get((row["rid"], row["srcip"], row["username"]), [])
+        ]
         confidence, flags = _confidence(row)
         row["confidence"] = confidence
         row["flags"] = flags
@@ -359,6 +380,7 @@ def top_distinct_findings(case_id: str, limit: int) -> list[dict]:
             row = dict(zip(cols, r))
             row["ts_first"] = _fmt_ts(row["ts_min"]) or row["ts_raw_first"]
             row["ts_last"] = _fmt_ts(row["ts_max"]) or row["ts_raw_first"]
+            row["level"] = level_of(row["lvl"])
             out.append(row)
         return out
     finally:
@@ -430,6 +452,7 @@ def build_graph(case_id: str, limit: int = 14) -> dict:
             "label": " / ".join(parts),
             "mitre": mitre[:4],
             "lvl": hits[0]["lvl"],
+            "level": level_of(hits[0]["lvl"]),
             "count": sum(h["n"] for h in hits),
             "rules": [h["rid"] for h in hits],
         })
@@ -507,6 +530,7 @@ def risk_scores(case_id: str, limit: int = 8) -> dict:
             ).fetchall()
             out[role] = [
                 {"entity": e, "score": sc, "findings": n, "max_lvl": mx,
+                 "max_level": level_of(mx),
                  "rules": sorted(rl)}
                 for e, sc, n, mx, rl in rows
             ]

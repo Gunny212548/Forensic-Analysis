@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getEvents } from '../api.js'
-import { fmtNum } from '../format.js'
+import { LEVEL_EN, SEV_CLASS, fmtNum } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
 
 const PAGE_SIZE = 100
@@ -54,7 +54,7 @@ export default function EventsTable({ caseId }) {
           <tr>
             <th>เวลา</th>
             <th>rule</th>
-            <th>lvl</th>
+            <th>level</th>
             <th>description</th>
             <th>mitre</th>
           </tr>
@@ -66,7 +66,7 @@ export default function EventsTable({ caseId }) {
                   shown only when nothing parsed (CLAUDE.md gotcha #21). */}
               <td>{e.ts || e.ts_raw || ''}</td>
               <td>{e.rid || ''}</td>
-              <td>{e.lvl ?? ''}</td>
+              <td className={SEV_CLASS[e.level] || ''}>{LEVEL_EN[e.level] || ''}</td>
               <td>{e.descr || ''}</td>
               <td>
                 <MitreTags list={e.mitre} />

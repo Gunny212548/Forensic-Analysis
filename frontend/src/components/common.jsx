@@ -1,8 +1,8 @@
 import { SEV_LABEL, severityBucket, statusOf } from '../format.js'
 
 /** Case-list severity at a glance, so a critical case is visible without
- *  opening it. Bucketed server-side from the rule engine's 0-15 lvl
- *  (db.severity_summary). */
+ *  opening it. Bucketed server-side from the findings' Sigma levels
+ *  (severity.summary). */
 export function SeverityPill({ severity }) {
   const bucket = severityBucket(severity)
   if (!bucket) return <span className="sev-pill sev-low">—</span>

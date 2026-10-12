@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getFindings, postReview } from '../api.js'
-import { REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
+import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
 
 // Unreviewed first, whatever its confidence: a high-confidence finding
@@ -80,6 +80,14 @@ export default function ReviewPanel({ caseId }) {
         return (
           <div className={`rv-item ${REVIEW_CLASS[st] || ''}`} key={f.key}>
             <div className="rv-head">
+              {f.level && (
+                <span
+                  className={`sev-tag sev-tag-${f.level}`}
+                  title={f.base_level && f.base_level !== f.level ? `Rule level: ${LEVEL_EN[f.base_level]}` : undefined}
+                >
+                  {LEVEL_EN[f.level]}
+                </span>
+              )}
               <span className="rv-status">{st}</span>
               <span className={`rv-conf rv-conf-${f.confidence}`}>confidence: {f.confidence}</span>
               {(f.flags || []).map((x) => (
@@ -93,6 +101,14 @@ export default function ReviewPanel({ caseId }) {
             <div className="rv-desc">
               {f.descr || ''} <MitreTags list={f.mitre} />
             </div>
+            {/* Why the level is above what the rule says on its own - an
+                attack-path pattern (severity.py) - so the analyst can check
+                the escalation instead of taking it on trust. */}
+            {(f.escalation || []).map((e) => (
+              <div className="rv-escalation" key={e.pattern}>
+                Raised to {LEVEL_EN[e.level]}: {e.reason}
+              </div>
+            ))}
             <div className="rv-meta">
               {f.ts_first || ''}
               {f.ts_last && f.ts_last !== f.ts_first ? ` → ${f.ts_last}` : ''}

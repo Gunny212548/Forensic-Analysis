@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getCustomerSummary } from '../api.js'
 import { ago } from '../format.js'
 
-const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' }
+const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', informational: 'Info' }
 
 /** figma-export/Customers.svg: case load per customer (FR-6.1).
  *
