@@ -93,6 +93,17 @@ export async function getFindings(caseId) {
   )
 }
 
+/** One status change or assignment on a tracked finding. The server
+ *  enforces every rule; a refusal comes back as an error with the reason. */
+export async function postLifecycle(caseId, body) {
+  const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}/lifecycle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return jsonOrThrow(resp, 'Could not change the finding status')
+}
+
 /** The rule set never changes while the app runs, so it is fetched once. */
 let rulesPromise = null
 export function getRules() {

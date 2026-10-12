@@ -22,7 +22,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | 11 | Entity risk ranking | **Internal method** - see below | `db.risk_scores` | ⚠️ documented here |
 | 12 | AI narrative | VERIS (structure), NIST AI RMF (governance) | `app/services/analysis.py` | ❌ |
 | 13 | Analyst review audit trail | ISO/IEC 27001:2022 A.8.15 (logging) | `app/services/review.py`, `hashchain.py` | ✅ append-only, hash-chained; pre-chain decisions sealed |
-| 14 | Finding lifecycle and MTTC | NIST SP 800-61 Rev. 3 | - | ❌ planned with Sprint 3 (IAI-45..49) |
+| 14 | Finding lifecycle and MTTC | NIST SP 800-61 Rev. 3 (CSF 2.0: RS.MA-02, RS.AN-03, RS.MI-01, RS.MI-02) | `app/services/lifecycle.py` | ✅ Open / Investigating / Contained / Resolved; workflow admits Sigma high and critical |
 | 15 | Report export | NIST SP 800-86 (reporting), STIX 2.1, ATT&CK Navigator layers | `app/services/attack_layer.py` | ⚠️ Navigator layer (format 4.5) per case; STIX and the report itself not yet |
 
 What each implemented step does, and what it does not claim, is recorded in

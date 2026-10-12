@@ -6,7 +6,8 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Requ
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import analysis, attack_layer, confidence, custody, db, review, storage
+from ..services import (analysis, attack_layer, auth, confidence, custody, db, lifecycle, review,
+                        storage)
 from .upload import CHUNK, _run_pipeline
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -316,10 +317,18 @@ async def get_case_findings(case_id: str):
         db.entity_members(case_id, manifest.get("members") or []),
     )
     state = review.current(case_id)
+    flow = lifecycle.state(case_id)
     for f in findings:
         r = state.get(f["key"])
         f["review"] = r or {"status": review.UNREVIEWED, "actor": "",
                             "reason_code": "", "note": "", "ts": None}
+        # Only high/critical findings enter the workflow (lifecycle.py); the
+        # rest stay visible here without a status.
+        if lifecycle.tracked(f):
+            lc = flow.get(f["key"]) or {"status": lifecycle.OPEN, "assignee": None, "history": []}
+            f["lifecycle"] = {"tracked": True, **lc, "csf": lifecycle.CSF[lc["status"]]}
+        else:
+            f["lifecycle"] = {"tracked": False}
 
     counts = review.summary(case_id, [f["key"] for f in findings])
     return {
@@ -327,6 +336,10 @@ async def get_case_findings(case_id: str):
         "findings": findings,
         "count": len(findings),
         "review_summary": counts,
+        "lifecycle_summary": lifecycle.summary(findings, _created_at(case_id, manifest)),
+        "classifications": lifecycle.CLASSIFICATIONS,
+        "assignees": [{"email": u["email"], "name": u.get("name") or u["email"]}
+                      for u in sorted(auth.load_users().values(), key=lambda u: u["email"])],
         # FR-5.6: the export gate reads exactly this - nothing may be left
         # Unreviewed when a final report is produced.
         "ready_for_report": counts.get(review.UNREVIEWED, 0) == 0 and bool(findings),
@@ -334,6 +347,41 @@ async def get_case_findings(case_id: str):
         # Whether the decision history behind these statuses is untampered.
         "review_chain": review.verify(case_id),
     }
+
+
+def _created_at(case_id: str, manifest: dict) -> str | None:
+    """When the case's findings were created - the first time the rule
+    engine finished on it (custody `processed`), else the upload time. MTTC
+    is measured from here (lifecycle.py); re-processing does not reset it."""
+    for e in custody.entries(case_id):
+        if e.get("action") == "processed":
+            return e.get("ts")
+    return manifest.get("uploaded_at")
+
+
+@router.post("/{case_id}/lifecycle")
+async def change_lifecycle(case_id: str, request: Request, body: dict = Body(...)):
+    """One status change or assignment on a tracked finding (lifecycle.py).
+    The actor is the signed-in account; the rules are enforced here, not
+    only by the UI."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    key = (body.get("finding_key") or "").strip()
+    finding = next((f for f in db.collapsed_findings(case_id) if f["key"] == key), None)
+    if finding is None:
+        raise HTTPException(404, "Finding not found in this case")
+    if not lifecycle.tracked(finding):
+        raise HTTPException(400, "This finding is below the workflow threshold (high) and has no lifecycle")
+    review_status = (review.current(case_id).get(key) or {}).get("status", review.UNREVIEWED)
+    try:
+        entry = lifecycle.apply(
+            case_id, finding, lifecycle.state(case_id).get(key), body.get("action") or "",
+            request.state.user["email"], body, review_status, set(auth.load_users()),
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"entry": entry, "lifecycle": lifecycle.state(case_id).get(key)}
 
 
 @router.post("/{case_id}/review")

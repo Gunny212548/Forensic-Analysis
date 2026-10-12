@@ -168,10 +168,19 @@ def build() -> dict:
             agg["max_lvl"] = max(agg["max_lvl"], e["max_lvl"] or 0)
 
         for entry in review.log(m["case_id"]):
+            rid = entry.get("finding_key", "").split("|")[0]
+            who = entry.get("actor") or "someone"
+            if entry.get("kind") == "lifecycle":
+                # Status changes share the review log (lifecycle.py).
+                what = (f"moved {rid} to {entry['to']}" if entry.get("to")
+                        else f"assigned {rid} to {entry.get('assignee')}")
+                recent.append({"ts": entry.get("ts"), "kind": "lifecycle", "case_id": m["case_id"],
+                               "level": "ok" if entry.get("to") == "Resolved" else "info",
+                               "text": f"{who} {what} in {m.get('original_filename')}"})
+                continue
             recent.append({"ts": entry.get("ts"), "kind": "review", "case_id": m["case_id"],
                            "level": {"Accepted": "ok", "Rejected": "muted"}.get(entry.get("status"), "info"),
-                           "text": f"{entry.get('actor') or 'someone'} marked "
-                                   f"{entry.get('finding_key', '').split('|')[0]} {entry.get('status', '').lower()}"
+                           "text": f"{who} marked {rid} {entry.get('status', '').lower()}"
                                    f" in {m.get('original_filename')}"})
 
     recent.sort(key=lambda r: _ago_key(r["ts"]), reverse=True)

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getFindings, postReview } from '../api.js'
 import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
+import Lifecycle from './Lifecycle.jsx'
 import RuleCard from './RuleCard.jsx'
 
 // Unreviewed first, whatever its confidence: a high-confidence finding
@@ -54,9 +55,21 @@ export default function ReviewPanel({ caseId }) {
 
   const s = data.review_summary || {}
   const unreviewed = s.Unreviewed || 0
+  // Within each review status, work in progress first (Investigating /
+  // Contained), then Open, then Resolved, then findings outside the
+  // workflow - and a fixed tie-break, so a finding does not jump away from
+  // under the analyst when the list reloads after a change.
+  const flowRank = (f) =>
+    !f.lifecycle?.tracked ? 3 : { Investigating: 0, Contained: 0, Open: 1, Resolved: 2 }[f.lifecycle.status] ?? 1
   const findings = (data.findings || []).slice().sort((a, b) => {
     const d = ORDER[a.review.status] - ORDER[b.review.status]
-    return d !== 0 ? d : b.lvl - a.lvl || b.cnt - a.cnt
+    return (
+      d ||
+      flowRank(a) - flowRank(b) ||
+      b.lvl - a.lvl ||
+      b.cnt - a.cnt ||
+      (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+    )
   })
   const reasonCodes = data.reason_codes || {}
 
@@ -93,10 +106,27 @@ export default function ReviewPanel({ caseId }) {
             : data.review_chain.entries === data.review_chain.sealed_legacy
               ? `${data.review_chain.entries} decision(s) recorded before the history was hash-chained - ` +
                 'not protected yet; the next decision seals them.'
-              : `Decision history intact: ${data.review_chain.entries} entries, hash-chained` +
+              : `Decision history intact: ${data.review_chain.entries} entr${
+                  data.review_chain.entries === 1 ? 'y' : 'ies'
+                }, hash-chained` +
                 (data.review_chain.sealed_legacy
                   ? ` (the first ${data.review_chain.sealed_legacy} predate chaining and are sealed by the next).`
                   : '.')}
+        </div>
+      )}
+
+      {/* Only high/critical findings enter the workflow (lifecycle.py). MTTC
+          counts true positives from creation to Contained. */}
+      {data.lifecycle_summary && (
+        <div className="lc-summary">
+          Workflow ({data.lifecycle_summary.tracked} of {data.count} findings - high and critical):{' '}
+          {Object.entries(data.lifecycle_summary.counts)
+            .map(([k, v]) => `${k} ${v}`)
+            .join(' · ')}
+          {' · '}MTTC{' '}
+          {data.lifecycle_summary.mttc_seconds == null
+            ? 'n/a (no contained true positive yet)'
+            : `${(data.lifecycle_summary.mttc_seconds / 3600).toFixed(1)} h over ${data.lifecycle_summary.mttc_n}`}
         </div>
       )}
 
@@ -179,6 +209,17 @@ export default function ReviewPanel({ caseId }) {
                 {f.review.actor} · {shortTs(f.review.ts)}
                 {f.review.reason_code ? ` · ${f.review.reason_code}` : ''}
               </div>
+            )}
+
+            {f.lifecycle?.tracked && (
+              <Lifecycle
+                caseId={caseId}
+                finding={f}
+                assignees={data.assignees}
+                classifications={data.classifications}
+                reviewed={st !== 'Unreviewed'}
+                onChanged={load}
+              />
             )}
 
             {rejecting === f.key ? (
