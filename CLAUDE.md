@@ -1221,6 +1221,8 @@ docker compose up -d --build --force-recreate      # rebuild + restart
                                                    # (also rebuilds the UI)
 docker exec forensic-analyzer-forensic-analyzer-1 python tools/refresh_intel.py
 docker exec forensic-analyzer-forensic-analyzer-1 python tools/backfill_custody.py   # dry run; --apply
+python tools/build_measurement_doc.py   # docs/measurement-method-th.pdf (Thai), rule tables
+                                        # read from the code - rebuild after changing a rule/level
 docker exec -it forensic-analyzer-forensic-analyzer-1 \
     python tools/create_user.py add you@example.com --name "..." --role analyst
 docker logs forensic-analyzer-forensic-analyzer-1 --tail 50
