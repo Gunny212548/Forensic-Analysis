@@ -184,6 +184,11 @@ export default function Result({ caseId }) {
                 Download ATT&amp;CK Navigator layer
               </a>{' '}
               - this case&apos;s techniques, scored by severity, for the MITRE ATT&amp;CK Navigator
+              <br />
+              <a href={`/api/cases/${encodeURIComponent(caseId)}/stix`} download>
+                Download STIX 2.1 bundle
+              </a>{' '}
+              - findings as sightings of ATT&amp;CK techniques, for a threat-intel platform or SIEM
             </div>
           )}
           {analyzing && (

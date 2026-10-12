@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from .. import config
 from ..services import (analysis, attack_layer, auth, confidence, custody, db, lifecycle, review,
-                        storage)
+                        stix_export, storage)
 from .upload import CHUNK, _run_pipeline
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -61,6 +61,23 @@ async def get_attack_layer(case_id: str):
     return JSONResponse(
         attack_layer.build(case_id, manifest),
         headers={"Content-Disposition": f'attachment; filename="{case_id}-attack-layer.json"'},
+    )
+
+
+@router.get("/{case_id}/stix")
+async def get_stix(case_id: str):
+    """The case as a STIX 2.1 bundle, served as a download
+    (services/stix_export.py). Ready cases only, as the layer export."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    if manifest.get("status") != "ready":
+        raise HTTPException(409, f"Case is {manifest.get('status')}, not ready - nothing to export")
+    bundle = stix_export.build(case_id, manifest, _findings_view(case_id, manifest),
+                               _created_at(case_id, manifest))
+    return JSONResponse(
+        bundle,
+        headers={"Content-Disposition": f'attachment; filename="{case_id}-stix21.json"'},
     )
 
 
@@ -300,14 +317,9 @@ async def get_case_events(
     }
 
 
-@router.get("/{case_id}/findings")
-async def get_case_findings(case_id: str):
-    """Findings collapsed to the unit an analyst actually reviews, each with
-    a computed confidence and its current review status."""
-    manifest = storage.load_manifest(case_id)
-    if manifest is None:
-        raise HTTPException(404, "Case not found")
-
+def _findings_view(case_id: str, manifest: dict) -> list[dict]:
+    """Collapsed findings with everything an analyst - or an export - sees
+    on them: Admiralty confidence, review decision, lifecycle status."""
     findings = db.collapsed_findings(case_id)
     # Admiralty grading (confidence.py): source reliability needs the
     # manifest's mapping and evidence plus the custody log; cross-source
@@ -329,7 +341,18 @@ async def get_case_findings(case_id: str):
             f["lifecycle"] = {"tracked": True, **lc, "csf": lifecycle.CSF[lc["status"]]}
         else:
             f["lifecycle"] = {"tracked": False}
+    return findings
 
+
+@router.get("/{case_id}/findings")
+async def get_case_findings(case_id: str):
+    """Findings collapsed to the unit an analyst actually reviews, each with
+    a computed confidence and its current review status."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+
+    findings = _findings_view(case_id, manifest)
     counts = review.summary(case_id, [f["key"] for f in findings])
     return {
         "case_id": case_id,
