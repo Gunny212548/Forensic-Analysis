@@ -132,9 +132,9 @@ def ts_range(case_id: str) -> tuple[str, str]:
         con.close()
 
 
-def _escalation_map(con: duckdb.DuckDBPyConnection) -> dict[tuple[str, str | None, str | None], list[str]]:
-    """{(rid, srcip, username): [pattern, ...]} for findings an attack-path
-    pattern raised. Empty for a case processed before the
+def _escalation_map(con: duckdb.DuckDBPyConnection) -> dict[tuple, list[tuple[str, list[str]]]]:
+    """{(rid, srcip, username): [(pattern, [rules on that path]), ...]} for
+    findings an attack-path pattern raised. Empty for a case processed before the
     escalations table existed, rather than an error."""
     exists = con.execute(
         "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'escalations'"
@@ -149,7 +149,28 @@ def _escalation_map(con: duckdb.DuckDBPyConnection) -> dict[tuple[str, str | Non
         GROUP BY e.rid, r.srcip, r.username
         """
     ).fetchall()
-    return {(rid, src, user): list(p) for rid, src, user, p in rows}
+    # Which rules made up each pattern's path, so the finding can name its
+    # actual evidence ("beaconing + large transfer") rather than the
+    # pattern's whole list of possibilities. A compromised host is one
+    # source; a credential compromise is one source on one account.
+    parts = con.execute(
+        """
+        SELECT e.pattern, r.srcip,
+               CASE WHEN e.pattern = 'credential-compromise' THEN r.username END,
+               list(DISTINCT e.rid ORDER BY e.rid)
+        FROM escalations e
+        JOIN raw_events r USING (row_id)
+        GROUP BY ALL
+        """
+    ).fetchall()
+    evidence = {(p, src, user): list(rids) for p, src, user, rids in parts}
+    return {
+        (rid, src, user): [
+            (p, evidence.get((p, src, user if p == "credential-compromise" else None), []))
+            for p in pats
+        ]
+        for rid, src, user, pats in rows
+    }
 
 
 FINDING_SELECT = """
@@ -174,6 +195,9 @@ def list_findings(case_id: str, limit: int, offset: int) -> list[dict]:
         out = [dict(zip(cols, r)) for r in rows]
         for row in out:
             row["level"] = level_of(row["lvl"])
+            # Rendered with its zone like every other time the UI shows
+            # (gotcha #21); it used to go out as a bare ISO string.
+            row["ts"] = _fmt_ts(row["ts"]) or None
         return out
     finally:
         con.close()
@@ -191,7 +215,10 @@ def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
         ).fetchall()
         cols = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username",
                 "action", "verdict", "raw"]
-        return [dict(zip(cols, r)) for r in rows]
+        out = [dict(zip(cols, r)) for r in rows]
+        for row in out:
+            row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings
+        return out
     finally:
         con.close()
 
@@ -331,8 +358,9 @@ def collapsed_findings(case_id: str) -> list[dict]:
         row["level"] = level_of(row["lvl"])
         row["base_level"] = RULE_LEVEL.get(row["rid"])
         row["escalation"] = [
-            {"pattern": p, "level": PATTERNS[p][0], "reason": PATTERNS[p][1]}
-            for p in escalated.get((row["rid"], row["srcip"], row["username"]), [])
+            {"pattern": p, "level": PATTERNS[p][0], "reason": PATTERNS[p][1],
+             "evidence": [{"rid": r, "label": RULE_LABELS.get(r, r)} for r in rids]}
+            for p, rids in escalated.get((row["rid"], row["srcip"], row["username"]), [])
         ]
         confidence, flags = _confidence(row)
         row["confidence"] = confidence

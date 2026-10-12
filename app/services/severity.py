@@ -69,12 +69,11 @@ WEIGHT = {"informational": 1, "low": 2, "medium": 4, "high": 8, "critical": 16}
 PATTERNS = {
     "credential-compromise": (
         "high",
-        "Same source brute-forced this account, then logged in to it",
+        "This source brute-forced the account, then logged in to it",
     ),
     "compromised-host": (
         "critical",
-        "Same host shows two different post-intrusion behaviours "
-        "(beaconing, known-bad traffic allowed, malware allowed, large upload)",
+        "This host shows two or more different post-intrusion behaviours",
     ),
 }
 

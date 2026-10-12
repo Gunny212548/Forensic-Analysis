@@ -118,6 +118,13 @@ export default function ReviewPanel({ caseId }) {
             {(f.escalation || []).map((e) => (
               <div className="rv-escalation" key={e.pattern}>
                 Raised to {LEVEL_EN[e.level]}: {e.reason}
+                {e.evidence?.length > 0 && (
+                  <>
+                    {' '}
+                    - {f.srcip ? `${f.srcip}: ` : ''}
+                    {e.evidence.map((r) => `${r.label} (${r.rid})`).join(' + ')}
+                  </>
+                )}
               </div>
             ))}
             <div className="rv-meta">

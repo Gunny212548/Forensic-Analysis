@@ -22,7 +22,8 @@ written per rule below.
                 one environment does not meet it.
   test          "mostly stable ... could require slight adjustments depending
                 on the environment" - fired correctly on real data, with its
-                false positives examined (the gotcha cited in `validation`).
+                false positives examined (the gotcha cited in `validation` -
+                a pointer kept in the source, stripped from what the UI shows).
   experimental  "could lead to false positives results or be noisy" - never
                 validated on real data: synthetic hits only, or none.
 
@@ -30,6 +31,8 @@ written per rule below.
 earliest date the history can show (the rules predate it). `modified` is
 the last change to a rule's logic or level.
 """
+
+import re
 
 from .rules import RULE_LABELS, RULE_LEVEL
 
@@ -425,9 +428,21 @@ def tags(rid: str) -> list[str]:
     return out
 
 
+_DEV_REF = re.compile(r"\s*\(gotcha #\d+\)")
+
+
+def _plain(text: str) -> str:
+    """Analyst-facing text: drop the "(gotcha #N)" pointers into CLAUDE.md.
+    They stay in the source so a developer can trace each claim; to an
+    analyst reading a rule card they are noise."""
+    return _DEV_REF.sub("", text)
+
+
 def describe(rid: str) -> dict:
     """One rule in Sigma field names, plus its ADS documentation."""
     m = RULE_META[rid]
+    m = {**m, "falsepositives": [_plain(f) for f in m["falsepositives"]],
+         "ads": {k: _plain(v) for k, v in m["ads"].items()}}
     techniques = m["techniques"]
     return {
         "rid": rid,
@@ -464,8 +479,6 @@ def problems() -> list[str]:
     tests/check_rule_meta.py. A rule without metadata, or whose documented
     techniques differ from the ATT&CK ids its SQL writes into findings, is a
     documentation bug the UI would otherwise show as fact."""
-    import re
-
     from .rules import RULES
 
     out = []

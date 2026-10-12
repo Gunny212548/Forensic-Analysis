@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getCustody, verifyEvidence } from '../api.js'
-import { fmtBytes, shortTs } from '../format.js'
+import { fmtBytes } from '../format.js'
 import { Empty } from './common.jsx'
 
 /** Evidence integrity + chain of custody (app/services/custody.py).
  *  The digest is what makes every finding on this case citable: it shows the
  *  file analysed is the file that was handed over. */
+
+/** Custody times are stored in UTC; shown in GMT+7 like every other time in
+ *  the app (CLAUDE.md gotcha #21), with the zone written out. Asia/Bangkok
+ *  has no DST, so a fixed offset is exact. */
+function gmt7(iso) {
+  if (!iso) return ''
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return iso
+  return `${new Date(t.getTime() + 7 * 3600e3).toISOString().slice(0, 19).replace('T', ' ')} +07:00`
+}
 
 const ACTION_EN = {
   acquired: 'Acquired (uploaded)',
@@ -88,11 +98,11 @@ export default function Evidence({ caseId }) {
           <dd>{fmtBytes(ev.bytes)} as stored (a compressed upload is kept and hashed compressed)</dd>
           <dt>Recorded</dt>
           <dd>
-            {shortTs(ev.recorded_at)} by {ev.recorded_by}
+            {gmt7(ev.recorded_at)} by {ev.recorded_by}
             {ev.retroactive && (
               <div className="map-note map-warn">
                 Recorded retroactively: this digest proves the file has not changed since{' '}
-                {shortTs(ev.recorded_at)}, not since it was uploaded.
+                {gmt7(ev.recorded_at)}, not since it was uploaded.
               </div>
             )}
           </dd>
@@ -119,7 +129,9 @@ export default function Evidence({ caseId }) {
         {entries.length === 0
           ? 'No custody events recorded yet.'
           : data.chain_intact
-            ? `Log intact: all ${entries.length} entries link by hash.`
+            ? entries.length === 1
+              ? 'Log intact: its one entry matches its hash.'
+              : `Log intact: all ${entries.length} entries link by hash.`
             : `Log altered: ${data.chain_problem}`}
       </div>
       {entries.length > 0 && (
@@ -127,7 +139,7 @@ export default function Evidence({ caseId }) {
           <thead>
             <tr>
               <th>#</th>
-              <th>When (UTC)</th>
+              <th>When</th>
               <th>Event</th>
               <th>By</th>
               <th>Details</th>
@@ -138,7 +150,7 @@ export default function Evidence({ caseId }) {
             {entries.map((e) => (
               <tr key={e.seq} className={e.action === 'integrity_failed' ? 'ev-row-bad' : ''}>
                 <td className="mono">{e.seq}</td>
-                <td className="mono">{(e.ts || '').replace('T', ' ').slice(0, 19)}</td>
+                <td className="mono">{gmt7(e.ts)}</td>
                 <td>{ACTION_EN[e.action] || e.action}</td>
                 <td>{e.actor}</td>
                 <td>{detail(e)}</td>
