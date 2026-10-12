@@ -20,7 +20,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | 9 | Confidence | Admiralty Code (NATO 6x6) | `app/services/confidence.py` | ✅ |
 | 10 | Attack graph / chain | ATT&CK tactics, ODNI CTF stages | `db.build_graph` | ⚠️ graph exact; stages not labelled on it |
 | 11 | Entity risk ranking | **Internal method** - see below | `db.risk_scores` | ⚠️ documented here |
-| 12 | AI narrative | VERIS (structure), NIST AI RMF (governance) | `app/services/analysis.py` | ❌ |
+| 12 | AI narrative | VERIS 1.4 (classification), NIST AI RMF 1.0 (governance) | `app/services/veris.py`, `analysis.py` | ✅ VERIS 4A computed from findings, validated against the VERIS schema, given to the model as fact; AI RMF alignment below |
 | 13 | Analyst review audit trail | ISO/IEC 27001:2022 A.8.15 (logging) | `app/services/review.py`, `hashchain.py` | ✅ append-only, hash-chained; pre-chain decisions sealed |
 | 14 | Finding lifecycle and MTTC | NIST SP 800-61 Rev. 3 (CSF 2.0: RS.MA-02, RS.AN-03, RS.MI-01, RS.MI-02) | `app/services/lifecycle.py` | ✅ Open / Investigating / Contained / Resolved; workflow admits Sigma high and critical |
 | 15 | Report export | NIST SP 800-86 (reporting), OASIS STIX 2.1, ATT&CK Navigator layers | `app/services/attack_layer.py`, `stix_export.py` | ⚠️ Navigator layer (format 4.5) and STIX 2.1 bundle per case; the human-readable report not yet |
@@ -54,6 +54,24 @@ Stated plainly so the claims stay accurate:
   nothing able to vouch for them before it. Anyone with write access could
   rebuild a whole chain; preventing that needs a digest held elsewhere or an
   external timestamp, which the tool does not have.
+
+## The AI narrative and NIST AI RMF 1.0
+
+The model (Groq-hosted qwen) writes prose only. Everything a reader could
+act on is computed without it. How that maps onto the RMF's four functions -
+aligned with, not certified against:
+
+- **GOVERN** - a final report needs every finding reviewed by an analyst
+  (FR-5.6 export gate); the review and status history are hash-chained.
+- **MAP** - the model is given computed facts: rule-tagged ATT&CK ids,
+  Sigma levels, source profiles, risk ranking and the VERIS classification,
+  and told not to re-grade or reclassify them (CLAUDE.md gotcha #13).
+- **MEASURE** - prompt settings were chosen by graded sweeps against
+  ground truth (gotcha #5); each analysis records finish reason, token
+  usage and missing keys in `_meta`.
+- **MANAGE** - the attack graph, severity, confidence, VERIS record and all
+  exports are produced without the model, so an AI outage or a bad answer
+  removes the prose, never the findings.
 
 ## Internal methods (no standard exists)
 

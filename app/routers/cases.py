@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from .. import config
 from ..services import (analysis, attack_layer, auth, confidence, custody, db, lifecycle, review,
-                        stix_export, storage)
+                        stix_export, storage, veris)
 from .upload import CHUNK, _run_pipeline
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -79,6 +79,32 @@ async def get_stix(case_id: str):
         bundle,
         headers={"Content-Disposition": f'attachment; filename="{case_id}-stix21.json"'},
     )
+
+
+def _veris_line(case_id: str) -> str | None:
+    """The computed VERIS classification as one prompt line (veris.py), or
+    None - a failure here must never stop the narrative."""
+    try:
+        manifest = storage.load_manifest(case_id) or {}
+        return veris.summary_line(veris.build(case_id, manifest, _findings_view(case_id, manifest)))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+@router.get("/{case_id}/veris")
+async def get_veris(case_id: str):
+    """The case as a VERIS 1.4 incident record (services/veris.py), as a
+    download. 409 unless the case is ready and has high/critical findings."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    if manifest.get("status") != "ready":
+        raise HTTPException(409, f"Case is {manifest.get('status')}, not ready - nothing to export")
+    record = veris.build(case_id, manifest, _findings_view(case_id, manifest))
+    if record is None:
+        raise HTTPException(409, "No high or critical finding - there is no incident to classify")
+    return JSONResponse(
+        record, headers={"Content-Disposition": f'attachment; filename="{case_id}-veris.json"'})
 
 
 @router.get("/{case_id}/custody")
@@ -566,6 +592,7 @@ async def _run_map_reduce_job(case_id: str, plan: dict) -> None:
             profiles_for=lambda ips: db.source_profiles(case_id, ips),
             on_progress=progress,
             auto_retry_max_wait=analysis.BACKGROUND_RETRY_MAX_WAIT,
+            veris=_veris_line(case_id),
         )
     except Exception as exc:  # noqa: BLE001 - the job owns its own failure
         storage.update_analysis_job(
@@ -645,7 +672,7 @@ async def analyze_case(case_id: str, background_tasks: BackgroundTasks, force: b
     try:
         result = await analysis.run_analysis(
             case_id, events, distinct_total, flagged, graph=graph,
-            profiles=profiles, risk=risk,
+            profiles=profiles, risk=risk, veris=_veris_line(case_id),
         )
     except analysis.AnalysisNotConfigured as exc:
         raise HTTPException(501, str(exc))

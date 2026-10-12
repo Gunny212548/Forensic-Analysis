@@ -8,6 +8,7 @@ import ReviewPanel from '../components/ReviewPanel.jsx'
 import AttackGraph from '../components/AttackGraph.jsx'
 import MappingNote from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
+import Veris from '../components/Veris.jsx'
 import {
   AnalysisMeta,
   AnalysisProgress,
@@ -177,6 +178,7 @@ export default function Result({ caseId }) {
             {fmtNum(manifest.flagged_count)} / {fmtNum(manifest.total_rows)} rows
           </div>
           <MappingNote manifest={manifest} />
+          <Veris caseId={caseId} />
           {manifest.flagged_count > 0 && (
             <div className="meta-line">
               {/* Same-origin link, so the session cookie goes with it. */}

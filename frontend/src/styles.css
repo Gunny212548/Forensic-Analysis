@@ -455,6 +455,13 @@
   .map-docs { margin: 4px 0 0; padding-left: 18px; font-size: 12px; }
   .map-docs a, .meta-line a { color: var(--accent); }
 
+  /* VERIS classification on the case overview (components/Veris.jsx). */
+  .veris { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px; }
+  .veris-head { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .veris-status { margin-left: 6px; font-size: 11px; padding: 1px 7px; border: 1px solid currentColor;
+    border-radius: 3px; color: var(--accent); }
+  .veris-4a { margin-bottom: 4px; }
+
   /* Evidence tab (components/Evidence.jsx). */
   .ev-facts { display: grid; grid-template-columns: 90px 1fr; gap: 6px 14px; font-size: 13px; margin: 0 0 14px; }
   .ev-facts dt { color: var(--muted); }

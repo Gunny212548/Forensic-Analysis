@@ -118,6 +118,14 @@ export function getRules() {
   return rulesPromise
 }
 
+/** The case's VERIS record, or null when it has no high/critical finding
+ *  (the server answers 409 then - nothing to classify, not an error). */
+export async function getVeris(caseId) {
+  const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}/veris`)
+  if (resp.status === 409) return null
+  return jsonOrThrow(resp, 'Could not load the VERIS classification')
+}
+
 export async function getCustody(caseId) {
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/custody`),

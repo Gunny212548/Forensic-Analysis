@@ -408,7 +408,7 @@ def _build_prompt(
     case_id: str, events: list[dict], distinct_total: int, flagged_total: int,
     profiles: list[dict] | None = None, risk: dict | None = None,
     digests: list[dict] | None = None, pool_size: int = 0,
-    capped: bool = False,
+    capped: bool = False, veris: str | None = None,
 ) -> tuple[str, int, int]:
     selected = [_condense(e) for e in events]
     selected.sort(key=lambda c: str(c.get("ts") or ""))
@@ -475,6 +475,14 @@ def _build_prompt(
             "\n\nBatch summaries (the rest of the evidence, already read and "
             "condensed one batch at a time; treat these as first-hand "
             "evidence):\n" + _format_digests(digests)
+        )
+    if veris:
+        # Computed from the findings (veris.py), not inferred: the narrative
+        # should use this classification, never invent a different one
+        # (gotcha #13 - hand the model the fact).
+        prompt += (
+            "\n\nIncident classification, computed from the findings with the "
+            "VERIS vocabulary (use it as given; do not reclassify):\n" + veris
         )
     prompt += "\n\n/no_think"
     return prompt, (pool_size or len(selected)), flagged_total
@@ -656,6 +664,7 @@ async def run_analysis(
     capped: bool = False,
     auto_retry_max_wait: float = AUTO_RETRY_MAX_WAIT,
     meta_extra: dict | None = None,
+    veris: str | None = None,
 ) -> dict:
     _preflight()
     if not events:
@@ -663,7 +672,7 @@ async def run_analysis(
 
     prompt, sent_count, total_count = _build_prompt(
         case_id, events, distinct_total, flagged_total, profiles, risk,
-        digests=digests, pool_size=pool_size, capped=capped,
+        digests=digests, pool_size=pool_size, capped=capped, veris=veris,
     )
 
     payload = {
@@ -931,6 +940,7 @@ async def run_map_reduce_analysis(
     profiles_for: Callable[[list[str]], list[dict]] | None = None,
     on_progress: Callable[[str, int, int], None] | None = None,
     auto_retry_max_wait: float = AUTO_RETRY_MAX_WAIT,
+    veris: str | None = None,
 ) -> dict:
     """Narrate a case whose evidence does not fit one call.
 
@@ -991,7 +1001,7 @@ async def run_map_reduce_analysis(
         case_id, chunks[0], distinct_total, flagged_total, graph=graph,
         profiles=profiles, risk=risk, digests=digests, pool_size=len(pool),
         capped=bool(plan.get("capped")), auto_retry_max_wait=auto_retry_max_wait,
-        meta_extra=meta_extra,
+        meta_extra=meta_extra, veris=veris,
     )
     result["_meta"]["map_digests"] = digests
     return result
