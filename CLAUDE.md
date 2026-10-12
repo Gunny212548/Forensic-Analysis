@@ -8,7 +8,8 @@ A standalone forensic log analysis tool — **no Wazuh dependency**. Upload any
 log file (syslog/auth.log style text, CSV firewall exports, JSON), the app's
 own decoder + rule engine extracts structured fields and flags
 security-relevant events with MITRE ATT&CK technique IDs. The attack graph
-is then built straight from those findings in SQL, and Groq (AI) writes the
+is then built straight from those findings in SQL, and an LLM (a local Ollama
+model since 2026-10-12; Groq before) writes the
 narrative around it — case summary, attack chain, timeline,
 recommendations.
 
@@ -92,8 +93,8 @@ GET  /api/cases/{id}/attack-layer            ATT&CK Navigator layer (format 4.5)
 GET  /api/rules[/{rid}]                      rule metadata: Sigma fields + ADS
                                              documentation (rule_meta.py)
 POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
-                                             graph + SQL top-N distinct → Groq
-                                             for the narrative
+                                             graph + SQL top-N distinct → the
+                                             LLM (Ollama now) for the narrative
 GET  /api/overview                           KPIs, severity, techniques, top
                                              entities, activity + case list
                                              across all cases (services/
@@ -276,7 +277,10 @@ port. Feeding it to a port-scan rule (which counts distinct *destination*
 ports) false-positives on any host that merely reconnects a lot. `decode.py`
 deliberately does not set `dstport` from SSH regex captures.
 
-**5. Groq output-token limits shape the whole prompt design.**
+**5. Groq output-token limits shape the whole prompt design.** *(Applies to
+`LLM_PROVIDER=groq`. Since 2026-10-12 the app runs a local Ollama model -
+see Environment / secrets; none of these limits bind it, and its settings
+have not been swept.)*
 - **`qwen/qwen3.8-27b` is the only model now** — the gpt-oss branch (and its
   `reasoning_effort: "low"` workaround for hidden reasoning tokens) is gone.
   Everything below exists to make the schema fit qwen's budget.
@@ -1001,7 +1005,8 @@ industry and government on it, which no log holds.
 
 Validated: every record from both stores against vz-risk/veris
 `verisc-merged.json` (jsonschema, Draft 4) - all valid. The prompt gets one
-`summary_line()`; measured on the ESXi case: finish `stop`, 912 completion
+`summary_line()`; measured on the ESXi case with the local
+`qwen2.5:7b-instruct` (Ollama, not Groq): finish `stop`, 912 completion
 tokens, no missing keys, and the summary named brute force followed by use
 of the stolen credentials over SSH. Known soft spot: R2006 lists *every*
 source that succeeded in the burst hour, so the Entra owner's own address
@@ -1233,10 +1238,27 @@ What the data forced onto the Figma, measured on the same corpus:
 
 ## Environment / secrets
 
-`.env` (gitignored) holds `GROQ_API_KEY`, `GROQ_MODEL`
-(`qwen/qwen3.8-27b`), and optionally `MAX_EVENTS_FOR_ANALYSIS` (15 — set by
-measurement, see the sweep table in gotcha #5). Copy `.env.example` to start. `docker compose`
-auto-loads it for `${VAR}` substitution in `docker-compose.yml`.
+**The narrative LLM is local now (2026-10-12): `LLM_PROVIDER=ollama`,
+`OLLAMA_MODEL=qwen2.5:7b-instruct`** on the host's Ollama
+(`host.docker.internal:11434`), with `OLLAMA_MAX_EVENTS_FOR_ANALYSIS` 50 and
+`OLLAMA_MAX_COMPLETION_TOKENS` 2400 (`config.py` swaps these in for the Groq
+values). Also pulled on the host: `gemma4:12b-it-qat`, `gemma4:e4b`,
+`qwen3.5:9b`. Consequences:
+- **Gotcha #5's limits are Groq's** (1000 OTPM, 950 max_tokens, one
+  analysis a minute, 429 + Retry-After). They do not bind a local model, and
+  its event/token settings were **not** chosen by a graded sweep - #5's
+  sweep table is for `qwen/qwen3.8-27b` on Groq. Re-run that sweep against
+  `tests/gen_usecase.py` before trusting the local settings.
+- A 7B model is weaker: on the ESXi case it wrote an attack chain with
+  Execution / Defense Evasion / Discovery stages no finding supports.
+- Case data no longer leaves the machine for the narrative - which also
+  settles the confidentiality question NIST AI RMF GOVERN raises.
+
+`.env` (gitignored) holds `LLM_PROVIDER`, `OLLAMA_MODEL`, and for the Groq
+path `GROQ_API_KEY`, `GROQ_MODEL` (`qwen/qwen3.8-27b`) and optionally
+`MAX_EVENTS_FOR_ANALYSIS` (15 - set by measurement, see the sweep table in
+gotcha #5). Copy `.env.example` to start. `docker compose` auto-loads it for
+`${VAR}` substitution in `docker-compose.yml`.
 
 ## Common commands
 

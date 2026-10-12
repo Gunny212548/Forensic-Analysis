@@ -57,18 +57,22 @@ Stated plainly so the claims stay accurate:
 
 ## The AI narrative and NIST AI RMF 1.0
 
-The model (Groq-hosted qwen) writes prose only. Everything a reader could
-act on is computed without it. How that maps onto the RMF's four functions -
+The model (a local Ollama model - `qwen2.5:7b-instruct` since 2026-10-12;
+Groq-hosted qwen before) writes prose only. Everything a reader could act on
+is computed without it. How that maps onto the RMF's four functions -
 aligned with, not certified against:
 
 - **GOVERN** - a final report needs every finding reviewed by an analyst
   (FR-5.6 export gate); the review and status history are hash-chained.
+  With the local model, case data no longer leaves the machine to produce
+  the narrative.
 - **MAP** - the model is given computed facts: rule-tagged ATT&CK ids,
   Sigma levels, source profiles, risk ranking and the VERIS classification,
   and told not to re-grade or reclassify them (CLAUDE.md gotcha #13).
-- **MEASURE** - prompt settings were chosen by graded sweeps against
-  ground truth (gotcha #5); each analysis records finish reason, token
-  usage and missing keys in `_meta`.
+- **MEASURE** - each analysis records model, finish reason, token usage
+  and missing keys in `_meta`. The prompt settings were chosen by graded
+  sweeps against ground truth for the *Groq* model (gotcha #5); the local
+  model's settings have **not** been swept yet - a gap.
 - **MANAGE** - the attack graph, severity, confidence, VERIS record and all
   exports are produced without the model, so an AI outage or a bad answer
   removes the prose, never the findings.
