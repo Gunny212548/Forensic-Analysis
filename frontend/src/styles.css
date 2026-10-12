@@ -433,6 +433,19 @@
   .map-sub { color: var(--muted); font-size: 12px; }
   .map-docs { margin: 4px 0 0; padding-left: 18px; font-size: 12px; }
   .map-docs a { color: var(--accent); }
+
+  /* Evidence tab (components/Evidence.jsx). */
+  .ev-facts { display: grid; grid-template-columns: 90px 1fr; gap: 6px 14px; font-size: 13px; margin: 0 0 14px; }
+  .ev-facts dt { color: var(--muted); }
+  .ev-facts dd { margin: 0; }
+  .ev-hash { word-break: break-all; }
+  .ev-actions { display: flex; align-items: center; gap: 12px; font-size: 13px; margin-bottom: 8px; }
+  .ev-ok { color: var(--ok); font-size: 13px; }
+  .ev-bad { color: var(--danger); font-weight: 600; font-size: 13px; }
+  .ev-log { width: 100%; font-size: 12px; margin-top: 8px; }
+  .ev-log td { vertical-align: top; }
+  .ev-row-bad td { color: var(--danger); }
+  .ev-short { white-space: nowrap; }
   .rv-n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
   .rv-desc { font-size: 13px; line-height: 1.5; }
   .rv-meta, .rv-who { font-size: 11px; color: var(--muted); margin-top: 4px; }

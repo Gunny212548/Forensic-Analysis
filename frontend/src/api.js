@@ -93,6 +93,21 @@ export async function getFindings(caseId) {
   )
 }
 
+export async function getCustody(caseId) {
+  return jsonOrThrow(
+    await fetch(`/api/cases/${encodeURIComponent(caseId)}/custody`),
+    'Could not load the chain of custody',
+  )
+}
+
+/** Re-hashes the preserved file server-side and records the check. */
+export async function verifyEvidence(caseId) {
+  return jsonOrThrow(
+    await fetch(`/api/cases/${encodeURIComponent(caseId)}/verify`, { method: 'POST' }),
+    'Could not verify the evidence',
+  )
+}
+
 /** Returns null when the case has never been analysed - not an error.
  *
  *  This is also the poll point for a queued map-reduce job, and both of its

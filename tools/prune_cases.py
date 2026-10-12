@@ -64,6 +64,10 @@ def case_files(data: Path, case_id: str) -> list[Path]:
         # analysis was too large for a single model call.
         data / "analysis" / f"{case_id}.job.json",
         data / "review" / f"{case_id}.jsonl",
+        # Its chain of custody. A pruned case is a byte-identical duplicate
+        # (same digest as the copy kept), so the evidence itself survives;
+        # this log only described the copy being removed.
+        data / "custody" / f"{case_id}.jsonl",
     ]
     found += list((data / "raw").glob(f"{case_id}.*"))
     return [p for p in found if p.exists()]

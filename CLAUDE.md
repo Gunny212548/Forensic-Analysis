@@ -79,6 +79,9 @@ GET  /api/cases/{id}/findings                collapsed findings + computed
                                              confidence + review status
 POST /api/cases/{id}/review                  one analyst decision (appended)
 GET  /api/cases/{id}/review-log              full decision history
+GET  /api/cases/{id}/custody                 evidence digest + chain of custody,
+                                             hash chain checked on read
+POST /api/cases/{id}/verify                  re-hash the raw file now, log it
 POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
                                              graph + SQL top-N distinct → Groq
                                              for the narrative
@@ -105,15 +108,18 @@ Storage layout under `DATA_DIR` (`/data`):
 `db/` per-case DuckDB · `raw/` original
 uploaded files, compressed ones kept compressed (audit trail) · `analysis/` cached AI output · `tmp/` staging ·
 `intel/` threat-intel feed files (see gotcha #17) · `review/` append-only
-analyst decision logs, one JSONL per case (see gotcha #19) · `users.json`
-login accounts + `session_secret` (see *Login* below).
+analyst decision logs, one JSONL per case (see gotcha #19) · `custody/`
+hash-chained chain-of-custody logs, one JSONL per case (gotcha #28) ·
+`users.json` login accounts + `session_secret` (see *Login* below).
 
 A manifest now carries more than the upload: `company_id`/`company_name`
 (always set since FR-2.1), `compression` (`gz`/`zip`/null), `size_bytes` (as
 uploaded) vs `uncompressed_bytes` (what the 10 GB limit is measured on),
 `members`/`skipped_members` for a zip (with each member's `row_id` range),
-and `progress` while processing. Cases uploaded before these existed simply
-lack the keys - read them with `.get()`.
+`progress` while processing, `evidence` (SHA-256 of the raw file at
+acquisition, gotcha #28), `mapping` (gotcha #27) and `escalations`
+(gotcha #26). Cases uploaded before these existed simply lack the keys -
+read them with `.get()`.
 
 **Login (FR-1, IAI-13).** Every `/api/*` route needs a signed-in session except
 `/api/health`, `/api/auth/login` and `/api/auth/config` - enforced by one
@@ -898,6 +904,44 @@ store held 8 cases and none of them was it, and no copy was found under
 `D:/forensic system`. Recover the original export before relying on that
 section.
 
+**28. Evidence is hashed when it arrives and re-hashed before every use
+(2026-10-12).** Until then nothing could show that the file analysed was the
+file handed over - every finding was uncitable as evidence. `custody.py`
+follows ISO/IEC 27037, NIST SP 800-86 and RFC 3227 (chain of custody), with
+SHA-256 from FIPS 180-4:
+
+- `upload_log()` hashes the bytes **as they stream to `raw/`** (compressed
+  stays compressed) - no second read of a 10 GB file - and writes the
+  manifest's `evidence` plus a custody `acquired` entry (who, from which
+  address, size, digest).
+- `pipeline.process_case()` re-hashes before every run and **refuses** on a
+  mismatch (`IntegrityError`, case `failed`). It checks before `db.drop()`,
+  so the last good findings are not destroyed by the refusal.
+- A merge is **derived** evidence: each source is re-hashed in the same pass
+  that concatenates it, the merge is refused (409) if any changed, and the
+  new case's first entry lists the sources and their digests.
+- `custody/{case_id}.jsonl` is append-only and **hash-chained** (each entry
+  carries `prev` + its own `hash`); `GET /custody` re-checks the chain on
+  every read. That detects an edit, a deletion or a reorder. It cannot stop
+  someone with write access from rebuilding the whole chain - only a digest
+  kept somewhere else (or an external timestamp) would.
+- `client_address` is the address **the server saw**. Behind Docker's port
+  mapping that can be the bridge gateway rather than the analyst's machine.
+
+Cases uploaded before this have no acquisition digest:
+`tools/backfill_custody.py --apply` hashes them now and marks the digest
+`retroactive` - it attests the file from that moment, not since upload, and
+the Evidence tab says so. A case without any digest is still processed, with
+an `unverified` custody entry. `prune_cases.py` removes a pruned duplicate's
+custody log with it (the kept copy has the same digest).
+
+Verified 2026-10-12 by an end-to-end API run (scratch DATA_DIR, 19 checks):
+digest equals the uploaded bytes, acquired -> verified -> processed, a
+one-byte append is caught by verify and by re-processing, a merge with an
+altered source gets 409, an edited custody line breaks the chain, backfill
+marks `retroactive` and skips cases that have a digest. Host parity
+unchanged (63 files).
+
 ## SENTRY-IR console (requirements Sept 2026, being built)
 
 The target UI is `figma-export/` (10 screens: login, Upload, Overview,
@@ -1025,6 +1069,7 @@ auto-loads it for `${VAR}` substitution in `docker-compose.yml`.
 docker compose up -d --build --force-recreate      # rebuild + restart
                                                    # (also rebuilds the UI)
 docker exec forensic-analyzer-forensic-analyzer-1 python tools/refresh_intel.py
+docker exec forensic-analyzer-forensic-analyzer-1 python tools/backfill_custody.py   # dry run; --apply
 docker exec -it forensic-analyzer-forensic-analyzer-1 \
     python tools/create_user.py add you@example.com --name "..." --role analyst
 docker logs forensic-analyzer-forensic-analyzer-1 --tail 50

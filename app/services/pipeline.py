@@ -21,7 +21,7 @@ from collections import Counter
 from pathlib import Path
 
 from .. import config
-from . import archive, db, decode, intel, logsources, parsers, rules, severity, storage
+from . import archive, custody, db, decode, intel, logsources, parsers, rules, severity, storage
 
 log = logging.getLogger(__name__)
 
@@ -418,6 +418,27 @@ def _ingest_zip(con, case_id: str, path: Path, report=_noop) -> tuple[bool, list
     return truncated, done, skipped
 
 
+class IntegrityError(Exception):
+    """The preserved file no longer matches its acquisition digest."""
+
+
+def _verify_evidence(case_id: str, path: Path) -> None:
+    """Re-compute the raw file's SHA-256 before using it (custody.py). A
+    mismatch stops the run: findings computed from altered evidence would
+    look exactly as trustworthy as real ones."""
+    recorded = (storage.load_manifest(case_id) or {}).get("evidence")
+    ok, actual = custody.check(case_id, path, recorded)
+    if ok is False:
+        custody.record(case_id, "integrity_failed", "system", sha256=actual,
+                       expected=recorded["sha256"], purpose="before processing")
+        raise IntegrityError(
+            f"SHA-256 of the preserved file is {actual}, but {recorded['sha256']} was "
+            f"recorded when it was acquired - the evidence has changed, refusing to analyse it")
+    custody.record(case_id, "verified" if ok else "unverified", "system", sha256=actual,
+                   purpose="before processing",
+                   **({} if ok else {"note": "no acquisition digest was recorded for this file"}))
+
+
 def process_case(case_id: str, path: Path, kind: str) -> None:
     """Synchronous - callers run this in a worker thread."""
     storage.update_status(case_id, "processing")
@@ -425,6 +446,7 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
     progress.set("ingest", 0, force=True)
     con = None
     try:
+        _verify_evidence(case_id, path)
         db.drop(case_id)  # re-processing a case starts clean
         con = db.init(case_id)
 
@@ -470,6 +492,8 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             progress={"stage": "done", "pct": 100, "estimated": False},
             **extra,
         )
+        custody.record(case_id, "processed", "system", rows=total_rows, flagged=flagged,
+                       rules=matched)
         log.info("case %s ready: %s rows, %s flagged", case_id, total_rows, flagged)
 
     except Exception as exc:  # noqa: BLE001 - surface any ingest failure to the UI

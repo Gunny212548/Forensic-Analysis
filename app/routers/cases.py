@@ -1,11 +1,12 @@
 import asyncio
+import hashlib
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import analysis, db, review, storage
+from ..services import analysis, custody, db, review, storage
 from .upload import CHUNK, _run_pipeline
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -27,8 +28,62 @@ async def get_case(case_id: str):
     return manifest
 
 
-def _concat_raw(sources: list, dest) -> int:
-    """Append raw log files byte for byte, returning the bytes written.
+def _raw_file(case_id: str):
+    """The preserved original, whatever its extension (.csv, .log.gz, .zip)."""
+    found = sorted(storage.raw_dir().glob(f"{case_id}.*"))
+    return found[0] if found else None
+
+
+def _custody_view(case_id: str, manifest: dict) -> dict:
+    intact, problem = custody.verify_chain(case_id)
+    return {
+        "evidence": manifest.get("evidence"),
+        "standards": custody.STANDARDS,
+        "chain_intact": intact,
+        "chain_problem": problem,
+        "entries": custody.entries(case_id),
+    }
+
+
+@router.get("/{case_id}/custody")
+async def get_custody(case_id: str):
+    """The evidence digest and the full chain-of-custody log, with the log's
+    own hash chain checked on every read (custody.py)."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    return _custody_view(case_id, manifest)
+
+
+@router.post("/{case_id}/verify")
+async def verify_evidence(case_id: str, request: Request):
+    """Re-compute the preserved file's SHA-256 now, on demand, and record the
+    check - who asked, when, and whether it matched - in the custody log."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    raw = _raw_file(case_id)
+    if raw is None:
+        raise HTTPException(409, "The preserved original file is missing")
+    recorded = manifest.get("evidence")
+    # Hashing a 10 GB file takes a while; keep it off the event loop.
+    ok, actual = await asyncio.to_thread(custody.check, case_id, raw, recorded)
+    actor = request.state.user["email"]
+    if ok is False:
+        custody.record(case_id, "integrity_failed", actor, sha256=actual,
+                       expected=recorded["sha256"], purpose="on request")
+    else:
+        custody.record(case_id, "verified" if ok else "unverified", actor, sha256=actual,
+                       purpose="on request",
+                       **({} if ok else {"note": "no acquisition digest was recorded for this file"}))
+    return {"match": ok, "sha256": actual, **_custody_view(case_id, manifest)}
+
+
+def _concat_raw(sources: list, dest) -> tuple[int, str, list[str]]:
+    """Append raw log files byte for byte. Returns (bytes written, SHA-256 of
+    the merged file, SHA-256 of each source as it was read) - the digests are
+    taken in the same pass, so a source is verified on exactly the bytes that
+    went into the merge (custody.py).
 
     Nothing is parsed: syslog/FortiGate lines are self-delimited by newlines
     and carry no cross-file state, so concatenation is the whole merge. Copied
@@ -39,6 +94,8 @@ def _concat_raw(sources: list, dest) -> int:
     """
     size = 0
     tail = b"\n"
+    merged = hashlib.sha256()
+    per_source = []
     with open(dest, "wb") as out:
         for src in sources:
             # A source not ending in a newline would otherwise glue its last
@@ -46,17 +103,22 @@ def _concat_raw(sources: list, dest) -> int:
             # decoder. `tail` starts as a newline so nothing leads the file.
             if tail != b"\n":
                 out.write(b"\n")
+                merged.update(b"\n")
                 size += 1
+            h = hashlib.sha256()
             with open(src, "rb") as fh:
                 while chunk := fh.read(CHUNK):
                     out.write(chunk)
+                    merged.update(chunk)
+                    h.update(chunk)
                     size += len(chunk)
                     tail = chunk[-1:]
-    return size
+            per_source.append(h.hexdigest())
+    return size, merged.hexdigest(), per_source
 
 
 @router.post("/merge")
-async def merge_cases(background_tasks: BackgroundTasks, body: dict = Body(...)):
+async def merge_cases(request: Request, background_tasks: BackgroundTasks, body: dict = Body(...)):
     """Concatenate several already-ingested line-log cases into one new case
     and run the normal pipeline over the whole thing.
 
@@ -152,11 +214,33 @@ async def merge_cases(background_tasks: BackgroundTasks, body: dict = Body(...))
     # Off the event loop for the same reason the pipeline is: this is minutes
     # of blocking disk IO (13GB for the FortiGate set), and running it inline
     # would stall every other request for the duration.
-    size = await asyncio.to_thread(
+    size, sha256, source_digests = await asyncio.to_thread(
         _concat_raw, [storage.raw_path(m["case_id"], "log") for _, _, m in ordered], dest
     )
 
-    fields = {"size_bytes": size}
+    # A merge is derived evidence: it is only as good as its sources, so each
+    # is checked against the digest recorded when it was acquired, and the
+    # derivation - which files, at which digests - is the new case's first
+    # custody entry.
+    altered = [m["case_id"] for (_, _, m), got in zip(ordered, source_digests)
+               if (m.get("evidence") or {}).get("sha256") not in (None, got)]
+    if altered:
+        dest.unlink(missing_ok=True)
+        storage.manifest_path(case_id).unlink(missing_ok=True)
+        raise HTTPException(
+            409, "Evidence integrity check failed - the preserved file no longer matches "
+                 f"its acquisition digest for: {', '.join(altered)}")
+    actor = request.state.user["email"]
+    custody.record(
+        case_id, "derived", actor, sha256=sha256, bytes=size, method="concatenation",
+        sources=[{"case_id": m["case_id"], "sha256": got,
+                  "verified": bool((m.get("evidence") or {}).get("sha256"))}
+                 for (_, _, m), got in zip(ordered, source_digests)],
+    )
+    for (_, _, m), got in zip(ordered, source_digests):
+        custody.record(m["case_id"], "used_in_merge", actor, sha256=got, merged_into=case_id)
+
+    fields = {"size_bytes": size, "evidence": custody.evidence(sha256, size, actor)}
     if fallback:
         fields["merge_order_fallback"] = fallback
     storage.update_case(case_id, **fields)

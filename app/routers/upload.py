@@ -1,12 +1,13 @@
 import asyncio
+import hashlib
 import shutil
 import zipfile
 import zlib
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile
 
 from .. import config
-from ..services import archive, pipeline, storage
+from ..services import archive, custody, pipeline, storage
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
@@ -60,6 +61,7 @@ async def _run_pipeline(case_id: str, path, kind: str) -> None:
 
 @router.post("/upload")
 async def upload_log(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     note: str = Form(""),
@@ -115,6 +117,9 @@ async def upload_log(
     # again, byte for byte, when the pipeline extracts it.
     size = 0
     counter = archive.GzipCounter(config.MAX_UPLOAD_BYTES) if compression == "gz" else None
+    # The acquisition digest (custody.py): over exactly the bytes written to
+    # raw/, computed as they stream rather than by reading 10 GB back.
+    digest = hashlib.sha256()
     try:
         with open(dest, "wb") as out:
             while chunk := await file.read(CHUNK):
@@ -123,6 +128,7 @@ async def upload_log(
                     counter.feed(chunk)
                 elif size > config.MAX_UPLOAD_BYTES:
                     raise too_large
+                digest.update(chunk)
                 out.write(chunk)
         uncompressed = counter.finish() if counter else size
     except archive.TooLarge:
@@ -157,8 +163,18 @@ async def upload_log(
         extra = {"members": [{"name": m.name, "kind": m.kind, "bytes": m.size} for m in members],
                  "skipped_members": skipped}
 
+    # Who handed the evidence over, from where, and its digest - recorded
+    # before anything reads it (RFC 3227 chain of custody).
+    actor = request.state.user["email"]
+    sha256 = digest.hexdigest()
+    custody.record(
+        case_id, "acquired", actor,
+        sha256=sha256, bytes=size, original_filename=manifest["original_filename"],
+        compression=compression, client_address=request.client.host if request.client else None,
+        stored_as=dest.name,
+    )
     fields = {"size_bytes": size, "uncompressed_bytes": uncompressed,
-              "compression": compression, **extra}
+              "compression": compression, "evidence": custody.evidence(sha256, size, actor), **extra}
     storage.update_case(case_id, **fields)
     manifest.update(fields)
 

@@ -7,6 +7,7 @@ import EventsTable from '../components/EventsTable.jsx'
 import ReviewPanel from '../components/ReviewPanel.jsx'
 import AttackGraph from '../components/AttackGraph.jsx'
 import MappingNote from '../components/Mapping.jsx'
+import Evidence from '../components/Evidence.jsx'
 import {
   AnalysisMeta,
   AnalysisProgress,
@@ -221,6 +222,8 @@ export default function Result({ caseId }) {
     })
 
     out.push({ key: 'review', label: 'Review', node: <ReviewPanel caseId={caseId} /> })
+
+    out.push({ key: 'evidence', label: 'Evidence', node: <Evidence caseId={caseId} /> })
 
     if (analysis) {
       out.push({
