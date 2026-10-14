@@ -18,6 +18,7 @@ import threading
 import time
 import traceback
 from collections import Counter
+from itertools import chain, islice
 from pathlib import Path
 
 from .. import config
@@ -293,18 +294,30 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
     # guessed row by row; line logs count which documented format read
     # each line.
     mapping = None
+    json_stats: dict = {}
+    rows = parsers.iter_rows(path, kind, progress, json_stats)
     if kind == "csv":
         header = _csv_header(path, parsers.sniff_delimiter(path))
         mapping = logsources.resolve(header, decode.match_column)
+    elif kind == "json":
+        # JSON has no header, so the first records stand in for one: their
+        # keys, in order of first appearance, are mapped exactly as a CSV
+        # header would be - by a documented profile when one matches - and
+        # then every record is read through that one mapping (IAI-35).
+        head = list(islice(rows, JSON_HEADER_RECORDS))
+        keys = list(dict.fromkeys(k for r in head if "_raw" not in r for k in r))
+        if keys:
+            mapping = logsources.resolve_keys(keys, decode.match_column)
+        rows = chain(head, rows)
     line_counts: Counter = Counter()
     with open(stage_path, "w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
-        for row in parsers.iter_rows(path, kind, progress):
+        for row in rows:
             if config.MAX_ROWS and total >= config.MAX_ROWS:
                 truncated = True
                 break
             event = decode.decode(row, kind, mapping)
-            if kind != "csv":
+            if kind == "log" or "_raw" in row:
                 line_counts[event["profile"]] += 1
             writer.writerow(_stage_row(start + total, event))
             total += 1
@@ -315,7 +328,17 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
     else:
         described = {"method": "heuristic", "profile": None, "fields": {},
                      "heuristic_fields": [], "docs": [], "notes": []}
+    if kind == "json":
+        # What could not be read as a record is reported, never dropped
+        # silently: those rows are still in the case, read as text lines.
+        described["json"] = {k: json_stats.get(k) for k in
+                             ("layout", "records", "wrapper", "unparseable",
+                              "unparseable_at", "broken_at_byte")}
     return total, truncated, described
+
+
+# How many records of a JSON file stand in for its header.
+JSON_HEADER_RECORDS = 200
 
 
 def _stage_dir() -> Path:

@@ -68,6 +68,20 @@ findings** — they're the false-positive check.
 A row can match several rules, so per-rule counts sum to more than the
 flagged-row count. `flagged_count` is DISTINCT rows.
 
+The two JSON twins (IAI-35) carry the same 26 firewall rows, so they must
+give **exactly the firewall table above** - only the format differs:
+
+| file | layout | read by | rows | flagged |
+|---|---|---|---|---|
+| `nightfall-firewall.json` | pretty-printed array, PAN-OS column names | documented PAN-OS profile (same as the CSV) | 26 | 21 |
+| `nightfall-firewall-nested.jsonl.gz` | gzipped JSON-lines, nested generic keys | guessed (`src.ip`, `dst.port`, `bytesSent`...) | **28** | 21 |
+
+The nested file's two extra rows are the two lines that are not JSON
+(`line 6`, `line 13`): kept in the case, reported on the mapping as
+`unparseable: 2`, and matched by no rule. Verified 2026-10-14: the decoded
+`ts / srcip / dstip / dstport / verdict / app / risk / bytes_sent / category`
+of all 26 rows are identical across the CSV and both JSON files.
+
 ## Expected severity (CLAUDE.md gotcha #26)
 
 Not asserted by `check_parity.py` - check the case's `severity` and
@@ -77,6 +91,7 @@ Not asserted by `check_parity.py` - check the case's `severity` and
 |---|---|---|
 | `nightfall-auth.log` | high | `credential-compromise` (17 findings): `10.20.30.40` brute-forced `root`, then logged in from the same address |
 | `nightfall-firewall.csv` | critical | `compromised-host` (3): `10.10.1.5` has both the malware-flagged and the two >50MB transfers |
+| both JSON twins | critical | the same as the CSV |
 
 `10.10.1.9`'s ordinary logins stay `informational`. If either file stops
 escalating, or the benign host starts, the attack-path patterns in

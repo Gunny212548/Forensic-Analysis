@@ -12,6 +12,8 @@ Scenario "Nightfall" - 2026-02-14/15:
 Benign noise is mixed in so the rules have something to NOT fire on.
 """
 import csv
+import gzip
+import json
 import pathlib
 import sys
 
@@ -100,5 +102,38 @@ with open(out / "nightfall-firewall.csv", "w", encoding="utf-8", newline="") as 
     w.writeheader()
     w.writerows(rows)
 
+# ------------------------------------------------------------- JSON twins
+# The same firewall rows twice more as JSON (IAI-35). Same data, so the same
+# findings are the test - only the format changes:
+#   nightfall-firewall.json            a pretty-printed array keyed by the
+#                                      PAN-OS column names: must read through
+#                                      the documented profile, exactly as the
+#                                      CSV does.
+#   nightfall-firewall-nested.jsonl.gz JSON-lines, gzipped, nested and with
+#                                      generic key names (no profile: read by
+#                                      guessing), plus two lines that are not
+#                                      JSON - which must be kept, counted and
+#                                      produce no finding.
+(out / "nightfall-firewall.json").write_text(json.dumps(rows, indent=2), encoding="utf-8")
+
+
+def nested(r):
+    return {
+        "timestamp": r["High Res Timestamp"],
+        "src": {"ip": r["Source address"]},
+        "dst": {"ip": r["Destination address"], "port": int(r["Destination Port"])},
+        "action": r["Action"],
+        "application": {"name": r["Application"], "risk": int(r["Risk of app"])},
+        "bytesSent": int(r["Bytes Sent"]),
+        "threat": {"category": r["Threat/Content Type"]},
+    }
+
+
+lines = [json.dumps(nested(r)) for r in rows]
+lines.insert(5, "### exporter restarted ###")
+lines.insert(12, '{"timestamp": "2026-02-14T22:30:00+07:00", "src": {"ip": ')  # cut off
+with gzip.open(out / "nightfall-firewall-nested.jsonl.gz", "wt", encoding="utf-8") as fh:
+    fh.write("\n".join(lines) + "\n")
+
 print(f"auth.log lines : {len(auth)}")
-print(f"firewall rows  : {len(rows)}")
+print(f"firewall rows  : {len(rows)}  (+ the same as .json and as nested .jsonl.gz)")

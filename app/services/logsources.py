@@ -40,6 +40,7 @@ What a profile fixed, measured against the guesswork it replaced:
   leaves it empty.
 """
 
+import re
 from dataclasses import dataclass, field
 
 
@@ -242,6 +243,34 @@ def resolve(header: list[str], heuristic) -> Mapping:
         columns[f] = cols
         source[f] = src
     return Mapping(profile, columns, source)
+
+
+_CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+
+
+def key_words(key: str) -> str:
+    """A JSON key as the words a CSV header would spell it:
+    `sourceIPAddress` -> "source ip address", `status.errorCode` ->
+    "status error code" - so decode's candidate names ("source ip",
+    "ip address") recognise it."""
+    return " ".join(_CAMEL.sub(" ", key).replace(".", " ").replace("_", " ").lower().split())
+
+
+def resolve_keys(keys: list[str], heuristic) -> Mapping:
+    """Map a JSON file from the keys its records carry (flattened, dotted).
+    Profiles match the keys as written; the guessing fallback sees them as
+    words, and every mapped column is still the original key, which is what
+    a record is read by."""
+    by_words: dict[str, str] = {}
+    for k in keys:
+        by_words.setdefault(key_words(k), k)
+    words = list(by_words)
+
+    def guess(_header, f):
+        hit = heuristic(words, f)
+        return by_words[hit] if hit else None
+
+    return resolve(keys, guess)
 
 
 def line_mapping(counts: dict[str | None, int]) -> dict:

@@ -410,9 +410,33 @@
    "R2000": 8
   }
  },
+ "nightfall-firewall-nested.jsonl.gz": {
+  "flagged": 21,
+  "md5": "d52caabe528d95d6e31d7301df3ab749",
+  "rows": 28,
+  "rules": {
+   "R2001": 15,
+   "R2002": 15,
+   "R3000": 6,
+   "R3001": 2,
+   "R3002": 1
+  }
+ },
  "nightfall-firewall.csv": {
   "flagged": 21,
   "md5": "8c49ca0e4dedf2374fe6fbfa01a770d2",
+  "rows": 26,
+  "rules": {
+   "R2001": 15,
+   "R2002": 15,
+   "R3000": 6,
+   "R3001": 2,
+   "R3002": 1
+  }
+ },
+ "nightfall-firewall.json": {
+  "flagged": 21,
+  "md5": "3cdbf83089f751fd3c7116ce4b3fb22b",
   "rows": 26,
   "rules": {
    "R2001": 15,

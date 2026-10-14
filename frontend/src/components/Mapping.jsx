@@ -41,9 +41,49 @@ function fieldList(fields, only) {
     .join(' · ')
 }
 
+const JSON_LAYOUT = {
+  lines: 'JSON-lines',
+  array: 'a JSON array',
+  object: 'one JSON document',
+  concatenated: 'JSON documents one after another',
+}
+
+/** How a JSON file was read (parsers.iter_json): its layout, and - stated,
+ *  never left out - every record that could not be read as one (IAI-35).
+ *  Those rows are still in the case, decoded as plain text lines. */
+function JsonNote({ stats, label }) {
+  if (!stats) return null
+  const bad = stats.unparseable || 0
+  const at = stats.unparseable_at || []
+  return (
+    <div className={`map-note${bad || stats.broken_at_byte != null ? ' map-warn' : ''}`}>
+      {label}Read as {JSON_LAYOUT[stats.layout] || 'JSON'}
+      {stats.wrapper && <> (records inside its &quot;{stats.wrapper}&quot; array)</>}:{' '}
+      {(stats.records || 0).toLocaleString()} records.
+      {bad > 0 && (
+        <>
+          {' '}
+          {bad.toLocaleString()} {bad === 1 ? 'entry was' : 'entries were'} not a readable JSON record (
+          {at.join(', ')}
+          {bad > at.length ? ', ...' : ''}) - kept in the case as text, where no column-based rule can fire on{' '}
+          {bad === 1 ? 'it' : 'them'}.
+        </>
+      )}
+      {stats.broken_at_byte != null && (
+        <>
+          {' '}
+          <strong>The file breaks off at character {stats.broken_at_byte.toLocaleString()}</strong> - nothing
+          after that point could be read.
+        </>
+      )}
+    </div>
+  )
+}
+
 function One({ mapping, name }) {
   if (!mapping) return null
   const label = name ? <strong>{name}: </strong> : null
+  const json = mapping.json ? <JsonNote stats={mapping.json} label={label} /> : null
 
   if (mapping.method === 'unrecognised') {
     return (
@@ -70,32 +110,39 @@ function One({ mapping, name }) {
   if (mapping.method === 'documented') {
     const guessed = mapping.heuristic_fields || []
     return (
-      <div className={`map-note${guessed.length ? ' map-warn' : ''}`}>
-        {label}Columns mapped from the log source's documentation: <strong>{mapping.name}</strong>.
-        {guessed.length > 0 && (
-          <>
-            {' '}
-            This export lacks the documented column for {guessed.map((f) => FIELD_EN[f] || f).join(', ')},
-            so it was guessed from column names - verify: {fieldList(mapping.fields, guessed)}.
-          </>
-        )}
-        {(mapping.notes || []).map((n) => (
-          <div className="map-sub" key={n}>
-            {n}
-          </div>
-        ))}
-        <Docs docs={mapping.docs} />
-      </div>
+      <>
+        <div className={`map-note${guessed.length ? ' map-warn' : ''}`}>
+          {label}Columns mapped from the log source's documentation: <strong>{mapping.name}</strong>.
+          {guessed.length > 0 && (
+            <>
+              {' '}
+              This export lacks the documented column for {guessed.map((f) => FIELD_EN[f] || f).join(', ')},
+              so it was guessed from column names - verify: {fieldList(mapping.fields, guessed)}.
+            </>
+          )}
+          {(mapping.notes || []).map((n) => (
+            <div className="map-sub" key={n}>
+              {n}
+            </div>
+          ))}
+          <Docs docs={mapping.docs} />
+        </div>
+        {json}
+      </>
     )
   }
 
   return (
-    <div className="map-note map-warn">
-      {label}
-      <strong>Column mapping not based on the log source's documentation.</strong> This file's
-      header matched no known log source, so its columns were guessed from their names. Verify the mapping
-      before relying on the findings: {fieldList(mapping.fields) || 'no column was recognised'}.
-    </div>
+    <>
+      <div className="map-note map-warn">
+        {label}
+        <strong>Column mapping not based on the log source's documentation.</strong>{' '}
+        {mapping.json ? "This file's keys" : "This file's header"} matched no known log source, so its{' '}
+        {mapping.json ? 'fields' : 'columns'} were guessed from their names. Verify the mapping before
+        relying on the findings: {fieldList(mapping.fields) || 'no column was recognised'}.
+      </div>
+      {json}
+    </>
   )
 }
 

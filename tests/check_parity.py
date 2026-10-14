@@ -30,7 +30,18 @@ import urllib.request
 from pathlib import Path
 
 BASELINE = Path(__file__).with_name("baseline.json")
-LOG_SUFFIXES = {".csv", ".log", ".json", ".txt"}
+LOG_SUFFIXES = {".csv", ".log", ".json", ".txt", ".jsonl", ".ndjson"}
+# A gzipped JSON log counts too (gen_usecase's nested .jsonl.gz, IAI-35).
+# Other .gz files stay out: the corpus's are ESXi binary traces (boot.gz,
+# vsantraces), and taking them in would change what the baseline covers.
+GZ_INNER = {".json", ".jsonl", ".ndjson"}
+
+
+def _is_log(p: Path) -> bool:
+    suffixes = [s.lower() for s in p.suffixes]
+    if suffixes[-1:] == [".gz"]:
+        return len(suffixes) > 1 and suffixes[-2] in GZ_INNER
+    return p.suffix.lower() in LOG_SUFFIXES
 DEFAULT_URL = "http://localhost:8091"
 PARITY_CUSTOMER = "Parity check"
 
@@ -193,8 +204,7 @@ def main() -> int:
     if not root.is_dir():
         print(f"not a directory: {root}")
         return 2
-    files = sorted(p for p in root.rglob("*")
-                   if p.is_file() and p.suffix.lower() in LOG_SUFFIXES)
+    files = sorted(p for p in root.rglob("*") if p.is_file() and _is_log(p))
     if not files:
         print(f"no log-shaped files under {root}")
         return 2
