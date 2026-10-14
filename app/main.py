@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -64,9 +65,21 @@ def _refuse_oversized_upload(request: Request) -> JSONResponse | None:
     return JSONResponse({"detail": detail}, status_code=status)
 
 
+@app.exception_handler(storage.StoreNeedsMigration)
+async def needs_migration(_request: Request, exc: storage.StoreNeedsMigration):
+    return JSONResponse({"detail": str(exc)}, status_code=503)
+
+
 @app.on_event("startup")
 async def on_startup():
-    storage.ensure_dirs()
+    legacy = storage.ensure_root()
+    if legacy:
+        # Cases in the pre-2026-10-14 flat layout are invisible until moved
+        # into their customers' stores - say so instead of showing an empty app.
+        logging.getLogger("forensic").warning(
+            "%s customer/case record(s) are still in the old shared layout and are not "
+            "shown; adding customers or cases is refused until you run: "
+            "python tools/migrate_to_customers.py --apply", legacy)
 
 
 @app.get("/api/health")

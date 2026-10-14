@@ -19,8 +19,7 @@ six decisions take a couple of minutes.
 
 from pathlib import Path
 
-from .. import config
-from . import hashchain
+from . import hashchain, storage
 
 # Review Status values from the requirements (FR-3 definitions table).
 UNREVIEWED = "Unreviewed"
@@ -45,12 +44,9 @@ REASON_CODES = {
 }
 
 
-def review_dir() -> Path:
-    return Path(config.DATA_DIR) / "review"
-
-
 def review_path(case_id: str) -> Path:
-    return review_dir() / f"{case_id}.jsonl"
+    # In the case's customer store (storage.case_dir).
+    return storage.case_dir(case_id, "review") / f"{case_id}.jsonl"
 
 
 def append(case_id: str, entry: dict) -> dict:
@@ -58,6 +54,7 @@ def append(case_id: str, entry: dict) -> dict:
     so an edited or deleted decision is detectable (ISO/IEC 27001 A.8.15).
     Decisions written before chaining are sealed by the first chained one.
     Never rewrites earlier lines."""
+    storage.require_owner(case_id)
     return hashchain.append(review_path(case_id), entry)
 
 

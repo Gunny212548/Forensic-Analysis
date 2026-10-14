@@ -1,8 +1,27 @@
-"""Flat-file storage for case manifests and cached AI analysis results.
+"""Flat-file storage for case manifests and cached AI analysis results - and
+where every case's files live.
 
 Event data itself lives in a per-case DuckDB file (see db.py); this module
-only handles the small JSON sidecars - the case manifest (status, counts,
-filename) and the cached analysis output.
+handles the small JSON sidecars - the case manifest (status, counts,
+filename) and the cached analysis output - and owns the layout.
+
+**Each customer has its own store** (since 2026-10-14): adding a customer
+creates `DATA_DIR/customers/<company_id>/`, and everything of that
+customer's cases lives under it and nowhere else -
+
+    customers/<company_id>/
+        customer.json   the customer record
+        cases/          manifests          db/        per-case DuckDB
+        raw/            evidence as given  analysis/  cached AI output
+        review/         decision logs      custody/   chain of custody
+
+so one customer's evidence is never in a file, folder or database shared
+with another's. What stays shared is not customer data: accounts
+(users.json), the public threat-intel feeds (intel/), the MCP access log,
+and transient staging under tmp/. `case_dir()` is the one place that
+answers "which customer's store is this case in"; db.py, review.py and
+custody.py build their paths on it. `tools/migrate_to_customers.py` moves a
+store from the old flat layout.
 """
 
 import json
@@ -28,33 +47,125 @@ def sanitize_original_name(name: str) -> str:
     return name[:200] or "upload"
 
 
-def cases_dir() -> Path:
-    return Path(config.DATA_DIR) / "cases"
+# ------------------------------------------------------- per-customer stores
+
+CASE_SUBDIRS = ("cases", "db", "raw", "analysis", "review", "custody")
+
+# Ids are checked before they become a path component: a case or company id
+# arrives in a URL, and "../users" must never resolve to a file.
+_CASE_ID_RE = re.compile(r"^case-[0-9A-Za-z-]{1,64}$")
+_COMPANY_ID_RE = re.compile(r"^co-[0-9a-f]{12}$")
+
+# Reads of a case no customer owns land here. It is never created, so they
+# miss; writes refuse instead (require_owner).
+_UNOWNED = "_unowned"
 
 
-def analysis_dir() -> Path:
-    return Path(config.DATA_DIR) / "analysis"
+class UnownedCase(LookupError):
+    """A write was attempted for a case that is in no customer's store."""
 
 
-def raw_dir() -> Path:
-    return Path(config.DATA_DIR) / "raw"
+class StoreNeedsMigration(RuntimeError):
+    """The old shared layout still holds customers or cases. Until they are
+    moved, adding a customer or a case is refused: the old customers are not
+    visible, so "Bigfish" typed on the upload form would become a second,
+    different Bigfish."""
 
 
-def companies_dir() -> Path:
-    return Path(config.DATA_DIR) / "companies"
+def valid_case_id(case_id: str) -> bool:
+    return bool(_CASE_ID_RE.match(case_id or ""))
 
 
-def ensure_dirs() -> None:
-    for d in (cases_dir(), analysis_dir(), raw_dir(), companies_dir()):
-        d.mkdir(parents=True, exist_ok=True)
+def valid_company_id(company_id: str) -> bool:
+    return bool(_COMPANY_ID_RE.match(company_id or ""))
+
+
+def customers_dir() -> Path:
+    return Path(config.DATA_DIR) / "customers"
+
+
+def customer_dir(company_id: str) -> Path:
+    if not valid_company_id(company_id):
+        raise ValueError(f"not a customer id: {company_id!r}")
+    return customers_dir() / company_id
+
+
+def legacy_count() -> int:
+    """Customer and case records still in the old shared layout
+    (DATA_DIR/companies, DATA_DIR/cases), which nothing reads any more."""
+    data = Path(config.DATA_DIR)
+    return sum(sum(1 for _ in (data / d).glob("*.json"))
+               for d in ("cases", "companies") if (data / d).is_dir())
+
+
+def _refuse_if_legacy() -> None:
+    if legacy_count():
+        raise StoreNeedsMigration(
+            "This store still has customers or cases in the old shared layout. "
+            "Run tools/migrate_to_customers.py --apply before adding anything.")
+
+
+def ensure_root() -> int:
+    """Create DATA_DIR/customers; return legacy_count()."""
+    customers_dir().mkdir(parents=True, exist_ok=True)
+    return legacy_count()
+
+
+def ensure_customer_store(company_id: str) -> Path:
+    """The customer's own store - created when the customer is added, and
+    re-asserted (idempotently) whenever a case is written into it."""
+    root = customer_dir(company_id)
+    for sub in CASE_SUBDIRS:
+        (root / sub).mkdir(parents=True, exist_ok=True)
+    return root
+
+
+# case_id -> company_id. A case never changes customer, so an entry never
+# goes stale; a miss is looked up on disk once and remembered.
+_owner: dict[str, str] = {}
+
+
+def case_company(case_id: str) -> str | None:
+    """Which customer's store holds this case, or None."""
+    if case_id in _owner:
+        return _owner[case_id]
+    if not valid_case_id(case_id):
+        return None
+    root = customers_dir()
+    if root.is_dir():
+        for d in root.iterdir():
+            if (d / "cases" / f"{case_id}.json").is_file() and valid_company_id(d.name):
+                _owner[case_id] = d.name
+                return d.name
+    return None
+
+
+def case_dir(case_id: str, sub: str) -> Path:
+    """`sub` (one of CASE_SUBDIRS) inside the store of the customer who owns
+    the case. For a case nobody owns: a path that does not exist."""
+    company_id = case_company(case_id)
+    return customers_dir() / (company_id or _UNOWNED) / sub
+
+
+def require_owner(case_id: str) -> str:
+    company_id = case_company(case_id)
+    if company_id is None:
+        raise UnownedCase(f"{case_id} belongs to no customer - nothing is written for it")
+    return company_id
 
 
 def manifest_path(case_id: str) -> Path:
-    return cases_dir() / f"{case_id}.json"
+    return case_dir(case_id, "cases") / f"{case_id}.json"
 
 
 def save_manifest(manifest: dict) -> None:
-    ensure_dirs()
+    # The manifest says whose case it is, and that decides where it goes:
+    # this is the write that puts a new case into its customer's store.
+    company_id = manifest.get("company_id")
+    if not company_id:
+        raise UnownedCase(f"{manifest.get('case_id')} has no customer (FR-2.1)")
+    ensure_customer_store(company_id)
+    _owner[manifest["case_id"]] = company_id
     # Write-then-rename: the pipeline now rewrites a manifest about once a
     # second to report progress (FR-2.5) while the UI polls it, and a reader
     # must never catch a half-written file.
@@ -71,14 +182,23 @@ def load_manifest(case_id: str) -> dict | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def list_manifests() -> list[dict]:
-    ensure_dirs()
+def list_manifests(company_id: str | None = None) -> list[dict]:
+    """One customer's cases, or - with no customer named - every customer's,
+    each read from its own store."""
+    if company_id is not None:
+        stores = [customer_dir(company_id)]
+    else:
+        root = customers_dir()
+        stores = [d for d in root.iterdir() if valid_company_id(d.name)] if root.is_dir() else []
     manifests = []
-    for path in cases_dir().glob("*.json"):
-        try:
-            manifests.append(json.loads(path.read_text(encoding="utf-8")))
-        except (json.JSONDecodeError, OSError):
-            continue
+    for store in stores:
+        for path in (store / "cases").glob("*.json"):
+            try:
+                m = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            _owner.setdefault(m.get("case_id", ""), store.name)
+            manifests.append(m)
     manifests.sort(key=lambda m: m.get("uploaded_at", ""), reverse=True)
     return manifests
 
@@ -104,7 +224,10 @@ def create_case(
     company_name: str | None = None,
     merged_from: list[dict] | None = None,
 ) -> dict:
-    ensure_dirs()
+    _refuse_if_legacy()
+    if not company_id or load_company(company_id) is None:
+        # FR-2.1 - and since 2026-10-14 also where the case is stored.
+        raise UnownedCase("a case needs an existing customer")
     manifest = {
         "case_id": new_case_id(),
         "original_filename": sanitize_original_name(original_filename),
@@ -130,26 +253,25 @@ def create_case(
 
 
 # ---------------------------------------------------------------- companies
-# Cases are grouped by company/client the same way they're grouped by
-# nothing today - a flat JSON sidecar per company, mirroring the case
-# manifest pattern rather than pulling in a real database for one lookup
-# table.
+# A customer is its store's customer.json. Adding one creates the store, so
+# a customer's first case already has somewhere of its own to go.
 
 def new_company_id() -> str:
     return f"co-{secrets.token_hex(6)}"
 
 
 def company_path(company_id: str) -> Path:
-    return companies_dir() / f"{company_id}.json"
+    return customer_dir(company_id) / "customer.json"
 
 
 def create_company(name: str) -> dict:
-    ensure_dirs()
+    _refuse_if_legacy()
     company = {
         "company_id": new_company_id(),
         "name": name[:200],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    ensure_customer_store(company["company_id"])
     company_path(company["company_id"]).write_text(
         json.dumps(company, indent=2, default=str), encoding="utf-8"
     )
@@ -157,6 +279,8 @@ def create_company(name: str) -> dict:
 
 
 def load_company(company_id: str) -> dict | None:
+    if not valid_company_id(company_id):
+        return None
     path = company_path(company_id)
     if not path.exists():
         return None
@@ -164,11 +288,13 @@ def load_company(company_id: str) -> dict | None:
 
 
 def list_companies() -> list[dict]:
-    ensure_dirs()
+    root = customers_dir()
     companies = []
-    for path in companies_dir().glob("*.json"):
+    for d in (root.iterdir() if root.is_dir() else []):
+        if not valid_company_id(d.name):
+            continue
         try:
-            companies.append(json.loads(path.read_text(encoding="utf-8")))
+            companies.append(json.loads((d / "customer.json").read_text(encoding="utf-8")))
         except (json.JSONDecodeError, OSError):
             continue
     companies.sort(key=lambda c: c.get("name", "").lower())
@@ -184,15 +310,15 @@ def find_company_by_name(name: str) -> dict | None:
 
 
 def raw_path(case_id: str, ext: str) -> Path:
-    return raw_dir() / f"{case_id}.{ext}"
+    return case_dir(case_id, "raw") / f"{case_id}.{ext}"
 
 
 def analysis_path(case_id: str) -> Path:
-    return analysis_dir() / f"{case_id}.json"
+    return case_dir(case_id, "analysis") / f"{case_id}.json"
 
 
 def save_analysis(case_id: str, result: dict) -> None:
-    ensure_dirs()
+    require_owner(case_id)
     analysis_path(case_id).write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
 
 
@@ -213,11 +339,11 @@ def load_analysis(case_id: str) -> dict | None:
 # narrative is still the best answer available.
 
 def analysis_job_path(case_id: str) -> Path:
-    return analysis_dir() / f"{case_id}.job.json"
+    return case_dir(case_id, "analysis") / f"{case_id}.job.json"
 
 
 def save_analysis_job(case_id: str, job: dict) -> dict:
-    ensure_dirs()
+    require_owner(case_id)
     job = dict(job, case_id=case_id, updated_at=datetime.now(timezone.utc).isoformat())
     analysis_job_path(case_id).write_text(
         json.dumps(job, indent=2, default=str), encoding="utf-8"

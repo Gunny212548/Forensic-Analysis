@@ -111,9 +111,12 @@ def _ago_key(iso: str) -> str:
     return iso or ""
 
 
-def build() -> dict:
-    manifests = storage.list_manifests()
-    companies = storage.list_companies()
+def build(company_id: str | None = None) -> dict:
+    """The Overview page - of one customer when `company_id` is given (each
+    read from that customer's own store), otherwise of all of them."""
+    manifests = storage.list_manifests(company_id)
+    all_companies = storage.list_companies()
+    companies = [c for c in all_companies if company_id in (None, c["company_id"])]
     now = datetime.now(TZ)
     today = now.date()
 
@@ -194,6 +197,9 @@ def build() -> dict:
     used_companies = {m.get("company_id") for m in manifests if m.get("company_id")}
     return {
         "generated_at": now.isoformat(),
+        # What the page is scoped to, and what it can be scoped to.
+        "company_id": company_id,
+        "customer_options": [{"company_id": c["company_id"], "name": c["name"]} for c in all_companies],
         "totals": {
             "cases": totals["cases"], "ready": totals["ready"],
             "processing": totals["queued"] + totals["processing"], "failed": totals["failed"],

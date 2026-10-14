@@ -16,6 +16,7 @@ const ACTION_EN = {
   unverified: 'Checked - no acquisition digest to compare',
   integrity_failed: 'INTEGRITY CHECK FAILED',
   processed: 'Processed',
+  relocated: "Moved into the customer's own store",
 }
 
 function detail(e) {
@@ -27,6 +28,7 @@ function detail(e) {
   if (e.action === 'derived') return `${(e.sources || []).length} source cases, ${fmtBytes(e.bytes)}`
   if (e.action === 'used_in_merge') return `merged into ${e.merged_into}`
   if (e.action === 'integrity_failed') return `expected ${e.expected}`
+  if (e.action === 'relocated') return `${e.from} → ${e.to}, digest unchanged`
   if (e.action === 'processed') return `${(e.rows ?? 0).toLocaleString()} rows, ${(e.flagged ?? 0).toLocaleString()} flagged`
   return e.purpose || e.note || ''
 }

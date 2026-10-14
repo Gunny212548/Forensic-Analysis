@@ -21,6 +21,7 @@ import duckdb
 from .. import config
 from . import intel
 from . import confidence
+from . import storage
 from .rule_meta import RULE_META
 from .rules import DENY_VERDICTS, RULE_LABELS, RULE_LEVEL
 from .severity import PATTERNS, level_of
@@ -69,16 +70,16 @@ CREATE TABLE IF NOT EXISTS escalations (
 """
 
 
-def db_dir() -> Path:
-    return Path(config.DATA_DIR) / "db"
-
-
 def db_path(case_id: str) -> Path:
-    return db_dir() / f"{case_id}.duckdb"
+    # In the case's customer store (storage.case_dir), never a shared folder.
+    return storage.case_dir(case_id, "db") / f"{case_id}.duckdb"
 
 
 def connect(case_id: str, read_only: bool = False) -> duckdb.DuckDBPyConnection:
-    db_dir().mkdir(parents=True, exist_ok=True)
+    if not read_only:
+        # A writable connection creates the file - only ever in an owner's store.
+        storage.require_owner(case_id)
+        db_path(case_id).parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db_path(case_id)), read_only=read_only)
     # Set on every connection, not just the ingest one, so a zone-less
     # timestamp means the same thing wherever it is cast (config.EVENT_TZ_*).

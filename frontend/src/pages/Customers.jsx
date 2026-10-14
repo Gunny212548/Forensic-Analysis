@@ -81,7 +81,15 @@ export default function Customers() {
               )}
               {data.customers.map((c) => (
                 <tr key={c.company_id || 'none'}>
-                  <td className={c.company_id ? 'cust-name' : 'cust-name muted'}>{c.name}</td>
+                  <td className={c.company_id ? 'cust-name' : 'cust-name muted'}>
+                    {c.company_id ? (
+                      <a href={`#/dashboard/${c.company_id}`} title="Open this customer's overview">
+                        {c.name}
+                      </a>
+                    ) : (
+                      c.name
+                    )}
+                  </td>
                   <td>
                     <span className={`cust-open${c.open ? ` tone-${c.open_severity || 'low'}` : ''}`}>{c.open}</span>{' '}
                     <span className="cell-sub">of {c.cases}</span>

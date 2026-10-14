@@ -15,7 +15,7 @@ const ROLE_EN = { sources: 'source', destinations: 'destination', accounts: 'acc
  *  Overview stories in Sprint 5 (IAI-65..70). Until then every tile shows a case / finding /
  *  review number from GET /api/overview - never a placeholder figure - and
  *  the table is the case list (IAI-20). */
-export default function Overview() {
+export default function Overview({ companyId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [sev, setSev] = useState('all')
@@ -23,12 +23,12 @@ export default function Overview() {
 
   const load = useCallback(async () => {
     try {
-      setData(await getOverview())
+      setData(await getOverview(companyId))
       setError('')
     } catch (err) {
       setError(err.message)
     }
-  }, [])
+  }, [companyId])
 
   useEffect(() => {
     load()
@@ -54,6 +54,7 @@ export default function Overview() {
   const t = data.totals
   const cs = data.case_severity
   const reviewedPct = t.reviewable ? Math.round(((t.reviewable - t.unreviewed) / t.reviewable) * 100) : 0
+  const scoped = (data.customer_options || []).find((c) => c.company_id === data.company_id)
 
   return (
     <section className="page ov">
@@ -61,11 +62,29 @@ export default function Overview() {
         <div>
           <h1>Security Operations Overview</h1>
           <div className="subtitle">
-            <span className="live-dot" /> {t.cases} cases · {t.customers} customers · updated{' '}
+            <span className="live-dot" /> {t.cases} cases ·{' '}
+            {scoped ? <>customer {scoped.name}</> : <>{t.customers} customers</>} · updated{' '}
             {ago(data.generated_at)}
           </div>
         </div>
         <div className="actions">
+          {/* Each customer's cases live in that customer's own store
+              (storage.py); this picks which store the page reads. */}
+          <select
+            className="ov-customer"
+            aria-label="Customer"
+            value={data.company_id || ''}
+            onChange={(e) => {
+              window.location.hash = e.target.value ? `#/dashboard/${e.target.value}` : '#/dashboard'
+            }}
+          >
+            <option value="">All customers</option>
+            {(data.customer_options || []).map((c) => (
+              <option key={c.company_id} value={c.company_id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
           <button type="button" className="secondary" onClick={load}>
             Refresh
           </button>

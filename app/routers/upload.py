@@ -72,8 +72,6 @@ async def upload_log(
     # FR-2.3: "fw.csv.gz" is a gzip'd CSV, a .zip is a bundle of logs.
     kind, compression = archive.detect(filename)
 
-    storage.ensure_dirs()
-
     # FR-2.1: every case belongs to exactly one customer, so an upload without
     # one is refused here and not only greyed out in the UI - the API is also
     # called by scripts (tests/check_parity.py).

@@ -57,8 +57,10 @@ export async function logout() {
 
 /** Everything the Overview page shows, aggregated server-side over all cases
  *  (app/services/overview.py). */
-export async function getOverview() {
-  return jsonOrThrow(await fetch('/api/overview'), 'Could not load the overview')
+/** All customers, or one customer's store when `companyId` is given. */
+export async function getOverview(companyId) {
+  const q = companyId ? `?company_id=${encodeURIComponent(companyId)}` : ''
+  return jsonOrThrow(await fetch(`/api/overview${q}`), 'Could not load the overview')
 }
 
 export async function listCases() {

@@ -34,7 +34,7 @@ def main() -> int:
     for m in storage.list_manifests():
         if (m.get("evidence") or {}).get("sha256"):
             continue
-        raws = sorted(storage.raw_dir().glob(f"{m['case_id']}.*"))
+        raws = sorted(storage.case_dir(m["case_id"], "raw").glob(f"{m['case_id']}.*"))
         (todo if raws else missing).append((m, raws[0] if raws else None))
 
     for m, raw in todo:

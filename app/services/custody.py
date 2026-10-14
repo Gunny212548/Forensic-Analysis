@@ -33,8 +33,7 @@ import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .. import config
-from . import hashchain
+from . import hashchain, storage
 
 CHUNK = 1024 * 1024
 
@@ -49,12 +48,9 @@ STANDARDS = [
 ]
 
 
-def custody_dir() -> Path:
-    return Path(config.DATA_DIR) / "custody"
-
-
 def custody_path(case_id: str) -> Path:
-    return custody_dir() / f"{case_id}.jsonl"
+    # In the case's customer store (storage.case_dir).
+    return storage.case_dir(case_id, "custody") / f"{case_id}.jsonl"
 
 
 def _now() -> str:
@@ -76,6 +72,7 @@ def entries(case_id: str) -> list[dict]:
 def record(case_id: str, action: str, actor: str, **details) -> dict:
     """Append one custody event to the hash-chained log (hashchain.py).
     Never rewrites earlier lines."""
+    storage.require_owner(case_id)
     return hashchain.append(custody_path(case_id), {"action": action, "actor": actor, **details})
 
 

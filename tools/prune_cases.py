@@ -23,6 +23,11 @@ budget of roughly one a minute. Freshness is the weakest signal here: a
 duplicate has identical *content* by definition, so the copy worth keeping is
 the one with work attached to it.
 
+**Duplicates are only ever looked for inside one customer's store.** Two
+customers holding the same bytes (one file, uploaded for each) are two
+customers' evidence, not a duplicate: pruning across stores would delete
+one customer's copy because another customer has one.
+
 A case whose raw file is missing is never touched - without it the case
 cannot be rebuilt, so it is the opposite of disposable.
 
@@ -55,10 +60,11 @@ def md5(path: Path) -> str:
 
 
 def case_files(data: Path, case_id: str) -> list[Path]:
-    """Every file belonging to one case, across all of DATA_DIR."""
+    """Every file belonging to one case, in its customer's store (`data`)."""
     found = [
         data / "cases" / f"{case_id}.json",
         data / "db" / f"{case_id}.duckdb",
+        data / "db" / f"{case_id}.duckdb.wal",
         data / "analysis" / f"{case_id}.json",
         # The map-reduce narrative job's progress sidecar, for cases whose
         # analysis was too large for a single model call.
@@ -83,28 +89,32 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    data = Path(config.DATA_DIR)
-    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    root = Path(config.DATA_DIR) / "customers"
+    groups: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
     orphans = 0
 
-    for manifest_path in sorted((data / "cases").glob("*.json")):
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        case_id = manifest["case_id"]
-        raws = list((data / "raw").glob(f"{case_id}.*"))
-        if not raws:
-            orphans += 1
-            continue
-        groups[(manifest.get("original_filename") or "?", md5(raws[0]))].append(
-            {
-                "case_id": case_id,
-                "uploaded_at": manifest.get("uploaded_at") or "",
-                "reviewed": (data / "review" / f"{case_id}.jsonl").exists(),
-                "analysed": (data / "analysis" / f"{case_id}.json").exists(),
-            }
-        )
+    stores = sorted(d for d in root.iterdir() if d.is_dir()) if root.is_dir() else []
+    for data in stores:
+        for manifest_path in sorted((data / "cases").glob("*.json")):
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            case_id = manifest["case_id"]
+            raws = list((data / "raw").glob(f"{case_id}.*"))
+            if not raws:
+                orphans += 1
+                continue
+            # The customer is part of the key: never a duplicate across stores.
+            groups[(data.name, manifest.get("original_filename") or "?", md5(raws[0]))].append(
+                {
+                    "case_id": case_id,
+                    "store": data,
+                    "uploaded_at": manifest.get("uploaded_at") or "",
+                    "reviewed": (data / "review" / f"{case_id}.jsonl").exists(),
+                    "analysed": (data / "analysis" / f"{case_id}.json").exists(),
+                }
+            )
 
     doomed: list[dict] = []
-    for (name, digest), members in sorted(groups.items()):
+    for (_customer, name, digest), members in sorted(groups.items(), key=lambda kv: kv[0]):
         if len(members) < 2:
             continue
         # Reviews first, then a cached analysis, then recency - see the
@@ -123,10 +133,10 @@ def main() -> int:
 
     freed = 0
     for m in doomed:
-        freed += sum(os.path.getsize(p) for p in case_files(data, m["case_id"]))
+        freed += sum(os.path.getsize(p) for p in case_files(m["store"], m["case_id"]))
 
     print(f"cases:            {sum(len(v) for v in groups.values())}")
-    print(f"distinct sources: {len(groups)}  (by filename + md5)")
+    print(f"distinct sources: {len(groups)}  (by customer + filename + md5)")
     print(f"duplicates:       {len(doomed)}")
     print(f"would free:       {freed / 1e9:.2f} GB")
     if orphans:
@@ -148,7 +158,7 @@ def main() -> int:
 
     removed = 0
     for m in doomed:
-        for p in case_files(data, m["case_id"]):
+        for p in case_files(m["store"], m["case_id"]):
             p.unlink()
         removed += 1
     print(f"\ndeleted {removed} cases, freed {freed / 1e9:.2f} GB")

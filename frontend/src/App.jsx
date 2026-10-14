@@ -85,7 +85,7 @@ export default function App() {
       />
 
       <main className="layout">
-        {page === 'dashboard' && <Overview />}
+        {page === 'dashboard' && <Overview companyId={param || null} />}
         {page === 'upload' && <Upload />}
         {page === 'customers' && <Customers />}
         {page === 'result' && param && <Result caseId={param} key={param} />}

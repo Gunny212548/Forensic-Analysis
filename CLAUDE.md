@@ -61,7 +61,7 @@ pipeline.process_case  (services/pipeline.py)
   then → rules.apply_rules() = SQL INSERT ... SELECT per rule
        → status=ready (or failed + error/traceback on the manifest)
 
-data/db/{case_id}.duckdb
+data/customers/{company_id}/db/{case_id}.duckdb   (gotcha #40)
   raw_events  every row, canonical typed columns
   findings    rule matches, joined back via row_id; lvl = Sigma level
               weight (gotcha #26)
@@ -119,13 +119,17 @@ ranks by accumulated risk score, not by case count: ranked by count, the
 benign admin account seen in every seeded case came out first (gotcha #16
 again).
 
-Storage layout under `DATA_DIR` (`/data`):
-`cases/` manifests (small JSON) · `companies/` one JSON per customer ·
-`db/` per-case DuckDB · `raw/` original
-uploaded files, compressed ones kept compressed (audit trail) · `analysis/` cached AI output · `tmp/` staging ·
-`intel/` threat-intel feed files (see gotcha #17) · `review/` append-only
-analyst decision logs, one JSONL per case (see gotcha #19) · `custody/`
-hash-chained chain-of-custody logs, one JSONL per case (gotcha #28) ·
+Storage layout under `DATA_DIR` (`/data`) - **one store per customer**
+since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything
+of that customer and nothing of anyone else's: `customer.json` the customer
+record · `cases/` manifests (small JSON) · `db/` per-case DuckDB · `raw/`
+original uploaded files, compressed ones kept compressed (audit trail) ·
+`analysis/` cached AI output · `review/` append-only analyst decision logs,
+one JSONL per case (see gotcha #19) · `custody/` hash-chained
+chain-of-custody logs, one JSONL per case (gotcha #28). Where older gotchas
+say `review/{case_id}.jsonl`, `raw/<case_id>.csv` and so on, read them as
+inside the case's customer store. Shared, because none of it is customer
+data: `intel/` threat-intel feed files (see gotcha #17) · `tmp/` staging ·
 `users.json` login accounts + `session_secret` (see *Login* below) ·
 `mcp/access.jsonl` hash-chained log of every MCP tool call (gotcha #38).
 
@@ -260,8 +264,8 @@ cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
-Numbered in the order they were written. #1-#29 run in order; #30-#39 were
-added on top of #29 newest-first, so they read #39, #38, #37 ... #30.
+Numbered in the order they were written. #1-#29 run in order; #30-#40 were
+added on top of #29 newest-first, so they read #40, #39, #38 ... #30.
 
 **1. DuckDB `executemany()` is catastrophically slow — never bulk-insert with it.**
 Benchmarked here at ~300 rows/sec (20k rows = 65 seconds); a 65k-row file
@@ -1004,6 +1008,52 @@ method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
 
+**40. Each customer's evidence is in its own store - and a merge used to
+mix two customers (2026-10-14).** The user's requirement: adding a customer
+creates that customer's database, and one customer's data is never put
+together with another's. `storage.py` now keeps everything of a case under
+`customers/<company_id>/` (layout above); `case_dir()` is the one place
+that answers "which store holds this case" (a `case_id -> company_id` map,
+looked up on disk on a miss and cached - a case never changes customer),
+and `db.py`, `review.py` and `custody.py` build their paths on it.
+
+- **A store per customer, not a DuckDB per customer.** One file for all of
+  a customer's cases would lock every one of them while one processes (one
+  writer per file; MCP readers get a lock error - gotcha #38), and one bad
+  file would take every case of that customer with it. The folder gives
+  the same separation without either.
+- **Adding a customer creates its store**; `save_manifest` puts a case into
+  the store its manifest names; a case with no customer cannot be written
+  (`UnownedCase`) - FR-2.1 already required one, now it is also where the
+  case lives. Ids are regex-checked before they become a path.
+- **The merge bug it found:** `POST /merge` accepted cases of different
+  customers and filed the result under the first one - two customers'
+  evidence concatenated into one file. Now 409.
+- **`prune_cases.py` dedupes inside one store only.** The store held the
+  same monsoon zip under SUMMIT and under Bigfish; deduping across stores
+  would have deleted one customer's evidence because another has a copy.
+- **Overview / case list take `?company_id=`** (the UI's customer select;
+  a customer row on the Customers page opens its overview). Unscoped, they
+  still list every customer - read store by store.
+- **Migration:** `tools/migrate_to_customers.py` (dry run; `--apply`) moves
+  each case's files with `os.replace` (a rename - bytes untouched), hashes
+  the raw file before and after against the acquisition digest, moves the
+  manifest last, and appends a `relocated` custody entry, so the chain
+  moves intact. Refuses while a case is queued/processing; idempotent.
+  **Until it has run the app refuses new customers and cases (503):** the
+  old customers are invisible, and "Bigfish" typed on the upload form
+  would have become a second Bigfish with a new id (tested both ways).
+- Not per customer yet: accounts (any user sees every customer - RBAC is
+  IAI-14, deferred by the user), and the MCP access log.
+
+Verified on a branch-built container, scratch store: corpus parity (67),
+gen_usecase (4), `tests/samples` (2), `check_mcp` (44) and the new
+`tests/check_customer_isolation.py` (22: stores created, the same bytes
+uploaded for two customers land in two stores, nothing outside them,
+scoped views, cross-customer merge 409, path-shaped ids refused). The
+production store, copied, migrated 8 cases / 3 customers: chains intact,
+digests unchanged, row counts equal to the manifests.
+
 **39. JSON is streamed, flattened and mapped like a CSV header - and a
 guess at a real Entra JSON export found nothing (2026-10-14, IAI-35).**
 `parsers.iter_json` used to `read()` the whole file, JSON-lines included,
@@ -1545,6 +1595,7 @@ docker compose up -d --build --force-recreate      # rebuild + restart
                                                    # (also rebuilds the UI)
 docker exec forensic-analyzer-forensic-analyzer-1 python tools/refresh_intel.py
 docker exec forensic-analyzer-forensic-analyzer-1 python tools/backfill_custody.py   # dry run; --apply
+docker exec forensic-analyzer-forensic-analyzer-1 python tools/migrate_to_customers.py   # dry run; --apply (gotcha #40)
 python tools/build_measurement_doc.py   # docs/measurement-method-th.pdf (Thai), rule tables
                                         # read from the code - rebuild after changing a rule/level
 docker exec -it forensic-analyzer-forensic-analyzer-1 \
@@ -1596,6 +1647,10 @@ Two more checks, each for its own layer:
 - **MCP server** - `tests/check_mcp.py` (44 checks), run in the container
   as its docstring shows, because the concurrent-writer check needs Linux
   `flock` (gotcha #38).
+- **Customer isolation** - `tests/check_customer_isolation.py <scratch>
+  --repo /app` (22 checks, gotcha #40); run it in the container the same
+  way as check_mcp. Run it after touching `storage.py`, any path helper or
+  a route that lists or merges cases.
 
 **`tests/check_parity.py` asserts it, so nobody has to read a table.** Until
 2026-09-15 every ingest change was validated by uploading files, curling
@@ -1754,7 +1809,8 @@ for `auth.log`), and the Azure sign-in export is
 `Logtest/2026-02/KM23 ITSupport_InteractiveSignIns_2026-06-04_2026-06-11.csv`.
 
 **Without Docker** the pipeline still runs on the host: `pip install duckdb`,
-set `DATA_DIR` to a scratch folder, then `storage.create_case(...)` +
+set `DATA_DIR` to a scratch folder, then `storage.create_company(...)` once
+(a case needs a customer - gotcha #40), `storage.create_case(..., company_id=)` +
 `pipeline.process_case(case_id, Path(file), kind)` per file. That
 reproduces the baseline anchors exactly except the intel rules
 (`R3003`-`R3006`), because `DATA_DIR/intel/` is empty - so `log_22_.csv`

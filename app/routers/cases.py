@@ -14,8 +14,10 @@ router = APIRouter(prefix="/api/cases", tags=["cases"])
 
 
 @router.get("")
-async def list_cases():
-    manifests = storage.list_manifests()
+async def list_cases(company_id: str | None = None):
+    if company_id is not None and storage.load_company(company_id) is None:
+        raise HTTPException(404, "Customer not found")
+    manifests = storage.list_manifests(company_id)
     for m in manifests:
         m["has_analysis"] = storage.load_analysis(m["case_id"]) is not None
     return manifests
@@ -31,7 +33,7 @@ async def get_case(case_id: str):
 
 def _raw_file(case_id: str):
     """The preserved original, whatever its extension (.csv, .log.gz, .zip)."""
-    found = sorted(storage.raw_dir().glob(f"{case_id}.*"))
+    found = sorted(storage.case_dir(case_id, "raw").glob(f"{case_id}.*"))
     return found[0] if found else None
 
 
@@ -206,6 +208,16 @@ async def merge_cases(request: Request, background_tasks: BackgroundTasks, body:
     if unknown:
         raise HTTPException(404, f"Case not found: {', '.join(unknown)}")
 
+    # One customer's evidence is never combined with another's - the merged
+    # case lives in exactly one customer's store (storage.py). This used to
+    # merge across customers and file the result under the first one.
+    owners = {m.get("company_id") for m in sources}
+    if len(owners) != 1 or None in owners:
+        raise HTTPException(409, "Cases of different customers cannot be merged")
+    company_id = owners.pop()
+    if body.get("company_id") not in (None, company_id):
+        raise HTTPException(409, "company_id must be the customer the cases belong to")
+
     # Only line logs for now. A CSV would contribute a header row per file
     # (and two log sources' exports need not even share a column set), and JSON
     # is either lines or one array - neither concatenates blindly.
@@ -237,19 +249,10 @@ async def merge_cases(request: Request, background_tasks: BackgroundTasks, body:
         ordered.append((key, ts_first, m))
     ordered.sort(key=lambda entry: entry[0])
 
-    company_id = body.get("company_id")
-    if company_id:
-        company = storage.load_company(company_id)
-        if company is None:
-            raise HTTPException(404, "Company not found")
-        company_name = company["name"]
-    else:
-        company_id = ordered[0][2].get("company_id")
-        company_name = ordered[0][2].get("company_name")
-    # FR-2.1 applies to a merged case too. Sources uploaded before customers
-    # were required may carry none, and then the caller has to name one.
-    if not company_id:
-        raise HTTPException(400, "A customer is required - pass company_id for the merged case")
+    company = storage.load_company(company_id)
+    if company is None:
+        raise HTTPException(404, "Company not found")
+    company_name = company["name"]
 
     names = [m.get("original_filename") or m["case_id"] for _, _, m in ordered]
     manifest = storage.create_case(
