@@ -267,8 +267,8 @@ cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
-Numbered in the order they were written. #1-#29 run in order; #30-#42 were
-added on top of #29 newest-first, so they read #42, #41, #40 ... #30.
+Numbered in the order they were written. #1-#29 run in order; #30-#43 were
+added on top of #29 newest-first, so they read #43, #42, #41 ... #30.
 
 **1. DuckDB `executemany()` is catastrophically slow — never bulk-insert with it.**
 Benchmarked here at ~300 rows/sec (20k rows = 65 seconds); a 65k-row file
@@ -913,9 +913,9 @@ which mappings to check.
   match (OpenSSH `auth.c` / `kex.c` / `session.c` / `packet.c`, Linux-PAM
   `pam_unix`, Broadcom KB 321910 for ESXi, FortiOS Log Message Reference),
   plus ESXi lines read as *observed* - real file, no published format
-  (gotcha #42). There is no Check Point profile: its export is not in the
-  corpus any more (see below), and a profile no file has tested is a guess
-  with a citation attached.
+  (gotcha #42). The Check Point SmartConsole export got its profile once
+  the real file was found again (gotcha #43); until then there was none,
+  because a profile no file has tested is a guess with a citation attached.
 - A documented profile still falls back **per field** when an export lacks
   a column (the UI names the field). `gen_usecase`'s `nightfall-firewall.csv`
   is exactly that: it has no `Category`, so its malware marker - written into
@@ -942,11 +942,11 @@ per-rule count identical to `tests/baseline.json`; 33 CSVs documented
 (31 PAN-OS - one with a guessed field - 1 Entra, 1 Exchange), 2 line logs
 documented, 28 unrecognised.
 
-**The Check Point benchmark is gone from the store.** *Real-world benchmark*
-below says it lives in `DATA_DIR/raw/<case_id>.csv`; on 2026-10-12 the
-store held 8 cases and none of them was it, and no copy was found under
-`D:/forensic system`. Recover the original export before relying on that
-section.
+**The Check Point benchmark was found again (2026-10-14):**
+`D:/logtest/Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv`, md5
+`1dd88109...` = the baseline entry. (On 2026-10-12 it was missing from the
+store and nobody looked outside `D:/forensic system`.) The store copy no
+longer exists - the store was reset - so `D:/logtest` is the copy.
 
 **28. Evidence is hashed when it arrives and re-hashed before every use
 (2026-10-12).** Until then nothing could show that the file analysed was the
@@ -1020,6 +1020,40 @@ standard (or "internal method", with the nearest framework named and the
 method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
+
+**43. Check Point's SmartConsole export is read by its documentation, and
+every case now says how much of its file was read (2026-10-14, IAI-31).**
+Profile `checkpoint-smartconsole`: the columns are sk144192's *display
+names* (Time, Action, Source, Destination, Service, Source User Name...),
+which is what a SmartConsole / SmartView log export writes. The guess had
+already mapped the same columns (gotcha #7 fixed the hard part), so the
+benchmark is unchanged - 45,209 / 45,201, R2001 42,223, R2003 42,223, R2004
+2,978, identical plain / `.gz` / `.zip` - but the case now cites the
+source, and two values are read on purpose:
+- `Key Install` (5 rows) is a VPN key exchange, not a traffic decision -
+  verdict NULL (the human SOC report on this file reads it the same way).
+  An empty vocabulary entry means "not a verdict"; the SQL path wraps the
+  CASE in `NULLIF(..., '')` so it agrees with `decode_row`.
+- `Detect` (IPS saw, did not block) stays `detect` - neither allow nor deny.
+- `Time` has no zone; SmartConsole writes the exporting computer's zone and
+  the file does not say which. Read as GMT+7, flagged timezone-unconfirmed,
+  and the profile note says so.
+
+**Coverage on every case** (`pipeline._coverage`, the AC "unparseable rows
+counted and reported" for CSV/JSON/logs): `mapping.coverage` = rows in the
+case, `not_loaded` (decoded but refused by the staging bulk load - it
+reads with `ignore_errors=true`, which skipped a bad row **silently** while
+the manifest still counted it; `_ingest_file` now returns rows actually
+loaded), `time_unparsed`, and per mapped field the rows carrying a value -
+the gotcha #7 query on every case. On the Check Point file: time / source /
+destination 45,209, verdict 45,204, service 45,198, account 0 ("empty in
+every row"). Corpus parity unchanged, so no file had been losing rows.
+
+Not done (no real file - IAI-85): `fwm logexport` (semicolon, field names)
+and Log Exporter (syslog `key="value"`). Sources found while researching:
+sk144192 (field <-> display name), R81 CLI Reference `fwm logexport`,
+R81.20 Log Exporter guide; Elastic's integration has Log Exporter test
+fixtures (license unchecked).
 
 **42. ESXi's auth.log is now read line for line - and its most important
 lines were the ones not read (2026-10-14, IAI-29).** On the SUMMIT
@@ -1764,20 +1798,17 @@ keeping, each of which was a bug in the checker before it was a feature:
   cause it; if `--update` ever reports 0 left untouched on a partial run,
   something is wrong.
 
-The Check Point benchmark is in the baseline but is not under `Logtest`, so
-checking it means pointing the script at a copy of
-`DATA_DIR/raw/<case_id>.csv` renamed back to
-`Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv`.
+The Check Point benchmark is in the baseline but is not under `Logtest`;
+check it with `python tests/check_parity.py D:/logtest` (gotcha #43).
 
 **Real-world benchmark.** A Check Point export was analysed alongside the
 human SOC report written from the same data ("Firewall Port Scanning &
 Implied Rule Bypass", Jun 2026). The source file is **not** under
 `d:\forensic system\Logtest` and searching there for it (by name, or by
-grepping for `171.6.30.201`) finds nothing - it is preserved in the audit
-trail as `DATA_DIR/raw/<case_id>.csv`, renamed to the case id, which is what
-`raw/` is for. Original name:
-`Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv`. The benchmark is still
-reproducible; don't conclude it is lost.
+grepping for `171.6.30.201`) finds nothing - it is at
+`D:/logtest/Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv` (since the
+store reset of 2026-10-14 the only copy; it used to be in the store's
+`raw/` too). The benchmark is reproducible; don't conclude it is lost.
 
 Every figure in that report reproduced
 exactly: 45,209 rows, 905 distinct services, 22,617 hits on the top service,

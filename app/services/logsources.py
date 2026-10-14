@@ -186,6 +186,51 @@ PROFILES: tuple[Profile, ...] = (
                "'Interrupted' in the CSV export.",
                "A sign-in has no firewall verdict; none is mapped."),
     ),
+    # IAI-31. A SmartConsole / SmartView "Export" of the Logs view: columns
+    # are the display names sk144192 gives each log field. Tested on the
+    # real export of CLAUDE.md's Real-world benchmark (D:/logtest, 45,209
+    # rows), whose figures the human SOC report also reproduced.
+    Profile(
+        id="checkpoint-smartconsole",
+        name="Check Point SmartConsole / SmartView log export",
+        docs=(
+            ("Check Point sk144192 - Description of Fields in Check Point Logs "
+             "(field name -> display name)",
+             "https://support.checkpoint.com/results/sk/sk144192"),
+        ),
+        signature=("Time", "Blade", "Action", "Origin", "Source", "Destination", "Service"),
+        fields={
+            # sk144192: time "Timestamp when the log was created".
+            "ts": ("Time",),
+            # src "Client source IP address"; the export writes the object
+            # name with the address in brackets - decode.extract_ip.
+            "srcip": ("Source",),
+            "dstip": ("Destination",),
+            "username": ("Source User Name", "User"),
+            # rule_action, display name "Action".
+            "verdict": ("Action",),
+            # The service *name* (http, FW1_ica_services); the export has no
+            # numeric port, so R2002 cannot fire and R2003 counts these
+            # instead (gotcha #8).
+            "app": ("Service",),
+        },
+        verdict_values={
+            "accept": "allow", "drop": "drop", "reject": "reject",
+            # IPS blocked it.
+            "prevent": "prevent",
+            # IPS saw it and let it pass.
+            "detect": "detect",
+            # A VPN key exchange (IKE), not a decision on traffic - the SOC
+            # report on this very export makes the same reading.
+            "key install": "",
+        },
+        notes=("The Time column carries no time zone: SmartConsole writes the "
+               "time in the zone of the computer that exported the log, which the "
+               "file does not record. It is read as GMT+7 and flagged "
+               "timezone-unconfirmed.",
+               "'Key Install' is a VPN key exchange, not a firewall verdict; none is mapped.",
+               "No numeric destination port is exported - Service is a name."),
+    ),
     Profile(
         id="exchange-message-trace",
         name="Exchange Online message trace",

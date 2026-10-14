@@ -80,22 +80,63 @@ function JsonNote({ stats, label }) {
   )
 }
 
+/** What of the file was actually read (pipeline._coverage, IAI-31): rows in
+ *  the case, rows the bulk load refused, timestamps that did not parse, and
+ *  per mapped field how many rows carry a value - the "0 findings: schema
+ *  mismatch or a boring log?" question (gotcha #7) answered on the page. */
+function CoverageNote({ cov, label }) {
+  if (!cov) return null
+  const n = (v) => (v ?? 0).toLocaleString()
+  const fields = Object.entries(cov.fields || {})
+  const problem = cov.not_loaded > 0 || cov.time_unparsed > 0
+  return (
+    <div className={`map-note${problem ? ' map-warn' : ''}`}>
+      {label}
+      {n(cov.rows)} rows read.
+      {cov.not_loaded > 0 && (
+        <>
+          {' '}
+          <strong>{n(cov.not_loaded)} decoded rows could not be loaded</strong> and are not in the case.
+        </>
+      )}
+      {cov.time_unparsed > 0 && <> {n(cov.time_unparsed)} rows have a timestamp that could not be read.</>}
+      {fields.length > 0 && (
+        <div className="map-sub">
+          Rows with a value, per mapped field:{' '}
+          {fields
+            .map(([f, c]) => `${FIELD_EN[f] || f} ${n(c)}${c === 0 ? ' (empty in every row)' : ''}`)
+            .join(' · ')}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function One({ mapping, name }) {
   if (!mapping) return null
   const label = name ? <strong>{name}: </strong> : null
-  const json = mapping.json ? <JsonNote stats={mapping.json} label={label} /> : null
+  const notes = (
+    <>
+      {mapping.json && <JsonNote stats={mapping.json} label={label} />}
+      <CoverageNote cov={mapping.coverage} label={label} />
+    </>
+  )
 
   if (mapping.method === 'unrecognised') {
     return (
-      <div className="map-note map-warn">
-        {label}No documented log format was recognised in this file. Only timestamps and IP
-        addresses were extracted, so no detection rule can fire on it.
-      </div>
+      <>
+        <div className="map-note map-warn">
+          {label}No documented log format was recognised in this file. Only timestamps and IP
+          addresses were extracted, so no detection rule can fire on it.
+        </div>
+        {notes}
+      </>
     )
   }
 
   if (mapping.line_profiles) {
     return (
+      <>
       <div className="map-note">
         {label}Read with documented message formats:{' '}
         {mapping.line_profiles
@@ -113,6 +154,8 @@ function One({ mapping, name }) {
           : '.'}
         <Docs docs={mapping.line_profiles.flatMap((p) => p.docs)} />
       </div>
+      {notes}
+      </>
     )
   }
 
@@ -136,7 +179,7 @@ function One({ mapping, name }) {
           ))}
           <Docs docs={mapping.docs} />
         </div>
-        {json}
+        {notes}
       </>
     )
   }
@@ -150,7 +193,7 @@ function One({ mapping, name }) {
         {mapping.json ? 'fields' : 'columns'} were guessed from their names. Verify the mapping before
         relying on the findings: {fieldList(mapping.fields) || 'no column was recognised'}.
       </div>
-      {json}
+      {notes}
     </>
   )
 }

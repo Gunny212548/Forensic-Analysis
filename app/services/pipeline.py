@@ -218,8 +218,10 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> tuple[int, dict | None]:
         profile.verdict_values if profile and profile.verdict_values else decode.VERDICT_ALIASES)
     verdict_expr = (
         "NULL" if verdict_col == "NULL" else
-        f"CASE lower(trim({verdict_col})) {verdict_whens} "
-        f"ELSE lower(trim({verdict_col})) END"
+        # NULLIF: a vocabulary entry of "" means "not a verdict" (Check
+        # Point's "Key Install"), the same None decode_row gives it.
+        f"NULLIF(CASE lower(trim({verdict_col})) {verdict_whens} "
+        f"ELSE lower(trim({verdict_col})) END, '')"
     )
 
     # Sign-in outcome -> the semantic `action` the R1xxx/R2000 auth rules
@@ -351,6 +353,40 @@ def _next_row_id(con) -> int:
     return con.execute("SELECT coalesce(max(row_id) + 1, 0) FROM raw_events").fetchone()[0]
 
 
+# Canonical mapped field -> the raw_events column it lands in.
+_FIELD_COLUMN = {"ts": "ts", "srcip": "srcip", "dstip": "dstip", "dstport": "dstport",
+                 "username": "username", "verdict": "verdict", "app": "app", "risk": "risk",
+                 "bytes_sent": "bytes_sent", "category": "category", "auth_status": "action"}
+
+
+def _coverage(con, start: int, written: int, mapping: dict) -> int:
+    """What of this file actually got read (IAI-31 - "unparseable rows
+    counted and reported, not silently dropped"), put on its mapping:
+
+    - `rows` in the case, and `not_loaded`: rows decoded but refused by the
+      bulk load (the staging read skips a row it cannot type) - nothing
+      reported that before;
+    - `time_unparsed`: rows with a timestamp text that did not parse;
+    - `fields`: per mapped field, how many rows carry a value - the gotcha #7
+      query (`count(srcip)`...) run on every case instead of by hand.
+    Returns the rows actually in the case."""
+    fields = [f for f in (mapping.get("fields") or {}) if f in _FIELD_COLUMN]
+    counts = ", ".join(f"count({_FIELD_COLUMN[f]})" for f in fields)
+    row = con.execute(
+        "SELECT count(*), count(*) FILTER (WHERE ts IS NULL AND coalesce(ts_raw, '') <> '')"
+        + (f", {counts}" if counts else "") + " FROM raw_events WHERE row_id >= ?",
+        [start],
+    ).fetchone()
+    loaded = row[0]
+    mapping["coverage"] = {
+        "rows": loaded,
+        "not_loaded": max(0, written - loaded),
+        "time_unparsed": row[1],
+        "fields": dict(zip(fields, row[2:])),
+    }
+    return loaded
+
+
 def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
                  report=_noop, expected_bytes: int | None = None) -> tuple[int, bool, dict]:
     """Decode one file into raw_events with row ids from `start`.
@@ -362,7 +398,7 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
         try:
             added, mapping = _ingest_csv_sql(con, path, start)
             if added >= 0:
-                return added, False, mapping
+                return _coverage(con, start, added, mapping), False, mapping
         except Exception:  # noqa: BLE001
             log.warning("case %s: SQL CSV ingest failed for %s, falling back", case_id,
                         path.name, exc_info=True)
@@ -395,7 +431,7 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
                 """,
                 [str(stage_path)],
             )
-        return total, truncated, mapping
+        return _coverage(con, start, total, mapping), truncated, mapping
     finally:
         stage_path.unlink(missing_ok=True)
 
