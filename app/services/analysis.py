@@ -515,6 +515,12 @@ def _to_ollama(payload: dict) -> dict:
         "model": payload["model"],
         "messages": payload["messages"],
         "stream": False,
+        # Thinking-capable models (qwen3.5, gemma4) otherwise reason first and
+        # that reasoning counts against num_predict: gemma4:12b spent all 2400
+        # tokens thinking and returned empty content (finish "length"). The
+        # "/no_think" line in the prompt is a Qwen convention other families
+        # ignore; this is the API switch. Accepted by non-thinking models too.
+        "think": False,
         "options": {
             "temperature": payload.get("temperature", 0.2),
             "num_predict": payload.get("max_tokens", config.MAX_COMPLETION_TOKENS),

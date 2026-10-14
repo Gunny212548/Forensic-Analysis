@@ -1251,6 +1251,30 @@ values). Also pulled on the host: `gemma4:12b-it-qat`, `gemma4:e4b`,
   `tests/gen_usecase.py` before trusting the local settings.
 - A 7B model is weaker: on the ESXi case it wrote an attack chain with
   Execution / Defense Evasion / Discovery stages no finding supports.
+- **Thinking models need `"think": false`** (`analysis._to_ollama`).
+  qwen3.5 and gemma4 reason before answering and that reasoning counts
+  against `num_predict`: gemma4:12b spent all 2400 tokens thinking and
+  returned empty content (502, finish `length`) on both runs. The prompt's
+  `/no_think` is a Qwen convention the others ignore. Non-thinking models
+  accept the flag (checked on qwen2.5).
+
+**Local model benchmark (2026-10-12, `tests/bench_llm.py`, 3 runs each,
+thinking off).** gen_usecase's two files zipped into one case, graded
+against tests/README.md's ground truth:
+
+| model | ok | avg s | expected stages hit (of 6) | unsupported stages | invented ATT&CK ids |
+|---|---|---|---|---|---|
+| qwen2.5:7b-instruct (current) | 3/3 | 21 | 2.0 | 5 | 3 |
+| **qwen3.5:9b** | 3/3 | 54 | 3.0 | **0** | **0** |
+| gemma4:e4b | 3/3 | 19 | **4.3** | 3 | 4 (T1021.001 RDP) |
+| gemma4:12b-it-qat | 3/3 | 93 | 3.7 | 1 | 2 (T1073.003) |
+
+All named the four planted entities every run and none put the benign
+10.10.1.9 into the chain. qwen3.5:9b is the only one that never invented a
+stage or a technique - the property that matters most when the narrative
+goes into an evidence report - but it overruns the 6-entry timeline cap
+(up to 13) and used up to 2,164 of the 2,400 completion tokens. n=3 on one
+synthetic case: a lead, not a verdict.
 - Case data no longer leaves the machine for the narrative - which also
   settles the confidentiality question NIST AI RMF GOVERN raises.
 
