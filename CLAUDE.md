@@ -54,7 +54,7 @@ pipeline.process_case  (services/pipeline.py)
   progress → manifest `progress: {stage, pct, estimated}` about once a
          second (FR-2.5; ingest 0-90, intel 90-92, rules 92-100). Measured
          for line logs/JSON (bytes read), zip members and rules. The CSV fast
-         path is ONE DuckDB statement and 1.1.3 has no query_progress(), so
+         path is ONE DuckDB statement and 1.1.3 had no query_progress(), so
          its share is an elapsed-time estimate at ~60 MB/s, held at 95% of
          the file, flagged `estimated` (the UI prefixes "~"). Manifests are
          now written tmp-then-rename, since they are rewritten while polled.
@@ -1064,8 +1064,15 @@ Validated in a container built from the branch on a scratch store, not on
 the host: the host has DuckDB 1.5.5 (the image pins 1.1.3), and under 1.5.5
 `intel.fill()`'s `read_csv` no longer sniffs the quotes in the IOC staging
 file (a ThreatFox note with commas, line 39,302) and every case fails.
-Not hit in the image - but it will be on the next DuckDB bump unless that
-call states `quote`/`escape`.
+**Fixed the same day by the upgrade to DuckDB 1.5.6** (image and
+`requirements.txt`): `intel.fill()` now states the dialect it wrote
+(`auto_detect=false`, `delim`, `quote`, `escape`), as the stage read in
+`pipeline` already did. Verified on 1.5.6 in a container: corpus parity
+(67 files), gen_usecase, `tests/samples` and `check_mcp` (44) all OK; a case
+DuckDB written by 1.1.3 opens in 1.5.6 and one written by 1.5.6 opens in
+1.1.3, so a rollback reads the files written meanwhile. 1.5.6 has
+`connection.query_progress()`, so the CSV fast path's elapsed-time estimate
+(FR-2.5) could become a measurement - not done yet.
 
 **38. Cases are readable over MCP - read-only, stdio, every call logged
 (2026-10-14).** `app/mcp_server.py` is a Model Context Protocol server

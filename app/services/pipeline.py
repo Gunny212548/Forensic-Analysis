@@ -44,8 +44,8 @@ _STAGE_COLUMNS = {
 INGEST_END = 90
 INTEL_END = 92
 
-# The CSV fast path is ONE DuckDB statement and DuckDB 1.1.3 has no
-# query_progress(), so its share is estimated from elapsed time against the
+# The CSV fast path is ONE DuckDB statement, and DuckDB 1.1.3 - which this
+# was written for - had no query_progress(), so its share is estimated from elapsed time against the
 # measured CSV rate (~77 MB/s on the host, CLAUDE.md scale notes) - set a
 # little lower so the estimate trails reality - and held at 95% of the file
 # until the statement returns. The manifest marks it `estimated` so the UI

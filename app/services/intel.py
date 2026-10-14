@@ -287,6 +287,11 @@ def fill(con) -> int:
     if staging is None or not count:
         return 0
 
+    # The dialect is stated, not sniffed: build_staging() wrote this file with
+    # csv.writer, so it is known. Sniffing guessed it right on DuckDB 1.1.3 and
+    # wrong on 1.5.x - the first quoted field (a ThreatFox note with commas)
+    # sits past the sniffer's sample, so it chose no quote character and every
+    # case failed on that row (CLAUDE.md gotcha #39).
     # Measured on the largest case (65,534 rows): 13ms to read the CSV and
     # semi-join it. A Parquet copy was tried and dropped - it saved 5ms per
     # case, which is noise next to the upload itself, and cost a second
@@ -296,7 +301,8 @@ def fill(con) -> int:
         INSERT INTO ioc
         SELECT * FROM read_csv(?, header=false, nullstr='',
                                columns={'value': 'VARCHAR', 'type': 'VARCHAR',
-                                        'source': 'VARCHAR', 'note': 'VARCHAR'})
+                                        'source': 'VARCHAR', 'note': 'VARCHAR'},
+                               auto_detect=false, delim=',', quote='"', escape='"')
         WHERE value IN (SELECT srcip FROM raw_events WHERE srcip IS NOT NULL
                         UNION
                         SELECT dstip FROM raw_events WHERE dstip IS NOT NULL)
