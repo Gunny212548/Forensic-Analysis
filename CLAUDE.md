@@ -267,8 +267,8 @@ cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
-Numbered in the order they were written. #1-#29 run in order; #30-#44 were
-added on top of #29 newest-first, so they read #44, #43, #42 ... #30.
+Numbered in the order they were written. #1-#29 run in order; #30-#45 were
+added on top of #29 newest-first, so they read #45, #44, #43 ... #30.
 
 **1. DuckDB `executemany()` is catastrophically slow — never bulk-insert with it.**
 Benchmarked here at ~300 rows/sec (20k rows = 65 seconds); a 65k-row file
@@ -1020,6 +1020,25 @@ standard (or "internal method", with the nearest framework named and the
 method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
+
+**45. A FortiGate session that ended normally is an allowed session
+(2026-10-14, IAI-32).** `decode._forti_verdict`: the traffic-log `action`
+values of an allowed session - `accept`, and the session-end values
+`close`, `timeout`, `client-rst`, `server-rst`, plus `start` - become
+`allow` (FortiOS Log Message Reference, traffic log fields). Before, only
+`accept` did, so the allow-based rules (R3000, R3001, R2004, R2007 where it
+filters) did not see the rest. Other values keep their spelling.
+
+Real files: `D:/Trafficlog/` - a FortiGate-200F's traffic logs (`tlog`
+only, 46 files, 45.8 GB; the zips hold more of the same plus network-
+diagram PDFs). The header carries `device_id=`, not `devid=`.
+- 23 MB file (25,876 rows): allow 5,955 -> 8,027; R2004 251 -> 512, every
+  other rule equal; plain / .gz / .zip identical; 0 lines unrecognised.
+- 931 MB file (1,003,143 rows): R2004 9,477 -> 14,700, all else equal;
+  41 s = 22.6 MB/s on the Python path (gotcha #18's ~21 MB/s), so a 10 GB
+  file is ~7-8 minutes.
+- No FortiGate file is in the corpus, so parity (67 + Check Point +
+  gen_usecase + samples) is unchanged by construction.
 
 **44. The syslog header is read by RFC 5424 / RFC 3164 - and an RFC 3164
 year is inferred, and says so (2026-10-14, IAI-34).** `decode.decode_line`

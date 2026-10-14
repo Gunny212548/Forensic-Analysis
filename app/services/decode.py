@@ -460,6 +460,19 @@ def _blank_event() -> dict:
     }
 
 
+# FortiGate traffic-log `action` values (FortiOS Log Message Reference,
+# traffic log fields). Session-end values of an allowed session are an
+# allow; anything not listed keeps its own spelling (normalize_verdict).
+_FORTI_ALLOW = {"accept", "close", "timeout", "client-rst", "server-rst", "start"}
+
+
+def _forti_verdict(action: str | None) -> str | None:
+    v = (action or "").strip().lower()
+    if v in _FORTI_ALLOW:
+        return "allow"
+    return normalize_verdict(action)
+
+
 def _decode_fortigate(line: str) -> dict:
     event = _blank_event()
     event["raw"] = line[:2000]
@@ -477,7 +490,7 @@ def _decode_fortigate(line: str) -> dict:
     event["srcip"] = extract_ip(kv.get("srcip"))
     event["dstip"] = extract_ip(kv.get("dstip"))
     event["dstport"] = kv.get("dstport")
-    event["verdict"] = normalize_verdict(kv.get("action"))
+    event["verdict"] = _forti_verdict(kv.get("action"))
     # service= is on effectively every traffic row; app= only appears on a
     # minority (application-control-inspected sessions) but is the more
     # specific signal when present.
