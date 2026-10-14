@@ -64,6 +64,7 @@ out.update({
     "benign_in_chain": "10.10.1.9" in chain_text,
     "timeline_n": len(a.get("timeline") or []),
     "recs_n": len(a.get("recommendations") or []),
+    "grounding_unsupported": [(u["kind"], u["value"]) for u in (meta.get("grounding") or {}).get("unsupported", [])],
     "summary": (a.get("summary") or "")[:400],
 })
 print(json.dumps(out, ensure_ascii=False))

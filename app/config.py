@@ -109,6 +109,12 @@ MAX_COMPLETION_TOKENS = int(os.environ.get("MAX_COMPLETION_TOKENS", "950"))
 OLLAMA_MAX_EVENTS_FOR_ANALYSIS = int(os.environ.get("OLLAMA_MAX_EVENTS_FOR_ANALYSIS", "50"))
 OLLAMA_MAX_COMPLETION_TOKENS = int(os.environ.get("OLLAMA_MAX_COMPLETION_TOKENS", "2400"))
 OLLAMA_MAP_COMPLETION_TOKENS = int(os.environ.get("OLLAMA_MAP_COMPLETION_TOKENS", "600"))
+# Reproducible narrative (grounding.py): greedy decoding with a fixed seed, so
+# the same case, model and prompt give the same text - an evidence report
+# that changes on every click cannot be cited. Verified on Ollama 0.34.1:
+# two runs at temperature 0 / seed 42 were byte-identical.
+OLLAMA_TEMPERATURE = float(os.environ.get("OLLAMA_TEMPERATURE", "0"))
+OLLAMA_SEED = int(os.environ.get("OLLAMA_SEED", "42"))
 
 # --- map-reduce narrative (large cases only) -------------------------------
 # A case with more distinct findings than MAX_EVENTS_FOR_ANALYSIS cannot be

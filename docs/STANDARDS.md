@@ -57,8 +57,8 @@ Stated plainly so the claims stay accurate:
 
 ## The AI narrative and NIST AI RMF 1.0
 
-The model (a local Ollama model - `qwen2.5:7b-instruct` since 2026-10-12;
-Groq-hosted qwen before) writes prose only. Everything a reader could act on
+The model (a local Ollama model - `qwen3.5:9b` since 2026-10-14,
+`qwen2.5:7b-instruct` from 2026-10-12; Groq-hosted qwen before) writes prose only. Everything a reader could act on
 is computed without it. How that maps onto the RMF's four functions -
 aligned with, not certified against:
 
@@ -69,10 +69,16 @@ aligned with, not certified against:
 - **MAP** - the model is given computed facts: rule-tagged ATT&CK ids,
   Sigma levels, source profiles, risk ranking and the VERIS classification,
   and told not to re-grade or reclassify them (CLAUDE.md gotcha #13).
-- **MEASURE** - each analysis records model, finish reason, token usage
-  and missing keys in `_meta`. The prompt settings were chosen by graded
-  sweeps against ground truth for the *Groq* model (gotcha #5); the local
-  model's settings have **not** been swept yet - a gap.
+- **MEASURE** - each analysis records model, finish reason, token usage,
+  missing keys, temperature, seed and the SHA-256 of its prompt and schema
+  in `_meta`; the same case gives the same narrative (CLAUDE.md gotcha #37).
+  `_meta.grounding` lists every address, technique id, e-mail, date or
+  stage the prose states that its input did not contain. Graded against
+  ground truth with `tests/bench_llm.py` (local models) and the gotcha #5
+  sweeps (Groq).
+- **MAP (constraint)** - with the local model the response is decoded
+  inside a per-case JSON schema: technique ids, ATT&CK stages, timestamps,
+  levels, addresses and targets can only be values the evidence contains.
 - **MANAGE** - the attack graph, severity, confidence, VERIS record and all
   exports are produced without the model, so an AI outage or a bad answer
   removes the prose, never the findings.

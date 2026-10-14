@@ -989,6 +989,60 @@ method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
 
+**37. The narrative is schema-constrained to the case's own evidence, and
+its input is deterministic (2026-10-14).** Telling the model "use only the
+rule engine's ids" was measured not to be enough: qwen3.5:9b invented
+T1076 / T1552.004 / T1059 and an Execution stage in 3 runs - while the old
+schema line literally said "infer from context". `grounding.py` now:
+
+- **Builds a JSON schema per call** from what the prompt carries: technique
+  ids (from the events' `mitre`, plus `T1078` / Initial Access for a
+  `credential-compromise` escalation), stages = their ATT&CK tactics
+  (`rule_meta.TACTICS`), timestamps, levels, addresses and entities as
+  enums; caps 4 stages / 6 timeline / 3 recommendations; maxLength on free
+  text (a constrained string has no natural end - a `target` ran to a
+  paragraph in testing). Ollama 0.34.1 structured outputs (`format` =
+  schema) decode inside it, so an off-evidence id cannot be generated.
+  Map batches get the same treatment per batch. Groq gets no schema.
+- **Checks the free text afterwards** (`_meta.grounding`): any IP (CIDR
+  accepted if it covers a prompt IP), technique id (a parent of a supplied
+  sub-technique is fine), e-mail, ISO date or distinctive stage name that
+  the user prompt does not contain. Shown as a warning on the case, not
+  removed. Execution/Discovery/Collection/Impact are not checked in prose -
+  as English words they would flag everything.
+- **Records** temperature 0, seed 42, SHA-256 of prompt and schema, and the
+  allowed ids/stages in `_meta.reproducibility`.
+
+**The evidence the model saw was random - found while testing this.** Two
+runs of one case at temperature 0 / seed 42 differed. Ollama was not the
+cause (identical requests were byte-identical, even across a model unload);
+the prompt was. `top_distinct_findings`, `collapsed_findings`,
+`risk_scores` and `source_profiles` ordered by severity/count with no
+tiebreak, and `any_value()` picked any row's `descr`/`mitre`/`raw` - so 8
+builds of the monsoon prompt gave **8 different prompts and 6 different
+sets of events** at the top-50 cutoff. Now every such ORDER BY ends in a
+total tiebreak (rid, srcip, username / entity), `any_value` became
+`arg_min(..., row_id)` (the first occurrence), and `_chrono()` breaks
+timestamp ties. 8 builds -> 1 prompt on all three cases. Any new query that
+feeds the prompt needs the same.
+
+Measured (qwen3.5:9b, 3000 / 1200 tokens):
+- `tests/bench_llm.py` x3: 0 unsupported stages, 0 invented ids, 0
+  grounding warnings, the three runs byte-identical, 33 s (was 52 s).
+  Expected stages 3.0 of 6 - Persistence (R1004 is untagged) and Initial
+  Access are not reached; the schema allows Initial Access, the model did
+  not pick it.
+- Real cases, single call: ESXi / Palo Alto / monsoon all `stop`, 0
+  off-schema ids; ESXi twice -> byte-identical. Palo Alto map-reduce: 5
+  batches all `stop`, 140 s.
+- What it cannot catch: a wrong *relation* between real entities. The
+  bench summary says root was brute-forced "on 10.10.1.5" - both exist in
+  the case, the pairing is wrong. And the monsoon prose said "lateral
+  movement" before the stage-name check existed.
+- Allowed stages follow ATT&CK, not intuition: R2006 tags T1078, whose four
+  tactics include Persistence and Defense Evasion, so those are allowed on
+  the Entra/monsoon cases.
+
 **36. VERIS classification is computed, then handed to the model
 (2026-10-12).** `veris.py` builds a VERIS 1.4 incident record from the
 case's high/critical findings (none -> no record, `/veris` 409): Actor is

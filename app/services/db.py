@@ -175,6 +175,37 @@ def _escalation_map(con: duckdb.DuckDBPyConnection) -> dict[tuple, list[tuple[st
     }
 
 
+def escalation_paths(case_id: str) -> list[dict]:
+    """Each attack-path pattern that fired, once per path: the source (and,
+    for a credential compromise, the account) and the rules on it. Handed to
+    the narrative as a computed fact, so a stage like Initial Access has
+    evidence to point at instead of being inferred."""
+    if not db_path(case_id).exists():
+        return []
+    con = connect(case_id, read_only=True)
+    try:
+        exists = con.execute(
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'escalations'"
+        ).fetchone()[0]
+        if not exists:
+            return []
+        rows = con.execute(
+            """
+            SELECT e.pattern, r.srcip,
+                   CASE WHEN e.pattern = 'credential-compromise' THEN r.username END,
+                   list(DISTINCT e.rid ORDER BY e.rid)
+            FROM escalations e
+            JOIN raw_events r USING (row_id)
+            GROUP BY ALL
+            ORDER BY 1, 2, 3
+            """
+        ).fetchall()
+        return [{"pattern": p, "srcip": src, "username": user, "rules": list(rids)}
+                for p, src, user, rids in rows]
+    finally:
+        con.close()
+
+
 FINDING_SELECT = """
 SELECT r.row_id, r.ts, r.ts_raw, r.srcip, r.dstip, r.username, r.raw,
        f.rid, f.lvl, f.descr, f.mitre
@@ -326,8 +357,8 @@ def collapsed_findings(case_id: str) -> list[dict]:
             WITH grouped AS (
                 SELECT f.rid, r.srcip, r.username,
                        max(f.lvl)            AS lvl,
-                       any_value(f.descr)    AS descr,
-                       any_value(f.mitre)    AS mitre,
+                       arg_min(f.descr, r.row_id)    AS descr,
+                       arg_min(f.mitre, r.row_id)    AS mitre,
                        count(*)              AS cnt,
                        count(r.ts)           AS ts_parsed,
                        -- Chronological, from the parsed GMT+7 ts. Taking
@@ -341,7 +372,7 @@ def collapsed_findings(case_id: str) -> list[dict]:
                        max(r.ts)             AS ts_max,
                        min(coalesce(r.ts_raw, '')) AS ts_raw_first,
                        min(r.row_id)         AS sample_row_id,
-                       any_value(r.raw)      AS raw
+                       arg_min(r.raw, r.row_id)      AS raw
                 FROM findings f
                 JOIN raw_events r USING (row_id)
                 GROUP BY f.rid, r.srcip, r.username
@@ -360,7 +391,7 @@ def collapsed_findings(case_id: str) -> list[dict]:
             FROM grouped g
             LEFT JOIN entity_rules e
               ON coalesce(g.srcip, g.username) = e.entity
-            ORDER BY g.lvl DESC, g.cnt DESC
+            ORDER BY g.lvl DESC, g.cnt DESC, g.rid, g.srcip NULLS LAST, g.username NULLS LAST
             """
         ).fetchall()
         escalated = _escalation_map(con)
@@ -413,8 +444,8 @@ def top_distinct_findings(case_id: str, limit: int) -> list[dict]:
             """
             SELECT f.rid,
                    max(f.lvl)                AS lvl,
-                   any_value(f.descr)        AS descr,
-                   any_value(f.mitre)        AS mitre,
+                   arg_min(f.descr, r.row_id)        AS descr,
+                   arg_min(f.mitre, r.row_id)        AS mitre,
                    r.srcip, r.username,
                    count(*)                  AS cnt,
                    -- Chronological and zone-stamped, for the same reason as
@@ -423,11 +454,11 @@ def top_distinct_findings(case_id: str, limit: int) -> list[dict]:
                    min(r.ts)                 AS ts_min,
                    max(r.ts)                 AS ts_max,
                    min(coalesce(r.ts_raw, '')) AS ts_raw_first,
-                   any_value(r.raw)          AS raw
+                   arg_min(r.raw, r.row_id)          AS raw
             FROM findings f
             JOIN raw_events r USING (row_id)
             GROUP BY f.rid, r.srcip, r.username
-            ORDER BY max(f.lvl) DESC, count(*) DESC
+            ORDER BY max(f.lvl) DESC, count(*) DESC, f.rid, r.srcip NULLS LAST, r.username NULLS LAST
             LIMIT ?
             """,
             [limit],
@@ -473,13 +504,14 @@ def build_graph(case_id: str, limit: int = 14) -> dict:
                    f.rid,
                    max(f.lvl)                       AS lvl,
                    count(*)                         AS n,
-                   any_value(f.mitre)               AS mitre
+                   arg_min(f.mitre, r.row_id)               AS mitre
             FROM findings f
             JOIN raw_events r USING (row_id)
             WHERE r.srcip IS NOT NULL
               AND coalesce(r.dstip, r.username) IS NOT NULL
               AND r.srcip <> coalesce(r.dstip, r.username)
             GROUP BY r.srcip, coalesce(r.dstip, r.username), f.rid
+            ORDER BY 1, 2, 3
             """
         ).fetchall()
     finally:
@@ -582,7 +614,7 @@ def risk_scores(case_id: str, limit: int = 8) -> dict:
                        list(DISTINCT rid)   AS rules
                 FROM per_rule
                 GROUP BY entity
-                ORDER BY score DESC
+                ORDER BY score DESC, entity
                 LIMIT ?
                 """,
                 [limit],
@@ -636,7 +668,7 @@ def source_profiles(case_id: str, ips: list[str], limit: int = 20) -> list[dict]
             FROM raw_events
             WHERE srcip IN ({placeholders})
             GROUP BY srcip
-            ORDER BY count(*) DESC
+            ORDER BY count(*) DESC, srcip
             LIMIT ?
             """,
             [*ips, limit],

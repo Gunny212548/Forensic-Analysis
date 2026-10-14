@@ -209,10 +209,48 @@ export function AnalysisMeta({ meta }) {
           incomplete. Re-run the analysis or lower MAX_EVENTS_FOR_ANALYSIS.
         </div>
       )}
+      <Grounding grounding={meta.grounding} />
       <div className="meta-line">
         Analysed with {meta.provider}/{meta.model} · used {meta.events_analyzed}/{meta.events_total}{' '}
         events
+        {meta.reproducibility && (
+          <>
+            {' '}
+            · {meta.reproducibility.constrained ? 'schema-constrained' : 'not schema-constrained'}
+            {meta.reproducibility.seed != null &&
+              ` · temperature ${meta.reproducibility.temperature}, seed ${meta.reproducibility.seed}`}
+            {meta.grounding && ` · ${meta.grounding.checked} cited values checked`}
+          </>
+        )}
       </div>
     </>
+  )
+}
+
+const GROUNDING_KIND = { ip: 'address', technique: 'ATT&CK id', email: 'e-mail', date: 'date' }
+
+/** grounding.check() on the server: values the narrative states that were
+ *  not in the evidence it was given. Shown, not removed - the analyst decides
+ *  whether "10.8.1.0/24" style generalisations are fair. */
+function Grounding({ grounding }) {
+  if (!grounding || grounding.ok) return null
+  const seen = new Set()
+  const items = grounding.unsupported.filter((u) => {
+    const k = `${u.kind}|${u.value}`
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+  return (
+    <div className="meta-warn">
+      The narrative states {items.length} value{items.length === 1 ? '' : 's'} that the evidence it was
+      given does not contain - check before quoting it:{' '}
+      {items.map((u, i) => (
+        <span key={i}>
+          {i > 0 && ', '}
+          {GROUNDING_KIND[u.kind] || u.kind} <code>{u.value}</code>
+        </span>
+      ))}
+    </div>
   )
 }

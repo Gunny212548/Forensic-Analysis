@@ -593,6 +593,7 @@ async def _run_map_reduce_job(case_id: str, plan: dict) -> None:
             on_progress=progress,
             auto_retry_max_wait=analysis.BACKGROUND_RETRY_MAX_WAIT,
             veris=_veris_line(case_id),
+            escalations=db.escalation_paths(case_id),
         )
     except Exception as exc:  # noqa: BLE001 - the job owns its own failure
         storage.update_analysis_job(
@@ -673,6 +674,7 @@ async def analyze_case(case_id: str, background_tasks: BackgroundTasks, force: b
         result = await analysis.run_analysis(
             case_id, events, distinct_total, flagged, graph=graph,
             profiles=profiles, risk=risk, veris=_veris_line(case_id),
+            escalations=db.escalation_paths(case_id),
         )
     except analysis.AnalysisNotConfigured as exc:
         raise HTTPException(501, str(exc))

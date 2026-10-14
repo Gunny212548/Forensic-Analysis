@@ -14,6 +14,7 @@ from typing import Callable
 import httpx
 
 from .. import config
+from . import grounding
 
 SYSTEM_PROMPT = """You are a SOC / digital-forensics analyst assistant.
 You are given a chronological list of security events, already decoded and
@@ -39,7 +40,7 @@ emit under a "graph" key is discarded. Spend the budget on the narrative.
       "description": "what happened at this stage, referencing evidence",
       "timestamp_range": "earliest - latest timestamp for this stage",
       "confidence": "low|medium|high",
-      "mitre": ["MITRE ATT&CK technique IDs for this stage - REQUIRED, infer from context if the underlying events didn't already have one"]
+      "mitre": ["technique ids from the 'Techniques tagged by the rule engine' list only - [] if none of them fits"]
     }
   ],
   "recommendations": ["short actionable remediation/investigation steps"],
@@ -50,7 +51,7 @@ emit under a "graph" key is discarded. Spend the budget on the narrative.
       "severity": "the sev of the event(s) described, verbatim",
       "source_ip": "IP address if present, else null",
       "target": "user/host/asset targeted if identifiable, else null",
-      "mitre": ["MITRE ATT&CK technique IDs relevant to this event, e.g. T1110.001 - REQUIRED array, use [] only if truly none apply"]
+      "mitre": ["the technique ids the event itself carries - [] if it carries none"]
     }
   ]
 }
@@ -76,11 +77,11 @@ JSON.
 
 ALL top-level keys (summary, attack_chain, recommendations, timeline)
 are REQUIRED, even when a list ends up empty - never omit a key. Every
-timeline entry and every attack_chain stage MUST include a "mitre" array;
-infer plausible technique IDs from the event's nature (a repeated failed
-login is credential access / brute force, a port scan is discovery /
-active scanning, etc.) rather than leaving it empty when a technique clearly
-applies.
+timeline entry and every attack_chain stage MUST include a "mitre" array.
+Use ONLY technique ids listed under "Techniques tagged by the rule engine",
+and a stage ONLY if that list names it - never infer a technique or a stage
+the rule engine did not tag. An empty array is the right answer when no
+tagged technique fits; activity with no tag is described in words.
 
 IMPORTANT about risk ranking: you may also be given "Top risk entities" -
 each entity's accumulated finding severity across the whole case. Lead the
@@ -226,6 +227,14 @@ def _condense(e: dict) -> dict:
         if e.get("ts_last") and e.get("ts_last") != e.get("ts_first"):
             out["ts_last_seen"] = e["ts_last"]
     return out
+
+
+def _chrono(c: dict) -> tuple:
+    """Time order with a total tiebreak: entries sharing a timestamp must
+    still land in the same order every time, or the same case gives a
+    different prompt - and a different narrative - on every run."""
+    return (str(c.get("ts") or ""), str(c.get("rid") or ""),
+            str(c.get("srcip") or ""), str(c.get("user") or ""))
 
 
 _IP_LIKE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
@@ -409,9 +418,10 @@ def _build_prompt(
     profiles: list[dict] | None = None, risk: dict | None = None,
     digests: list[dict] | None = None, pool_size: int = 0,
     capped: bool = False, veris: str | None = None,
+    facts: "grounding.Facts | None" = None, escalations: list[dict] | None = None,
 ) -> tuple[str, int, int]:
     selected = [_condense(e) for e in events]
-    selected.sort(key=lambda c: str(c.get("ts") or ""))
+    selected.sort(key=_chrono)
 
     note = ""
     if digests:
@@ -484,6 +494,21 @@ def _build_prompt(
             "\n\nIncident classification, computed from the findings with the "
             "VERIS vocabulary (use it as given; do not reclassify):\n" + veris
         )
+    esc_text = grounding.escalations_block(escalations)
+    if esc_text:
+        prompt += (
+            "\n\nAttack-path escalations (computed by the rule engine from the "
+            "findings; each is evidence that the step it names happened):\n" + esc_text
+        )
+    if facts is not None:
+        # The ids the response schema allows, stated with their stage and the
+        # rules behind them - so an allowed id is never one the model has not
+        # been told the meaning of (grounding.py).
+        prompt += (
+            "\n\nTechniques tagged by the rule engine - the ONLY ids and stages "
+            "you may use (id - ATT&CK stage(s) (rules)):\n"
+            + (grounding.techniques_block(facts) or "  (none - leave every mitre array empty)")
+        )
     prompt += "\n\n/no_think"
     return prompt, (pool_size or len(selected)), flagged_total
 
@@ -522,12 +547,20 @@ def _to_ollama(payload: dict) -> dict:
         # ignore; this is the API switch. Accepted by non-thinking models too.
         "think": False,
         "options": {
-            "temperature": payload.get("temperature", 0.2),
+            # Greedy + fixed seed: the same case gives the same narrative
+            # (config.OLLAMA_TEMPERATURE). The 0.2 in the payload is Groq's.
+            "temperature": config.OLLAMA_TEMPERATURE,
+            "seed": config.OLLAMA_SEED,
             "num_predict": payload.get("max_tokens", config.MAX_COMPLETION_TOKENS),
             "num_ctx": config.OLLAMA_NUM_CTX,
         },
     }
-    if (payload.get("response_format") or {}).get("type") == "json_object":
+    if payload.get("_schema"):
+        # Structured outputs: Ollama compiles the schema into a grammar and
+        # decodes inside it, so an enum value is the only thing that can be
+        # written there (grounding.py).
+        body["format"] = payload["_schema"]
+    elif (payload.get("response_format") or {}).get("type") == "json_object":
         body["format"] = "json"
     return body
 
@@ -578,6 +611,9 @@ async def _chat(client, payload: dict, auto_retry_max_wait: float = AUTO_RETRY_M
         return _from_ollama(json.loads(resp.content.decode("utf-8")))
 
     headers = {"Authorization": f"Bearer {config.GROQ_API_KEY}"}
+    # Keys starting with "_" are ours (the grounding schema); Groq stays on
+    # plain JSON mode and only the after-the-fact check applies to it.
+    payload = {k: v for k, v in payload.items() if not k.startswith("_")}
     resp = await client.post(config.GROQ_API_URL, headers=headers, json=payload)
 
     if resp.status_code == 429:
@@ -647,11 +683,13 @@ def _system_prompt() -> str:
     prompt = SYSTEM_PROMPT
     budget = config.MAX_COMPLETION_TOKENS
     if budget >= _ROOMY_BUDGET:
+        # The entry caps (6 timeline, 4 stages, 3 recommendations) are no
+        # longer relaxed here: they are grounding.TIMELINE_CAP / CHAIN_CAP /
+        # RECS_CAP, enforced by the schema, and the prompt must state the
+        # same numbers the schema enforces.
         prompt = (
             prompt
             .replace("roughly 900 tokens", f"roughly {budget - 200} tokens")
-            .replace('"timeline": at most 6 entries', '"timeline": at most 12 entries')
-            .replace('"attack_chain": at most 4 stages', '"attack_chain": at most 6 stages')
             .replace("BE EXTREMELY CONCISE", "BE CONCISE")
         )
     return prompt
@@ -671,20 +709,30 @@ async def run_analysis(
     auto_retry_max_wait: float = AUTO_RETRY_MAX_WAIT,
     meta_extra: dict | None = None,
     veris: str | None = None,
+    escalations: list[dict] | None = None,
+    technique_events: list[dict] | None = None,
 ) -> dict:
     _preflight()
     if not events:
         raise AnalysisError("This case has no flagged events - nothing to analyze.")
 
+    facts = grounding.facts(
+        events, technique_events=technique_events, digests=digests, risk=risk,
+        profiles=profiles, escalations=escalations,
+    )
     prompt, sent_count, total_count = _build_prompt(
         case_id, events, distinct_total, flagged_total, profiles, risk,
         digests=digests, pool_size=pool_size, capped=capped, veris=veris,
+        facts=facts, escalations=escalations,
     )
+    system = _system_prompt()
+    schema = grounding.narrative_schema(facts)
 
     payload = {
         "model": config.LLM_MODEL,
+        "_schema": schema,
         "messages": [
-            {"role": "system", "content": _system_prompt()},
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
         "response_format": {"type": "json_object"},
@@ -746,6 +794,18 @@ async def run_analysis(
         "missing_keys": missing,
         "salvaged": salvaged,
         "usage": body.get("usage"),
+        # What the narrative could not see past, and whether it stayed inside
+        # it (grounding.py). `constrained` is false on Groq, which gets the
+        # check but not the schema.
+        "grounding": grounding.check(result, prompt),
+        "reproducibility": {
+            "constrained": _is_local(),
+            "temperature": config.OLLAMA_TEMPERATURE if _is_local() else payload["temperature"],
+            "seed": config.OLLAMA_SEED if _is_local() else None,
+            "prompt_sha256": grounding.digest(system, prompt),
+            "schema_sha256": grounding.digest(schema),
+            "allowed": {"techniques": sorted(facts.techniques), "stages": facts.stages},
+        },
     }
     if meta_extra:
         result["_meta"].update(meta_extra)
@@ -866,7 +926,7 @@ async def _run_map_call(
     failure: a case is not worth abandoning because batch 3 of 5 came back
     unparseable, and the reduce prompt says so explicitly."""
     condensed = [_condense(e) for e in events]
-    condensed.sort(key=lambda c: str(c.get("ts") or ""))
+    condensed.sort(key=_chrono)
     prompt = (
         f"Case ID: {case_id}\n"
         f"Batch {index} of {total} (this case has {flagged_total} flagged "
@@ -885,10 +945,17 @@ async def _run_map_call(
             "\n\nSource profiles (behaviour of each source across the whole "
             "case, not just this batch):\n" + _format_profiles(profiles)
         )
+    facts = grounding.facts(events, profiles=profiles)
+    prompt += (
+        "\n\nTechniques tagged by the rule engine in this batch - the ONLY ids "
+        "you may use:\n"
+        + (grounding.techniques_block(facts) or "  (none - leave every mitre array empty)")
+    )
     prompt += "\n\n/no_think"
 
     payload = {
         "model": config.LLM_MODEL,
+        "_schema": grounding.map_schema(facts),
         "messages": [
             {"role": "system", "content": MAP_SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
@@ -947,6 +1014,7 @@ async def run_map_reduce_analysis(
     on_progress: Callable[[str, int, int], None] | None = None,
     auto_retry_max_wait: float = AUTO_RETRY_MAX_WAIT,
     veris: str | None = None,
+    escalations: list[dict] | None = None,
 ) -> dict:
     """Narrate a case whose evidence does not fit one call.
 
@@ -1007,7 +1075,10 @@ async def run_map_reduce_analysis(
         case_id, chunks[0], distinct_total, flagged_total, graph=graph,
         profiles=profiles, risk=risk, digests=digests, pool_size=len(pool),
         capped=bool(plan.get("capped")), auto_retry_max_wait=auto_retry_max_wait,
-        meta_extra=meta_extra, veris=veris,
+        meta_extra=meta_extra, veris=veris, escalations=escalations,
+        # Every batch was read, so every technique in the pool is evidence
+        # the reduce call may cite - not just the batch it quotes.
+        technique_events=pool,
     )
     result["_meta"]["map_digests"] = digests
     return result
