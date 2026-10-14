@@ -94,7 +94,9 @@ GET  /api/rules[/{rid}]                      rule metadata: Sigma fields + ADS
                                              documentation (rule_meta.py)
 POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
                                              graph + SQL top-N distinct → the
-                                             LLM (Ollama now) for the narrative
+                                             LLM (Ollama now) for the narrative,
+                                             decoded inside a per-case JSON
+                                             schema + grounding check (#37)
 MCP (stdio, read-only)                       app/mcp_server.py - 12 tools over the
                                              same views; every call hash-chain
                                              logged to mcp/access.jsonl (#38)
@@ -174,8 +176,11 @@ frontend/src/
   pages/               Overview (#/dashboard) · Upload · Customers · Result · Login · Placeholder
                        (menu pages whose story is not built yet)
   components/          Sidebar (app shell, FR-0) · Workspace (case tabs)
-                       EventsTable · ReviewPanel
-                       AttackGraph · analysis.jsx (chain/timeline/risk/meta)
+                       EventsTable · ReviewPanel · Lifecycle (status workflow)
+                       RuleCard (Sigma/ADS) · Evidence (custody tab)
+                       Mapping (log source note) · Veris
+                       AttackGraph · analysis.jsx (chain/timeline/risk/meta,
+                       grounding warnings)
                        common.jsx (severity pill, status badge, MITRE tags)
 ```
 
@@ -254,6 +259,9 @@ cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
+Numbered in the order they were written. #1-#29 run in order; #30-#38 were
+added on top of #29 newest-first, so they read #38, #37, #36 ... #30.
+
 **1. DuckDB `executemany()` is catastrophically slow — never bulk-insert with it.**
 Benchmarked here at ~300 rows/sec (20k rows = 65 seconds); a 65k-row file
 took 3.5 minutes end-to-end. It's a per-row prepared-statement call. The
@@ -283,8 +291,9 @@ deliberately does not set `dstport` from SSH regex captures.
 
 **5. Groq output-token limits shape the whole prompt design.** *(Applies to
 `LLM_PROVIDER=groq`. Since 2026-10-12 the app runs a local Ollama model -
-see Environment / secrets; none of these limits bind it, and its settings
-have not been swept.)*
+see Environment / secrets; none of these limits bind it. Its output is
+graded by `tests/bench_llm.py` (#37), but its settings have not been swept
+the way this section's were.)*
 - **`qwen/qwen3.8-27b` is the only model now** — the gpt-oss branch (and its
   `reasoning_effort: "low"` workaround for hidden reasoning tokens) is gone.
   Everything below exists to make the schema fit qwen's budget.
@@ -1351,15 +1360,18 @@ What the data forced onto the Figma, measured on the same corpus:
 **The narrative LLM is local now (2026-10-12): `LLM_PROVIDER=ollama`,
 `OLLAMA_MODEL=qwen2.5:7b-instruct`, then `qwen3.5:9b` from 2026-10-14 (see
 below)** on the host's Ollama
-(`host.docker.internal:11434`), with `OLLAMA_MAX_EVENTS_FOR_ANALYSIS` 50 and
-`OLLAMA_MAX_COMPLETION_TOKENS` 2400 (`config.py` swaps these in for the Groq
-values). Also pulled on the host: `gemma4:12b-it-qat`, `gemma4:e4b`,
-`qwen3.5:9b`. Consequences:
+(`host.docker.internal:11434`). Settings in force (`.env` overrides; the
+`docker-compose.yml` defaults are still the qwen2.5 ones):
+`OLLAMA_MAX_EVENTS_FOR_ANALYSIS` 50, `OLLAMA_MAX_COMPLETION_TOKENS` 3000,
+`OLLAMA_MAP_COMPLETION_TOKENS` 1200, `OLLAMA_TEMPERATURE` 0 and
+`OLLAMA_SEED` 42 (config defaults - gotcha #37); `config.py` swaps these in
+for the Groq values. Also pulled on the host: `gemma4:12b-it-qat`,
+`gemma4:e4b`, `qwen2.5:7b-instruct`. Consequences:
 - **Gotcha #5's limits are Groq's** (1000 OTPM, 950 max_tokens, one
-  analysis a minute, 429 + Retry-After). They do not bind a local model, and
-  its event/token settings were **not** chosen by a graded sweep - #5's
-  sweep table is for `qwen/qwen3.8-27b` on Groq. Re-run that sweep against
-  `tests/gen_usecase.py` before trusting the local settings.
+  analysis a minute, 429 + Retry-After). They do not bind a local model.
+  The local settings are graded by `tests/bench_llm.py` against
+  gen_usecase's ground truth (below and #37), but the events / token
+  numbers were **not** swept the way #5 swept Groq's - that is still open.
 - A 7B model is weaker: on the ESXi case it wrote an attack chain with
   Execution / Defense Evasion / Discovery stages no finding supports.
 - **Thinking models need `"think": false`** (`analysis._to_ollama`).
@@ -1375,7 +1387,7 @@ against tests/README.md's ground truth:
 
 | model | ok | avg s | expected stages hit (of 6) | unsupported stages | invented ATT&CK ids |
 |---|---|---|---|---|---|
-| qwen2.5:7b-instruct (current) | 3/3 | 21 | 2.0 | 5 | 3 |
+| qwen2.5:7b-instruct (in use until 2026-10-14) | 3/3 | 21 | 2.0 | 5 | 3 |
 | **qwen3.5:9b** | 3/3 | 54 | 3.0 | **0** | **0** |
 | gemma4:e4b | 3/3 | 19 | **4.3** | 3 | 4 (T1021.001 RDP) |
 | gemma4:12b-it-qat | 3/3 | 93 | 3.7 | 1 | 2 (T1073.003) |
@@ -1396,8 +1408,10 @@ after the switch:
   qwen3.5 is clearly better on *stages* than qwen2.5 but not on technique
   ids. The likely cause is the schema itself: `"mitre": [... REQUIRED, infer
   from context if the underlying events didn't already have one]` asks the
-  model to invent. Restricting it to the ids the events carry is the
-  gotcha #13 fix and has not been made or measured yet.
+  model to invent. **Fixed the same day (gotcha #37):** the schema now
+  allows only the ids and stages the evidence carries, and the re-run gave
+  0 unsupported stages, 0 invented ids and three byte-identical runs in
+  33 s.
 - Three real cases, single call: all `stop`, 1,282-1,488 tokens, 42-49 s,
   no unsupported stage; on ESXi it called 10.9.3.91 a legitimate internal
   host (source profiles at work); on the monsoon zip it called 10.8.1.50 an
@@ -1430,6 +1444,10 @@ docker exec -it forensic-analyzer-forensic-analyzer-1 \
     python tools/create_user.py add you@example.com --name "..." --role analyst
 docker logs forensic-analyzer-forensic-analyzer-1 --tail 50
 
+# read-only MCP server for an MCP client (gotcha #38); every call is logged
+docker exec -i forensic-analyzer-forensic-analyzer-1 \
+    python -m app.mcp_server --actor you@example.com
+
 cd frontend && npm ci && npm run build   # UI only, straight into ../static
 cd frontend && npm run dev               # hot reload, /api proxied to 8091
 
@@ -1456,6 +1474,17 @@ known in advance (see `tests/README.md` for the expected counts). Run it
 after touching `decode.py`, `rules.py`, or the ingest pipeline - it catches
 both missed detections and false positives, and it is how the R2001 MITRE
 mis-tag below was found.
+
+Two more checks, each for its own layer:
+- **Narrative** - `python tests/bench_llm.py <scratch> qwen3.5:9b --runs 3`
+  (needs Ollama on localhost:11434): grades the AI narrative against the
+  same ground truth - expected stages, unsupported stages, invented ATT&CK
+  ids, grounding warnings. Run it after touching `analysis.py`,
+  `grounding.py` or anything that feeds the prompt; with the schema and
+  seed in place the three runs should be byte-identical (gotcha #37).
+- **MCP server** - `tests/check_mcp.py` (44 checks), run in the container
+  as its docstring shows, because the concurrent-writer check needs Linux
+  `flock` (gotcha #38).
 
 **`tests/check_parity.py` asserts it, so nobody has to read a table.** Until
 2026-09-15 every ingest change was validated by uploading files, curling
