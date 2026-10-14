@@ -267,8 +267,8 @@ cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
-Numbered in the order they were written. #1-#29 run in order; #30-#43 were
-added on top of #29 newest-first, so they read #43, #42, #41 ... #30.
+Numbered in the order they were written. #1-#29 run in order; #30-#44 were
+added on top of #29 newest-first, so they read #44, #43, #42 ... #30.
 
 **1. DuckDB `executemany()` is catastrophically slow — never bulk-insert with it.**
 Benchmarked here at ~300 rows/sec (20k rows = 65 seconds); a 65k-row file
@@ -1020,6 +1020,48 @@ standard (or "internal method", with the nearest framework named and the
 method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
+
+**44. The syslog header is read by RFC 5424 / RFC 3164 - and an RFC 3164
+year is inferred, and says so (2026-10-14, IAI-34).** `decode.decode_line`
+reads the envelope before any message format: an optional `<PRI>` (RFC
+5424 6.2.1 / 3164 4.1.1, facility = PRI // 8), then either an RFC 5424
+header (`1 TIMESTAMP HOST APP PROCID MSGID SD MSG`, nil `-`, STRUCTURED-DATA
+skipped with its `\]` escapes, BOM stripped) or a timestamp + `host
+prog[pid]:` (gotcha #3's split). What it fixed, each measured:
+- **An ISO timestamp with an offset lost the whole header.** `_ISO_TS_RE`
+  took `Z` or nothing, so rsyslog's RSYSLOG_FileFormat
+  (`2026-01-10T13:13:32.123456+07:00 host prog:`) matched no timestamp,
+  no host and no program, and no message format could fire.
+- **A `<PRI>` prefix did the same** - every network-received syslog line.
+- **Old Red Hat's `sshd(pam_unix)[pid]:`** was no program token: Loghub's
+  `Linux_2k.log` (real, 2,000 lines) gave 0 findings; now 361 (R1000 361,
+  R2000 356, R2005 239). The `(module)` part is dropped for the lookup.
+- **RFC 3164 has no year**, and `parse_ts` deliberately returned None, so
+  every such file had no timestamps at all (Loghub OpenSSH_2k: 1,123
+  findings, 0 times - no timeline, no window rule). Now
+  `decode.infer_year` puts it in the year of the case's upload time
+  (`REFERENCE_TIME`, a contextvar the pipeline sets around decoding), or
+  the year before when that is more than a day ahead (Dec 10 in a file
+  uploaded in October -> last year) - the rsyslog / Logstash practice.
+  **It is a guess and is labelled one**: `mapping.syslog.year_inferred`
+  (warning on the case) and the finding flag `year-inferred`
+  (`db._flags`, tested against the source text like `timezone-unconfirmed`).
+  Linux_2k is really from 2005 and reads as 2026 - nothing in the file can
+  say otherwise. Feb 29 in a non-leap year stays NULL.
+- **ESXi `shell.log`** (vmware-esxi profile, Broadcom KB 321910 + 306962):
+  `shell[pid]: [root]: <command>` -> `shell_command` with the account
+  (the `[user]: ` prefix is in real files, not in the KB example - optional),
+  `Interactive shell session started`, and `SSH login enabled/disabled`,
+  `ESXi shell login enabled/disabled` -> `ssh_enabled` etc. On the SUMMIT
+  host: 185/185 lines read (was 0), SSH switched on 10 times. No rule reads
+  these yet (IAI-82).
+
+`mapping.syslog` counts header kinds per file (rfc5424 / rfc3164 / iso,
+pri, year_inferred), shown with the RFC links. No rule moved: corpus (67),
+Check Point, gen_usecase and tests/samples parity identical; plain / .gz /
+.zip identical on all four test files. Loghub (`logpai/loghub`, research /
+academic use, commercial use unstated) was used in scratch only - **not
+committed**.
 
 **43. Check Point's SmartConsole export is read by its documentation, and
 every case now says how much of its file was read (2026-10-14, IAI-31).**

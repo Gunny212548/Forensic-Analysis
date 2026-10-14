@@ -312,6 +312,8 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
             mapping = logsources.resolve_keys(keys, decode.match_column)
         rows = chain(head, rows)
     line_counts: Counter = Counter()
+    # Which syslog header each line had (decode.decode_line, IAI-34).
+    syslog_counts: Counter = Counter()
     with open(stage_path, "w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
         for row in rows:
@@ -321,6 +323,12 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
             event = decode.decode(row, kind, mapping)
             if kind == "log" or "_raw" in row:
                 line_counts[event["profile"]] += 1
+                if event.get("envelope"):
+                    syslog_counts[event["envelope"]] += 1
+                if event.get("syslog_pri") is not None:
+                    syslog_counts["pri"] += 1
+                if event.get("year_inferred"):
+                    syslog_counts["year_inferred"] += 1
             writer.writerow(_stage_row(start + total, event))
             total += 1
     if mapping is not None:
@@ -330,6 +338,10 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
     else:
         described = {"method": "heuristic", "profile": None, "fields": {},
                      "heuristic_fields": [], "docs": [], "notes": []}
+    if syslog_counts:
+        # rfc5424 / rfc3164 / iso header lines, how many carried a <PRI>, and
+        # how many RFC 3164 timestamps had their year inferred.
+        described["syslog"] = dict(syslog_counts)
     if kind == "json":
         # What could not be read as a record is reported, never dropped
         # silently: those rows are still in the case, read as text lines.
@@ -414,6 +426,10 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
     fd, stage_name = tempfile.mkstemp(suffix=".csv", dir=str(_stage_dir()))
     os.close(fd)
     stage_path = Path(stage_name)
+    # The year an RFC 3164 timestamp is put in: the case's upload time
+    # (decode.infer_year, IAI-34).
+    uploaded = (storage.load_manifest(case_id) or {}).get("uploaded_at")
+    year_ref = decode.REFERENCE_TIME.set(decode.parse_ts(uploaded))
     try:
         # Parsing is most of the work; the bulk load that follows is quick.
         total, truncated, mapping = _write_stage(path, kind, stage_path, start,
@@ -433,6 +449,7 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
             )
         return _coverage(con, start, total, mapping), truncated, mapping
     finally:
+        decode.REFERENCE_TIME.reset(year_ref)
         stage_path.unlink(missing_ok=True)
 
 

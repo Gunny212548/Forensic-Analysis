@@ -277,10 +277,13 @@ LINE_PROFILES: dict[str, dict] = {
     # IAI-29. ESXi writes its shell-session and console-login lines into
     # auth.log; Broadcom documents them.
     "vmware-esxi": {
-        "name": "VMware ESXi shell session and console login",
+        "name": "VMware ESXi shell sessions, shell command history, console login, SSH / ESXi Shell on-off",
         "docs": [("Broadcom KB 321910 - Auditing ESXi Shell logins and commands",
                   "https://knowledge.broadcom.com/external/article/321910/"
-                  "auditing-esxi-shell-logins-and-commands.html")],
+                  "auditing-esxi-shell-logins-and-commands.html"),
+                 # IAI-34: shell.log - command history, enable/disable events.
+                 ("Broadcom KB 306962 - Location and Contents of ESXi log files",
+                  "https://knowledge.broadcom.com/external/article/306962")],
     },
     # Lines a real ESXi auth.log carries whose format VMware does not
     # publish ("User 'root' running command '...'", pam_per_user). Read,
@@ -298,6 +301,12 @@ LINE_PROFILES: dict[str, dict] = {
                   "fortios-log-message-reference/949981")],
     },
 }
+
+# The syslog header itself (IAI-34) - read before any message format above.
+SYSLOG_DOCS = [
+    {"title": "RFC 5424 - The Syslog Protocol", "url": "https://www.rfc-editor.org/rfc/rfc5424"},
+    {"title": "RFC 3164 - The BSD syslog Protocol", "url": "https://www.rfc-editor.org/rfc/rfc3164"},
+]
 
 CSV_FIELDS = ("ts", "srcip", "dstip", "dstport", "username", "verdict", "app",
               "risk", "bytes_sent", "category", "auth_status")
@@ -416,4 +425,5 @@ def line_mapping(counts: dict[str | None, int]) -> dict:
             for k, n in sorted(used.items(), key=lambda kv: -kv[1])
         ],
         "unrecognised_lines": counts.get(None, 0),
+        "syslog_docs": SYSLOG_DOCS,
     }

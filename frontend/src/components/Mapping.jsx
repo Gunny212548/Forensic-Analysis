@@ -112,12 +112,42 @@ function CoverageNote({ cov, label }) {
   )
 }
 
+/** The syslog header each line had (decode.decode_line, IAI-34): RFC 5424,
+ *  RFC 3164 or an ISO / RFC 3339 timestamp, how many carried a <PRI>, and -
+ *  said as a caveat, because it is a guess - how many RFC 3164 timestamps,
+ *  which carry no year, were put in the year of the upload. */
+function SyslogNote({ syslog, docs, label }) {
+  if (!syslog) return null
+  const n = (v) => (v ?? 0).toLocaleString()
+  const parts = [
+    syslog.rfc5424 && `RFC 5424 ${n(syslog.rfc5424)}`,
+    syslog.rfc3164 && `RFC 3164 ${n(syslog.rfc3164)}`,
+    syslog.iso && `ISO 8601 timestamp ${n(syslog.iso)}`,
+  ].filter(Boolean)
+  return (
+    <div className={`map-note${syslog.year_inferred ? ' map-warn' : ''}`}>
+      {label}Syslog header read on {parts.join(' · ')} lines
+      {syslog.pri ? ` (${n(syslog.pri)} with a <PRI> priority)` : ''}.
+      {syslog.year_inferred > 0 && (
+        <>
+          {' '}
+          <strong>{n(syslog.year_inferred)} timestamps carry no year</strong> (RFC 3164) - the year was
+          taken from the upload date, or the year before when that would put them in the future. Check
+          the dates against another source before quoting them.
+        </>
+      )}
+      <Docs docs={docs} />
+    </div>
+  )
+}
+
 function One({ mapping, name }) {
   if (!mapping) return null
   const label = name ? <strong>{name}: </strong> : null
   const notes = (
     <>
       {mapping.json && <JsonNote stats={mapping.json} label={label} />}
+      <SyslogNote syslog={mapping.syslog} docs={mapping.syslog_docs} label={label} />
       <CoverageNote cov={mapping.coverage} label={label} />
     </>
   )

@@ -9,6 +9,7 @@ raw source row never has to be carried any further - that keeps storage
 proportional to the source file instead of several times larger.
 """
 
+import contextvars
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -19,11 +20,69 @@ _EVENT_TZ = timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))
 
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 
-_ISO_TS_RE = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(?P<rest>.*)$")
+# ISO 8601 / RFC 3339 at the start of a line - with an offset too: rsyslog's
+# RSYSLOG_FileFormat writes "2026-01-10T13:13:32.123456+07:00 host prog:",
+# which the first version (Z or nothing) did not match, so such a file lost
+# its whole syslog header (IAI-34).
+_ISO_TS_RE = re.compile(
+    r"^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s+(?P<rest>.*)$")
+# RFC 3164 "Mmm dd hh:mm:ss" - no year, no zone.
 _SYSLOG_TS_RE = re.compile(r"^(?P<ts>[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?P<rest>.*)$")
+_RFC3164_TS = re.compile(r"^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}$")
 
-# Matches a "program[pid]:" or "program:" token, e.g. "sshd[49289]:"
-_PROG_TOKEN_RE = re.compile(r"^(?P<prog>[\w.\-/]+?)(?:\[(?P<pid>\d+)\])?:$")
+# Syslog over the network (and many collectors' files) start with the
+# priority: "<134>". RFC 5424 sec. 6.2.1 / RFC 3164 sec. 4.1.1:
+# facility = PRI // 8, severity = PRI % 8.
+_PRI_RE = re.compile(r"^<(?P<pri>\d{1,3})>")
+# RFC 5424 sec. 6: "1 TIMESTAMP HOSTNAME APP-NAME PROCID MSGID SD MSG", every
+# header field "-" when absent.
+_RFC5424_RE = re.compile(
+    r"^(?P<ver>[1-9]\d{0,2}) (?P<ts>\S+) (?P<host>\S+) (?P<app>\S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<rest>.*)$")
+
+# Matches a "program[pid]:" or "program:" token, e.g. "sshd[49289]:" - and
+# old Red Hat's "sshd(pam_unix)[19939]:", the module in brackets.
+_PROG_TOKEN_RE = re.compile(r"^(?P<prog>[\w.\-/]+?(?:\([\w.\-]+\))?)(?:\[(?P<pid>\d+)\])?:$")
+
+# The year an RFC 3164 timestamp is placed in (IAI-34): the case's upload
+# time, set by the pipeline around decoding a file. Unset -> no year is
+# guessed and ts stays NULL, as before.
+REFERENCE_TIME: contextvars.ContextVar[datetime | None] = contextvars.ContextVar(
+    "REFERENCE_TIME", default=None)
+
+
+def infer_year(ts_text: str) -> datetime | None:
+    """An RFC 3164 timestamp placed in the reference time's year - or the year
+    before, when that would put it more than a day after the reference (a
+    December line in a file uploaded in January). The common receiver
+    practice (rsyslog, Logstash), and a guess: the case flags it
+    (`year-inferred`, db._confidence) rather than presenting it as read."""
+    ref = REFERENCE_TIME.get()
+    if ref is None or not _RFC3164_TS.match(ts_text or ""):
+        return None
+    try:
+        dt = datetime.strptime(f"{ref.year} {' '.join(ts_text.split())}", "%Y %b %d %H:%M:%S")
+    except ValueError:
+        return None  # Feb 29 in a non-leap year, a bad month name
+    if dt > ref + timedelta(days=1):
+        try:
+            dt = dt.replace(year=ref.year - 1)
+        except ValueError:
+            return None
+    return dt
+
+
+def _sd_end(text: str) -> int:
+    """Where RFC 5424 STRUCTURED-DATA ends: "-" or one or more "[...]"
+    elements, in which \\] and \\" are escapes (sec. 6.3.5)."""
+    if text.startswith("-"):
+        return 1
+    i = 0
+    while i < len(text) and text[i] == "[":
+        i += 1
+        while i < len(text) and text[i] != "]":
+            i += 2 if text[i] == "\\" else 1
+        i += 1
+    return i
 
 # FortiGate (and other Fortinet) logs are flat space-separated key=value
 # lines with no leading timestamp at all - "devname=... date=... time=...
@@ -151,6 +210,27 @@ _ESXI_PATTERNS = [
     ("console_login", re.compile(r"^(?P<user>\S+) login on '(?P<tty>[^']+)'")),
 ]
 
+# ESXi's shell.log (IAI-34): the ESXi Shell's command history and the
+# switching on and off of the shell and of SSH - Broadcom KB 321910 (command
+# history, "Interactive shell session started") and KB 306962 (shell.log:
+# "ESXi Shell usage, including enable/disable"). Real files prefix each
+# command with the account ("[root]: cd /var/log"); KB 321910's example has
+# none, so the prefix is optional.
+_ESXI_SHELL_PATTERNS = [
+    ("shell_session_start", re.compile(r"^Interactive shell session started")),
+    ("shell_command", re.compile(r"^(?:\[(?P<user>[^\]]+)\]: )?(?P<cmd>\S.*)$")),
+]
+_ESXI_SERVICE_PATTERNS = [
+    # Turning SSH or the ESXi Shell on is a common step before hands-on
+    # activity on a host - the SUMMIT host enabled both minutes before the
+    # encryptor ran.
+    ("ssh_enabled", re.compile(r"^SSH login enabled")),
+    ("ssh_disabled", re.compile(r"^SSH login disabled")),
+    ("esxi_shell_enabled", re.compile(r"^ESXi shell login enabled", re.I)),
+    ("esxi_shell_disabled", re.compile(r"^ESXi shell login disabled", re.I)),
+    (None, re.compile(r"^ESXi Shell (?:available|unavailable)", re.I)),
+]
+
 # ESXi lines seen in real auth.logs whose format VMware/Broadcom does not
 # publish - kept apart so the case says "observed", never "documented"
 # (logsources.LINE_PROFILES). `User 'root' running command '...'` is a
@@ -172,6 +252,9 @@ _PROGRAM_PATTERNS = {
     "pam": [(_PAM_PATTERNS, "linux-pam")],
     "sudo": [(_PAM_PATTERNS, "linux-pam")],
     "login": [(_ESXI_PATTERNS, "vmware-esxi")],
+    "shell": [(_ESXI_SHELL_PATTERNS, "vmware-esxi")],
+    "ESXShell": [(_ESXI_SERVICE_PATTERNS, "vmware-esxi")],
+    "SSH": [(_ESXI_SERVICE_PATTERNS, "vmware-esxi")],
 }
 
 # Column-name candidates for each canonical field, matched case-insensitively
@@ -417,18 +500,44 @@ def decode_line(line: str) -> dict:
     event = _blank_event()
     event["raw"] = line[:2000]
 
-    m = _ISO_TS_RE.match(line) or _SYSLOG_TS_RE.match(line)
-    if m:
-        event["ts_raw"] = m.group("ts")
-        event["ts"] = parse_ts(m.group("ts"))
-        hostname, program, msg = _split_host_prog(m.group("rest"))
-        event["hostname"] = hostname
-        event["program"] = program
+    # The syslog header (IAI-34): an optional <PRI>, then either an RFC 5424
+    # header or a timestamp (RFC 3164 or ISO / RFC 3339) and "host prog[pid]:".
+    # `envelope` / `syslog_pri` / `year_inferred` are counted per file by the
+    # pipeline; they are not raw_events columns.
+    body = line
+    pm = _PRI_RE.match(body)
+    if pm:
+        event["syslog_pri"] = int(pm.group("pri"))
+        body = body[pm.end():]
+    m5 = _RFC5424_RE.match(body) if pm else None  # RFC 5424 always has a PRI
+    if m5 and m5.group("ver") == "1":
+        event["envelope"] = "rfc5424"
+        nil = lambda v: None if v == "-" else v  # noqa: E731
+        event["ts_raw"] = nil(m5.group("ts"))
+        event["ts"] = parse_ts(event["ts_raw"])
+        event["hostname"] = nil(m5.group("host"))
+        event["program"] = nil(m5.group("app"))
+        rest = m5.group("rest")
+        msg = rest[_sd_end(rest):].lstrip().lstrip("﻿")  # MSG may start with a BOM
     else:
-        msg = line
+        m = _ISO_TS_RE.match(body) or _SYSLOG_TS_RE.match(body)
+        if m:
+            event["envelope"] = "rfc3164" if _RFC3164_TS.match(m.group("ts")) else "iso"
+            event["ts_raw"] = m.group("ts")
+            event["ts"] = parse_ts(m.group("ts"))
+            if event["ts"] is None:
+                event["ts"] = infer_year(m.group("ts"))
+                event["year_inferred"] = event["ts"] is not None
+            hostname, program, msg = _split_host_prog(m.group("rest"))
+            event["hostname"] = hostname
+            event["program"] = program
+        else:
+            msg = body
 
     matched = False
-    for patterns, profile in _PROGRAM_PATTERNS.get(event["program"], ()):
+    # "sshd(pam_unix)" is sshd's PAM module - its messages are sshd's.
+    base = (event["program"] or "").split("(", 1)[0]
+    for patterns, profile in _PROGRAM_PATTERNS.get(base, ()):
         for action, pattern in patterns:
             pm = pattern.search(msg)
             if pm:

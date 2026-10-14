@@ -296,6 +296,9 @@ def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
 # "04/06/2026 10:21:33" does not, and guessing wrong by an hour reorders the
 # timeline (FR-1.6).
 _TZ_MARKER = re.compile(r"(?:Z|UTC|GMT|[+-]\d{2}:?\d{2})\s*$", re.I)
+# An RFC 3164 timestamp ("Aug 12 05:03:31"): the source gave no year, so the
+# one stored was inferred from the upload time (decode.infer_year, IAI-34).
+_NO_YEAR = re.compile(r"^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}$")
 
 
 def _fmt_ts(value) -> str:
@@ -331,6 +334,8 @@ def _flags(row: dict) -> list[str]:
     # the source itself never said, and the GMT+7 ingest rule was assumed.
     if not _TZ_MARKER.search(str(row.get("ts_raw_first") or "")):
         flags.append("timezone-unconfirmed")
+    if row["ts_parsed"] and _NO_YEAR.match(str(row.get("ts_raw_first") or "")):
+        flags.append("year-inferred")
     if row["ts_parsed"]:
         if row["entity_families"] < 2:
             flags.append("single-source")
