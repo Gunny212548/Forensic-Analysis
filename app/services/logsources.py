@@ -134,6 +134,58 @@ PROFILES: tuple[Profile, ...] = (
         notes=("Status 'Interrupted' is not counted as a failed sign-in.",
                "A sign-in has no firewall verdict; none is mapped."),
     ),
+    # The same sign-in, as Azure Monitor diagnostic settings export it (to a
+    # storage account / event hub, one JSON record per line): an envelope
+    # (time, category, resultType, callerIpAddress) around `properties`, which
+    # is the Microsoft Graph signIn object. Keys are flattened by
+    # parsers.flatten. Tested on Splunk attack_data's two Entra password-spray
+    # captures (T1110.003, Apache-2.0) - see CLAUDE.md gotcha #39.
+    Profile(
+        id="entra-signin-azure-monitor",
+        name="Microsoft Entra ID sign-in log (Azure Monitor JSON export)",
+        docs=(
+            ("Microsoft Graph - signIn resource type (createdDateTime, ipAddress, "
+             "userPrincipalName, status)",
+             "https://learn.microsoft.com/en-us/graph/api/resources/signin?view=graph-rest-1.0"),
+            ("Microsoft Graph - signInStatus resource type (errorCode)",
+             "https://learn.microsoft.com/en-us/graph/api/resources/signinstatus?view=graph-rest-1.0"),
+            ("Microsoft Entra authentication & authorization error codes (AADSTS)",
+             "https://learn.microsoft.com/en-us/entra/identity-platform/reference-error-codes"),
+            ("Microsoft Learn - Monitoring and health activity log schemas (Azure Monitor "
+             "vs Graph)",
+             "https://learn.microsoft.com/en-us/entra/identity/monitoring-health/"
+             "concept-activity-log-schemas"),
+        ),
+        signature=("time", "category", "resultType", "callerIpAddress",
+                   "properties.userPrincipalName", "properties.status.errorCode"),
+        fields={
+            # Graph: "Date and time (UTC) the sign-in was initiated". The
+            # envelope's `time` is the record's and can differ (by 28 minutes
+            # in the Splunk capture), so it is only the fallback.
+            "ts": ("properties.createdDateTime", "time"),
+            # Graph: "IP address of the client used to sign in".
+            "srcip": ("properties.ipAddress", "callerIpAddress"),
+            # The account. userDisplayName is a display name - the same trap
+            # as the CSV's User vs Username (gotcha #27).
+            "username": ("properties.userPrincipalName",),
+            "auth_status": ("properties.status.errorCode",),
+            "app": ("properties.appDisplayName",),
+        },
+        auth_values={
+            "0": "auth_success",
+            # Credential-validation failures, by Microsoft's AADSTS names:
+            # InvalidUserNameOrPassword, UserAccountNotFound, IdsLocked,
+            # invalid or null password, CredentialAuthenticationError.
+            "50126": "auth_failed", "50034": "auth_failed", "50053": "auth_failed",
+            "50056": "auth_failed", "50064": "auth_failed",
+        },
+        notes=("Sign-in outcome from status.errorCode: 0 is a success; only codes "
+               "Microsoft names as credential failures (50126, 50034, 50053, 50056, "
+               "50064) count as failed. Interrupts such as 50140 KmsiInterrupt or "
+               "50074 MFA required, and any other code, are not counted - like "
+               "'Interrupted' in the CSV export.",
+               "A sign-in has no firewall verdict; none is mapped."),
+    ),
     Profile(
         id="exchange-message-trace",
         name="Exchange Online message trace",

@@ -77,6 +77,23 @@
    "R2005": 39
   }
  },
+ "azure_ad_distributed_spray.jsonl": {
+  "flagged": 31,
+  "md5": "93860523578bb0f9a68f4aba11a9fcac",
+  "rows": 31,
+  "rules": {
+   "R1000": 31
+  }
+ },
+ "azuread_signin.jsonl": {
+  "flagged": 31,
+  "md5": "8cf574a029823ea89ebbfb3a87027816",
+  "rows": 31,
+  "rules": {
+   "R1000": 31,
+   "R2000": 31
+  }
+ },
  "configRP.log": {
   "flagged": 0,
   "md5": "a092ba006fff91ef20be821d1cd0d890",

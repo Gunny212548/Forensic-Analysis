@@ -10,7 +10,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | # | Step | Standard | Implemented in | Status |
 |---|---|---|---|---|
 | 1 | Evidence acquisition and integrity | ISO/IEC 27037:2012, NIST SP 800-86, RFC 3227 (chain of custody), FIPS 180-4 (SHA-256) | `app/services/custody.py`, `app/routers/upload.py` | ✅ |
-| 2 | Reading each log format | The log source's own format documentation (PAN-OS Traffic Log Fields, Microsoft Entra sign-in log, Exchange Get-MessageTrace, OpenSSH `auth.c`, Linux-PAM `pam_unix`, FortiOS Log Message Reference) | `app/services/logsources.py` | ⚠️ 3 CSV log sources + 3 line formats; others are guessed and flagged |
+| 2 | Reading each log format | The log source's own format documentation (PAN-OS Traffic Log Fields, Microsoft Entra sign-in log, Microsoft Graph signIn / signInStatus + AADSTS error codes, Exchange Get-MessageTrace, OpenSSH `auth.c`, Linux-PAM `pam_unix`, FortiOS Log Message Reference) | `app/services/logsources.py`, `parsers.py` | ⚠️ 3 CSV log sources + 1 JSON (Entra via Azure Monitor) + 3 line formats; others are guessed and flagged; unreadable JSON records counted and reported |
 | 3 | Time | ISO 8601 / RFC 3339, single zone (GMT+7, FR-10.1) | `app/services/pipeline.py`, `decode.py` | ✅ |
 | 4 | Canonical event schema | OCSF | - | ❌ own schema (`raw_events`) |
 | 5 | Threat intelligence | OASIS STIX 2.1 / TAXII 2.1 | `app/services/intel.py` | ⚠️ STIX 2.1 bundles read (IP-equality indicators); no TAXII client - export a collection and drop the bundle in |
