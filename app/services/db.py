@@ -236,6 +236,40 @@ def list_findings(case_id: str, limit: int, offset: int) -> list[dict]:
         con.close()
 
 
+def finding_rows(case_id: str, key: str, limit: int, offset: int = 0) -> dict:
+    """The raw rows behind one collapsed finding (`rid|srcip|username`, the
+    finding_key), in row order - the evidence a statement about that finding
+    has to be checked against. {"total": n, "rows": [...]}."""
+    rid, src, user = (key.split("|", 2) + ["", ""])[:3]
+    if not db_path(case_id).exists():
+        return {"total": 0, "rows": []}
+    # finding_key() writes NULL as '', so match on the same spelling.
+    where = (" WHERE f.rid = ? AND coalesce(r.srcip, '') = ?"
+             " AND coalesce(r.username, '') = ?")
+    con = connect(case_id, read_only=True)
+    try:
+        total = con.execute(
+            "SELECT count(*) FROM findings f JOIN raw_events r USING (row_id)" + where,
+            [rid, src, user],
+        ).fetchone()[0]
+        rows = con.execute(
+            FINDING_SELECT + where + " ORDER BY r.row_id LIMIT ? OFFSET ?",
+            [rid, src, user, limit, offset],
+        ).fetchall()
+        cols = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username", "raw",
+                "rid", "lvl", "descr", "mitre"]
+        out = []
+        for r in rows:
+            row = dict(zip(cols, r))
+            row["level"] = level_of(row.pop("lvl"))
+            row["ts"] = _fmt_ts(row["ts"]) or None
+            row["mitre"] = list(row["mitre"] or [])
+            out.append(row)
+        return {"total": total, "rows": out}
+    finally:
+        con.close()
+
+
 def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
     if not db_path(case_id).exists():
         return []

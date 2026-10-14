@@ -24,6 +24,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | 13 | Analyst review audit trail | ISO/IEC 27001:2022 A.8.15 (logging) | `app/services/review.py`, `hashchain.py` | ✅ append-only, hash-chained; pre-chain decisions sealed |
 | 14 | Finding lifecycle and MTTC | NIST SP 800-61 Rev. 3 (CSF 2.0: RS.MA-02, RS.AN-03, RS.MI-01, RS.MI-02) | `app/services/lifecycle.py` | ✅ Open / Investigating / Contained / Resolved; workflow admits Sigma high and critical |
 | 15 | Report export | NIST SP 800-86 (reporting), OASIS STIX 2.1, ATT&CK Navigator layers | `app/services/attack_layer.py`, `stix_export.py` | ⚠️ Navigator layer (format 4.5) and STIX 2.1 bundle per case; the human-readable report not yet |
+| 16 | Machine access to case data (MCP) | Model Context Protocol 2025-11-25; ISO/IEC 27037 (access to evidence recorded) | `app/mcp_server.py`, `hashchain.py` | ✅ read-only stdio server, 12 tools, every call in a hash-chained access log; no write tools, no free SQL |
 
 What each implemented step does, and what it does not claim, is recorded in
 `CLAUDE.md` gotchas #26 (severity), #27 (log source mapping), #28 (evidence),

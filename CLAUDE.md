@@ -95,6 +95,9 @@ GET  /api/rules[/{rid}]                      rule metadata: Sigma fields + ADS
 POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
                                              graph + SQL top-N distinct → the
                                              LLM (Ollama now) for the narrative
+MCP (stdio, read-only)                       app/mcp_server.py - 12 tools over the
+                                             same views; every call hash-chain
+                                             logged to mcp/access.jsonl (#38)
 GET  /api/overview                           KPIs, severity, techniques, top
                                              entities, activity + case list
                                              across all cases (services/
@@ -120,7 +123,8 @@ uploaded files, compressed ones kept compressed (audit trail) · `analysis/` cac
 `intel/` threat-intel feed files (see gotcha #17) · `review/` append-only
 analyst decision logs, one JSONL per case (see gotcha #19) · `custody/`
 hash-chained chain-of-custody logs, one JSONL per case (gotcha #28) ·
-`users.json` login accounts + `session_secret` (see *Login* below).
+`users.json` login accounts + `session_secret` (see *Login* below) ·
+`mcp/access.jsonl` hash-chained log of every MCP tool call (gotcha #38).
 
 A manifest now carries more than the upload: `company_id`/`company_name`
 (always set since FR-2.1), `compression` (`gz`/`zip`/null), `size_bytes` (as
@@ -988,6 +992,58 @@ standard (or "internal method", with the nearest framework named and the
 method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
+
+**38. Cases are readable over MCP - read-only, stdio, every call logged
+(2026-10-14).** `app/mcp_server.py` is a Model Context Protocol server
+(spec 2025-11-25, newline-delimited JSON-RPC 2.0 on stdio) so any MCP
+client can investigate a case by asking for it instead of being handed a
+pre-cut prompt:
+
+```bash
+docker exec -i forensic-analyzer-forensic-analyzer-1 \
+    python -m app.mcp_server --actor you@example.com
+```
+
+12 tools, all annotated read-only: `list_cases`, `get_case` (custody
+status included), `list_findings`, `get_finding_events` (the raw rows behind
+a finding, with `row_id` and the original line), `get_source_profiles`,
+`get_risk_ranking`, `get_attack_graph`, `get_escalations`, `get_veris`,
+`get_rule`, `get_custody`, `get_analysis` (served with an "AI-generated -
+not evidence" notice). The `initialize` instructions tell the client it is
+an assistant, not the judge: quote the rule engine's levels and tags, cite
+a finding_key or row_ids for every claim, and treat uncited claims as
+hypotheses.
+
+What it deliberately does not do, so don't add it casually:
+- **No write tool.** Review, lifecycle and upload take their actor from a
+  session; a write over MCP would need its own authorisation story.
+- **No free SQL.** A query tool is a read-anything tool.
+- **No port.** stdio via `docker exec`: whoever can run that already reads
+  `/data`, so it needs no second auth system. `--actor` must be an account
+  in `users.json` (exit 2 otherwise) and goes on every access record.
+- **No SDK.** stdlib only; the `mcp` package brings its own
+  starlette/pydantic and the app pins fastapi 0.115 / starlette 0.38.6.
+
+Every `tools/call` - refusals included - appends to
+`DATA_DIR/mcp/access.jsonl` through `hashchain.py` (ISO/IEC 27037: access
+to evidence is recorded). Several MCP sessions are several *processes*, and
+hashchain's lock is in-process, so the append is wrapped in an `flock`.
+That lock is load-bearing, not belt-and-braces: with it removed,
+`tests/check_mcp.py`'s 3-server x 25-call burst broke the chain at entry 23
+("sequence number is 22"). A case id is regex-checked before it touches a
+path (`../users` is refused). A DuckDB file locked by a running pipeline
+comes back as a tool error, not a crash.
+
+**A cloud client takes the data off the machine.** The local narrative
+model keeps case data on the host; Claude Desktop/Code or any hosted model
+reading through this server does not. Decide per customer before wiring one
+up - nothing in the server can tell where its client sends what it reads.
+
+Verified with `tests/check_mcp.py` (44 checks, in the container on a
+scratch store: handshake, all 12 tools against the planted gen_usecase
+facts - digest equals the uploaded bytes, the brute force -> root
+escalation, rows per finding - every refusal, stdout purity, one access
+entry per call, chain intact, concurrent writers).
 
 **37. The narrative is schema-constrained to the case's own evidence, and
 its input is deterministic (2026-10-14).** Telling the model "use only the
