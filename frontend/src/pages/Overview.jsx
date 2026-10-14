@@ -152,7 +152,7 @@ export default function Overview({ companyId }) {
       <div className="panel">
         <div className="ov-table-head">
           <h2>
-            Cases <span className="muted mono">{cases.length} shown</span>
+            Findings <span className="muted mono">{cases.length} shown</span>
           </h2>
         </div>
         <div className="ov-filters">
