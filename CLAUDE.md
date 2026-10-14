@@ -583,6 +583,14 @@ gives the same findings, which matters when the output is evidence.
   inflated every DuckDB for nothing.
 - Feed snapshot at time of writing: 42,952 usable IPs from 5 feeds
   (blocklist_de 24,577 / cins 14,724 / threatfox 2,365 / tor 1,286).
+  **Replaced 2026-10-14** when the whole store was reset: the old feed files
+  went with it (no backup), so the old R3004 counts cannot be reproduced.
+  Re-fetched: 44,514 (blocklist_de 25,729 / cins 14,759 / threatfox 2,846 /
+  tor 1,180). The baseline was re-taken on it - only `R3004` moved, in 6
+  files (`log_22_` 324 -> 318, `log_23_`/`log_24_` -> 319, `log_25_`/`log_26_`
+  100 -> 92, `log_27_` 68 -> 73), every other rule and every row count
+  identical. **A feed refresh moves R3003-R3006 by design**; re-take the
+  baseline after one and say so, as here.
 
 **18. Measure before optimising - twice here the bottleneck was not where it
 looked.** The corpus wall-clock moved from ~18s to ~60s when IOC matching
@@ -1806,18 +1814,20 @@ DuckDB bulk-load fix, and ~38s total while decode was still Python-per-row.
 
 Any change to ingest or rules should be checked for **parity**, and the
 baseline to check against is `tests/baseline.json`, not this file - per-file
-`rows / flagged / per-rule` counts for **70 files, 660,691 rows, 162,145
-findings**, asserted by `tests/check_parity.py`. A silent drop to 0 findings
+`rows / flagged / per-rule` counts for **75 files, 660,807 rows, 162,222
+flagged** (2026-10-14: +4 JSON files of gotcha #39, R3004 re-taken on the
+refreshed feeds - gotcha #17), asserted by `tests/check_parity.py`. A silent drop to 0 findings
 is exactly the failure mode gotcha #2 describes, and a *plausible* wrong
 finding is gotcha #22.
 
 The four anchors still worth knowing by heart, as of 2026-09-15:
 `log_13_.csv` 65534/11324 · `src10-8-3-215.csv` 25579/**18888** ·
-`log_22_.csv` 20530/14838 · `auth.log` 776/329. Two of those moved from the
+`log_22_.csv` 20530/14832 · `auth.log` 776/329. Two of those moved from the
 numbers recorded before that date and both moves are deliberate:
 `src10-8-3-215.csv` 25579 → 18888 from the R2002/R2003 deny restriction
 (gotcha #23), `log_22_.csv` 14514 → 14838 from `R3004` (+324), the
-threat-intel rule of gotcha #17, which postdates the original figure.
+threat-intel rule of gotcha #17, which postdates the original figure -
+and since the feed refresh of 2026-10-14 it is 14832 (R3004 318).
 
 The corpus behind the baseline: **98 cases / 988,818 rows** from
 `d:\forensic system\Logtest`, plus the Check Point export (in `raw/`, see
@@ -1840,7 +1850,7 @@ set `DATA_DIR` to a scratch folder, then `storage.create_company(...)` once
 `pipeline.process_case(case_id, Path(file), kind)` per file. That
 reproduces the baseline anchors exactly except the intel rules
 (`R3003`-`R3006`), because `DATA_DIR/intel/` is empty - so `log_22_.csv`
-gives 14514, not 14838. It is how gotcha #24 was measured while the Docker
+gives 14514, not 14832. It is how gotcha #24 was measured while the Docker
 daemon was down.
 
 Zero-finding files are expected for ESXi system logs (not auth logs) and for
