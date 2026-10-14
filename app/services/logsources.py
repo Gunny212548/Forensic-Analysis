@@ -211,13 +211,40 @@ LINE_PROFILES: dict[str, dict] = {
     "openssh-sshd": {
         "name": "OpenSSH sshd authentication messages",
         "docs": [("OpenSSH portable - auth.c, auth_log()",
-                  "https://github.com/openssh/openssh-portable/blob/master/auth.c")],
+                  "https://github.com/openssh/openssh-portable/blob/master/auth.c"),
+                 # IAI-29: pre-auth probes, sftp, closed / timed-out sessions.
+                 ("OpenSSH portable - kex.c (identification string exchange)",
+                  "https://github.com/openssh/openssh-portable/blob/master/kex.c"),
+                 ("OpenSSH portable - session.c (subsystem request)",
+                  "https://github.com/openssh/openssh-portable/blob/master/session.c"),
+                 ("OpenSSH portable - packet.c (connection closed)",
+                  "https://github.com/openssh/openssh-portable/blob/master/packet.c")],
     },
     "linux-pam": {
-        "name": "Linux-PAM pam_unix password change",
+        "name": "Linux-PAM pam_unix password change and session messages",
         "docs": [("Linux-PAM - modules/pam_unix/pam_unix_passwd.c",
                   "https://github.com/linux-pam/linux-pam/blob/master/modules/pam_unix/"
-                  "pam_unix_passwd.c")],
+                  "pam_unix_passwd.c"),
+                 ("Linux-PAM - modules/pam_unix/pam_unix_sess.c",
+                  "https://github.com/linux-pam/linux-pam/blob/master/modules/pam_unix/"
+                  "pam_unix_sess.c")],
+    },
+    # IAI-29. ESXi writes its shell-session and console-login lines into
+    # auth.log; Broadcom documents them.
+    "vmware-esxi": {
+        "name": "VMware ESXi shell session and console login",
+        "docs": [("Broadcom KB 321910 - Auditing ESXi Shell logins and commands",
+                  "https://knowledge.broadcom.com/external/article/321910/"
+                  "auditing-esxi-shell-logins-and-commands.html")],
+    },
+    # Lines a real ESXi auth.log carries whose format VMware does not
+    # publish ("User 'root' running command '...'", pam_per_user). Read,
+    # because the command line is evidence, but never called documented:
+    # no docs, and the case page says the format was observed.
+    "vmware-esxi-observed": {
+        "name": "VMware ESXi remote command and PAM per-user lines",
+        "docs": [],
+        "observed": True,
     },
     "fortigate-traffic": {
         "name": "FortiGate FortiOS traffic log (key=value)",
@@ -332,11 +359,15 @@ def line_mapping(counts: dict[str | None, int]) -> dict:
     only each line's timestamp and first IP address were pulled out, and no
     rule can fire on it (an ESXi hostd.log, say)."""
     used = {k: v for k, v in counts.items() if k}
+    documented = any(not LINE_PROFILES[k].get("observed") for k in used)
     return {
-        "method": "documented" if used else "unrecognised",
+        # "observed" only if every line read was of an unpublished format.
+        "method": "documented" if documented else ("observed" if used else "unrecognised"),
         "line_profiles": [
             {"profile": k, "lines": n, "name": LINE_PROFILES[k]["name"],
-             "docs": [{"title": t, "url": u} for t, u in LINE_PROFILES[k]["docs"]]}
+             "docs": [{"title": t, "url": u} for t, u in LINE_PROFILES[k]["docs"]],
+             # Format seen in real logs, not published by the log source.
+             "observed": bool(LINE_PROFILES[k].get("observed"))}
             for k, n in sorted(used.items(), key=lambda kv: -kv[1])
         ],
         "unrecognised_lines": counts.get(None, 0),

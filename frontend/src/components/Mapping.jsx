@@ -98,7 +98,16 @@ function One({ mapping, name }) {
     return (
       <div className="map-note">
         {label}Read with documented message formats:{' '}
-        {mapping.line_profiles.map((p) => `${p.name} (${p.lines.toLocaleString()} lines)`).join(', ')}
+        {mapping.line_profiles
+          .map(
+            (p) =>
+              `${p.name} (${p.lines.toLocaleString()} lines` +
+              // Seen in real logs, not published by the log source: read,
+              // but not vouched for by any documentation.
+              (p.observed ? ' - format observed in real logs, not documented by the vendor' : '') +
+              ')',
+          )
+          .join(', ')}
         {mapping.unrecognised_lines
           ? `. ${mapping.unrecognised_lines.toLocaleString()} other lines matched no known format and carry no findings.`
           : '.'}

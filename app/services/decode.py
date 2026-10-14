@@ -117,11 +117,62 @@ _SSHD_PATTERNS = [
     )),
     ("connection", re.compile(r"Connection from (?P<ip>[\d.]+) port (?P<port>\d+)")),
     ("invalid_user", re.compile(r"Invalid user (?P<user>\S+) from (?P<ip>[\d.]+)")),
+    # Pre-authentication probes (IAI-29): a client that connects and never
+    # speaks SSH (a port scanner), or speaks something else at the SSH port
+    # ("GET / HTTP/1.1"). OpenSSH kex.c / sshd.c.
+    ("ssh_probe", re.compile(r"Did not receive identification string from (?P<ip>[\d.]+)")),
+    ("ssh_probe", re.compile(r"Bad protocol version identification .* from (?P<ip>[\d.]+)")),
+    # session.c - a file-transfer channel on an authenticated session.
+    ("sftp_session", re.compile(r"subsystem request for sftp by user (?P<user>\S+)")),
+    # Recognised, but no security meaning on their own (packet.c,
+    # serverloop.c): an action of None keeps them out of every rule.
+    (None, re.compile(r"Connection closed by (?P<ip>[\d.]+)")),
+    (None, re.compile(r"Timeout, client not responding")),
 ]
 
 _PAM_PATTERNS = [
     ("password_changed", re.compile(r"password changed for (?P<user>\S+)")),
 ]
+
+# pam_unix's session messages (pam_unix_sess.c), which sshd writes under its
+# own name: "pam_unix(system-auth-generic:session): session opened for user
+# root by (uid=0)".
+_PAM_SESSION_PATTERNS = [
+    ("session_open", re.compile(r"pam_unix\([^)]*:session\): session opened for user (?P<user>\S+)")),
+    ("session_close", re.compile(r"pam_unix\([^)]*:session\): session closed for user (?P<user>\S+)")),
+]
+
+# VMware ESXi's own auth.log lines, documented in Broadcom KB 321910
+# ("Auditing ESXi Shell logins and commands"): an ESXi Shell session over
+# SSH, and a login at the console (DCUI / tty).
+_ESXI_PATTERNS = [
+    ("shell_session_open", re.compile(r"Session opened for '(?P<user>[^']+)' on")),
+    ("shell_session_close", re.compile(r"Session closed for '(?P<user>[^']+)'")),
+    ("console_login", re.compile(r"^(?P<user>\S+) login on '(?P<tty>[^']+)'")),
+]
+
+# ESXi lines seen in real auth.logs whose format VMware/Broadcom does not
+# publish - kept apart so the case says "observed", never "documented"
+# (logsources.LINE_PROFILES). `User 'root' running command '...'` is a
+# command sent over SSH (`ssh host <cmd>`): on the SUMMIT ransomware host it
+# is the only trace of `/tmp/esxi_encryptor` and `rm -rf /.ash_history`.
+_ESXI_OBSERVED_PATTERNS = [
+    ("command_exec", re.compile(r"User '(?P<user>[^']+)' running command '")),
+    # ESXi's PAM per-user mapping - plumbing, no security meaning.
+    (None, re.compile(r"pam_per_user: create_subrequest_handle\(\)")),
+]
+
+# Which patterns are tried for a program, in order, and the line profile
+# (logsources.LINE_PROFILES) each set cites. Per pattern set, not per
+# program: sshd writes pam_unix's and ESXi's messages under its own name.
+_PROGRAM_PATTERNS = {
+    "sshd": [(_SSHD_PATTERNS, "openssh-sshd"), (_PAM_SESSION_PATTERNS, "linux-pam"),
+             (_ESXI_PATTERNS, "vmware-esxi"), (_ESXI_OBSERVED_PATTERNS, "vmware-esxi-observed")],
+    "passwd": [(_PAM_PATTERNS, "linux-pam")],
+    "pam": [(_PAM_PATTERNS, "linux-pam")],
+    "sudo": [(_PAM_PATTERNS, "linux-pam")],
+    "login": [(_ESXI_PATTERNS, "vmware-esxi")],
+}
 
 # Column-name candidates for each canonical field, matched case-insensitively
 # as substrings. Order matters: the first hit wins.
@@ -376,24 +427,23 @@ def decode_line(line: str) -> dict:
     else:
         msg = line
 
-    patterns, profile = [], None
-    if event["program"] == "sshd":
-        patterns, profile = _SSHD_PATTERNS, "openssh-sshd"
-    elif event["program"] in ("passwd", "pam", "sudo"):
-        patterns, profile = _PAM_PATTERNS, "linux-pam"
-
-    for action, pattern in patterns:
-        pm = pattern.search(msg)
-        if pm:
-            gd = pm.groupdict()
-            event["action"] = action
-            event["profile"] = profile
-            event["srcip"] = gd.get("ip")
-            event["username"] = gd.get("user")
-            # NOTE: the "port" captured here is the remote client's ephemeral
-            # SOURCE port, not a destination port being probed - deliberately
-            # not stored as dstport, or the port-scan rule would false-positive
-            # on any host that simply reconnects a lot.
+    matched = False
+    for patterns, profile in _PROGRAM_PATTERNS.get(event["program"], ()):
+        for action, pattern in patterns:
+            pm = pattern.search(msg)
+            if pm:
+                gd = pm.groupdict()
+                event["action"] = action
+                event["profile"] = profile
+                event["srcip"] = gd.get("ip")
+                event["username"] = gd.get("user")
+                # NOTE: the "port" captured here is the remote client's ephemeral
+                # SOURCE port, not a destination port being probed - deliberately
+                # not stored as dstport, or the port-scan rule would false-positive
+                # on any host that simply reconnects a lot.
+                matched = True
+                break
+        if matched:
             break
 
     if not event["srcip"]:

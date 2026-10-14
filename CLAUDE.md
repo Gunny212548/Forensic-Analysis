@@ -267,8 +267,8 @@ cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
-Numbered in the order they were written. #1-#29 run in order; #30-#41 were
-added on top of #29 newest-first, so they read #41, #40, #39 ... #30.
+Numbered in the order they were written. #1-#29 run in order; #30-#42 were
+added on top of #29 newest-first, so they read #42, #41, #40 ... #30.
 
 **1. DuckDB `executemany()` is catastrophically slow — never bulk-insert with it.**
 Benchmarked here at ~300 rows/sec (20k rows = 65 seconds); a 65k-row file
@@ -910,8 +910,10 @@ which mappings to check.
   file to test against**: PAN-OS traffic log, Microsoft Entra ID sign-in log
   (CSV, and since 2026-10-14 its Azure Monitor JSON export - gotcha #39),
   Exchange Online message trace. Line logs cite the message formats they
-  match (OpenSSH `auth.c`, Linux-PAM `pam_unix`, FortiOS Log Message
-  Reference). There is no Check Point profile: its export is not in the
+  match (OpenSSH `auth.c` / `kex.c` / `session.c` / `packet.c`, Linux-PAM
+  `pam_unix`, Broadcom KB 321910 for ESXi, FortiOS Log Message Reference),
+  plus ESXi lines read as *observed* - real file, no published format
+  (gotcha #42). There is no Check Point profile: its export is not in the
   corpus any more (see below), and a profile no file has tested is a guess
   with a citation attached.
 - A documented profile still falls back **per field** when an export lacks
@@ -1018,6 +1020,47 @@ standard (or "internal method", with the nearest framework named and the
 method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
+
+**42. ESXi's auth.log is now read line for line - and its most important
+lines were the ones not read (2026-10-14, IAI-29).** On the SUMMIT
+ransomware host's `auth.log` (776 lines) the decoder recognised 383; the
+rest kept a timestamp and maybe an IP, and no rule could ever see them.
+Among them, the only record of the attack itself: `User 'root' running
+command '/tmp/esxi_encryptor'`, `'chmod 777 /tmp/esxi_encryptor'`,
+`'rm -rf /.ash_history'`, `vim-cmd vmsvc/getallvms` loops. Now all 776 are
+read, each by a cited profile:
+
+| lines | action | profile (source) |
+|---|---|---|
+| `Session opened/closed for 'root' on /dev/char/pty/tN` (100) | `shell_session_open` / `_close` | `vmware-esxi` (Broadcom KB 321910) |
+| `login[]: root login on 'char/tty/1'` | `console_login` | `vmware-esxi` |
+| `pam_unix(...:session): session opened/closed for user root` (71) | `session_open` / `_close` | `linux-pam` (`pam_unix_sess.c`) |
+| `Did not receive identification string` / `Bad protocol version identification` (59) | `ssh_probe` | `openssh-sshd` (`kex.c`) |
+| `subsystem request for sftp by user root` (1) | `sftp_session` | `openssh-sshd` (`session.c`) |
+| `Connection closed by`, `Timeout, client not responding` | none | `openssh-sshd` (`packet.c`) |
+| `User 'root' running command '...'` (33) | `command_exec` | `vmware-esxi-observed` |
+| `pam_per_user: create_subrequest_handle()` (166) | none | `vmware-esxi-observed` |
+
+- **Profiles are per pattern set, not per program** (`decode._PROGRAM_PATTERNS`):
+  sshd writes pam_unix's and ESXi's messages under its own name, so a
+  line now cites the source that defines *it*.
+- **"observed" is its own honesty level.** VMware/Broadcom publish no format
+  for `running command` or `pam_per_user` (searched: KB 321910 shows the
+  session lines only; the Google/Mandiant UNC3944 write-up describes
+  auth.log without the format). Gotcha #27 says a profile needs a document
+  *and* a real file; these have only the file, and the command text is too
+  important to leave unread. So `vmware-esxi-observed` has no docs and
+  `observed: true`; the case page says "format observed in real logs, not
+  documented by the vendor", and a file read *only* that way is
+  `method: observed`, never `documented`.
+- **No rule moved**: no rule keys on the new actions. `auth.log` stays
+  776 / 329 with every per-rule count equal; plain, `.gz` and inside a
+  `.zip` are identical (rows, flagged, rules, actions, mapping); corpus
+  parity unchanged. The new actions are input for rules not yet written.
+- **The year was never wrong** - see *Scale notes*: the file has full ISO
+  timestamps, and the 2014 rows are `vpxuser` rotations (12 a year, every
+  30 days, vCenter's default). Which is also a finding for the rules:
+  **R1004 fires 138 times on that benign rotation** - follow-up, not parser.
 
 **41. Login accounts live apart from customer data (2026-10-14).** The
 user's requirement, after a reset of `/data` took every account with it:
@@ -1897,7 +1940,7 @@ upload requirement makes this real: measured on the host, CSV ran at ~77 MB/s
 28 MB file (~8 min or more for 10 GB). Neither was measured on a GB-sized
 file.
 
-Known, not investigated: the ESXi `auth.log` has no year in its timestamps,
-and its `min(ts)` comes out as **2014-07-02** while the file's max is
-2026-01-10 - the year inference misplaces some rows, which will distort any
-timeline built from that file.
+~~Known, not investigated: the ESXi `auth.log` has no year in its timestamps~~ -
+**wrong, corrected 2026-10-14 (gotcha #42):** every line carries a full ISO
+8601 UTC timestamp, and the 2014-07-02 minimum is real - 138 monthly
+`vpxuser` password rotations by vCenter reach back to the host's install.
