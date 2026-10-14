@@ -32,6 +32,11 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - forensic-data:/data
+      # Login accounts + session secret, apart from customer data (config.py
+      # AUTH_DIR, the sibling of DATA_DIR): wiping or copying forensic-data
+      # leaves who can sign in untouched.
+      - forensic-auth:/auth
 
 volumes:
   forensic-data:
+  forensic-auth:

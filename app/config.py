@@ -2,6 +2,16 @@ import os
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 
+# Login accounts and the session secret live apart from customer data
+# (2026-10-14, CLAUDE.md gotcha #41): resetting, backing up or handing over
+# DATA_DIR never touches who can sign in, and the two can be permissioned
+# separately. The default is a sibling of DATA_DIR - /data -> /auth, which
+# docker-compose mounts as its own volume - rather than a fixed path, so a
+# test that points DATA_DIR at a scratch store gets a scratch auth store
+# beside it and can never write a throwaway account into the real one.
+AUTH_DIR = os.environ.get("AUTH_DIR") or os.path.join(
+    os.path.dirname(os.path.abspath(DATA_DIR.rstrip("/\\") or "/")) or "/", "auth")
+
 # Every uploaded log is interpreted and stored in ONE fixed zone: GMT+7.
 # A timestamp carrying an offset ("...Z", "...+00:00") is converted into it;
 # a timestamp carrying none is taken to already be in it. So `raw_events.ts`
@@ -22,7 +32,7 @@ EVENT_TZ_SUFFIX = "+07:00"
 
 # Login (FR-1, app/services/auth.py). A session lasts one working shift;
 # SESSION_SECRET signs the cookie and, when unset, is generated once and kept
-# in DATA_DIR so sessions survive a container restart.
+# in AUTH_DIR so sessions survive a container restart.
 SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "12"))
 # Where "can't sign in?" points on the login page (FR-1.2) - a mailto: or a
 # helpdesk URL. Empty shows the instruction without a link.

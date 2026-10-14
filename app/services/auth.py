@@ -1,13 +1,14 @@
 """Accounts and sessions (FR-1). Standard library only - no new dependency.
 
-Accounts live in DATA_DIR/users.json and are created with
+Accounts live in AUTH_DIR/users.json - not with customer data (config.py) -
+and are created with
 `tools/create_user.py`; there is no sign-up page, because this is an internal
 tool and who may read customer logs is decided by an administrator, not by
 whoever reaches the login screen.
 
 Sessions are a signed cookie rather than server-side state: the payload is
 {email, exp}, HMAC-signed with a secret from SESSION_SECRET or, failing that,
-one generated once and kept in DATA_DIR. Every request re-reads the account,
+one generated once and kept in AUTH_DIR. Every request re-reads the account,
 so deleting a user ends their sessions immediately. The price of being
 stateless is that logging out clears the cookie in the browser but cannot
 revoke a copy of it taken elsewhere before it expires (SESSION_HOURS).
@@ -40,11 +41,11 @@ _cache: dict = {"mtime": None, "users": {}}
 
 
 def _users_path() -> Path:
-    return Path(config.DATA_DIR) / "users.json"
+    return Path(config.AUTH_DIR) / "users.json"
 
 
 def _secret_path() -> Path:
-    return Path(config.DATA_DIR) / "session_secret"
+    return Path(config.AUTH_DIR) / "session_secret"
 
 
 # --- passwords -------------------------------------------------------------

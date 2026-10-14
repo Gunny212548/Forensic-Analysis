@@ -102,6 +102,8 @@ def main() -> int:
                 kinds = {p.parent.name for p in files}
                 check(inside and {"cases", "db", "raw", "custody"} <= kinds,
                       f"{cid}: {len(files)} files, all in its own store ({sorted(kinds)})")
+        check(not any(p.name in ("users.json", "session_secret") for p in everything),
+              "no login account file inside DATA_DIR (they live in AUTH_DIR)")
         shared = [p for p in everything if "customers" not in p.parts
                   and any(cid in p.name for ids in cases.values() for cid in ids)]
         check(not shared, f"no case file outside the customer stores ({len(shared)} found)")

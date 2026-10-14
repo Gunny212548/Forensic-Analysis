@@ -130,8 +130,10 @@ chain-of-custody logs, one JSONL per case (gotcha #28). Where older gotchas
 say `review/{case_id}.jsonl`, `raw/<case_id>.csv` and so on, read them as
 inside the case's customer store. Shared, because none of it is customer
 data: `intel/` threat-intel feed files (see gotcha #17) · `tmp/` staging ·
-`users.json` login accounts + `session_secret` (see *Login* below) ·
 `mcp/access.jsonl` hash-chained log of every MCP tool call (gotcha #38).
+**Login accounts are not in `DATA_DIR` at all** (gotcha #41): `users.json` +
+`session_secret` live in `AUTH_DIR` (`/auth`, its own Docker volume
+`forensic-auth`; see *Login* below).
 
 A manifest now carries more than the upload: `company_id`/`company_name`
 (always set since FR-2.1), `compression` (`gz`/`zip`/null), `size_bytes` (as
@@ -147,7 +149,8 @@ read them with `.get()`.
 middleware in `app/main.py`, so a new router is protected without doing
 anything. The page and its bundle stay public; they hold no data.
 - Accounts are made by an administrator with `tools/create_user.py`
-  (add / list / remove); there is no sign-up page on purpose. Passwords are
+  (add / list / remove) and kept in `AUTH_DIR/users.json`, apart from
+  customer data (gotcha #41); there is no sign-up page on purpose. Passwords are
   stdlib `scrypt`, so auth added no dependency.
 - The session is an HMAC-signed cookie (`fa_session`, HttpOnly, 12h), not
   server state. Every request re-reads the account, so **removing a user
@@ -264,8 +267,8 @@ cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
-Numbered in the order they were written. #1-#29 run in order; #30-#40 were
-added on top of #29 newest-first, so they read #40, #39, #38 ... #30.
+Numbered in the order they were written. #1-#29 run in order; #30-#41 were
+added on top of #29 newest-first, so they read #41, #40, #39 ... #30.
 
 **1. DuckDB `executemany()` is catastrophically slow — never bulk-insert with it.**
 Benchmarked here at ~300 rows/sec (20k rows = 65 seconds); a 65k-row file
@@ -1008,6 +1011,29 @@ method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
 
+**41. Login accounts live apart from customer data (2026-10-14).** The
+user's requirement, after a reset of `/data` took every account with it:
+the database of who can sign in is separate from the customers'.
+`users.json` and `session_secret` are in `config.AUTH_DIR`, mounted as its
+own volume (`forensic-auth:/auth`), so wiping, backing up or handing over
+`forensic-data` never touches accounts or sessions (tested: `/data` wiped
+under a signed-in session - the session, a fresh login and the account all
+survived), and the two can be permissioned and backed up separately.
+
+- **The default is the sibling of `DATA_DIR`** (`/data` -> `/auth`), not a
+  fixed `/auth`, and docker-compose deliberately does **not** set
+  `AUTH_DIR`. The test harnesses (`check_mcp`, `check_customer_isolation`,
+  `bench_llm`) point `DATA_DIR` at a scratch store and create a throwaway
+  account; with a fixed `AUTH_DIR` in the container's environment those
+  accounts would land in the production account file. With the sibling
+  rule each scratch store gets a scratch `auth/` beside it (verified: after
+  both checks ran in the container, `/auth` still held exactly its one
+  account). Set `AUTH_DIR` explicitly only outside the container.
+- On startup the app warns if `users.json` / `session_secret` are still in
+  `DATA_DIR` - they are no longer read there.
+- `check_customer_isolation.py` now also fails if an account file appears
+  inside `DATA_DIR` (23 checks).
+
 **40. Each customer's evidence is in its own store - and a merge used to
 mix two customers (2026-10-14).** The user's requirement: adding a customer
 creates that customer's database, and one customer's data is never put
@@ -1648,7 +1674,7 @@ Two more checks, each for its own layer:
   as its docstring shows, because the concurrent-writer check needs Linux
   `flock` (gotcha #38).
 - **Customer isolation** - `tests/check_customer_isolation.py <scratch>
-  --repo /app` (22 checks, gotcha #40); run it in the container the same
+  --repo /app` (23 checks, gotchas #40/#41); run it in the container the same
   way as check_mcp. Run it after touching `storage.py`, any path helper or
   a route that lists or merges cases.
 

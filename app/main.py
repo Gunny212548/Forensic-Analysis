@@ -11,6 +11,7 @@ from .routers import companies as companies_router
 from .routers import overview as overview_router
 from .routers import rules as rules_router
 from .routers import upload as upload_router
+from . import config
 from .services import auth, storage
 
 app = FastAPI(title="Forensic Analyzer")
@@ -72,6 +73,13 @@ async def needs_migration(_request: Request, exc: storage.StoreNeedsMigration):
 
 @app.on_event("startup")
 async def on_startup():
+    # Accounts belong in AUTH_DIR, not beside customer data (config.py).
+    stray = [n for n in ("users.json", "session_secret") if (Path(config.DATA_DIR) / n).exists()]
+    if stray:
+        logging.getLogger("forensic").warning(
+            "%s found in DATA_DIR (%s) - accounts now live in AUTH_DIR (%s) and these are "
+            "not read; move them there or delete them", ", ".join(stray), config.DATA_DIR,
+            config.AUTH_DIR)
     legacy = storage.ensure_root()
     if legacy:
         # Cases in the pre-2026-10-14 flat layout are invisible until moved

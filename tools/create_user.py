@@ -1,7 +1,8 @@
 """Create, update, list or remove login accounts (FR-1).
 
 There is no sign-up page on purpose - an administrator decides who may read
-customer logs. Run it inside the container so it writes the same DATA_DIR:
+customer logs. Run it inside the container so it writes the same AUTH_DIR
+(the accounts store, apart from customer data - config.py):
 
     docker exec -it forensic-analyzer-forensic-analyzer-1 \\
         python tools/create_user.py add someone@example.com --name "Somchai" --role analyst
