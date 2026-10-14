@@ -6,6 +6,7 @@ instead of scaling with it (the previous version read the whole file into
 a list of dicts, which is what made a 45MB CSV cost hundreds of MB).
 """
 
+import codecs
 import csv
 import gzip
 import json
@@ -18,12 +19,25 @@ from pathlib import Path
 csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 
+def detect_encoding(path: Path) -> str:
+    """"utf-16" when the file starts with a UTF-16 byte order mark, else
+    "utf-8-sig" (UTF-8, with or without its BOM). Excel's "Unicode Text"
+    save writes UTF-16 with a BOM: a real PAN-OS export saved that way read as
+    UTF-8 lines and gave twice the rows and 0 findings (IAI-30)."""
+    opener = gzip.open if str(path).lower().endswith(".gz") else open
+    with opener(path, "rb") as fh:
+        head = fh.read(2)
+    return "utf-16" if head in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE) else "utf-8-sig"
+
+
 def open_text(path: Path, newline: str | None = None):
     """Open a log for reading as text, gunzipping on the fly when the name
-    ends in .gz - read as a stream, never extracted to disk (FR-2.3)."""
+    ends in .gz - read as a stream, never extracted to disk (FR-2.3) - in
+    the encoding its byte order mark says (detect_encoding)."""
+    enc = detect_encoding(path)
     if str(path).lower().endswith(".gz"):
-        return gzip.open(path, "rt", encoding="utf-8-sig", errors="replace", newline=newline)
-    return open(path, "r", encoding="utf-8-sig", errors="replace", newline=newline)
+        return gzip.open(path, "rt", encoding=enc, errors="replace", newline=newline)
+    return open(path, "r", encoding=enc, errors="replace", newline=newline)
 
 
 # Delimiters worth considering. Comma is the fallback because it is what the

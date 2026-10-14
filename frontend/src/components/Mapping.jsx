@@ -146,6 +146,14 @@ function One({ mapping, name }) {
   const label = name ? <strong>{name}: </strong> : null
   const notes = (
     <>
+      {/* How the file itself was read (pipeline._file_notes, IAI-30). */}
+      {(mapping.encoding || mapping.read_as) && (
+        <div className="map-note">
+          {label}
+          {mapping.read_as && 'Read as a table: the file name does not say so, but its first line is the header of the log source below. '}
+          {mapping.encoding && `Text encoding ${mapping.encoding.toUpperCase()} (from the file's byte order mark).`}
+        </div>
+      )}
       {mapping.json && <JsonNote stats={mapping.json} label={label} />}
       <SyslogNote syslog={mapping.syslog} docs={mapping.syslog_docs} label={label} />
       <CoverageNote cov={mapping.coverage} label={label} />

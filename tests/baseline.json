@@ -393,10 +393,12 @@
   "rules": {}
  },
  "log_8_-01.txt": {
-  "flagged": 0,
+  "flagged": 14434,
   "md5": "b0f5fa30be6ce5d3ea1f429bb09581cd",
-  "rows": 37555,
-  "rules": {}
+  "rows": 18776,
+  "rules": {
+   "R3000": 14434
+  }
  },
  "log_8_.csv": {
   "flagged": 14434,

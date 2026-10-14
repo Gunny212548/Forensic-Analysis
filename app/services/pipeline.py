@@ -116,6 +116,25 @@ def _q(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
+def _table_header(path: Path) -> list[str]:
+    """The first line of a file read as a delimited header (any encoding,
+    any of the sniffed delimiters) - [] when it is not one."""
+    try:
+        return _csv_header(path, parsers.sniff_delimiter(path))
+    except (OSError, csv.Error, UnicodeError):
+        return []
+
+
+def _is_profiled_table(path: Path) -> bool:
+    """A .log / .txt whose first line is the header of a documented log
+    source (logsources.PROFILES) is that log source's table, whatever its
+    name says: a PAN-OS export saved from Excel as "Unicode Text" is named
+    .txt (IAI-30). Only a documented header counts - general format
+    detection is IAI-26."""
+    header = _table_header(path)
+    return len(header) > 1 and logsources.match_profile(header) is not None
+
+
 def _csv_header(path: Path, delimiter: str) -> list[str]:
     with parsers.open_text(path, newline="") as fh:
         try:
@@ -131,7 +150,8 @@ def _sql_values(mapping: dict[str, str]) -> str:
     return " ".join(f"WHEN {lit(k)} THEN {lit(v)}" for k, v in mapping.items())
 
 
-def _ingest_csv_sql(con, path: Path, start: int = 0) -> tuple[int, dict | None]:
+def _ingest_csv_sql(con, path: Path, start: int = 0,
+                    encoding: str = "utf-8-sig") -> tuple[int, dict | None]:
     """Ingest a CSV entirely inside DuckDB: it reads the file, maps source
     columns onto the canonical schema, and inserts - no row ever crosses
     into Python. Column mapping is resolved once from the header - from the
@@ -149,6 +169,8 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> tuple[int, dict | None]:
     # (gotcha #22).
     delimiter = parsers.sniff_delimiter(path)
     header = _csv_header(path, delimiter)
+    # DuckDB reads UTF-8 (with or without a BOM) by default; UTF-16 is named.
+    enc_opt = ", encoding='utf-16'" if encoding == "utf-16" else ""
     if not header:
         return -1, None
 
@@ -278,7 +300,7 @@ def _ingest_csv_sql(con, path: Path, start: int = 0) -> tuple[int, dict | None]:
             {col('category')}                     AS category,
             substr({raw_expr}, 1, 2000)           AS raw
         FROM read_csv(?, all_varchar=true, header=true, sample_size=-1,
-                      delim='{delimiter}')
+                      delim='{delimiter}'{enc_opt})
         """,
         [str(path)],
     )
@@ -399,17 +421,30 @@ def _coverage(con, start: int, written: int, mapping: dict) -> int:
     return loaded
 
 
+def _file_notes(mapping: dict, encoding: str, read_as: str | None) -> None:
+    """What the case page should say about how the file itself was read."""
+    if encoding != "utf-8-sig":
+        mapping["encoding"] = encoding
+    if read_as:
+        mapping["read_as"] = read_as
+
+
 def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
                  report=_noop, expected_bytes: int | None = None) -> tuple[int, bool, dict]:
     """Decode one file into raw_events with row ids from `start`.
     `report(fraction, estimated)` gets this file's progress (FR-2.5).
     Returns (rows added, truncated, how its columns were mapped - logsources.py)."""
+    read_as = None
+    if kind == "log" and _is_profiled_table(path):
+        kind, read_as = "csv", "csv"
+    encoding = parsers.detect_encoding(path)
     if kind == "csv" and not config.MAX_ROWS:
         # Fast path: DuckDB reads and decodes the CSV itself.
         stop, th = _estimate_while(report, expected_bytes or path.stat().st_size)
         try:
-            added, mapping = _ingest_csv_sql(con, path, start)
+            added, mapping = _ingest_csv_sql(con, path, start, encoding)
             if added >= 0:
+                _file_notes(mapping, encoding, read_as)
                 return _coverage(con, start, added, mapping), False, mapping
         except Exception:  # noqa: BLE001
             log.warning("case %s: SQL CSV ingest failed for %s, falling back", case_id,
@@ -447,6 +482,7 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
                 """,
                 [str(stage_path)],
             )
+        _file_notes(mapping, encoding, read_as)
         return _coverage(con, start, total, mapping), truncated, mapping
     finally:
         decode.REFERENCE_TIME.reset(year_ref)
