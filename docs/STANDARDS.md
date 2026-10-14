@@ -80,6 +80,15 @@ aligned with, not certified against:
 - **MAP (constraint)** - with the local model the response is decoded
   inside a per-case JSON schema: technique ids, ATT&CK stages, timestamps,
   levels, addresses and targets can only be values the evidence contains.
+- **MEASURE (traceability)** - every attack-chain stage and timeline entry
+  cites the findings it rests on (`refs` -> `finding_keys`, the review unit
+  `rid|srcip|username`; the schema allows only findings the prompt carried,
+  at least one) and states a `basis`: `fact` or `inference`. Each citation
+  opens its finding in the Review tab. `_meta.grounding` also flags an entry
+  that names an address none of its cited findings states - a wrong link
+  between two real entities, which the schema cannot rule out. The model's
+  own `basis` label is not relied on: it called such links `fact` (CLAUDE.md
+  gotcha #37).
 - **MANAGE** - the attack graph, severity, confidence, VERIS record and all
   exports are produced without the model, so an AI outage or a bad answer
   removes the prose, never the findings.

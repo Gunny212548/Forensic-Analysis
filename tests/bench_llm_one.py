@@ -4,6 +4,7 @@ model, graded against tests/README.md's ground truth. Prints one JSON line.
 Usage: DATA_DIR=<bench store> python tests/bench_llm_one.py <repo> <case_id> <model> <run>
 Driven by tests/bench_llm.py, which builds the store and the case.
 """
+import hashlib
 import json
 import os
 import re
@@ -66,5 +67,15 @@ out.update({
     "recs_n": len(a.get("recommendations") or []),
     "grounding_unsupported": [(u["kind"], u["value"]) for u in (meta.get("grounding") or {}).get("unsupported", [])],
     "summary": (a.get("summary") or "")[:400],
+    # Citations (grounding.resolve / check): how many chain + timeline
+    # entries cite a finding, how many say they are inference, and how many
+    # name a source none of their citations has - a wrong pairing of real
+    # entities, the one error the enums cannot prevent.
+    "citations": meta.get("citations"),
+    "relation_warnings": sum(1 for u in (meta.get("grounding") or {}).get("unsupported", [])
+                             if u["kind"] == "relation"),
+    "narrative_sha256": hashlib.sha256(json.dumps(
+        {k: a.get(k) for k in ("summary", "attack_chain", "recommendations", "timeline")},
+        sort_keys=True).encode()).hexdigest()[:16],
 })
 print(json.dumps(out, ensure_ascii=False))

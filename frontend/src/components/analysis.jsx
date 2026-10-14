@@ -33,32 +33,68 @@ export function ChainFlow({ chain }) {
   )
 }
 
-export function ChainStages({ chain }) {
+/** The findings a stage or timeline entry cites (grounding.resolve on the
+ *  server: ref F7 -> finding key rid|srcip|username). Each chip opens that
+ *  finding in the Review tab, so a claim can be checked against its evidence
+ *  rather than believed. `basis: inference` is said out loud - the entry
+ *  concludes more than the cited findings show. Analyses cached before
+ *  citations existed carry neither field and render as before. */
+function Citations({ item, onCite }) {
+  const keys = item.finding_keys || []
+  if (!keys.length && item.basis !== 'inference') return null
+  return (
+    <span className="cite-row">
+      {item.basis === 'inference' && (
+        <span className="cite-basis" title="Concludes more than the cited findings show by themselves">
+          inference
+        </span>
+      )}
+      {keys.map((key, i) => (
+        <button
+          type="button"
+          className="cite-chip"
+          key={key}
+          title={`Open finding ${key} in Review`}
+          onClick={() => onCite && onCite(key)}
+        >
+          {(item.refs || [])[i] || key.split('|')[0]}
+        </button>
+      ))}
+    </span>
+  )
+}
+
+export function ChainStages({ chain, onCite }) {
   if (!chain || !chain.length) {
     return <Empty>No clear multi-stage attack pattern was found.</Empty>
   }
   return (
     <>
       {chain.map((stage, i) => (
-        <div className="chain-stage" key={`${stage.stage}-${i}`}>
+        <div className={`chain-stage ${stage.basis === 'inference' ? 'is-inference' : ''}`} key={`${stage.stage}-${i}`}>
           <span className="stage-conf">confidence: {stage.confidence || '-'}</span>
           <div className="stage-name">{stage.stage || ''}</div>
           <div className="stage-desc">
             {stage.description || ''} <MitreTags list={stage.mitre} />
           </div>
-          <div className="stage-meta">{stage.timestamp_range || ''}</div>
+          <div className="stage-meta">
+            {stage.timestamp_range || ''} <Citations item={stage} onCite={onCite} />
+          </div>
         </div>
       ))}
     </>
   )
 }
 
-export function Timeline({ items }) {
+export function Timeline({ items, onCite }) {
   if (!items || !items.length) return null
   return (
     <>
       {items.map((item, i) => (
-        <div className="timeline-item" key={`${item.timestamp}-${i}`}>
+        <div
+          className={`timeline-item ${item.basis === 'inference' ? 'is-inference' : ''}`}
+          key={`${item.timestamp}-${i}`}
+        >
           <div className="ts">{item.timestamp || ''}</div>
           <div>
             <span className={SEV_CLASS[(item.severity || '').toLowerCase()] || ''}>
@@ -73,6 +109,7 @@ export function Timeline({ items }) {
             )}
             {item.target && <> → {item.target}</>}
             <MitreTags list={item.mitre} />
+            <Citations item={item} onCite={onCite} />
           </div>
         </div>
       ))}
@@ -220,6 +257,9 @@ export function AnalysisMeta({ meta }) {
             {meta.reproducibility.seed != null &&
               ` · temperature ${meta.reproducibility.temperature}, seed ${meta.reproducibility.seed}`}
             {meta.grounding && ` · ${meta.grounding.checked} cited values checked`}
+            {meta.citations &&
+              ` · ${meta.citations.cited}/${meta.citations.entries} entries cite a finding` +
+                ` (${meta.citations.findings} distinct), ${meta.citations.inference} marked inference`}
           </>
         )}
       </div>
@@ -227,30 +267,66 @@ export function AnalysisMeta({ meta }) {
   )
 }
 
-const GROUNDING_KIND = { ip: 'address', technique: 'ATT&CK id', email: 'e-mail', date: 'date' }
+const GROUNDING_KIND = { ip: 'address', technique: 'ATT&CK id', email: 'e-mail', date: 'date', stage: 'stage' }
+// Citation problems (grounding._check_citations) are a different warning:
+// the values are real, what is wrong is what they are attached to.
+const CITATION_KINDS = new Set(['relation', 'uncited', 'ref'])
 
-/** grounding.check() on the server: values the narrative states that were
- *  not in the evidence it was given. Shown, not removed - the analyst decides
- *  whether "10.8.1.0/24" style generalisations are fair. */
-function Grounding({ grounding }) {
-  if (!grounding || grounding.ok) return null
+function dedupe(list, keyOf) {
   const seen = new Set()
-  const items = grounding.unsupported.filter((u) => {
-    const k = `${u.kind}|${u.value}`
+  return list.filter((u) => {
+    const k = keyOf(u)
     if (seen.has(k)) return false
     seen.add(k)
     return true
   })
+}
+
+function citationText(u) {
+  const where = u.path.replace(/\.(refs|source_ip|description|event|target)$/, '')
+  if (u.kind === 'uncited') return `${where} cites no finding`
+  if (u.kind === 'ref') return `${where} cites ${u.value}, which the evidence does not have`
+  return `${where}: ${u.value}`
+}
+
+/** grounding.check() on the server: values the narrative states that were
+ *  not in the evidence it was given, and entries whose citations do not
+ *  carry what the entry says about them. Shown, not removed - the analyst
+ *  decides whether "10.8.1.0/24" style generalisations are fair. */
+function Grounding({ grounding }) {
+  if (!grounding || grounding.ok) return null
+  const all = grounding.unsupported || []
+  // A value is reported once however often it recurs; a citation problem
+  // once per entry, since each one is a different statement.
+  const values = dedupe(all.filter((u) => !CITATION_KINDS.has(u.kind)), (u) => `${u.kind}|${u.value}`)
+  const cites = dedupe(all.filter((u) => CITATION_KINDS.has(u.kind)), (u) => `${u.kind}|${u.path}|${u.value}`)
   return (
-    <div className="meta-warn">
-      The narrative states {items.length} value{items.length === 1 ? '' : 's'} that the evidence it was
-      given does not contain - check before quoting it:{' '}
-      {items.map((u, i) => (
-        <span key={i}>
-          {i > 0 && ', '}
-          {GROUNDING_KIND[u.kind] || u.kind} <code>{u.value}</code>
-        </span>
-      ))}
-    </div>
+    <>
+      {values.length > 0 && (
+        <div className="meta-warn">
+          The narrative states {values.length} value{values.length === 1 ? '' : 's'} that the evidence it was
+          given does not contain - check before quoting it:{' '}
+          {values.map((u, i) => (
+            <span key={i}>
+              {i > 0 && ', '}
+              {GROUNDING_KIND[u.kind] || u.kind} <code>{u.value}</code>
+            </span>
+          ))}
+        </div>
+      )}
+      {cites.length > 0 && (
+        <div className="meta-warn">
+          {cites.length} statement{cites.length === 1 ? '' : 's'} not backed by the finding
+          {cites.length === 1 ? '' : 's'} cited - an address or link the cited evidence does not show is an
+          inference, whatever its label:{' '}
+          {cites.map((u, i) => (
+            <span key={i}>
+              {i > 0 && '; '}
+              <code>{citationText(u)}</code>
+            </span>
+          ))}
+        </div>
+      )}
+    </>
   )
 }

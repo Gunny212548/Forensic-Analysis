@@ -20,6 +20,16 @@ TACTICS, the same map the Sigma tags use) plus the attack-path escalations,
 never from the model. A rule without a technique tag (R1001, R1003, R1004)
 therefore cannot put a stage on the chain: the narrative says less, and
 everything it does say has a rule behind it.
+
+**Citations.** Every quoted finding carries a short `ref` (`F7`, its rank in
+the case's pool - `assign_refs()`), and every attack-chain stage and timeline
+entry must cite one or more of them in `refs`, plus a `basis`: `fact` when it
+restates what the cited findings say, `inference` when it concludes beyond
+them. The schema allows only refs the prompt carries; `resolve()` turns them
+back into finding keys (`rid|srcip|username`, the unit the analyst reviews),
+and `check()` flags an entry that names an address - as its `source_ip` or in
+its text - that none of its citations states: a wrong relation between two
+real entities, which no enum can catch.
 """
 
 import hashlib
@@ -28,6 +38,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
+from .db import finding_key
 from .rule_meta import TACTICS
 from .severity import LEVELS
 
@@ -36,6 +47,9 @@ CHAIN_CAP = 4
 TIMELINE_CAP = 6
 RECS_CAP = 3
 NOTABLE_CAP = 4
+REFS_CAP = 5        # citations per stage / timeline entry
+NOTABLE_REFS_CAP = 3
+BASES = ["fact", "inference"]
 
 # Free-text ceilings. Generous - the prompt asks for far less - they exist
 # because a constrained string has no natural end: in testing a "target"
@@ -66,7 +80,11 @@ ESCALATION_FACTS = {
     "credential-compromise": (["T1078"], ["Initial Access"]),
 }
 
-_IPV4 = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?:/(\d{1,2}))?(?![\d.])")
+# The lookahead refuses a following digit or ".digit" (a longer dotted
+# number), not a bare "." - it used to, and so never matched an address that
+# ends a sentence ("...gained shell access to 10.10.1.5."), which check()
+# then never read.
+_IPV4 = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?:/(\d{1,2}))?(?!\d|\.\d)")
 _TECH = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
 _EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b")
 _DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
@@ -89,6 +107,9 @@ class Facts:
     levels: set = field(default_factory=set)
     ips: set = field(default_factory=set)
     entities: set = field(default_factory=set)
+    # ref -> the finding it names: {"key", "rid", "srcip", "username", "ips"}. Only
+    # refs the prompt actually shows (quoted, or cited by a batch digest).
+    refs: dict[str, dict] = field(default_factory=dict)
 
     def add_technique(self, tid: str, stages: list[str], rid: str | None = None) -> None:
         self.techniques.setdefault(tid, set()).update(stages)
@@ -103,6 +124,32 @@ class Facts:
 
 def _ips_in(text) -> list[str]:
     return [m.group(1) for m in _IPV4.finditer(str(text or ""))]
+
+
+def assign_refs(rows: list[dict]) -> list[dict]:
+    """Give each finding its citation id, `F1`.. in the order given (the
+    pool's severity rank, which is deterministic - gotcha #37). Rows that
+    already carry one keep it, so a map-reduce pool numbered once stays
+    numbered the same in every batch and in the reduce call."""
+    for i, row in enumerate(rows, start=1):
+        row.setdefault("ref", f"F{i}")
+    return rows
+
+
+def ref_order(ref: str) -> tuple:
+    return (int(ref[1:]) if ref[1:].isdigit() else 0, ref)
+
+
+def _ref_entry(e: dict) -> dict:
+    return {
+        "key": finding_key(e.get("rid"), e.get("srcip"), e.get("username")),
+        "rid": e.get("rid"),
+        "srcip": e.get("srcip"),
+        "username": e.get("username"),
+        # Every address the finding itself states: its source, and the ones
+        # its description names (the destination of a transfer, say).
+        "ips": sorted({*_ips_in(e.get("descr")), *([e["srcip"]] if e.get("srcip") else [])}),
+    }
 
 
 def facts(
@@ -120,10 +167,14 @@ def facts(
     quotes one batch but summarises the whole pool); it defaults to `events`.
     """
     f = Facts()
-    for e in technique_events if technique_events is not None else events:
+    pool = technique_events if technique_events is not None else events
+    by_ref = {e["ref"]: e for e in pool if e.get("ref")}
+    for e in pool:
         for tid in e.get("mitre") or []:
             f.add_technique(tid, tactics_of(tid), e.get("rid"))
     for e in events:
+        if e.get("ref"):
+            f.refs[e["ref"]] = _ref_entry(e)
         for ts in (e.get("ts_first"), e.get("ts_last")):
             if ts:
                 f.timestamps.add(str(ts))
@@ -141,6 +192,11 @@ def facts(
         for ev in d.get("notable_events") or []:
             if not isinstance(ev, dict):
                 continue
+            # A batch digest's citations are evidence the reduce call may
+            # cite too: the finding was read, only not quoted again.
+            for ref in ev.get("refs") or []:
+                if ref in by_ref:
+                    f.refs[ref] = _ref_entry(by_ref[ref])
             if ev.get("ts"):
                 f.timestamps.add(str(ev["ts"]))
             if ev.get("sev"):
@@ -208,6 +264,15 @@ def _ids(f: Facts) -> dict:
     return {"type": "array", "items": _enum(f.techniques)}
 
 
+def _refs(f: Facts, cap: int) -> dict:
+    # At least one: a stage or a timeline entry with no finding behind it is
+    # exactly the claim this field exists to rule out.
+    if not f.refs:
+        return {"type": "array", "maxItems": 0}
+    refs = sorted(f.refs, key=ref_order)
+    return {"type": "array", "minItems": 1, "maxItems": cap, "items": {"enum": refs}}
+
+
 def _timestamp(f: Facts) -> dict:
     # A case whose timestamps never parsed has nothing to enumerate; a short
     # free string then, and check() still reads it.
@@ -230,8 +295,11 @@ def narrative_schema(f: Facts) -> dict:
             "timestamp_range": {"type": "string", "maxLength": TIMESTAMP_RANGE_MAX},
             "confidence": {"enum": ["low", "medium", "high"]},
             "mitre": _ids(f),
+            "refs": _refs(f, REFS_CAP),
+            "basis": {"enum": BASES},
         },
-        "required": ["stage", "description", "timestamp_range", "confidence", "mitre"],
+        "required": ["stage", "description", "timestamp_range", "confidence", "mitre",
+                     "refs", "basis"],
     }
     timeline_item = {
         "type": "object",
@@ -242,8 +310,11 @@ def narrative_schema(f: Facts) -> dict:
             "source_ip": _enum(f.ips, nullable=True),
             "target": _enum(f.entities, nullable=True),
             "mitre": _ids(f),
+            "refs": _refs(f, REFS_CAP),
+            "basis": {"enum": BASES},
         },
-        "required": ["timestamp", "event", "severity", "source_ip", "target", "mitre"],
+        "required": ["timestamp", "event", "severity", "source_ip", "target", "mitre",
+                     "refs", "basis"],
     }
     return {
         "type": "object",
@@ -277,8 +348,9 @@ def map_schema(f: Facts) -> dict:
                         "src": _enum(f.ips, nullable=True),
                         "target": _enum(f.entities, nullable=True),
                         "mitre": _ids(f),
+                        "refs": _refs(f, NOTABLE_REFS_CAP),
                     },
-                    "required": ["ts", "event", "sev", "src", "target", "mitre"],
+                    "required": ["ts", "event", "sev", "src", "target", "mitre", "refs"],
                 },
             },
         },
@@ -310,7 +382,7 @@ def _strings(value, path: str):
             yield from _strings(v, f"{path}.{k}")
 
 
-def check(result: dict, prompt: str) -> dict:
+def check(result: dict, prompt: str, refs: dict | None = None) -> dict:
     """Every address, technique id, e-mail and ISO date the narrative states
     must appear in the prompt it was written from. Schema-enforced fields are
     read too: the Groq path has no schema, and a check that skips fields can
@@ -355,7 +427,97 @@ def check(result: dict, prompt: str) -> dict:
                     checked += 1
                     if not rx.search(prompt):
                         unsupported.append({"path": path, "kind": "stage", "value": stage})
+    if refs is not None:
+        checked += _check_citations(result, refs, unsupported)
     return {"ok": not unsupported, "checked": checked, "unsupported": unsupported}
+
+
+def _cited(result: dict):
+    for key in ("attack_chain", "timeline"):
+        for i, item in enumerate(result.get(key) or []):
+            if isinstance(item, dict):
+                yield f"{key}[{i}]", item
+
+
+def _ref_list(item: dict) -> list[str]:
+    # Unconstrained (Groq) output can write "refs": "F3" - one ref, not the
+    # letters F and 3.
+    refs = item.get("refs")
+    if isinstance(refs, str):
+        refs = [refs]
+    return [r for r in refs or [] if isinstance(r, str)]
+
+
+def _covers(text_ip: str, prefix: str | None, stated: set) -> bool:
+    if not prefix:
+        return text_ip in stated
+    try:
+        net = ipaddress.ip_network(f"{text_ip}/{prefix}", strict=False)
+    except ValueError:
+        return False
+    return any(_valid(ip) and ipaddress.ip_address(ip) in net for ip in stated)
+
+
+def _check_citations(result: dict, refs: dict, unsupported: list) -> int:
+    """Citations the schema cannot police: Groq gets no schema, so a ref can
+    be absent or invented there; and on either path an entry can cite real
+    findings that are about a different source than the one it names."""
+    checked = 0
+    for path, item in _cited(result):
+        cited = _ref_list(item)
+        checked += 1
+        if not cited:
+            unsupported.append({"path": f"{path}.refs", "kind": "uncited", "value": ""})
+            continue
+        for r in cited:
+            if r not in refs:
+                unsupported.append({"path": f"{path}.refs", "kind": "ref", "value": r})
+        src = item.get("source_ip")
+        known = [refs[r] for r in cited if r in refs]
+        if not known:
+            continue
+        if src:
+            checked += 1
+            if not any(src in (k.get("srcip"), k.get("username")) for k in known):
+                unsupported.append({
+                    "path": f"{path}.source_ip", "kind": "relation",
+                    "value": f"{src} - not the source of {', '.join(cited)}",
+                })
+        # The same test on the prose: an address the entry names must be one
+        # its own citations state. "Brute-forced root on 10.10.1.5", citing
+        # auth-log findings that never name a host, joins two real entities
+        # the evidence does not join - an inference written as a fact.
+        stated = {ip for k in known for ip in k.get("ips") or []}
+        for field_ in ("description", "event", "target"):
+            for m in _IPV4.finditer(str(item.get(field_) or "")):
+                checked += 1
+                # A network that covers a stated address is the same claim,
+                # less specific - as in check().
+                if not _covers(m.group(1), m.group(2), stated):
+                    unsupported.append({
+                        "path": f"{path}.{field_}", "kind": "relation",
+                        "value": f"{m.group(0)} - not in {', '.join(cited)}",
+                    })
+    return checked
+
+
+def resolve(result: dict, refs: dict) -> dict:
+    """Turn each cited ref into the finding key the analyst reviews, in
+    place, and count what was cited - `_meta.citations`."""
+    out = {"entries": 0, "cited": 0, "fact": 0, "inference": 0, "findings": 0}
+    seen = set()
+    for _, item in _cited(result):
+        out["entries"] += 1
+        cited = list(dict.fromkeys(r for r in _ref_list(item) if r in refs))
+        item["refs"] = cited
+        item["finding_keys"] = [refs[r]["key"] for r in cited]
+        if cited:
+            out["cited"] += 1
+        if item.get("basis") in BASES:
+            out[item["basis"]] += 1
+        seen.update(item["finding_keys"])
+    out["findings"] = len(seen)
+    return out
 
 
 # Execution, Discovery, Collection and Impact are left out: as ordinary

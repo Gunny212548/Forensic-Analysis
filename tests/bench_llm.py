@@ -79,7 +79,8 @@ def main() -> int:
     by = collections.defaultdict(list)
     for r in rows:
         by[r["model"]].append(r)
-    print(f"\n{'model':22} ok   avg_s  exp_stages  unsup_stages  unsup_tech  entities  benign")
+    print(f"\n{'model':22} ok   avg_s  exp_stages  unsup_stages  unsup_tech  entities  benign"
+          f"  cited  infer  relation  distinct")
     for m, rs in by.items():
         ok = [r for r in rs if r.get("http") == 200 and not r.get("missing")]
         if not ok:
@@ -91,7 +92,12 @@ def main() -> int:
               f"{sum(len(r['unsupported_stages']) for r in ok):12} "
               f"{sum(len(r['unsupported_techniques']) for r in ok):10} "
               f"{avg(lambda r: len(r['entities_named'])):8.2f} "
-              f"{sum(r['benign_in_chain'] for r in ok):6}")
+              f"{sum(r['benign_in_chain'] for r in ok):6} "
+              f"{sum((r.get('citations') or {}).get('cited', 0) for r in ok):4}/"
+              f"{sum((r.get('citations') or {}).get('entries', 0) for r in ok):<3} "
+              f"{sum((r.get('citations') or {}).get('inference', 0) for r in ok):5} "
+              f"{sum(r.get('relation_warnings', 0) for r in ok):9} "
+              f"{len({r.get('narrative_sha256') for r in ok}):9}")
     return 0
 
 

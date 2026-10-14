@@ -40,7 +40,9 @@ emit under a "graph" key is discarded. Spend the budget on the narrative.
       "description": "what happened at this stage, referencing evidence",
       "timestamp_range": "earliest - latest timestamp for this stage",
       "confidence": "low|medium|high",
-      "mitre": ["technique ids from the 'Techniques tagged by the rule engine' list only - [] if none of them fits"]
+      "mitre": ["technique ids from the 'Techniques tagged by the rule engine' list only - [] if none of them fits"],
+      "refs": ["the ref of every event this stage rests on, e.g. F3 - at least one"],
+      "basis": "fact|inference"
     }
   ],
   "recommendations": ["short actionable remediation/investigation steps"],
@@ -51,10 +53,20 @@ emit under a "graph" key is discarded. Spend the budget on the narrative.
       "severity": "the sev of the event(s) described, verbatim",
       "source_ip": "IP address if present, else null",
       "target": "user/host/asset targeted if identifiable, else null",
-      "mitre": ["the technique ids the event itself carries - [] if it carries none"]
+      "mitre": ["the technique ids the event itself carries - [] if it carries none"],
+      "refs": ["the ref of the event(s) this entry describes - at least one"],
+      "basis": "fact|inference"
     }
   ]
 }
+
+CITE YOUR EVIDENCE. Every event carries a "ref" (F1, F2, ...). Every
+attack_chain stage and every timeline entry must list in "refs" the events it
+rests on, and only those. "source_ip" must be the srcip of a cited event.
+"basis" is "fact" when the entry only restates what the cited events show,
+and "inference" when it concludes something they do not show by themselves
+(a motive, a link between two events, that an attack succeeded). Prefer
+fact; an inference is allowed, but it must be marked as one.
 
 "timeline": at most 6 entries, the most significant ones only. The full
 event list is already available to the analyst in the UI - the timeline here
@@ -136,7 +148,8 @@ written before the event list can eat the budget.
       "sev": "the event's sev, verbatim",
       "src": "source IP if present, else null",
       "target": "user/host/asset targeted if identifiable, else null",
-      "mitre": ["MITRE ATT&CK technique ids - keep the ones the rule engine already supplied"]
+      "mitre": ["MITRE ATT&CK technique ids - keep the ones the rule engine already supplied"],
+      "refs": ["the ref of the event(s) this entry describes, e.g. F3"]
     }
   ]
 }
@@ -209,7 +222,8 @@ def _condense(e: dict) -> dict:
     """Map one SQL row from db.top_distinct_findings() into the compact
     shape sent to the model. Dedup/severity-selection already happened in
     SQL, so this is pure formatting."""
-    out = {
+    out = {"ref": e["ref"]} if e.get("ref") else {}
+    out |= {
         "ts": e.get("ts_first"),
         "rid": e.get("rid"),
         "sev": e.get("level"),
@@ -409,6 +423,9 @@ def _format_digests(digests: list[dict]) -> str:
             mitre = [m for m in (ev.get("mitre") or []) if m]
             if mitre:
                 bits.append(",".join(str(m) for m in mitre))
+            refs = [str(r) for r in (ev.get("refs") or []) if r]
+            if refs:
+                bits.append("refs=" + ",".join(refs))
             lines.append("    - " + " | ".join(bits))
     return "\n".join(lines)
 
@@ -462,7 +479,7 @@ def _build_prompt(
         f"All times are {config.EVENT_TZ_SUFFIX} (GMT+7); every event in this "
         f"case was normalised to that zone at ingest, so they are directly "
         f"comparable. Report times as given - do not convert them.\n\n"
-        f"Events (JSON array, chronological, short keys: ts=timestamp, "
+        f"Events (JSON array, chronological, short keys: ref=the id to cite this event by, ts=timestamp, "
         f"rid=internal rule id, sev=Sigma level computed by the rule engine (informational/low/medium/high/critical; critical means an attack-path pattern showed the attack succeeded) - copy it, do not re-grade, desc=description, "
         f"srcip, user, mitre=technique ids already tagged by the rule engine "
         f"if any, count/ts_last_seen present when this entry represents "
@@ -714,6 +731,8 @@ async def run_analysis(
     _preflight()
     if not events:
         raise AnalysisError("This case has no flagged events - nothing to analyze.")
+    # A map-reduce pool arrives numbered; a single call is numbered here.
+    grounding.assign_refs(events)
 
     facts = grounding.facts(
         events, technique_events=technique_events, digests=digests, risk=risk,
@@ -796,7 +815,7 @@ async def run_analysis(
         # What the narrative could not see past, and whether it stayed inside
         # it (grounding.py). `constrained` is false on Groq, which gets the
         # check but not the schema.
-        "grounding": grounding.check(result, prompt),
+        "grounding": grounding.check(result, prompt, facts.refs),
         "reproducibility": {
             "constrained": _is_local(),
             "temperature": config.OLLAMA_TEMPERATURE if _is_local() else payload["temperature"],
@@ -806,6 +825,9 @@ async def run_analysis(
             "allowed": {"techniques": sorted(facts.techniques), "stages": facts.stages},
         },
     }
+    # After check(), which has to see a ref the model invented (Groq has no
+    # schema) before resolve() drops it.
+    result["_meta"]["citations"] = grounding.resolve(result, facts.refs)
     if meta_extra:
         result["_meta"].update(meta_extra)
     return result
@@ -933,7 +955,7 @@ async def _run_map_call(
         f"distinct findings).\n\n"
         f"All times are {config.EVENT_TZ_SUFFIX} (GMT+7). Report times as "
         f"given - do not convert them.\n\n"
-        f"Events (JSON array, chronological, short keys: ts=timestamp, "
+        f"Events (JSON array, chronological, short keys: ref=the id to cite this event by, ts=timestamp, "
         f"rid=internal rule id, sev=Sigma level computed by the rule engine (informational/low/medium/high/critical; critical means an attack-path pattern showed the attack succeeded) - copy it, do not re-grade, desc=description, srcip, "
         f"user, mitre=technique ids already tagged by the rule engine, "
         f"count/ts_last_seen present when this entry collapses repeats):\n"
@@ -1030,6 +1052,9 @@ async def run_map_reduce_analysis(
 
     plan = plan or plan_map_reduce(distinct_total or len(pool))
     per_chunk = plan["per_chunk"]
+    # Numbered once over the whole pool, so F7 means the same finding in its
+    # batch, in that batch's digest and in the reduce call.
+    grounding.assign_refs(pool)
     chunks = [pool[i:i + per_chunk] for i in range(0, len(pool), per_chunk)][
         : max(1, config.ANALYSIS_MAP_MAX_CHUNKS)
     ]

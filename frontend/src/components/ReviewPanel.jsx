@@ -13,7 +13,7 @@ const ORDER = { Unreviewed: 0, Modified: 1, Accepted: 2, Rejected: 3 }
  *  row - one case has 20,063 finding rows and 4 reviewable findings, and
  *  reviewing rows one at a time is a requirement that cannot be met
  *  (CLAUDE.md gotcha #19). Decisions are append-only server-side. */
-export default function ReviewPanel({ caseId }) {
+export default function ReviewPanel({ caseId, focus }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [rejecting, setRejecting] = useState(null) // finding key awaiting a reason
@@ -34,6 +34,24 @@ export default function ReviewPanel({ caseId }) {
   useEffect(() => {
     load()
   }, [load])
+
+  // A narrative citation asked for this finding (Result.jsx): bring it into
+  // view and mark it briefly. After a frame, because the tab it lives in is
+  // made visible in the same render that set `focus`.
+  const [flash, setFlash] = useState('')
+  useEffect(() => {
+    if (!focus || !data) return undefined
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(`rv-${focus.key}`)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFlash(focus.key)
+    })
+    const t = setTimeout(() => setFlash(''), 2500)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(t)
+    }
+  }, [focus, data])
 
   async function submit(key, action, extra = {}) {
     setBusyKey(key)
@@ -136,7 +154,11 @@ export default function ReviewPanel({ caseId }) {
         const st = f.review.status
         const busy = busyKey === f.key
         return (
-          <div className={`rv-item ${REVIEW_CLASS[st] || ''}`} key={f.key}>
+          <div
+            className={`rv-item ${REVIEW_CLASS[st] || ''} ${flash === f.key ? 'rv-flash' : ''}`}
+            id={`rv-${f.key}`}
+            key={f.key}
+          >
             <div className="rv-head">
               {f.level && (
                 <span

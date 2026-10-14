@@ -71,6 +71,13 @@ export default function Result({ caseId }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState('')
   const [tab, setTab] = useState(undefined)
+  // A citation chip in the chain/timeline opens its finding in Review. An
+  // object, not the key, so citing the same finding twice still scrolls.
+  const [focus, setFocus] = useState(null)
+  const cite = useCallback((key) => {
+    setFocus({ key })
+    setTab('review')
+  }, [])
 
   // One place decides what a body means, so the POST answer and every poll
   // answer are treated identically.
@@ -237,7 +244,7 @@ export default function Result({ caseId }) {
       node: <EventsTable caseId={caseId} />,
     })
 
-    out.push({ key: 'review', label: 'Review', node: <ReviewPanel caseId={caseId} /> })
+    out.push({ key: 'review', label: 'Review', node: <ReviewPanel caseId={caseId} focus={focus} /> })
 
     out.push({ key: 'evidence', label: 'Evidence', node: <Evidence caseId={caseId} /> })
 
@@ -246,7 +253,7 @@ export default function Result({ caseId }) {
         key: 'chain',
         label: 'Attack Chain',
         count: (analysis.attack_chain || []).length,
-        node: <ChainStages chain={analysis.attack_chain} />,
+        node: <ChainStages chain={analysis.attack_chain} onCite={cite} />,
       })
 
       const edges = analysis.graph?.edges?.length || 0
@@ -278,7 +285,7 @@ export default function Result({ caseId }) {
           key: 'timeline',
           label: 'Timeline',
           count: analysis.timeline.length,
-          node: <Timeline items={analysis.timeline} />,
+          node: <Timeline items={analysis.timeline} onCite={cite} />,
         })
       }
 
@@ -293,7 +300,7 @@ export default function Result({ caseId }) {
     }
 
     return out
-  }, [manifest, analysis, analyzing, analyzeError, job, jobFailed, stalled, caseId, analyze])
+  }, [manifest, analysis, analyzing, analyzeError, job, jobFailed, stalled, caseId, analyze, focus, cite])
 
   const [statusLabel] = statusOf(manifest?.status)
 
