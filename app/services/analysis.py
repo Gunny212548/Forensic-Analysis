@@ -675,10 +675,9 @@ def _system_prompt() -> str:
     """The narrative schema prompt, with its size instructions matched to the
     output budget actually in force.
 
-    The caps in SYSTEM_PROMPT (900 tokens, 6 timeline entries, 4 stages) are
-    measurements of what fits on Groq, not properties of the schema. A local
-    model given 2400 tokens can afford more, and telling it the old numbers
-    just wastes the budget it was given.
+    The ~900-token budget and "extremely concise" in SYSTEM_PROMPT are what
+    fits on Groq; a local model with a bigger budget is told its own number.
+    The entry caps stay as written - the grounding schema enforces them.
     """
     prompt = SYSTEM_PROMPT
     budget = config.MAX_COMPLETION_TOKENS
