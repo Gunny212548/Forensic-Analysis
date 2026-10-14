@@ -16,3 +16,5 @@ logtest/
 
 # Functional-spec PDFs are external reference, kept out of the code repo.
 *.pdf
+# archify diagram output (generated, local only)
+.archify/
