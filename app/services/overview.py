@@ -226,7 +226,7 @@ def build(company_id: str | None = None) -> dict:
         # One technique is the same behaviour in every customer, so it stays
         # one card - naming each customer it was seen in.
         "techniques": [{"id": t, "name": TECHNIQUE_NAMES.get(t, ""), "cases": n, "findings": tech_findings[t],
-                        "customers": sorted(tech_customers[t])}
+                        "customers": sorted(tech_customers[t], key=str.lower)}
                        for t, n in tech_cases.most_common(8)],
         "recent": recent[:8],
         "cases": [{k: m.get(k) for k in ("case_id", "original_filename", "company_name", "file_kind",
