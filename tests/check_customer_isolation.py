@@ -14,6 +14,9 @@ case that tempts a shared store), and checks:
   customer's cases; unscoped they show both;
 - merging cases of two customers is refused (409), and within one customer
   it is allowed and lands in that customer's store;
+- a project lives in its customer's store, is reused by name, and another
+  customer's project id is refused (409) without making a case; a merge
+  keeps a project only when every source is in it;
 - a case id that is not a case id, or a customer that does not exist, is
   refused instead of turning into a path.
 
@@ -136,6 +139,40 @@ def main() -> int:
         check(merged is not None
               and (store / "customers" / a["company_id"] / "cases" / f"{merged}.json").is_file(),
               f"merge within one customer lands in its store ({r.status_code})")
+
+        print("projects")
+
+        def upload_a(data: dict) -> "object":
+            with open(uc / "nightfall-auth.log", "rb") as fh:
+                return c.post("/api/upload", files={"file": ("p.log", fh)}, data=data)
+
+        p1 = upload_a({"company_id": a["company_id"], "project_name": "Investigation 1"}).json()
+        pid = p1.get("project_id")
+        check(bool(pid) and p1.get("project_name") == "Investigation 1"
+              and (store / "customers" / a["company_id"] / "projects" / f"{pid}.json").is_file(),
+              "a new project is created in its customer's store and the case is filed in it")
+        p2 = upload_a({"company_id": a["company_id"], "project_name": "investigation 1 "}).json()
+        check(p2.get("project_id") == pid, "a project name is reused, not forked")
+        listed = c.get(f"/api/companies/{a['company_id']}/projects").json()
+        check([p["project_id"] for p in listed] == [pid], "the customer's project list has it")
+        check(c.get(f"/api/companies/{b['company_id']}/projects").json() == [],
+              "the other customer has no projects")
+        before = len(c.get(f"/api/cases?company_id={b['company_id']}").json())
+        with open(uc / "nightfall-auth.log", "rb") as fh:
+            r = c.post("/api/upload", files={"file": ("x.log", fh)},
+                       data={"company_id": b["company_id"], "project_id": pid})
+        after = len(c.get(f"/api/cases?company_id={b['company_id']}").json())
+        check(r.status_code == 409 and after == before,
+              f"another customer's project is refused and no case is made ({r.status_code})")
+        r = upload_a({"company_id": a["company_id"], "project_id": "../../users"})
+        check(r.status_code == 409, f"a path-shaped project id is not a project ({r.status_code})")
+        r = c.post("/api/cases/merge", json={"case_ids": [p1["case_id"], p2["case_id"]]})
+        m = c.get(f"/api/cases/{r.json().get('case_id')}").json() if r.status_code == 200 else {}
+        check(m.get("project_id") == pid, f"a merge of one project's cases stays in it ({r.status_code})")
+        r = c.post("/api/cases/merge", json={"case_ids": [p1["case_id"], auth_a]})
+        m = c.get(f"/api/cases/{r.json().get('case_id')}").json() if r.status_code == 200 else {}
+        check(r.status_code == 200 and not m.get("project_id"),
+              f"a merge across projects is in no project ({r.status_code})")
 
         print("refusals")
         check(c.get("/api/cases/..%2F..%2Fusers").status_code in (404, 422),

@@ -253,6 +253,9 @@ async def merge_cases(request: Request, background_tasks: BackgroundTasks, body:
     if company is None:
         raise HTTPException(404, "Company not found")
     company_name = company["name"]
+    # Sources from one project stay in it; mixed ones give a case in none.
+    project_ids = {m.get("project_id") for m in sources}
+    project = storage.load_project(company_id, project_ids.pop()) if len(project_ids) == 1 else None
 
     names = [m.get("original_filename") or m["case_id"] for _, _, m in ordered]
     manifest = storage.create_case(
@@ -262,6 +265,7 @@ async def merge_cases(request: Request, background_tasks: BackgroundTasks, body:
         note=body.get("note") or f"Merged {len(ordered)} cases in chronological order",
         company_id=company_id,
         company_name=company_name,
+        project=project,
         merged_from=[
             {"case_id": m["case_id"], "original_filename": m.get("original_filename"),
              "ts_first": ts_first}

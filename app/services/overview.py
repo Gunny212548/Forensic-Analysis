@@ -229,9 +229,9 @@ def build(company_id: str | None = None) -> dict:
                         "customers": sorted(tech_customers[t], key=str.lower)}
                        for t, n in tech_cases.most_common(8)],
         "recent": recent[:8],
-        "cases": [{k: m.get(k) for k in ("case_id", "original_filename", "company_name", "file_kind",
-                                         "status", "error", "severity", "total_rows", "flagged_count",
-                                         "uploaded_at", "size_bytes", "progress")}
+        "cases": [{k: m.get(k) for k in ("case_id", "original_filename", "company_name", "project_name",
+                                         "file_kind", "status", "error", "severity", "total_rows",
+                                         "flagged_count", "uploaded_at", "size_bytes", "progress")}
                   for m in manifests],
     }
 

@@ -76,6 +76,7 @@ GET/POST /api/companies                      customers (FR-2.1 requires one)
 GET  /api/companies/summary                  Customers page: open/closed cases,
                                              highest open severity, last
                                              activity (overview.customers())
+GET  /api/companies/{id}/projects            the customer's projects (storage.py)
 GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
 GET  /api/cases/{id}/findings                collapsed findings + computed
                                              confidence + review status
@@ -128,7 +129,7 @@ the same technique is the same behaviour whoever it happened to.
 Storage layout under `DATA_DIR` (`/data`) - **one store per customer**
 since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything
 of that customer and nothing of anyone else's: `customer.json` the customer
-record · `cases/` manifests (small JSON) · `db/` per-case DuckDB · `raw/`
+record · `projects/` its projects, one JSON each · `cases/` manifests (small JSON) · `db/` per-case DuckDB · `raw/`
 original uploaded files, compressed ones kept compressed (audit trail) ·
 `analysis/` cached AI output · `review/` append-only analyst decision logs,
 one JSONL per case (see gotcha #19) · `custody/` hash-chained
@@ -142,7 +143,8 @@ data: `intel/` threat-intel feed files (see gotcha #17) · `tmp/` staging ·
 `forensic-auth`; see *Login* below).
 
 A manifest now carries more than the upload: `company_id`/`company_name`
-(always set since FR-2.1), `compression` (`gz`/`zip`/null), `size_bytes` (as
+(always set since FR-2.1), `project_id`/`project_name` (only when the case
+was uploaded into a project), `compression` (`gz`/`zip`/null), `size_bytes` (as
 uploaded) vs `uncompressed_bytes` (what the 10 GB limit is measured on),
 `members`/`skipped_members` for a zip (with each member's `row_id` range),
 `progress` while processing, `evidence` (SHA-256 of the raw file at
@@ -1649,6 +1651,20 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
   case. Frontend only - it reads
   `/api/overview?company_id=` and `/api/cases?company_id=`. "Reports" is
   shown as **AI analyses** on purpose: no report feature exists yet (IAI-55).
+- **Projects (2026-10-15, the user's request, no story).** A project is one
+  investigation of one customer, grouping the cases uploaded for it
+  (customer -> project -> case). Chosen on the Upload page under the
+  customer ("+ Add new project..." creates one, idempotent by name within
+  the customer, like customers); **optional** - old cases, scripts and
+  uploads without one are "No project". Stored in the customer's own store
+  (`customers/<id>/projects/<pj-id>.json`), so a project can only hold that
+  customer's cases: an upload naming another customer's project id is 409
+  and creates nothing. A merge keeps the project only if every source is
+  in it. Shown on the customer profile (Projects panel + a Project column),
+  on its own page `#/customers/<id>/projects/<pj-id>`, on the case header
+  and under the customer in the Overview / recent-uploads tables. Not yet:
+  moving a case between projects, renaming / deleting a project, a project
+  status.
 - Not yet: **IAI-24 resumable chunked
   upload** (Sprint 6). The upload is one request, so a dropped connection
   restarts a 10 GB file from zero.
@@ -1863,7 +1879,7 @@ Two more checks, each for its own layer:
   as its docstring shows, because the concurrent-writer check needs Linux
   `flock` (gotcha #38).
 - **Customer isolation** - `tests/check_customer_isolation.py <scratch>
-  --repo /app` (23 checks, gotchas #40/#41); run it in the container the same
+  --repo /app` (31 checks, gotchas #40/#41, and projects); run it in the container the same
   way as check_mcp. Run it after touching `storage.py`, any path helper or
   a route that lists or merges cases.
 

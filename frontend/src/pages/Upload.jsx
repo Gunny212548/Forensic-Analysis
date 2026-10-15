@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { checkUpload, listCases, listCompanies, uploadFile } from '../api.js'
+import { checkUpload, listCases, listCompanies, listProjects, uploadFile } from '../api.js'
 import { fmtBytes, fmtTime } from '../format.js'
 import { ResultLink, SeverityPill, StatusBadge } from '../components/common.jsx'
 
@@ -57,6 +57,9 @@ export default function Upload({ user }) {
   const [companies, setCompanies] = useState([])
   const [companyId, setCompanyId] = useState('')
   const [newCompany, setNewCompany] = useState('')
+  const [projects, setProjects] = useState([])
+  const [projectId, setProjectId] = useState('')
+  const [newProject, setNewProject] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState({ msg: '', cls: '' })
@@ -74,6 +77,20 @@ export default function Upload({ user }) {
       // the "add new customer" option still works without the list
     }
   }, [])
+
+  // The project list is the chosen customer's; a new customer has none yet.
+  const loadProjects = useCallback(async (id) => {
+    if (!id || id === '__new__') return setProjects([])
+    try {
+      setProjects(await listProjects(id))
+    } catch {
+      setProjects([])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadProjects(companyId)
+  }, [companyId, loadProjects])
 
   useEffect(() => {
     loadCompanies()
@@ -130,6 +147,10 @@ export default function Upload({ user }) {
       setStatus({ msg: 'Select a customer first', cls: 'err' })
       return
     }
+    if (projectId === '__new__' && !newProject.trim()) {
+      setStatus({ msg: 'Name the new project, or choose No project', cls: 'err' })
+      return
+    }
     if (!file) {
       setStatus({ msg: 'Choose a file first', cls: 'err' })
       return
@@ -148,6 +169,8 @@ export default function Upload({ user }) {
         note,
         companyId: companyId === '__new__' ? '' : companyId,
         companyName: companyId === '__new__' ? newCompany.trim() : '',
+        projectId: projectId === '__new__' ? '' : projectId,
+        projectName: projectId === '__new__' ? newProject.trim() : '',
         onProgress: setUploadPct,
       })
       setUploadPct(1)
@@ -156,6 +179,12 @@ export default function Upload({ user }) {
       setFile(null)
       setNote('')
       setNewCompany('')
+      setNewProject('')
+      // Keep the customer and project for the next file of the same
+      // investigation - as the records just created, if they were new.
+      if (companyId === '__new__') setCompanyId(data.company_id)
+      if (projectId === '__new__') setProjectId(data.project_id || '')
+      loadProjects(data.company_id)
       if (fileRef.current) fileRef.current.value = ''
       loadCompanies()
       refreshManifests()
@@ -189,7 +218,10 @@ export default function Upload({ user }) {
               id="company-select"
               required
               value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
+              onChange={(e) => {
+                setCompanyId(e.target.value)
+                setProjectId('')
+              }}
             >
               <option value="" disabled>
                 Select a customer
@@ -211,6 +243,37 @@ export default function Upload({ user }) {
               style={{ marginTop: 8, maxWidth: 420 }}
               value={newCompany}
               onChange={(e) => setNewCompany(e.target.value)}
+            />
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="project-select">Project</label>
+          <div className="customer-row">
+            <select
+              id="project-select"
+              value={projectId}
+              disabled={!companyId}
+              onChange={(e) => setProjectId(e.target.value)}
+            >
+              <option value="">No project</option>
+              {projects.map((p) => (
+                <option value={p.project_id} key={p.project_id}>
+                  {p.name}
+                </option>
+              ))}
+              <option value="__new__">+ Add new project...</option>
+            </select>
+            <span className="field-hint">optional — one investigation of this customer</span>
+          </div>
+          {projectId === '__new__' && (
+            <input
+              type="text"
+              placeholder="New project name"
+              aria-label="New project name"
+              style={{ marginTop: 8, maxWidth: 420 }}
+              value={newProject}
+              onChange={(e) => setNewProject(e.target.value)}
             />
           )}
         </div>
@@ -343,7 +406,10 @@ export default function Upload({ user }) {
                       <code>{m.case_id}</code>
                     </td>
                     <td>{m.original_filename}</td>
-                    <td>{m.company_name || '—'}</td>
+                    <td>
+                      {m.company_name || '—'}
+                      {m.project_name && <div className="cell-sub">{m.project_name}</div>}
+                    </td>
                     <td>
                       {fmtBytes(m.size_bytes)}
                       {/* FR-2.2's limit is on this size, not the upload's. */}

@@ -67,6 +67,8 @@ async def upload_log(
     note: str = Form(""),
     company_id: str = Form(""),
     company_name: str = Form(""),
+    project_id: str = Form(""),
+    project_name: str = Form(""),
 ):
     filename = file.filename or "upload"
     # FR-2.3: "fw.csv.gz" is a gzip'd CSV, a .zip is a bundle of logs.
@@ -86,6 +88,19 @@ async def upload_log(
     else:
         raise HTTPException(400, "A customer is required - every case belongs to exactly one customer")
 
+    # Optional. A project is one of the chosen customer's - an id from any
+    # other customer is refused, never filed under this one.
+    project = None
+    if project_id:
+        project = storage.load_project(company["company_id"], project_id)
+        if project is None:
+            raise HTTPException(409, "Project not found for this customer")
+    elif project_name.strip():
+        # Inline "add new project", idempotent by name like the customer.
+        project = (storage.find_project_by_name(company["company_id"], project_name)
+                   or storage.create_project(company["company_id"], project_name,
+                                             request.state.user["email"]))
+
     manifest = storage.create_case(
         original_filename=filename,
         file_kind=kind,
@@ -93,6 +108,7 @@ async def upload_log(
         note=note,
         company_id=company["company_id"],
         company_name=company["name"],
+        project=project,
     )
     case_id = manifest["case_id"]
     # The raw copy keeps the analyst's bytes as uploaded - compressed stays

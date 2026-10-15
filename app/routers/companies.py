@@ -34,3 +34,10 @@ async def create_company(payload: CompanyIn):
     if existing:
         return existing
     return storage.create_company(name)
+
+
+@router.get("/{company_id}/projects")
+async def list_projects(company_id: str):
+    if storage.load_company(company_id) is None:
+        raise HTTPException(404, "Company not found")
+    return storage.list_projects(company_id)

@@ -11,6 +11,7 @@ customer's cases lives under it and nowhere else -
 
     customers/<company_id>/
         customer.json   the customer record
+        projects/       the customer's projects (one investigation each)
         cases/          manifests          db/        per-case DuckDB
         raw/            evidence as given  analysis/  cached AI output
         review/         decision logs      custody/   chain of custody
@@ -55,6 +56,7 @@ CASE_SUBDIRS = ("cases", "db", "raw", "analysis", "review", "custody")
 # arrives in a URL, and "../users" must never resolve to a file.
 _CASE_ID_RE = re.compile(r"^case-[0-9A-Za-z-]{1,64}$")
 _COMPANY_ID_RE = re.compile(r"^co-[0-9a-f]{12}$")
+_PROJECT_ID_RE = re.compile(r"^pj-[0-9a-f]{12}$")
 
 # Reads of a case no customer owns land here. It is never created, so they
 # miss; writes refuse instead (require_owner).
@@ -223,11 +225,14 @@ def create_case(
     company_id: str | None = None,
     company_name: str | None = None,
     merged_from: list[dict] | None = None,
+    project: dict | None = None,
 ) -> dict:
     _refuse_if_legacy()
     if not company_id or load_company(company_id) is None:
         # FR-2.1 - and since 2026-10-14 also where the case is stored.
         raise UnownedCase("a case needs an existing customer")
+    if project and load_project(company_id, project["project_id"]) is None:
+        raise ValueError("the project is not one of this customer's")
     manifest = {
         "case_id": new_case_id(),
         "original_filename": sanitize_original_name(original_filename),
@@ -248,6 +253,9 @@ def create_case(
         # trail - the same reason the original upload is kept in raw/ - and
         # `note` is capped at 1000 chars, which a dozen case ids overflow.
         manifest["merged_from"] = merged_from
+    if project:
+        manifest["project_id"] = project["project_id"]
+        manifest["project_name"] = project["name"]
     save_manifest(manifest)
     return manifest
 
@@ -306,6 +314,65 @@ def find_company_by_name(name: str) -> dict | None:
     for c in list_companies():
         if c.get("name", "").strip().lower() == target:
             return c
+    return None
+
+
+# ----------------------------------------------------------------- projects
+# A project is one investigation for one customer, grouping the cases
+# uploaded for it. It is kept in that customer's store, so it can never
+# hold another customer's case. Optional: a case without one is "No project".
+
+def valid_project_id(project_id: str) -> bool:
+    return bool(_PROJECT_ID_RE.match(project_id or ""))
+
+
+def project_path(company_id: str, project_id: str) -> Path:
+    if not valid_project_id(project_id):
+        raise ValueError(f"not a project id: {project_id!r}")
+    return customer_dir(company_id) / "projects" / f"{project_id}.json"
+
+
+def create_project(company_id: str, name: str, created_by: str) -> dict:
+    if load_company(company_id) is None:
+        raise UnownedCase("a project needs an existing customer")
+    project = {
+        "project_id": f"pj-{secrets.token_hex(6)}",
+        "company_id": company_id,
+        "name": name.strip()[:200],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": created_by,
+    }
+    path = project_path(company_id, project["project_id"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(project, indent=2, default=str), encoding="utf-8")
+    return project
+
+
+def load_project(company_id: str, project_id: str) -> dict | None:
+    if not (valid_company_id(company_id) and valid_project_id(project_id)):
+        return None
+    path = project_path(company_id, project_id)
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def list_projects(company_id: str) -> list[dict]:
+    projects = []
+    for path in (customer_dir(company_id) / "projects").glob("pj-*.json"):
+        try:
+            projects.append(json.loads(path.read_text(encoding="utf-8")))
+        except (json.JSONDecodeError, OSError):
+            continue
+    projects.sort(key=lambda p: p.get("created_at", ""), reverse=True)
+    return projects
+
+
+def find_project_by_name(company_id: str, name: str) -> dict | None:
+    target = name.strip().lower()
+    for p in list_projects(company_id):
+        if p.get("name", "").strip().lower() == target:
+            return p
     return None
 
 

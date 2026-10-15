@@ -89,7 +89,10 @@ export default function App() {
         {page === 'dashboard' && <Overview companyId={param || null} />}
         {page === 'upload' && <Upload user={user} />}
         {page === 'customers' && !param && <Customers />}
-        {page === 'customers' && param && <CustomerDetail companyId={param} key={param} />}
+        {page === 'customers' && param && (
+          // #/customers/<id> or #/customers/<id>/projects/<project id>
+          <CustomerDetail companyId={param.split('/')[0]} projectId={param.split('/')[2]} key={param} />
+        )}
         {page === 'result' && param && <Result caseId={param} key={param} />}
         {placeholder && <Placeholder title={placeholder.label} />}
       </main>

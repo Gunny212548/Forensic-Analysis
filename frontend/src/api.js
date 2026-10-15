@@ -72,6 +72,14 @@ export async function listCompanies() {
   return jsonOrThrow(await fetch('/api/companies'), 'Could not load the customer list')
 }
 
+/** One customer's projects (storage.py), newest first. */
+export async function listProjects(companyId) {
+  return jsonOrThrow(
+    await fetch(`/api/companies/${encodeURIComponent(companyId)}/projects`),
+    'Could not load the project list',
+  )
+}
+
 /** FR-6.1: case load per customer (app/services/overview.py customers()). */
 export async function getCustomerSummary() {
   return jsonOrThrow(await fetch('/api/companies/summary'), 'Could not load customers')
@@ -195,12 +203,14 @@ export async function checkUpload(size) {
 /** XMLHttpRequest, not fetch: fetch has no upload progress, and FR-2.5 wants
  *  a percentage for the upload itself. `onProgress(fraction)` follows the
  *  bytes sent; processing progress is on the case manifest afterwards. */
-export function uploadFile({ file, note, companyId, companyName, onProgress }) {
+export function uploadFile({ file, note, companyId, companyName, projectId, projectName, onProgress }) {
   const fd = new FormData()
   // Text fields before the file, so the server has them before the big part.
   fd.append('note', note || '')
   if (companyName) fd.append('company_name', companyName)
   else if (companyId) fd.append('company_id', companyId)
+  if (projectName) fd.append('project_name', projectName)
+  else if (projectId) fd.append('project_id', projectId)
   fd.append('file', file)
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()

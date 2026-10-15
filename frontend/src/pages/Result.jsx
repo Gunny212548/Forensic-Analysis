@@ -318,6 +318,7 @@ export default function Result({ caseId }) {
                 <code>{manifest.case_id}</code> · uploaded {fmtTime(manifest.uploaded_at)} ·
                 status: {statusLabel}
                 {manifest.company_name ? ` · customer: ${manifest.company_name}` : ''}
+                {manifest.project_name ? ` · project: ${manifest.project_name}` : ''}
                 {manifest.note ? ` · ${manifest.note}` : ''}
               </>
             )}

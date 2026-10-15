@@ -219,7 +219,10 @@ export default function Overview({ companyId }) {
                       {ready ? <a href={`#/result/${c.case_id}`}>{c.original_filename}</a> : c.original_filename}
                       <div className="cell-sub">{c.file_kind}</div>
                     </td>
-                    <td>{c.company_name || '—'}</td>
+                    <td>
+                      {c.company_name || '—'}
+                      {c.project_name && <div className="cell-sub">{c.project_name}</div>}
+                    </td>
                     <td className="num mono">{ready ? fmtNum(c.total_rows) : '—'}</td>
                     <td className="num mono">{ready ? fmtNum(c.flagged_count) : '—'}</td>
                     <td>{b ? <span className={`sev-tag sev-tag-${b}`}>{SEV_EN[b]}</span> : '—'}</td>
