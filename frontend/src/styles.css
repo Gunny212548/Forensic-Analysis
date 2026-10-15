@@ -137,8 +137,10 @@
   .ov-table .num { text-align: right; }
   .ov-table tr.clickable { cursor: pointer; }
   .ov-table tr.clickable:hover td { background: var(--subtle); }
-  .ov-table a { color: var(--text); text-decoration: none; }
-  .ov-table a:hover { color: var(--accent); }
+  /* A link in a table is the way into a case / customer / project, so it
+     is drawn as one - the action colour - not as plain text. */
+  .ov-table a, a.table-link { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .ov-table a:hover, a.table-link:hover { text-decoration: underline; }
   .cell-sub { font-size: 11px; color: var(--muted); }
   .raw-cell { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-family: var(--mono); font-size: 11px; }
@@ -191,6 +193,7 @@
   .cp-glance dd { font-weight: 600; }
   .cp-glance dd .cell-sub { font-weight: 400; margin-left: 6px; }
   .cp-list { margin: 0; padding-left: 16px; }
+  .cp-glance .cp-list { font-weight: 400; }
   @media (max-width: 900px) {
     .cp-grid { grid-template-columns: minmax(0, 1fr); }
     .cp-head { flex-wrap: wrap; }

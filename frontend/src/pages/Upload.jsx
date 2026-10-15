@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { checkUpload, listCases, listCompanies, listProjects, uploadFile } from '../api.js'
 import { fmtBytes, fmtTime } from '../format.js'
-import { ResultLink, SeverityPill, StatusBadge } from '../components/common.jsx'
+import { SeverityPill, StatusBadge } from '../components/common.jsx'
 
 const RECENT_LIMIT = 10
 const POLL_MS = 5000
@@ -30,12 +30,14 @@ function processingPct(m) {
 // still accepted and decoded heuristically - this list is what is known to
 // work, not a whitelist.
 const SUPPORTED_FORMATS = [
-  'VMware ESXi auth.log',
-  'Linux syslog / auth.log',
+  'VMware ESXi auth.log / shell.log',
+  'Linux syslog / auth.log (RFC 5424 / 3164)',
   'Palo Alto CSV export',
-  'Check Point SmartLog CSV',
-  'Microsoft Entra ID sign-in CSV',
-  'Generic JSON',
+  'Check Point SmartConsole CSV',
+  'FortiGate traffic log',
+  'Microsoft Entra ID sign-in CSV / JSON',
+  'Exchange Online message trace CSV',
+  'Other CSV / JSON (columns guessed)',
   // FR-2.3: any of the above, compressed. A multi-file .zip becomes one case.
   '.gz (streamed)',
   '.zip (multi-file → one case)',
@@ -373,7 +375,9 @@ export default function Upload({ user }) {
         <div className="top-bar">
           <h2>My recent uploads</h2>
           {/* FR-11.1's case list lives on the Overview for now. */}
-          <a href="#/dashboard">View all cases →</a>
+          <a className="table-link" href="#/dashboard">
+            View all cases →
+          </a>
         </div>
         <div className="table-scroll">
           <table>
@@ -386,13 +390,12 @@ export default function Upload({ user }) {
                 <th>Size</th>
                 <th>Status</th>
                 <th>Severity</th>
-                <th />
               </tr>
             </thead>
             <tbody>
               {!recent.length && (
                 <tr>
-                  <td colSpan={8} className="empty">
+                  <td colSpan={7} className="empty">
                     No uploads from {user.email} yet
                   </td>
                 </tr>
@@ -405,7 +408,16 @@ export default function Upload({ user }) {
                     <td>
                       <code>{m.case_id}</code>
                     </td>
-                    <td>{m.original_filename}</td>
+                    <td>
+                      {/* The file name opens the case once it can be read. */}
+                      {ready ? (
+                        <a className="table-link" href={`#/result/${m.case_id}`}>
+                          {m.original_filename}
+                        </a>
+                      ) : (
+                        m.original_filename
+                      )}
+                    </td>
                     <td>
                       {m.company_name || '—'}
                       {m.project_name && <div className="cell-sub">{m.project_name}</div>}
@@ -427,11 +439,6 @@ export default function Upload({ user }) {
                       )}
                     </td>
                     <td>{ready ? <SeverityPill severity={m.severity} /> : '—'}</td>
-                    <td>
-                      <ResultLink caseId={m.case_id} ready={ready}>
-                        View result
-                      </ResultLink>
-                    </td>
                   </tr>
                 )
               })}

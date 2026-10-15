@@ -194,7 +194,7 @@ export default function Overview({ companyId }) {
                 <th>File</th>
                 <th>Customer</th>
                 <th className="num">Events</th>
-                <th className="num">Findings</th>
+                <th className="num">Flagged</th>
                 <th>Severity</th>
                 <th>Status</th>
                 <th>Uploaded</th>

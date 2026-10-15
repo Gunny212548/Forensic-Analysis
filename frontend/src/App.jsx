@@ -54,6 +54,13 @@ export default function App() {
   const { page, param } = useHashRoute()
   const [user, setUser] = useSession()
 
+  // A new page opens at its top. The document is one scroll container
+  // shared by every route, so without this a page opened from halfway down
+  // another one started halfway down too (Upload showed only its table).
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [page, param])
+
   // A result route with no case id is a dead end; send it home.
   useEffect(() => {
     if (page === 'result' && !param) window.location.hash = '#/dashboard'

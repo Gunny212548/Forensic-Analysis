@@ -181,8 +181,8 @@ export default function Result({ caseId }) {
       node: (
         <>
           <div className="meta-line" style={{ marginTop: 0 }}>
-            <SeverityPill severity={manifest.severity} /> · findings{' '}
-            {fmtNum(manifest.flagged_count)} / {fmtNum(manifest.total_rows)} rows
+            <SeverityPill severity={manifest.severity} /> · {fmtNum(manifest.flagged_count)} flagged of{' '}
+            {fmtNum(manifest.total_rows)} events
           </div>
           <MappingNote manifest={manifest} />
           <Veris caseId={caseId} />
@@ -308,17 +308,32 @@ export default function Result({ caseId }) {
     <section className="page">
       <div className="top-bar">
         <div>
-          <a href="#/dashboard" className="back-link">
-            &larr; Back to Overview
-          </a>
+          {/* Where the case sits: customer, then project, both one click away. */}
+          <div className="back-link">
+            {manifest?.company_id ? (
+              <>
+                <a href="#/customers">Customers</a> ›{' '}
+                <a href={`#/customers/${manifest.company_id}`}>{manifest.company_name}</a> ›{' '}
+                {manifest.project_id && (
+                  <>
+                    <a href={`#/customers/${manifest.company_id}/projects/${manifest.project_id}`}>
+                      {manifest.project_name}
+                    </a>{' '}
+                    ›{' '}
+                  </>
+                )}
+                {manifest.original_filename}
+              </>
+            ) : (
+              <a href="#/dashboard">&larr; Back to Overview</a>
+            )}
+          </div>
           <h1>{manifest ? manifest.original_filename : caseId}</h1>
           <div className="subtitle">
             {manifest && (
               <>
                 <code>{manifest.case_id}</code> · uploaded {fmtTime(manifest.uploaded_at)} ·
                 status: {statusLabel}
-                {manifest.company_name ? ` · customer: ${manifest.company_name}` : ''}
-                {manifest.project_name ? ` · project: ${manifest.project_name}` : ''}
                 {manifest.note ? ` · ${manifest.note}` : ''}
               </>
             )}

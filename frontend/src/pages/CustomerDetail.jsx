@@ -84,18 +84,6 @@ export default function CustomerDetail({ companyId, projectId }) {
             <dd>{fmtTime(customer.created_at)}</dd>
             <dt>Uploaded by</dt>
             <dd>{uploaders.length ? uploaders.map((u) => <div key={u}>{u}</div>) : '—'}</dd>
-            <dt>Log sources</dt>
-            <dd>
-              {sources.length ? (
-                <ul className="cp-list">
-                  {sources.map((s) => (
-                    <li key={s}>{s}</li>
-                  ))}
-                </ul>
-              ) : (
-                'None identified yet'
-              )}
-            </dd>
           </dl>
         </div>
 
@@ -122,6 +110,20 @@ export default function CustomerDetail({ companyId, projectId }) {
               <dt>AI analyses</dt>
               <dd>
                 {analysed} <span className="cell-sub">of {ready.length} ready cases</span>
+              </dd>
+              {/* Here, not in the Profile column: the names are long
+                  (logsources.py) and read badly wrapped into a narrow one. */}
+              <dt>Log sources</dt>
+              <dd>
+                {sources.length ? (
+                  <ul className="cp-list">
+                    {sources.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  'None identified yet'
+                )}
               </dd>
             </dl>
           </div>
