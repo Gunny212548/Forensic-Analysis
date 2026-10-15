@@ -14,8 +14,22 @@ const ROLE_EN = { sources: 'source', destinations: 'destination', accounts: 'acc
  *  open-findings table); that lifecycle arrives in Sprint 3 and the real
  *  Overview stories in Sprint 5 (IAI-65..70). Until then every tile shows a case / finding /
  *  review number from GET /api/overview - never a placeholder figure - and
- *  the table is the case list (IAI-20). */
+ *  the table is the case list (IAI-20).
+ *
+ *  Always one customer - the one chosen in the sidebar (IAI-88). The API
+ *  still answers unscoped, for MCP and scripts; this page never asks it to. */
 export default function Overview({ companyId }) {
+  if (!companyId) {
+    return (
+      <div className="panel empty">
+        No customers yet - add one when you <a href="#/upload">upload</a> a log
+      </div>
+    )
+  }
+  return <CustomerOverview companyId={companyId} key={companyId} />
+}
+
+function CustomerOverview({ companyId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [sev, setSev] = useState('all')
@@ -62,29 +76,11 @@ export default function Overview({ companyId }) {
         <div>
           <h1>Security Operations Overview</h1>
           <div className="subtitle">
-            <span className="live-dot" /> {t.cases} cases ·{' '}
-            {scoped ? <>customer {scoped.name}</> : <>{t.customers} customers</>} · updated{' '}
+            <span className="live-dot" /> {t.cases} cases · customer {scoped?.name} · updated{' '}
             {ago(data.generated_at)}
           </div>
         </div>
         <div className="actions">
-          {/* Each customer's cases live in that customer's own store
-              (storage.py); this picks which store the page reads. */}
-          <select
-            className="ov-customer"
-            aria-label="Customer"
-            value={data.company_id || ''}
-            onChange={(e) => {
-              window.location.hash = e.target.value ? `#/dashboard/${e.target.value}` : '#/dashboard'
-            }}
-          >
-            <option value="">All customers</option>
-            {(data.customer_options || []).map((c) => (
-              <option key={c.company_id} value={c.company_id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
           <button type="button" className="secondary" onClick={load}>
             Refresh
           </button>

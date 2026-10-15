@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { AUTH_REQUIRED, getMe, logout } from './api.js'
+import { useCallback, useEffect, useState } from 'react'
+import { AUTH_REQUIRED, getMe, listCompanies, logout } from './api.js'
 import Overview from './pages/Overview.jsx'
 import Upload from './pages/Upload.jsx'
 import Customers from './pages/Customers.jsx'
@@ -49,9 +49,73 @@ function useSession() {
   return [user, setUser]
 }
 
+const CUSTOMER_KEY = 'fa_customer'
+
+/** The customer every page shows (IAI-88): one at a time, never all of them -
+ *  the display is separated by customer as the stores are (CLAUDE.md #40).
+ *  The choice is a per-browser convenience; storage can throw in a private
+ *  window, and then the first customer is used. */
+function useCustomer(signedIn) {
+  const [customers, setCustomers] = useState(null)
+  const [chosen, setChosen] = useState(() => {
+    try {
+      return localStorage.getItem(CUSTOMER_KEY) || ''
+    } catch {
+      return ''
+    }
+  })
+
+  const reload = useCallback(async () => {
+    try {
+      setCustomers(await listCompanies())
+    } catch {
+      setCustomers((prev) => prev || [])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (signedIn) reload()
+  }, [signedIn, reload])
+
+  const select = useCallback((id) => {
+    setChosen(id)
+    try {
+      localStorage.setItem(CUSTOMER_KEY, id)
+    } catch {
+      // only the remembered choice is lost
+    }
+  }, [])
+
+  // A remembered customer that no longer exists (store reset) falls back to
+  // the first one rather than to nothing.
+  const list = customers || []
+  const customerId = list.some((c) => c.company_id === chosen) ? chosen : list[0]?.company_id || ''
+  return { customers: list, loaded: customers !== null, customerId, select, reload }
+}
+
 export default function App() {
   const { page, param } = useHashRoute()
   const [user, setUser] = useSession()
+  const { customers, loaded, customerId, select, reload } = useCustomer(!!user)
+
+  // #/dashboard/<company_id> (a Customers row, an old pasted link) selects
+  // that customer; the Overview itself always reads the selection.
+  useEffect(() => {
+    if (page === 'dashboard' && param && customers.some((c) => c.company_id === param)) select(param)
+  }, [page, param, customers, select])
+
+  // Switching customer while a case is open leaves that case behind: it is
+  // another customer's, so go to the new customer's Overview instead.
+  function chooseCustomer(id) {
+    select(id)
+    if (page === 'dashboard' || page === 'result') window.location.hash = `#/dashboard/${id}`
+  }
+
+  // An upload can create a customer; reload the list, then show that one.
+  async function uploaded(companyId) {
+    await reload()
+    select(companyId)
+  }
 
   // A result route with no case id is a dead end; send it home.
   useEffect(() => {
@@ -82,13 +146,16 @@ export default function App() {
         counts={{ findings: null }}
         user={user}
         onLogout={signOut}
+        customers={customers}
+        customerId={customerId}
+        onCustomer={chooseCustomer}
       />
 
       <main className="layout">
-        {page === 'dashboard' && <Overview companyId={param || null} />}
-        {page === 'upload' && <Upload user={user} />}
+        {page === 'dashboard' && loaded && <Overview companyId={customerId} />}
+        {page === 'upload' && <Upload user={user} customerId={customerId} onUploaded={uploaded} />}
         {page === 'customers' && <Customers />}
-        {page === 'result' && param && <Result caseId={param} key={param} />}
+        {page === 'result' && param && <Result caseId={param} key={param} onCustomer={select} />}
         {placeholder && <Placeholder title={placeholder.label} />}
       </main>
     </div>

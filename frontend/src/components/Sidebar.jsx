@@ -34,7 +34,7 @@ export const NAV_GROUPS = [
 /** `counts` maps a route to a number shown beside it (FR-0.2). A route with
  *  no number - null or absent - shows no badge at all, rather than a 0 that
  *  would claim nothing is open. */
-export default function Sidebar({ active, counts = {}, user, onLogout }) {
+export default function Sidebar({ active, counts = {}, user, onLogout, customers = [], customerId, onCustomer }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -43,6 +43,24 @@ export default function Sidebar({ active, counts = {}, user, onLogout }) {
           <div className="brand-name">SENTRY-IR</div>
           <div className="brand-sub">Finding Response Console</div>
         </div>
+      </div>
+
+      {/* IAI-88: every page shows this customer's data and nobody else's. */}
+      <div className="sidebar-customer">
+        <label htmlFor="sidebar-customer">Customer</label>
+        {customers.length ? (
+          <select id="sidebar-customer" value={customerId} onChange={(e) => onCustomer(e.target.value)}>
+            {customers.map((c) => (
+              <option key={c.company_id} value={c.company_id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="field-hint">
+            None yet - add one on <a href="#/upload">Upload</a>
+          </div>
+        )}
       </div>
 
       <nav className="sidebar-nav">
