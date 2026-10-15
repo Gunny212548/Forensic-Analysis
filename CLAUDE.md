@@ -122,6 +122,8 @@ user's requirement):** the header names the customer, or every customer
 when unscoped; each top-affected row and activity line carries its
 customer; and top-affected is aggregated *per customer* - the same address
 in two customers' cases is two hosts, and used to add up into one row.
+A technique card stays *one* card and lists every customer it was seen in:
+the same technique is the same behaviour whoever it happened to.
 
 Storage layout under `DATA_DIR` (`/data`) - **one store per customer**
 since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything

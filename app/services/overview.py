@@ -125,6 +125,7 @@ def build(company_id: str | None = None) -> dict:
     daily = {today - timedelta(days=i): Counter() for i in range(13, -1, -1)}
     tech_cases: Counter = Counter()
     tech_findings: Counter = Counter()
+    tech_customers: dict[str, set] = {}
     entity_agg: dict[tuple, dict] = {}
     recent = []
 
@@ -165,6 +166,7 @@ def build(company_id: str | None = None) -> dict:
         for tid, n in facts["techniques"].items():
             tech_cases[tid] += 1
             tech_findings[tid] += n
+            tech_customers.setdefault(tid, set()).add(customer)
         for e in facts["entities"]:
             # Per customer: the same address in two customers' cases is two
             # different hosts, and must not add up into one row.
@@ -221,7 +223,10 @@ def build(company_id: str | None = None) -> dict:
         "daily": [{"date": d.isoformat(), **{k: c[k] for k in ("critical", "high", "medium", "low", "none", "pending")}}
                   for d, c in daily.items()],
         "top_entities": top_entities,
-        "techniques": [{"id": t, "name": TECHNIQUE_NAMES.get(t, ""), "cases": n, "findings": tech_findings[t]}
+        # One technique is the same behaviour in every customer, so it stays
+        # one card - naming each customer it was seen in.
+        "techniques": [{"id": t, "name": TECHNIQUE_NAMES.get(t, ""), "cases": n, "findings": tech_findings[t],
+                        "customers": sorted(tech_customers[t])}
                        for t, n in tech_cases.most_common(8)],
         "recent": recent[:8],
         "cases": [{k: m.get(k) for k in ("case_id", "original_filename", "company_name", "file_kind",

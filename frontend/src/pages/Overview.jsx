@@ -264,6 +264,13 @@ export default function Overview({ companyId }) {
               <div className="tech-card" key={tq.id}>
                 <div className="mono accent">{tq.id}</div>
                 <div>{tq.name || '—'}</div>
+                <div className="tech-customers">
+                  {(tq.customers || []).map((c) => (
+                    <span className="cust-tag" key={c}>
+                      {c}
+                    </span>
+                  ))}
+                </div>
                 <div className="muted">
                   {tq.cases} {tq.cases === 1 ? 'case' : 'cases'}
                 </div>
