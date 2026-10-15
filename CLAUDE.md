@@ -1637,11 +1637,14 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
   status, so until Sprint 3 a case is open while any finding group is
   **unreviewed** and the page footnotes that; the status rule is
   **IAI-79**. Cases without a customer (pre-FR-2.1) are a "No customer" row
-  so the totals add up. A customer's name opens its **detail page**
+  so the totals add up. A customer's name opens its **profile page**
   (`#/customers/<id>`, `CustomerDetail.jsx`, 2026-10-15 at the user's
-  request, no story): onboarded date (`created_at`, i.e. the first upload
-  for it), cases / findings / flagged events / AI analyses, the log sources
-  its files were read as, and every case. Frontend only - it reads
+  request, no story; laid out as a customer profile - header card, Profile
+  column, At a glance + cases - which the user chose over KPI tiles and
+  over a report-style page): onboarded date (`created_at`, i.e. the first
+  upload for it), uploaders, the log sources its files were read as, cases /
+  findings / flagged events / highest severity / AI analyses, and every
+  case. Frontend only - it reads
   `/api/overview?company_id=` and `/api/cases?company_id=`. "Reports" is
   shown as **AI analyses** on purpose: no report feature exists yet (IAI-55).
 - Not yet: **IAI-24 resumable chunked

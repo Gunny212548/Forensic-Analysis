@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { getOverview, listCases, listCompanies } from '../api.js'
 import { ago, fmtNum, fmtTime } from '../format.js'
 import { SeverityPill, StatusBadge } from '../components/common.jsx'
-import { Kpi } from './Overview.jsx'
 
-/** One customer, opened from the Customers list: since when, how much,
- *  which log sources, and every case. Read-only, like the list. */
+const SEVS = ['critical', 'high', 'medium', 'low']
+const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' }
+
+/** One customer's profile, opened from the Customers list: who they are,
+ *  since when, what they sent, and every case. Read-only, like the list. */
 export default function CustomerDetail({ companyId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -33,106 +35,140 @@ export default function CustomerDetail({ companyId }) {
   const ready = cases.filter((m) => m.status === 'ready')
   const analysed = ready.filter((m) => m.has_analysis).length
   const lastActivity = overview.recent[0]?.ts || cases[0]?.uploaded_at || customer.created_at
+  const highest = SEVS.find((s) => overview.case_severity[s] > 0)
+  const uploaders = [...new Set(cases.map((m) => m.evidence?.recorded_by).filter(Boolean))]
+  const sources = logSources(cases)
+  const flagged = t.findings_critical + t.findings_high + t.findings_medium + t.findings_low
 
   return (
     <section className="page ov">
-      <div className="top-bar">
-        <div>
-          <div className="back-link">
-            <a href="#/customers">Customers</a> › {customer.name}
-          </div>
+      <div className="back-link">
+        <a href="#/customers">Customers</a> › {customer.name}
+      </div>
+
+      <div className="panel cp-head">
+        <div className="cp-avatar" aria-hidden="true">
+          {initials(customer.name)}
+        </div>
+        <div className="cp-title">
           <h1>{customer.name}</h1>
           <div className="subtitle">
-            Onboarded {fmtTime(customer.created_at)} · last activity {ago(lastActivity)}
+            Customer since {fmtTime(customer.created_at).slice(0, 10)} · last activity {ago(lastActivity)}
           </div>
         </div>
-        <div className="actions">
-          <a className="btn-secondary" href={`#/dashboard/${companyId}`}>
-            Open this customer&apos;s dashboard
-          </a>
-        </div>
+        <a className="btn-secondary" href={`#/dashboard/${companyId}`}>
+          Open dashboard
+        </a>
       </div>
 
-      <div className="kpis">
-        <Kpi
-          label="Cases"
-          value={t.cases}
-          sub={`${t.ready} ready · ${t.processing} processing · ${t.failed} failed`}
-          tone="danger"
-        />
-        <Kpi label="Findings" value={fmtNum(t.reviewable)} sub={`${fmtNum(t.unreviewed)} awaiting review`} tone="ok" />
-        <Kpi
-          label="Flagged events"
-          value={fmtNum(t.findings_critical + t.findings_high + t.findings_medium + t.findings_low)}
-          sub={`${fmtNum(t.findings_critical)} critical · ${fmtNum(t.findings_high)} high`}
-          tone="warn"
-        />
-        {/* No report feature exists yet (Reports page, IAI-55); the AI
-            narrative per case is the nearest thing, and is named as such. */}
-        <Kpi label="AI analyses" value={analysed} sub={`of ${ready.length} ready cases`} tone="info" />
-      </div>
-
-      <div className="panel">
-        <h2>Log sources received</h2>
-        <div className="format-chips">
-          {logSources(cases).map((s) => (
-            <span className="chip" key={s}>
-              {s}
-            </span>
-          ))}
-          {!logSources(cases).length && <span className="muted">None identified yet</span>}
-        </div>
-      </div>
-
-      <div className="panel">
-        <h2>
-          Cases <span className="muted mono">{cases.length}</span>
-        </h2>
-        <div className="table-scroll">
-          <table className="ov-table">
-            <thead>
-              <tr>
-                <th>Uploaded</th>
-                <th>File</th>
-                <th>Uploaded by</th>
-                <th>Severity</th>
-                <th className="num">Flagged</th>
-                <th>Status</th>
-                <th>AI analysis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!cases.length && (
-                <tr>
-                  <td colSpan={7} className="empty">
-                    No cases yet
-                  </td>
-                </tr>
+      <div className="cp-grid">
+        <div className="panel">
+          <h2>Profile</h2>
+          <dl className="cp-dl">
+            <dt>Customer ID</dt>
+            <dd className="mono">{customer.company_id}</dd>
+            <dt>Onboarded</dt>
+            <dd>{fmtTime(customer.created_at)}</dd>
+            <dt>Uploaded by</dt>
+            <dd>{uploaders.length ? uploaders.map((u) => <div key={u}>{u}</div>) : '—'}</dd>
+            <dt>Log sources</dt>
+            <dd>
+              {sources.length ? (
+                <ul className="cp-list">
+                  {sources.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ul>
+              ) : (
+                'None identified yet'
               )}
-              {cases.map((m) => {
-                const isReady = m.status === 'ready'
-                return (
-                  <tr key={m.case_id}>
-                    <td className="mono muted">{fmtTime(m.uploaded_at)}</td>
-                    <td>
-                      {isReady ? <a href={`#/result/${m.case_id}`}>{m.original_filename}</a> : m.original_filename}
-                    </td>
-                    <td>{m.evidence?.recorded_by || '—'}</td>
-                    <td>{isReady ? <SeverityPill severity={m.severity} /> : '—'}</td>
-                    <td className="num mono">{isReady ? fmtNum(m.flagged_count) : '—'}</td>
-                    <td>
-                      <StatusBadge status={m.status} error={m.error} />
-                    </td>
-                    <td>{m.has_analysis ? 'Yes' : '—'}</td>
+            </dd>
+          </dl>
+        </div>
+
+        <div className="cp-main">
+          <div className="panel">
+            <h2>At a glance</h2>
+            <dl className="cp-dl cp-glance">
+              <dt>Cases</dt>
+              <dd>
+                {t.cases} <span className="cell-sub">{t.ready} ready · {t.processing} processing · {t.failed} failed</span>
+              </dd>
+              <dt>Findings</dt>
+              <dd>
+                {fmtNum(t.reviewable)} <span className="cell-sub">{fmtNum(t.unreviewed)} awaiting review</span>
+              </dd>
+              <dt>Flagged events</dt>
+              <dd>{fmtNum(flagged)}</dd>
+              <dt>Highest severity</dt>
+              <dd>{highest ? <span className={`sev-tag sev-tag-${highest}`}>{SEV_EN[highest]}</span> : '—'}</dd>
+              {/* No report feature exists yet (IAI-55); the AI narrative per
+                  case is the nearest thing, and is named as such. */}
+              <dt>AI analyses</dt>
+              <dd>
+                {analysed} <span className="cell-sub">of {ready.length} ready cases</span>
+              </dd>
+            </dl>
+          </div>
+
+          <div className="panel">
+            <h2>
+              Cases <span className="muted mono">{cases.length}</span>
+            </h2>
+            <div className="table-scroll">
+              <table className="ov-table">
+                <thead>
+                  <tr>
+                    <th>Uploaded</th>
+                    <th>File</th>
+                    <th>Uploaded by</th>
+                    <th>Severity</th>
+                    <th className="num">Flagged</th>
+                    <th>Status</th>
+                    <th>AI analysis</th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {!cases.length && (
+                    <tr>
+                      <td colSpan={7} className="empty">
+                        No cases yet
+                      </td>
+                    </tr>
+                  )}
+                  {cases.map((m) => {
+                    const isReady = m.status === 'ready'
+                    return (
+                      <tr key={m.case_id}>
+                        <td className="mono muted">{fmtTime(m.uploaded_at)}</td>
+                        <td>
+                          {isReady ? <a href={`#/result/${m.case_id}`}>{m.original_filename}</a> : m.original_filename}
+                        </td>
+                        <td>{m.evidence?.recorded_by || '—'}</td>
+                        <td>{isReady ? <SeverityPill severity={m.severity} /> : '—'}</td>
+                        <td className="num mono">{isReady ? fmtNum(m.flagged_count) : '—'}</td>
+                        <td>
+                          <StatusBadge status={m.status} error={m.error} />
+                        </td>
+                        <td>{m.has_analysis ? 'Yes' : '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </section>
   )
+}
+
+/** "Big Fish Co" -> "BF"; one word -> its first two letters ("SUMMIT" -> "SU"). */
+function initials(name) {
+  const words = (name || '').trim().split(/\s+/).filter(Boolean)
+  const text = words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2)
+  return text.toUpperCase()
 }
 
 /** The log sources the customer's files were read as (logsources.py
