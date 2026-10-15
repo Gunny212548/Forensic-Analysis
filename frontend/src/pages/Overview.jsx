@@ -149,9 +149,9 @@ export default function Overview({ companyId }) {
           {data.top_entities.map((e) => (
             <div className="ov-line" key={`${e.customer}|${e.role}|${e.entity}`}>
               <span>
+                <span className="cust-tag">{e.customer}</span>
                 <span className="mono">{e.entity}</span>{' '}
                 <span className="muted">{ROLE_EN[e.role] || e.role}</span>
-                <div className="cell-sub">{e.customer}</div>
               </span>
               <span>
                 {e.cases} {e.cases === 1 ? 'case' : 'cases'}
@@ -248,7 +248,7 @@ export default function Overview({ companyId }) {
             {data.recent.map((r, i) => (
               <li key={i} className={`act-${r.level || 'muted'}`}>
                 <a href={`#/result/${r.case_id}`}>{r.text}</a>
-                {r.customer && <span className="muted"> · {r.customer}</span>}
+                {r.customer && <span className="cust-tag cust-tag-after">{r.customer}</span>}
                 <div className="mono muted">{ago(r.ts)}</div>
               </li>
             ))}

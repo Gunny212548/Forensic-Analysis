@@ -129,6 +129,10 @@
   .ov-search { flex: 1 1 240px; background: var(--subtle) !important; padding: 7px 14px !important; }
   .table-scroll { overflow-x: auto; }
   .ov-scope { font-size: 14px; margin-top: 6px; }
+  /* Whose data a line is (Overview): a label, not small print. */
+  .cust-tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--info);
+    background: var(--info-tint); border-radius: 3px; padding: 1px 6px; margin-right: 6px; }
+  .cust-tag-after { margin: 0 0 0 6px; }
   .ov-table td { vertical-align: middle; }
   .ov-table .num { text-align: right; }
   .ov-table tr.clickable { cursor: pointer; }
