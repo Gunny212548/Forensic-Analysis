@@ -5,10 +5,16 @@ import { Empty, MitreTags } from './common.jsx'
 
 const PAGE_SIZE = 100
 
+// Only the two auth outcomes are an auth result; other actions (ssh_probe,
+// session_open, command_exec...) describe the event, not its outcome.
+const AUTH_RESULT = { auth_success: 'Success', auth_failed: 'Failed' }
+
 /** Paginated, server-side. A case can hold 65k+ rows and 25k findings, so
  *  the client never pulls the whole table - the offset lives here and every
- *  page is its own query. */
+ *  page is its own query. FR-11.2: every event of the case by default, the
+ *  rule matches one click away. */
 export default function EventsTable({ caseId }) {
+  const [flagged, setFlagged] = useState(false)
   const [offset, setOffset] = useState(0)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -16,81 +22,149 @@ export default function EventsTable({ caseId }) {
   const load = useCallback(async () => {
     setError('')
     try {
-      setData(await getEvents(caseId, { limit: PAGE_SIZE, offset }))
+      setData(await getEvents(caseId, { limit: PAGE_SIZE, offset, flagged }))
     } catch (err) {
       setError(err.message)
     }
-  }, [caseId, offset])
+  }, [caseId, offset, flagged])
 
   useEffect(() => {
     load()
   }, [load])
 
-  if (error) return <Empty>Could not load: {error}</Empty>
-  if (!data) return <Empty>Loading...</Empty>
-  if (!data.events.length) {
-    return (
+  function showFlagged(on) {
+    setFlagged(on)
+    setOffset(0)
+    setData(null)
+  }
+
+  const toggle = (
+    <div className="ov-filters">
+      <button type="button" className={`chip-btn${flagged ? '' : ' active'}`} onClick={() => showFlagged(false)}>
+        All events
+      </button>
+      <button type="button" className={`chip-btn${flagged ? ' active' : ''}`} onClick={() => showFlagged(true)}>
+        Flagged only
+      </button>
+    </div>
+  )
+
+  let body
+  if (error) body = <Empty>Could not load: {error}</Empty>
+  else if (!data) body = <Empty>Loading...</Empty>
+  else if (!data.events.length) {
+    body = (
       <Empty>
-        {offset === 0
-          ? 'The rule engine flagged nothing in this file'
-          : 'No more events'}
+        {offset > 0
+          ? 'No more events'
+          : flagged
+            ? 'The rule engine flagged nothing in this file'
+            : 'No events in this file'}
       </Empty>
+    )
+  } else {
+    const from = data.offset + 1
+    const to = data.offset + data.count
+    const hasPrev = data.offset > 0
+    const hasNext = to < data.total
+    body = (
+      <>
+        <Empty style={{ paddingBottom: 8 }}>
+          {flagged
+            ? `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} findings (raw rows in the file: ${fmtNum(data.total_rows)})`
+            : `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} events (${fmtNum(data.flagged_count)} flagged)`}
+        </Empty>
+        <div className="table-scroll">{flagged ? <FlaggedRows events={data.events} /> : <AllRows events={data.events} />}</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <button
+            className="secondary"
+            disabled={!hasPrev}
+            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+          >
+            &larr; Previous
+          </button>
+          <button
+            className="secondary"
+            disabled={!hasNext}
+            onClick={() => setOffset(offset + PAGE_SIZE)}
+          >
+            Next &rarr;
+          </button>
+        </div>
+      </>
     )
   }
 
-  const from = data.offset + 1
-  const to = data.offset + data.count
-  const hasPrev = data.offset > 0
-  const hasNext = to < data.total
-
   return (
     <>
-      <Empty style={{ paddingBottom: 8 }}>
-        Showing {fmtNum(from)}-{fmtNum(to)} of {fmtNum(data.total)} findings (raw rows in the file:{' '}
-        {fmtNum(data.total_rows)})
-      </Empty>
-      <table>
-        <thead>
-          <tr>
-            <th>time</th>
-            <th>rule</th>
-            <th>level</th>
-            <th>description</th>
-            <th>mitre</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.events.map((e, i) => (
-            <tr key={`${e.row_id}-${e.rid}-${i}`}>
-              {/* ts is the parsed GMT+7 event time; ts_raw is the source text,
-                  shown only when nothing parsed (CLAUDE.md gotcha #21). */}
-              <td>{e.ts || e.ts_raw || ''}</td>
-              <td>{e.rid || ''}</td>
-              <td className={SEV_CLASS[e.level] || ''}>{LEVEL_EN[e.level] || ''}</td>
-              <td>{e.descr || ''}</td>
-              <td>
-                <MitreTags list={e.mitre} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-        <button
-          className="secondary"
-          disabled={!hasPrev}
-          onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-        >
-          &larr; Previous
-        </button>
-        <button
-          className="secondary"
-          disabled={!hasNext}
-          onClick={() => setOffset(offset + PAGE_SIZE)}
-        >
-          Next &rarr;
-        </button>
-      </div>
+      {toggle}
+      {body}
     </>
+  )
+}
+
+function AllRows({ events }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>time</th>
+          <th>source</th>
+          <th>destination</th>
+          <th>account</th>
+          <th>auth result</th>
+          <th>verdict</th>
+          <th>application</th>
+          <th>raw message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {events.map((e) => (
+          <tr key={e.row_id}>
+            {/* ts is the parsed GMT+7 event time; ts_raw is the source text,
+                shown only when nothing parsed (CLAUDE.md gotcha #21). */}
+            <td>{e.ts || e.ts_raw || ''}</td>
+            <td>{e.srcip || ''}</td>
+            <td>{e.dstip || ''}</td>
+            <td>{e.username || ''}</td>
+            <td>{AUTH_RESULT[e.action] || ''}</td>
+            <td>{e.verdict || ''}</td>
+            <td>{e.app || ''}</td>
+            <td className="raw-cell" title={e.raw || ''}>
+              {e.raw || ''}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function FlaggedRows({ events }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>time</th>
+          <th>rule</th>
+          <th>level</th>
+          <th>description</th>
+          <th>mitre</th>
+        </tr>
+      </thead>
+      <tbody>
+        {events.map((e, i) => (
+          <tr key={`${e.row_id}-${e.rid}-${i}`}>
+            <td>{e.ts || e.ts_raw || ''}</td>
+            <td>{e.rid || ''}</td>
+            <td className={SEV_CLASS[e.level] || ''}>{LEVEL_EN[e.level] || ''}</td>
+            <td>{e.descr || ''}</td>
+            <td>
+              <MitreTags list={e.mitre} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }

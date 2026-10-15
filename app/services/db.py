@@ -277,12 +277,12 @@ def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
     con = connect(case_id, read_only=True)
     try:
         rows = con.execute(
-            "SELECT row_id, ts, ts_raw, srcip, dstip, username, action, verdict, raw "
+            "SELECT row_id, ts, ts_raw, srcip, dstip, username, action, verdict, app, raw "
             "FROM raw_events ORDER BY row_id LIMIT ? OFFSET ?",
             [limit, offset],
         ).fetchall()
         cols = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username",
-                "action", "verdict", "raw"]
+                "action", "verdict", "app", "raw"]
         out = [dict(zip(cols, r)) for r in rows]
         for row in out:
             row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings

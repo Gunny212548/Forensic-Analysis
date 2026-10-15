@@ -135,6 +135,8 @@
   .ov-table a { color: var(--text); text-decoration: none; }
   .ov-table a:hover { color: var(--accent); }
   .cell-sub { font-size: 11px; color: var(--muted); }
+  .raw-cell { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--mono); font-size: 11px; }
   .sev-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
     padding: 2px 9px; border-radius: 999px; }
   .sev-tag::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
