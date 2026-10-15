@@ -117,7 +117,11 @@ Until then every tile is a case, finding, review or technique number, and the
 table is the case list (IAI-20). No figure is a placeholder. "Top affected"
 ranks by accumulated risk score, not by case count: ranked by count, the
 benign admin account seen in every seeded case came out first (gotcha #16
-again).
+again). **The page always says whose data it shows (2026-10-15, the
+user's requirement):** the header names the customer, or every customer
+when unscoped; each top-affected row and activity line carries its
+customer; and top-affected is aggregated *per customer* - the same address
+in two customers' cases is two hosts, and used to add up into one row.
 
 Storage layout under `DATA_DIR` (`/data`) - **one store per customer**
 since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything

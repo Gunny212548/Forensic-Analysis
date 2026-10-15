@@ -62,9 +62,20 @@ export default function Overview({ companyId }) {
         <div>
           <h1>Security Operations Overview</h1>
           <div className="subtitle">
-            <span className="live-dot" /> {t.cases} cases ·{' '}
-            {scoped ? <>customer {scoped.name}</> : <>{t.customers} customers</>} · updated{' '}
-            {ago(data.generated_at)}
+            <span className="live-dot" /> {t.cases} cases · updated {ago(data.generated_at)}
+          </div>
+          {/* Whose data every figure below is - named, never just counted. */}
+          <div className="ov-scope">
+            {scoped ? (
+              <>
+                Customer: <strong>{scoped.name}</strong>
+              </>
+            ) : (
+              <>
+                All customers:{' '}
+                <strong>{(data.customer_options || []).map((c) => c.name).join(', ') || 'none yet'}</strong>
+              </>
+            )}
           </div>
         </div>
         <div className="actions">
@@ -136,10 +147,11 @@ export default function Overview({ companyId }) {
           <div className="section-label">Top affected hosts &amp; accounts</div>
           {!data.top_entities.length && <div className="empty">No findings yet</div>}
           {data.top_entities.map((e) => (
-            <div className="ov-line" key={`${e.role}|${e.entity}`}>
+            <div className="ov-line" key={`${e.customer}|${e.role}|${e.entity}`}>
               <span>
                 <span className="mono">{e.entity}</span>{' '}
                 <span className="muted">{ROLE_EN[e.role] || e.role}</span>
+                <div className="cell-sub">{e.customer}</div>
               </span>
               <span>
                 {e.cases} {e.cases === 1 ? 'case' : 'cases'}
@@ -236,6 +248,7 @@ export default function Overview({ companyId }) {
             {data.recent.map((r, i) => (
               <li key={i} className={`act-${r.level || 'muted'}`}>
                 <a href={`#/result/${r.case_id}`}>{r.text}</a>
+                {r.customer && <span className="muted"> · {r.customer}</span>}
                 <div className="mono muted">{ago(r.ts)}</div>
               </li>
             ))}

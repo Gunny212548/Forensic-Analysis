@@ -128,6 +128,7 @@
   .chip-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .ov-search { flex: 1 1 240px; background: var(--subtle) !important; padding: 7px 14px !important; }
   .table-scroll { overflow-x: auto; }
+  .ov-scope { font-size: 14px; margin-top: 6px; }
   .ov-table td { vertical-align: middle; }
   .ov-table .num { text-align: right; }
   .ov-table tr.clickable { cursor: pointer; }

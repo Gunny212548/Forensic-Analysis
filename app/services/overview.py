@@ -129,6 +129,9 @@ def build(company_id: str | None = None) -> dict:
     recent = []
 
     for m in manifests:
+        # Every listed item names its customer, so an unscoped page never
+        # leaves the reader guessing whose data a line is.
+        customer = m.get("company_name") or "No customer"
         totals["cases"] += 1
         totals[m.get("status") or "unknown"] += 1
         sev = m.get("severity") or {}
@@ -149,8 +152,8 @@ def build(company_id: str | None = None) -> dict:
             if d in daily:
                 daily[d][b or "pending"] += 1
             recent.append({"ts": up, "kind": "upload", "case_id": m["case_id"], "level": b,
-                           "text": f"{m.get('original_filename')} uploaded"
-                                   + (f" for {m['company_name']}" if m.get("company_name") else "")})
+                           "customer": customer,
+                           "text": f"{m.get('original_filename')} uploaded"})
 
         if m.get("status") != "ready" or not db.db_path(m["case_id"]).exists():
             continue
@@ -163,8 +166,10 @@ def build(company_id: str | None = None) -> dict:
             tech_cases[tid] += 1
             tech_findings[tid] += n
         for e in facts["entities"]:
-            k = (e["role"], e["entity"])
-            agg = entity_agg.setdefault(k, {"entity": e["entity"], "role": e["role"],
+            # Per customer: the same address in two customers' cases is two
+            # different hosts, and must not add up into one row.
+            k = (m.get("company_id"), e["role"], e["entity"])
+            agg = entity_agg.setdefault(k, {"entity": e["entity"], "role": e["role"], "customer": customer,
                                             "cases": 0, "score": 0.0, "max_lvl": 0})
             agg["cases"] += 1
             agg["score"] += e["score"] or 0
@@ -179,10 +184,12 @@ def build(company_id: str | None = None) -> dict:
                         else f"assigned {rid} to {entry.get('assignee')}")
                 recent.append({"ts": entry.get("ts"), "kind": "lifecycle", "case_id": m["case_id"],
                                "level": "ok" if entry.get("to") == "Resolved" else "info",
+                               "customer": customer,
                                "text": f"{who} {what} in {m.get('original_filename')}"})
                 continue
             recent.append({"ts": entry.get("ts"), "kind": "review", "case_id": m["case_id"],
                            "level": {"Accepted": "ok", "Rejected": "muted"}.get(entry.get("status"), "info"),
+                           "customer": customer,
                            "text": f"{who} marked {rid} {entry.get('status', '').lower()}"
                                    f" in {m.get('original_filename')}"})
 
