@@ -61,7 +61,7 @@ export function readAnalysis(body) {
   return { report: body, job: null, failed: '' }
 }
 
-export default function Result({ caseId, onCustomer }) {
+export default function Result({ caseId }) {
   const [manifest, setManifest] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [job, setJob] = useState(null)
@@ -98,9 +98,6 @@ export default function Result({ caseId, onCustomer }) {
         const m = await getCase(caseId)
         if (!alive) return
         setManifest(m)
-        // The sidebar must name whose data this is (IAI-88): a link to
-        // another customer's case switches the selection to that customer.
-        if (m.company_id) onCustomer?.(m.company_id)
         if (m.status === 'ready') {
           const a = await getAnalysis(caseId)
           if (alive) apply(a)
@@ -112,7 +109,7 @@ export default function Result({ caseId, onCustomer }) {
     return () => {
       alive = false
     }
-  }, [caseId, apply, onCustomer])
+  }, [caseId, apply])
 
   // Polls only while a job is in flight. The interval is torn down by this
   // effect's cleanup: on unmount (leaving the page), on opening another case
@@ -311,22 +308,16 @@ export default function Result({ caseId, onCustomer }) {
     <section className="page">
       <div className="top-bar">
         <div>
-          {/* Breadcrumb: customer > file. */}
-          <div className="back-link">
-            {manifest?.company_id ? (
-              <a href={`#/dashboard/${manifest.company_id}`}>{manifest.company_name || 'Customer'}</a>
-            ) : (
-              <a href="#/dashboard">Overview</a>
-            )}
-            {' › '}
-            {manifest ? manifest.original_filename : caseId}
-          </div>
+          <a href="#/dashboard" className="back-link">
+            &larr; Back to Overview
+          </a>
           <h1>{manifest ? manifest.original_filename : caseId}</h1>
           <div className="subtitle">
             {manifest && (
               <>
                 <code>{manifest.case_id}</code> · uploaded {fmtTime(manifest.uploaded_at)} ·
                 status: {statusLabel}
+                {manifest.company_name ? ` · customer: ${manifest.company_name}` : ''}
                 {manifest.note ? ` · ${manifest.note}` : ''}
               </>
             )}

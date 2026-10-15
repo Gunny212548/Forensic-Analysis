@@ -1232,10 +1232,9 @@ and `db.py`, `review.py` and `custody.py` build their paths on it.
 - **`prune_cases.py` dedupes inside one store only.** The store held the
   same monsoon zip under SUMMIT and under Bigfish; deduping across stores
   would have deleted one customer's evidence because another has a copy.
-- **Overview / case list take `?company_id=`**. Unscoped, they still list
-  every customer - read store by store - but since IAI-88 only MCP and
-  scripts ask that way: the UI always sends the sidebar's customer (see
-  *Decisions*, "The screen shows one customer at a time").
+- **Overview / case list take `?company_id=`** (the UI's customer select;
+  a customer row on the Customers page opens its overview). Unscoped, they
+  still list every customer - read store by store.
 - **Migration:** `tools/migrate_to_customers.py` (dry run; `--apply`) moves
   each case's files with `os.replace` (a rename - bytes untouched), hashes
   the raw file before and after against the acquisition digest, moves the
@@ -1656,17 +1655,6 @@ Decisions the user made, which the Figma does not show:
 - **Every datum comes from an upload.** No "New finding" button, no live
   feed, no EDR/SIEM/email integrations, no ingest API key. The Figma's
   source column (CrowdStrike, Splunk, Proofpoint...) becomes the log type.
-- **The screen shows one customer at a time (2026-10-15, IAI-88)** - the
-  user's requirement: data shown is separated by customer, as storage is
-  (gotcha #40), with a customer selector on every page. It is in the
-  sidebar (`App.jsx` `useCustomer`, remembered per browser as
-  `fa_customer`, first customer by default) and there is **no "all
-  customers" view**: Overview, Upload's recent uploads and every future
-  page (Findings, Timeline, Attack Graph, ATT&CK Map) read that selection.
-  Opening a case switches the selection to the case's customer, so the
-  sidebar always names whose data is on screen; switching customer while a
-  case is open goes to the new customer's Overview. The Customers page
-  stays a list of all customers - one row is one customer, nothing mixes.
 - **A customer is added only on the Upload page (2026-10-05)** - the
   "+ Add new customer..." option of its customer select. The Customers page
   is read-only, although the Figma gives it an "Add customer" button. The

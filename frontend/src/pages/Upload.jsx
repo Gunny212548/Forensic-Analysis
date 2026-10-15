@@ -43,23 +43,19 @@ const SUPPORTED_FORMATS = [
 
 /** FR-2.7: "my" uploads are the cases whose evidence this account acquired
  *  (custody's `recorded_by`), so the list follows the analyst, not the
- *  browser - of the customer chosen in the sidebar only (IAI-88). Newest
- *  first - list_manifests already sorts by uploaded_at. */
+ *  browser. Newest first - list_manifests already sorts by uploaded_at. */
 function myRecent(cases, email) {
   return cases.filter((m) => m.evidence?.recorded_by === email).slice(0, RECENT_LIMIT)
 }
 
 /** Laid out as figma-export/Upload.svg: customer first (FR-2.1), then the
  *  drop area (FR-2.2) and the supported formats (FR-2.6). */
-export default function Upload({ user, customerId, onUploaded }) {
+export default function Upload({ user }) {
   const fileRef = useRef(null)
   const [file, setFile] = useState(null)
   const [dragging, setDragging] = useState(false)
   const [companies, setCompanies] = useState([])
-  // Defaults to the sidebar's customer and follows it; the analyst can still
-  // pick another (or add one) for this upload.
-  const [companyId, setCompanyId] = useState(customerId || '')
-  useEffect(() => setCompanyId(customerId || ''), [customerId])
+  const [companyId, setCompanyId] = useState('')
   const [newCompany, setNewCompany] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -89,13 +85,12 @@ export default function Upload({ user, customerId, onUploaded }) {
   // Polls this account's uploads so the analyst can watch
   // queued -> processing -> ready without leaving the page.
   const refreshManifests = useCallback(async () => {
-    if (!customerId) return setRecent([])
     try {
-      setRecent(myRecent(await listCases(customerId), user.email))
+      setRecent(myRecent(await listCases(), user.email))
     } catch {
       // keep the last list; the next poll tries again
     }
-  }, [user.email, customerId])
+  }, [user.email])
   const manifests = Object.fromEntries(recent.map((m) => [m.case_id, m]))
 
   // Poll quickly only while something is moving, so a progress bar moves
@@ -158,8 +153,6 @@ export default function Upload({ user, customerId, onUploaded }) {
       setUploadPct(1)
       setActiveCase(data.case_id)
       setStatus({ msg: `Uploaded - case ${data.case_id} (${data.file_kind})`, cls: 'ok' })
-      // The sidebar follows the customer the case went to (it may be new).
-      onUploaded(data.company_id)
       setFile(null)
       setNote('')
       setNewCompany('')
@@ -337,7 +330,7 @@ export default function Upload({ user, customerId, onUploaded }) {
               {!recent.length && (
                 <tr>
                   <td colSpan={8} className="empty">
-                    No uploads from {user.email} for this customer yet
+                    No uploads from {user.email} yet
                   </td>
                 </tr>
               )}

@@ -63,9 +63,8 @@ export async function getOverview(companyId) {
   return jsonOrThrow(await fetch(`/api/overview${q}`), 'Could not load the overview')
 }
 
-export async function listCases(companyId) {
-  const q = companyId ? `?company_id=${encodeURIComponent(companyId)}` : ''
-  return jsonOrThrow(await fetch(`/api/cases${q}`), 'Could not load the case list')
+export async function listCases() {
+  return jsonOrThrow(await fetch('/api/cases'), 'Could not load the case list')
 }
 
 export async function listCompanies() {
