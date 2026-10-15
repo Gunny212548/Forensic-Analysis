@@ -185,7 +185,7 @@ frontend/src/
                        #/result/<id>, and the menu routes of Sidebar.jsx)
   api.js               every call the UI makes, and nothing else
   format.js            fmtBytes/fmtTime/shortTs + the status & severity maps
-  pages/               Overview (#/dashboard) · Upload · Customers · Result · Login · Placeholder
+  pages/               Overview (#/dashboard) · Upload · Customers · CustomerDetail · Result · Login · Placeholder
                        (menu pages whose story is not built yet)
   components/          Sidebar (app shell, FR-0) · Workspace (case tabs)
                        EventsTable · ReviewPanel · Lifecycle (status workflow)
@@ -1637,7 +1637,13 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
   status, so until Sprint 3 a case is open while any finding group is
   **unreviewed** and the page footnotes that; the status rule is
   **IAI-79**. Cases without a customer (pre-FR-2.1) are a "No customer" row
-  so the totals add up.
+  so the totals add up. A customer's name opens its **detail page**
+  (`#/customers/<id>`, `CustomerDetail.jsx`, 2026-10-15 at the user's
+  request, no story): onboarded date (`created_at`, i.e. the first upload
+  for it), cases / findings / flagged events / AI analyses, the log sources
+  its files were read as, and every case. Frontend only - it reads
+  `/api/overview?company_id=` and `/api/cases?company_id=`. "Reports" is
+  shown as **AI analyses** on purpose: no report feature exists yet (IAI-55).
 - Not yet: **IAI-24 resumable chunked
   upload** (Sprint 6). The upload is one request, so a dropped connection
   restarts a 10 GB file from zero.

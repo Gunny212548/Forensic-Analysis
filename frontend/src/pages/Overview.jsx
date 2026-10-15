@@ -276,7 +276,7 @@ export default function Overview({ companyId }) {
   )
 }
 
-function Kpi({ label, value, sub, chip, chipTone, tone }) {
+export function Kpi({ label, value, sub, chip, chipTone, tone }) {
   return (
     <div className={`kpi kpi-${tone}`}>
       <div className="kpi-head">

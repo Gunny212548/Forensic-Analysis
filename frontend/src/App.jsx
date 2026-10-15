@@ -3,6 +3,7 @@ import { AUTH_REQUIRED, getMe, logout } from './api.js'
 import Overview from './pages/Overview.jsx'
 import Upload from './pages/Upload.jsx'
 import Customers from './pages/Customers.jsx'
+import CustomerDetail from './pages/CustomerDetail.jsx'
 import Result from './pages/Result.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import Login from './pages/Login.jsx'
@@ -87,7 +88,8 @@ export default function App() {
       <main className="layout">
         {page === 'dashboard' && <Overview companyId={param || null} />}
         {page === 'upload' && <Upload user={user} />}
-        {page === 'customers' && <Customers />}
+        {page === 'customers' && !param && <Customers />}
+        {page === 'customers' && param && <CustomerDetail companyId={param} key={param} />}
         {page === 'result' && param && <Result caseId={param} key={param} />}
         {placeholder && <Placeholder title={placeholder.label} />}
       </main>

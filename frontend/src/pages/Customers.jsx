@@ -83,7 +83,7 @@ export default function Customers() {
                 <tr key={c.company_id || 'none'}>
                   <td className={c.company_id ? 'cust-name' : 'cust-name muted'}>
                     {c.company_id ? (
-                      <a href={`#/dashboard/${c.company_id}`} title="Open this customer's overview">
+                      <a href={`#/customers/${c.company_id}`} title="Open this customer's details">
                         {c.name}
                       </a>
                     ) : (
