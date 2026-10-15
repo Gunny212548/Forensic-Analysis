@@ -86,7 +86,7 @@ export default function App() {
 
       <main className="layout">
         {page === 'dashboard' && <Overview companyId={param || null} />}
-        {page === 'upload' && <Upload />}
+        {page === 'upload' && <Upload user={user} />}
         {page === 'customers' && <Customers />}
         {page === 'result' && param && <Result caseId={param} key={param} />}
         {placeholder && <Placeholder title={placeholder.label} />}

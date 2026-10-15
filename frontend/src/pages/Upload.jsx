@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { checkUpload, getCase, listCompanies, uploadFile } from '../api.js'
+import { checkUpload, listCases, listCompanies, uploadFile } from '../api.js'
 import { fmtBytes, fmtTime } from '../format.js'
 import { ResultLink, SeverityPill, StatusBadge } from '../components/common.jsx'
 
-const RECENT_KEY = 'fa_recent_uploads'
+const RECENT_LIMIT = 10
 const POLL_MS = 5000
 const FAST_POLL_MS = 1500
 
@@ -41,30 +41,16 @@ const SUPPORTED_FORMATS = [
   '.zip (multi-file → one case)',
 ]
 
-// Per-browser convenience only - the server is the record of what exists.
-// Wrapped because storage throws in a private window or with site data
-// blocked, and the page has to render anyway.
-function getRecent() {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
-  } catch {
-    return []
-  }
-}
-
-function addRecent(item) {
-  const list = getRecent().filter((i) => i.case_id !== item.case_id)
-  list.unshift(item)
-  try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 10)))
-  } catch {
-    // nothing to do - the upload still happened, only the local list is lost
-  }
+/** FR-2.7: "my" uploads are the cases whose evidence this account acquired
+ *  (custody's `recorded_by`), so the list follows the analyst, not the
+ *  browser. Newest first - list_manifests already sorts by uploaded_at. */
+function myRecent(cases, email) {
+  return cases.filter((m) => m.evidence?.recorded_by === email).slice(0, RECENT_LIMIT)
 }
 
 /** Laid out as figma-export/Upload.svg: customer first (FR-2.1), then the
  *  drop area (FR-2.2) and the supported formats (FR-2.6). */
-export default function Upload() {
+export default function Upload({ user }) {
   const fileRef = useRef(null)
   const [file, setFile] = useState(null)
   const [dragging, setDragging] = useState(false)
@@ -75,8 +61,7 @@ export default function Upload() {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState({ msg: '', cls: '' })
   const [limits, setLimits] = useState(null)
-  const [recent, setRecent] = useState(getRecent)
-  const [manifests, setManifests] = useState({})
+  const [recent, setRecent] = useState([])
   // FR-2.5: two separate percentages - the upload (measured by the browser)
   // and the processing of the case it created (reported on its manifest).
   const [uploadPct, setUploadPct] = useState(null)
@@ -97,26 +82,20 @@ export default function Upload() {
       .catch(() => {})
   }, [loadCompanies])
 
-  // Polls the manifest of every upload made from this browser so the analyst
-  // can watch queued -> processing -> ready without leaving the page.
+  // Polls this account's uploads so the analyst can watch
+  // queued -> processing -> ready without leaving the page.
   const refreshManifests = useCallback(async () => {
-    const list = getRecent()
-    setRecent(list)
-    const entries = await Promise.all(
-      list.map(async (item) => {
-        try {
-          return [item.case_id, await getCase(item.case_id)]
-        } catch {
-          return [item.case_id, null]
-        }
-      }),
-    )
-    setManifests(Object.fromEntries(entries))
-  }, [])
+    try {
+      setRecent(myRecent(await listCases(), user.email))
+    } catch {
+      // keep the last list; the next poll tries again
+    }
+  }, [user.email])
+  const manifests = Object.fromEntries(recent.map((m) => [m.case_id, m]))
 
   // Poll quickly only while something is moving, so a progress bar moves
   // and an idle page stays quiet.
-  const moving = busy || Object.values(manifests).some((m) => m && ['queued', 'processing'].includes(m.status))
+  const moving = busy || recent.some((m) => ['queued', 'processing'].includes(m.status))
   useEffect(() => {
     refreshManifests()
     const t = setInterval(refreshManifests, moving ? FAST_POLL_MS : POLL_MS)
@@ -174,11 +153,6 @@ export default function Upload() {
       setUploadPct(1)
       setActiveCase(data.case_id)
       setStatus({ msg: `Uploaded - case ${data.case_id} (${data.file_kind})`, cls: 'ok' })
-      addRecent({
-        case_id: data.case_id,
-        filename: file.name,
-        uploaded_at: new Date().toISOString(),
-      })
       setFile(null)
       setNote('')
       setNewCompany('')
@@ -334,74 +308,70 @@ export default function Upload() {
 
       <div className="panel">
         <div className="top-bar">
-          <h2>Recent uploads</h2>
+          <h2>My recent uploads</h2>
+          {/* FR-11.1's case list lives on the Overview for now. */}
+          <a href="#/dashboard">View all cases →</a>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Uploaded</th>
-              <th>File</th>
-              <th>Customer</th>
-              <th>Status</th>
-              <th>Severity</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {!recent.length && (
+        <div className="table-scroll">
+          <table>
+            <thead>
               <tr>
-                <td colSpan={6} className="empty">
-                  No uploads from this browser yet
-                </td>
+                <th>Uploaded</th>
+                <th>Case ID</th>
+                <th>File</th>
+                <th>Customer</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>Severity</th>
+                <th />
               </tr>
-            )}
-            {recent.map((item) => {
-              const m = manifests[item.case_id]
-              if (!m) {
+            </thead>
+            <tbody>
+              {!recent.length && (
+                <tr>
+                  <td colSpan={8} className="empty">
+                    No uploads from {user.email} yet
+                  </td>
+                </tr>
+              )}
+              {recent.map((m) => {
+                const ready = m.status === 'ready'
                 return (
-                  <tr key={item.case_id}>
-                    <td>{fmtTime(item.uploaded_at)}</td>
+                  <tr key={m.case_id}>
+                    <td>{fmtTime(m.uploaded_at)}</td>
                     <td>
-                      {item.filename}
-                      <br />
-                      <code>{item.case_id}</code>
+                      <code>{m.case_id}</code>
                     </td>
-                    <td colSpan={4} className="empty">
-                      Case no longer exists
+                    <td>{m.original_filename}</td>
+                    <td>{m.company_name || '—'}</td>
+                    <td>
+                      {fmtBytes(m.size_bytes)}
+                      {/* FR-2.2's limit is on this size, not the upload's. */}
+                      {m.compression && m.uncompressed_bytes != null && (
+                        <div className="cell-sub">{fmtBytes(m.uncompressed_bytes)} uncompressed</div>
+                      )}
+                    </td>
+                    <td>
+                      <StatusBadge status={m.status} error={m.error} />
+                      {m.status === 'processing' && m.progress && (
+                        <div className="cell-sub">
+                          {m.progress.estimated ? '~' : ''}
+                          {m.progress.pct}%
+                        </div>
+                      )}
+                    </td>
+                    <td>{ready ? <SeverityPill severity={m.severity} /> : '—'}</td>
+                    <td>
+                      <ResultLink caseId={m.case_id} ready={ready}>
+                        View result
+                      </ResultLink>
                     </td>
                   </tr>
                 )
-              }
-              const ready = m.status === 'ready'
-              return (
-                <tr key={item.case_id}>
-                  <td>{fmtTime(m.uploaded_at)}</td>
-                  <td>
-                    {m.original_filename}
-                    <br />
-                    <code>{m.case_id}</code>
-                  </td>
-                  <td>{m.company_name || '—'}</td>
-                  <td>
-                    <StatusBadge status={m.status} error={m.error} />
-                    {m.status === 'processing' && m.progress && (
-                      <div className="cell-sub">
-                        {m.progress.estimated ? '~' : ''}
-                        {m.progress.pct}%
-                      </div>
-                    )}
-                  </td>
-                  <td>{ready ? <SeverityPill severity={m.severity} /> : '—'}</td>
-                  <td>
-                    <ResultLink caseId={m.case_id} ready={ready}>
-                      View result
-                    </ResultLink>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   )

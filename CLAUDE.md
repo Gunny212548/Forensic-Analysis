@@ -192,10 +192,13 @@ frontend/src/
                        common.jsx (severity pill, status badge, MITRE tags)
 ```
 
-It replaced a hand-written 1,212-line `static/index.html`, whose URLs and
-localStorage key `fa_recent_uploads` were kept unchanged so pasted case links
-and an analyst's recent uploads survived the rewrite (`analyst-name` is no
-longer read - the reviewer is the signed-in account, see *Login*). The
+It replaced a hand-written 1,212-line `static/index.html`, whose URLs were
+kept unchanged so pasted case links survived the rewrite. Neither of its
+localStorage keys is read any more: `analyst-name` (the reviewer is the
+signed-in account, see *Login*) and `fa_recent_uploads` (since IAI-28 the
+Upload page's "My recent uploads" are the cases whose `evidence.recorded_by`
+is the signed-in account, from `GET /api/cases` - they follow the analyst
+across browsers, and a case that no longer exists cannot linger). The
 original is preserved at `legacy/index.html.orig` — this repo is not a git
 checkout, so that copy is the only history it has.
 
