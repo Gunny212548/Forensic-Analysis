@@ -39,12 +39,20 @@ export default function Overview({ companyId }) {
   if (!data) return <div className="empty">Loading...</div>
 
   const t = data.totals
-  const reviewedPct = t.reviewable ? Math.round(((t.reviewable - t.unreviewed) / t.reviewable) * 100) : 0
   const scoped = (data.customer_options || []).find((c) => c.company_id === data.company_id)
   const sevTotals = Object.fromEntries(
     SEVS.map((s) => [s, data.areas.reduce((n, a) => n + (a.total[s] || 0), 0)]),
   )
-  const trend = t.created_last7 - t.created_prev7
+  const todo = [
+    { n: t.critical_unassigned, label: 'critical findings unassigned', href: '#/findings/severity=critical&unassigned=1' },
+    { n: t.unreviewed, label: 'awaiting review', href: data.review_case ? `#/result/${data.review_case}` : '#/customers' },
+    { n: t.failed_cases, label: 'cases failed', href: '#/customers' },
+    { n: data.attention.length, label: 'evidence problems',
+      href: data.attention.length ? `#/result/${data.attention[0].case_id}` : '#/customers' },
+  ].filter((x) => x.n > 0)
+  // Red when it is a critical finding nobody owns, a failed case or tampered evidence;
+  // a review backlog alone is only a nudge.
+  const bad = t.critical_unassigned > 0 || t.failed_cases > 0 || data.attention.length > 0
   const mttcHours = t.mttc_seconds == null ? null : t.mttc_seconds / 3600
 
   return (
@@ -98,109 +106,42 @@ export default function Overview({ companyId }) {
         </div>
       </div>
 
-      <div className="attn-row">
-        <div className="attn-grid">
-          <Attn
-            label="Critical, unassigned"
-            value={t.critical_unassigned}
-            href="#/findings/severity=critical&unassigned=1"
-            bad
-            hint="Open critical findings nobody owns yet"
-          />
-          <Attn
-            label="Findings awaiting review"
-            value={t.unreviewed}
-            href={data.review_case ? `#/result/${data.review_case}` : null}
-            hint={
-              data.review_case
-                ? `of ${fmtNum(t.reviewable)} - opens the case with the most`
-                : 'Every finding has a decision'
-            }
-          />
-          <Attn
-            label="Cases that failed"
-            value={t.failed_cases}
-            href="#/customers"
-            bad
-            hint="Processing stopped - see the case for the reason"
-          />
-          <Attn
-            label="Evidence or audit-log problems"
-            value={data.attention.length}
-            href={data.attention.length ? `#/result/${data.attention[0].case_id}` : null}
-            bad
-            hint="A custody chain or decision history that no longer verifies"
-          />
+      {/* Only when something is waiting: a thin banner of links, and nothing at all
+          when there is nothing to do. */}
+      {todo.length > 0 && (
+        <div className={`attn-banner${bad ? ' attn-bad' : ''}`}>
+          {todo.map((x) => (
+            <a key={x.label} href={x.href}>
+              <strong>{fmtNum(x.n)}</strong> {x.label}
+            </a>
+          ))}
         </div>
-        {data.attention.length > 0 && (
-          <ul className="attn-alert" role="alert">
-            {data.attention.slice(0, 5).map((a) => (
-              <li key={`${a.case_id}|${a.reason}`}>
-                <a href={`#/result/${a.case_id}`}>{a.file}</a> <span className="cust-tag">{a.customer}</span> - {a.reason}
-              </li>
-            ))}
-          </ul>
-        )}
+      )}
+      {data.attention.length > 0 && (
+        <ul className="attn-alert" role="alert">
+          {data.attention.slice(0, 5).map((a) => (
+            <li key={`${a.case_id}|${a.reason}`}>
+              <a href={`#/result/${a.case_id}`}>{a.file}</a> <span className="cust-tag">{a.customer}</span> - {a.reason}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="stats">
+        <Stat label="Open findings" value={fmtNum(t.open_findings)} tone={t.open_findings ? 'danger' : ''} />
+        <Stat label="Mean time to contain" value={mttcHours == null ? '—' : fmtHours(mttcHours)}
+          tone={mttcHours != null && mttcHours > t.mttc_target_hours ? 'danger' : ''}
+          title={`created → Contained, true positives · target ≤ ${t.mttc_target_hours} h`} />
+        <Stat label="Open cases" value={fmtNum(t.open_cases)} />
+        <Stat label="Customers" value={t.customers} />
       </div>
 
-      <div className="kpis">
-        <Kpi
-          label="Open findings"
-          value={fmtNum(t.open_findings)}
-          chip={`${t.created_last7} created in 7 days`}
-          chipTone={trend > 0 ? 'danger' : 'ok'}
-          sub={
-            `high and critical, not yet Resolved · previous 7 days: ${t.created_prev7}` +
-            (t.new_findings ? ` · ${fmtNum(t.new_findings)} not started` : '')
-          }
-          tone="danger"
-        />
-        <Kpi
-          label="Mean time to contain"
-          value={mttcHours == null ? '—' : fmtHours(mttcHours)}
-          chip={t.mttc_n ? `${t.mttc_n} contained` : null}
-          chipTone={mttcHours != null && mttcHours > t.mttc_target_hours ? 'danger' : 'ok'}
-          sub={
-            mttcHours == null
-              ? `no contained true positive yet · target ≤ ${t.mttc_target_hours} h`
-              : `created → Contained, true positives · target ≤ ${t.mttc_target_hours} h`
-          }
-          tone={mttcHours != null && mttcHours > t.mttc_target_hours ? 'danger' : 'ok'}
-        />
-        <Kpi
-          label="Open cases"
-          value={fmtNum(t.open_cases)}
-          chip={t.uploaded_today ? `+${t.uploaded_today} today` : null}
-          chipTone="danger"
-          sub={`of ${t.cases} cases · ${reviewedPct}% of findings reviewed`}
-          tone="warn"
-        />
-        <Kpi
-          label="Customers"
-          value={t.customers}
-          sub={`${t.customers_with_cases} with cases`}
-          tone="info"
-        />
-      </div>
-
-      <div className="panel">
-        <div className="area-title">
-          <h2>Detection areas</h2>
-          <span className="muted">
-            {data.trend_days.length
-              ? `trend: findings first seen per day, ${data.trend_days[0]} to ${data.trend_days[data.trend_days.length - 1]}`
-              : 'no findings yet'}
-          </span>
-        </div>
+      <div>
+        <h2 className="section-h">Detection areas</h2>
         <div className="area-grid">
           {data.areas.map((a) => (
             <AreaCard key={a.id} area={a} days={data.trend_days} />
           ))}
-        </div>
-        <div className="field-hint cust-note">
-          The number is findings in the status workflow (high and critical) that are not yet Resolved. New is
-          those still Open; Total is every finding of the area by level, workflow or not. A card opens the
-          Findings page on that area.
         </div>
       </div>
 
@@ -281,38 +222,25 @@ function fmtHours(h) {
   return `${h.toFixed(1)} h`
 }
 
-/** One thing waiting for the analyst. Red while it is more than zero and bad
- *  news; a link only when there is somewhere to go. */
-function Attn({ label, value, href, bad, hint }) {
-  const tone = value ? (bad ? 'danger' : 'accent') : 'ok'
-  const body = (
-    <>
-      <span className="attn-value">{fmtNum(value)}</span>
-      <span className="attn-label">{label}</span>
-    </>
-  )
-  return href && value ? (
-    <a className={`attn attn-${tone}`} href={href} title={hint}>
-      {body}
-    </a>
-  ) : (
-    <div className={`attn attn-${tone}`} title={hint}>
-      {body}
+function Stat({ label, value, tone, title }) {
+  return (
+    <div className="stat" title={title}>
+      <div className={`stat-value${tone ? ` tone-${tone}` : ''}`}>{value}</div>
+      <div className="stat-label">{label}</div>
     </div>
   )
 }
 
 const AREA_CHIPS = ['critical', 'high', 'medium', 'low']
 
-function AreaRow({ label, counts }) {
+function AreaChips({ counts, totals }) {
   return (
     <div className="area-row">
-      <span className="area-row-label">{label}</span>
       {AREA_CHIPS.map((c) => (
         <span
           key={c}
           className={`area-chip chip-lvl-${c}${counts[c] ? '' : ' zero'}`}
-          title={`${counts[c]} ${SEV_EN[c].toLowerCase()}`}
+          title={`${counts[c]} open of ${totals[c]} ${SEV_EN[c].toLowerCase()}`}
         >
           {counts[c]}
         </span>
@@ -340,8 +268,7 @@ function AreaCard({ area, days }) {
           {fmtNum(area.open)}
         </span>
       </div>
-      <AreaRow label="New" counts={area.new} />
-      <AreaRow label="Total" counts={area.total} />
+      <AreaChips counts={area.open_by} totals={area.total} />
       <Spark values={area.trend} days={days} />
     </a>
   )
@@ -377,19 +304,6 @@ function Spark({ values, days }) {
       <polygon className="spark-fill" points={`0,${H} ${line} ${W},${H}`} />
       <polyline className="spark-line" points={line} />
     </svg>
-  )
-}
-
-function Kpi({ label, value, sub, chip, chipTone, tone }) {
-  return (
-    <div className={`kpi kpi-${tone}`}>
-      <div className="kpi-head">
-        <span>{label}</span>
-        {chip && <span className={`kpi-chip chip-${chipTone}`}>{chip}</span>}
-      </div>
-      <div className="kpi-value">{value}</div>
-      <div className="kpi-sub">{sub}</div>
-    </div>
   )
 }
 
