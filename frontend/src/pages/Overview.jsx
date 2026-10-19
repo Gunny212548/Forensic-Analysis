@@ -184,7 +184,7 @@ export default function Overview({ companyId }) {
           <ul className="urgent">
             {data.urgent.map((r) => (
               <li key={`${r.case_id}|${r.key}`}>
-                <a className="table-link mono" href={`#/result/${r.case_id}/${encodeURIComponent(r.key)}`}>
+                <a className="table-link mono" href={`#/finding/${r.case_id}/${encodeURIComponent(r.key)}`}>
                   {r.fd}
                 </a>
                 <span className={`sev-tag sev-tag-${r.level}`}>{SEV_EN[r.level]}</span>

@@ -200,8 +200,8 @@ export default function Findings({ param }) {
                   <td className="mono">
                     <a
                       className="table-link"
-                      href={`#/result/${r.case_id}/${encodeURIComponent(r.key)}`}
-                      title="Open this finding in its case"
+                      href={`#/finding/${r.case_id}/${encodeURIComponent(r.key)}`}
+                      title="Open this finding"
                     >
                       {r.fd}
                     </a>

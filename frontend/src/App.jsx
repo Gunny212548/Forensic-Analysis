@@ -6,12 +6,13 @@ import Customers from './pages/Customers.jsx'
 import Findings from './pages/Findings.jsx'
 import CustomerDetail from './pages/CustomerDetail.jsx'
 import Result from './pages/Result.jsx'
+import FindingDetail from './pages/FindingDetail.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import Login from './pages/Login.jsx'
 import Sidebar, { NAV_GROUPS } from './components/Sidebar.jsx'
 
 const MENU = NAV_GROUPS.flatMap((g) => g.items)
-const PAGES = [...MENU.map((it) => it.route), 'result']
+const PAGES = [...MENU.map((it) => it.route), 'result', 'finding']
 
 function parseHash() {
   const h = window.location.hash.replace(/^#\/?/, '')
@@ -70,7 +71,8 @@ function useOpenFindings(user, page, param) {
   return open
 }
 
-/** #/result/<case id> or #/result/<case id>/<finding key, URL-encoded>. */
+/** #/result/<case id> or #/result/<case id>/<finding key, URL-encoded>;
+ *  #/finding/<case id>/<finding key, URL-encoded> has the same shape. */
 function splitResult(param) {
   const i = param.indexOf('/')
   if (i < 0) return { caseId: param, findingKey: null }
@@ -95,9 +97,11 @@ export default function App() {
     window.scrollTo(0, 0)
   }, [page, param])
 
-  // A result route with no case id is a dead end; send it home.
+  // A result route with no case id is a dead end; send it home. So is a
+  // finding route with no finding: its list is the Findings page.
   useEffect(() => {
     if (page === 'result' && !param) window.location.hash = '#/dashboard'
+    if (page === 'finding' && !splitResult(param).findingKey) window.location.hash = '#/findings'
   }, [page, param])
 
   const placeholder = MENU.find((it) => it.route === page && it.ready === false)
@@ -117,7 +121,7 @@ export default function App() {
     <div className="app">
       {/* A case is opened from the Overview list, so that is what stays lit. */}
       <Sidebar
-        active={page === 'result' ? 'dashboard' : page}
+        active={page === 'result' ? 'dashboard' : page === 'finding' ? 'findings' : page}
         counts={{ findings: openFindings }}
         user={user}
         onLogout={signOut}
@@ -134,6 +138,9 @@ export default function App() {
         )}
         {page === 'result' && param && (
           <Result {...splitResult(param)} key={param} />
+        )}
+        {page === 'finding' && splitResult(param).findingKey && (
+          <FindingDetail {...splitResult(param)} key={param} />
         )}
         {placeholder && <Placeholder title={placeholder.label} />}
       </main>

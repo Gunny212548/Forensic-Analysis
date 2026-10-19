@@ -14,7 +14,7 @@ const ORDER = { Unreviewed: 0, Modified: 1, Accepted: 2, Rejected: 3 }
  *  row - one case has 20,063 finding rows and 4 reviewable findings, and
  *  reviewing rows one at a time is a requirement that cannot be met
  *  (CLAUDE.md gotcha #19). Decisions are append-only server-side. */
-export default function ReviewPanel({ caseId, focus }) {
+export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref = null }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [rejecting, setRejecting] = useState(null) // finding key awaiting a reason
@@ -22,7 +22,7 @@ export default function ReviewPanel({ caseId, focus }) {
   const [reasonNote, setReasonNote] = useState('')
   const [busyKey, setBusyKey] = useState('')
   const [openRule, setOpenRule] = useState('') // finding key whose rule card is open
-  const [openEvents, setOpenEvents] = useState('') // finding key whose source events are open
+  const [openEvents, setOpenEvents] = useState(onlyKey || '') // finding key whose source events are open
 
   const load = useCallback(async () => {
     setError('')
@@ -101,8 +101,16 @@ export default function ReviewPanel({ caseId, focus }) {
   })
   const reasonCodes = data.reason_codes || {}
 
+  // One finding on its own page (FindingDetail): only that finding, without the
+  // case-wide gate, history banner and workflow totals around it.
+  const single = onlyKey != null
+  const shown = single ? findings.filter((f) => f.key === onlyKey) : findings
+  if (single && !shown.length) return <Empty>This finding is not in the case (it may have been re-processed away).</Empty>
+
   return (
     <>
+      {!single && (
+        <>
       {/* The export gate is stated up front, not discovered at export time:
           under a deadline an analyst needs to know what is still blocking. */}
       <div className={`rv-gate ${data.ready_for_report ? 'ok' : 'blocked'}`}>
@@ -158,9 +166,12 @@ export default function ReviewPanel({ caseId, focus }) {
         </div>
       )}
 
+        </>
+      )}
+
       {error && <Empty>{error}</Empty>}
 
-      {findings.map((f) => {
+      {shown.map((f) => {
         const st = f.review.status
         const busy = busyKey === f.key
         return (
@@ -240,15 +251,26 @@ export default function ReviewPanel({ caseId, focus }) {
                 <span className="rv-related">
                   Same attack chain ({f.related_count}):
                   {f.related.map((r) => (
-                    <button
-                      type="button"
-                      className="rv-chip"
-                      key={r.key}
-                      title={`Go to ${r.rid} ${r.srcip || r.username || ''}`}
-                      onClick={() => reveal(r.key)}
-                    >
-                      {r.rid} {r.srcip || r.username}
-                    </button>
+                    relatedHref ? (
+                      <a
+                        className="rv-chip"
+                        key={r.key}
+                        href={relatedHref(r.key)}
+                        title={`Open ${r.rid} ${r.srcip || r.username || ''}`}
+                      >
+                        {r.rid} {r.srcip || r.username}
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        className="rv-chip"
+                        key={r.key}
+                        title={`Go to ${r.rid} ${r.srcip || r.username || ''}`}
+                        onClick={() => reveal(r.key)}
+                      >
+                        {r.rid} {r.srcip || r.username}
+                      </button>
+                    )
                   ))}
                   {f.related_count > f.related.length && ` +${f.related_count - f.related.length} more`}
                 </span>
