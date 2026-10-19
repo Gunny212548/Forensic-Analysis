@@ -3,16 +3,19 @@ import { getOverview } from '../api.js'
 import { ago, fmtNum } from '../format.js'
 
 const POLL_MS = 15000
+const SEVS = ['critical', 'high', 'medium', 'low']
 const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', none: 'None' }
+const ROLE_EN = { sources: 'source', destinations: 'destination', accounts: 'account' }
 
-/** The Overview, kept short on purpose (2026-10-19, the user found a fuller page
- *  too busy): what is waiting for the analyst, four KPIs, and the six detection
- *  areas. Everything else has its own page - findings, customers and their cases.
+/** The Overview, redesigned 2026-10-19 at the user's request. It answers three
+ *  questions in this order: what is waiting for me (the attention row), how are
+ *  we doing (the four KPIs, the detection areas, findings per day and severity)
+ *  and what do I open next (the most urgent findings, recent activity).
  *
- *  Every figure comes from GET /api/overview - never a placeholder - and every tile
- *  that counts something links to where it can be worked. The API still returns
- *  the daily chart, severity split, top hosts, urgent findings and activity feed
- *  (tests/check_workflow.py covers them); this page does not show them. */
+ *  Every figure comes from GET /api/overview - never a placeholder - and every
+ *  tile that counts something links to where it can be worked. What used to be
+ *  here and now lives elsewhere: the findings table is the Findings page, the
+ *  case list is Customers, the ATT&CK technique list is waiting for its own page. */
 export default function Overview({ companyId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -38,6 +41,9 @@ export default function Overview({ companyId }) {
   const t = data.totals
   const reviewedPct = t.reviewable ? Math.round(((t.reviewable - t.unreviewed) / t.reviewable) * 100) : 0
   const scoped = (data.customer_options || []).find((c) => c.company_id === data.company_id)
+  const sevTotals = Object.fromEntries(
+    SEVS.map((s) => [s, data.areas.reduce((n, a) => n + (a.total[s] || 0), 0)]),
+  )
   const trend = t.created_last7 - t.created_prev7
   const mttcHours = t.mttc_seconds == null ? null : t.mttc_seconds / 3600
 
@@ -195,6 +201,80 @@ export default function Overview({ companyId }) {
             <AreaCard key={a.id} area={a} days={data.trend_days} />
           ))}
         </div>
+        <div className="field-hint cust-note">
+          The number is findings in the status workflow (high and critical) that are not yet Resolved. New is
+          those still Open; Total is every finding of the area by level, workflow or not. A card opens the
+          Findings page on that area.
+        </div>
+      </div>
+
+      <div className="ov-row">
+        <div className="panel ov-chart-panel">
+          <h2>
+            Findings created per day <span className="muted">high and critical, when they entered the workflow</span>
+          </h2>
+          <DailyChart days={data.findings_daily} unit="findings" keys={['critical', 'high']} />
+        </div>
+        <div className="panel ov-side">
+          <h2>Severity distribution</h2>
+          <SeverityBars counts={sevTotals} />
+          <div className="section-label">Top affected hosts &amp; accounts</div>
+          {!data.top_entities.length && <div className="empty">No findings yet</div>}
+          {data.top_entities.map((e) => (
+            <div className="ov-line" key={`${e.customer}|${e.role}|${e.entity}`}>
+              <span>
+                <span className="cust-tag">{e.customer}</span>
+                <span className="mono">{e.entity}</span>{' '}
+                <span className="muted">{ROLE_EN[e.role] || e.role}</span>
+              </span>
+              <span>
+                {e.cases} {e.cases === 1 ? 'case' : 'cases'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="ov-row">
+        <div className="panel">
+          <div className="area-title">
+            <h2>Most urgent findings</h2>
+            <a href="#/findings" className="table-link">
+              All findings →
+            </a>
+          </div>
+          {!data.urgent.length && <div className="empty">Nothing is open in the workflow</div>}
+          <ul className="urgent">
+            {data.urgent.map((r) => (
+              <li key={`${r.case_id}|${r.key}`}>
+                <a className="table-link mono" href={`#/result/${r.case_id}/${encodeURIComponent(r.key)}`}>
+                  {r.fd}
+                </a>
+                <span className={`sev-tag sev-tag-${r.level}`}>{SEV_EN[r.level]}</span>
+                <span className="urgent-main">
+                  {r.name} <span className="mono muted">{r.host}</span>
+                  <span className="cell-sub">
+                    {r.company_name} · {r.log_type} · {r.status}
+                  </span>
+                </span>
+                <span className={r.assignee ? 'muted' : 'urgent-unassigned'}>{r.assignee || 'unassigned'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="panel ov-activity">
+          <h2>Recent activity</h2>
+          {!data.recent.length && <div className="empty">Nothing yet</div>}
+          <ul className="activity">
+            {data.recent.slice(0, 5).map((r, i) => (
+              <li key={i} className={`act-${r.level || 'muted'}`}>
+                <a href={`#/result/${r.case_id}`}>{r.text}</a>
+                {r.customer && <span className="cust-tag cust-tag-after">{r.customer}</span>}
+                <div className="mono muted">{ago(r.ts)}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </section>
   )
@@ -213,7 +293,7 @@ function Attn({ label, value, href, bad, hint }) {
     <>
       <span className="attn-value">{fmtNum(value)}</span>
       <span className="attn-label">{label}</span>
-      {(value > 0 || !bad) && <span className="attn-hint">{hint}</span>}
+      <span className="attn-hint">{value || !bad ? hint : 'Nothing to do'}</span>
     </>
   )
   return href && value ? (
@@ -313,5 +393,54 @@ function Kpi({ label, value, sub, chip, chipTone, tone }) {
       <div className="kpi-value">{value}</div>
       <div className="kpi-sub">{sub}</div>
     </div>
+  )
+}
+
+function SeverityBars({ counts }) {
+  const max = Math.max(1, ...SEVS.map((s) => counts[s] || 0))
+  return (
+    <div className="sev-bars">
+      {SEVS.map((s) => (
+        <div className="sev-bar-row" key={s}>
+          <span>{SEV_EN[s]}</span>
+          <span className="sev-track">
+            <span className={`sev-fill fill-${s}`} style={{ width: `${((counts[s] || 0) / max) * 100}%` }} />
+          </span>
+          <span className="mono">{counts[s] || 0}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Stacked by severity. Plain divs, no chart library - the same rule as the
+ *  attack graph: nothing fetched, nothing to load. */
+function DailyChart({ days, unit, keys }) {
+  const total = (d) => keys.reduce((n, k) => n + (d[k] || 0), 0)
+  const max = Math.max(1, ...days.map(total))
+  return (
+    <>
+      <div className="chart">
+        {days.map((d) => (
+          <div className="chart-col" key={d.date} title={`${d.date}: ${total(d)} ${unit}`}>
+            <div className="chart-stack">
+              {keys.map((k) =>
+                d[k] ? (
+                  <span key={k} className={`fill-${k}`} style={{ height: `${(d[k] / max) * 100}%` }} />
+                ) : null,
+              )}
+            </div>
+            <div className="chart-label mono">{Number(d.date.slice(8))}</div>
+          </div>
+        ))}
+      </div>
+      <div className="chart-legend">
+        {keys.map((s) => (
+          <span key={s}>
+            <i className={`fill-${s}`} /> {SEV_EN[s]}
+          </span>
+        ))}
+      </div>
+    </>
   )
 }
