@@ -144,7 +144,11 @@ export default function App() {
           <CustomerDetail companyId={param.split('/')[0]} projectId={param.split('/')[2]} key={param} />
         )}
         {VIEWS[page] && !param && <CasePicker route={VIEWS[page].route} title={VIEWS[page].title} />}
-        {VIEWS[page] && param && <CaseView caseId={param} view={page} key={`${page}/${param}`} />}
+        {VIEWS[page] && param && (
+          // #/reports/<case> or #/reports/<case>/<tab>
+          <CaseView caseId={param.split('/')[0]} initialTab={param.split('/')[1]} view={page}
+                    key={`${page}/${param}`} />
+        )}
         {page === 'finding' && splitResult(param).findingKey && (
           <FindingDetail {...splitResult(param)} key={param} />
         )}

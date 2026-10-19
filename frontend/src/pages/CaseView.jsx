@@ -4,6 +4,7 @@ import { fmtNum, fmtTime, statusOf } from '../format.js'
 import { Empty, SeverityPill } from '../components/common.jsx'
 import Workspace from '../components/Workspace.jsx'
 import EventsTable from '../components/EventsTable.jsx'
+import ReviewPanel from '../components/ReviewPanel.jsx'
 import AttackGraph from '../components/AttackGraph.jsx'
 import MappingNote from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
@@ -71,7 +72,7 @@ export const VIEWS = {
   timeline: { title: 'Timeline', route: 'timeline' },
 }
 
-export default function CaseView({ caseId, view = 'reports' }) {
+export default function CaseView({ caseId, view = 'reports', initialTab }) {
   const [manifest, setManifest] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [job, setJob] = useState(null)
@@ -80,7 +81,7 @@ export default function CaseView({ caseId, view = 'reports' }) {
   const [error, setError] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState('')
-  const [tab, setTab] = useState(undefined)
+  const [tab, setTab] = useState(initialTab)
   // A citation chip in the chain/timeline opens its finding's page.
   const cite = useCallback((key) => {
     window.location.hash = `#/finding/${caseId}/${encodeURIComponent(key)}`
@@ -257,6 +258,10 @@ export default function CaseView({ caseId, view = 'reports' }) {
         count: manifest.flagged_count,
         node: <EventsTable caseId={caseId} />,
       })
+      // Every finding of the case, the ones outside the status workflow too:
+      // this is where medium, low and informational findings are reviewed
+      // (the workflow ones are also reviewed on their own page).
+      out.push({ key: 'findings', label: 'Findings', node: <ReviewPanel caseId={caseId} /> })
       out.push({ key: 'evidence', label: 'Evidence', node: <Evidence caseId={caseId} /> })
     }
 
