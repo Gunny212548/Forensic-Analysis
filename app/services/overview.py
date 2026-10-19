@@ -20,7 +20,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from .. import config
-from . import areas, custody, db, finding_ids, findings_index, lifecycle, review, storage
+from . import areas, custody, db, filestamp, finding_ids, findings_index, lifecycle, review, storage
 from .severity import level_of
 
 TZ = timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))
@@ -59,17 +59,14 @@ def bucket(sev: dict | None) -> str | None:
     return "none"
 
 
-def _mtime(path) -> float:
-    try:
-        return path.stat().st_mtime
-    except OSError:
-        return 0.0
-
-
 def _case_facts(case_id: str) -> dict:
     """Techniques, review backlog and top entities for one ready case."""
-    stamp = (_mtime(db.db_path(case_id)), _mtime(review.review_path(case_id)),
-             _mtime(custody.custody_path(case_id)))
+    # The id registry is in the stamp: "findings created per day" reads it, and
+    # it changes when ids are first handed out to a case that predates them.
+    company_id = storage.case_company(case_id)
+    stamp = filestamp.of(db.db_path(case_id), review.review_path(case_id),
+                         custody.custody_path(case_id),
+                         *([finding_ids.registry_path(company_id)] if company_id else []))
     with _lock:
         hit = _cache.get(case_id)
         if hit and hit[0] == stamp:
@@ -162,10 +159,7 @@ def _case_facts(case_id: str) -> dict:
         summ_in.append({"lifecycle": {"tracked": True, "status": (st or {}).get("status", lifecycle.OPEN),
                                       "contained_at": (st or {}).get("contained_at"),
                                       "classification": (st or {}).get("classification")}})
-    manifest = storage.load_manifest(case_id) or {}
-    created_at = next((e.get("ts") for e in custody.entries(case_id) if e.get("action") == "processed"),
-                      manifest.get("uploaded_at"))
-    ms = lifecycle.summary(summ_in, created_at)
+    ms = lifecycle.summary(summ_in, custody.created_at(case_id))
 
     facts = {"techniques": techniques, "unreviewed": unreviewed, "findings": len(keys),
              "custody_issue": custody_issue, "review_issue": review_issue, "created": created,

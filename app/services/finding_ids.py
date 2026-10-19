@@ -16,9 +16,11 @@ report, must not be reassigned or quietly rewritten.
 """
 
 import threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import db, hashchain, lifecycle, storage
+from .. import config
+from . import custody, db, hashchain, lifecycle, storage
 
 _lock = threading.Lock()
 
@@ -29,12 +31,17 @@ def _path(company_id: str) -> Path:
     return d / "ids.jsonl"
 
 
+def registry_path(company_id: str) -> Path:
+    """Where the registry is, without creating it - for readers and cache stamps."""
+    return storage.customer_dir(company_id) / "findings" / "ids.jsonl"
+
+
 def lookup(case_id: str) -> dict[str, str]:
     """{finding_key: id} for the case; reads only, assigns nothing."""
     company_id = storage.case_company(case_id)
     if not company_id:
         return {}
-    path = storage.customer_dir(company_id) / "findings" / "ids.jsonl"
+    path = registry_path(company_id)
     return {e["finding_key"]: e["fd"] for e in hashchain.entries(path)
             if e.get("case_id") == case_id and e.get("action") == "assigned"}
 
@@ -45,7 +52,7 @@ def created(case_id: str) -> dict[str, str]:
     company_id = storage.case_company(case_id)
     if not company_id:
         return {}
-    path = storage.customer_dir(company_id) / "findings" / "ids.jsonl"
+    path = registry_path(company_id)
     return {e["finding_key"]: e["ts"] for e in hashchain.entries(path)
             if e.get("case_id") == case_id and e.get("action") == "assigned" and e.get("ts")}
 
@@ -86,10 +93,15 @@ def ensure(case_id: str, manifest: dict | None = None, findings: list[dict] | No
 
 
 def _year(case_id: str, manifest: dict) -> str:
-    """The year the case's findings were created: its first `processed` custody
-    entry, else the upload time (the same moment MTTC counts from)."""
-    from . import custody
-    for e in custody.entries(case_id):
-        if e.get("action") == "processed" and e.get("ts"):
-            return e["ts"][:4]
-    return (manifest.get("uploaded_at") or "")[:4] or "0000"
+    """The year the case's findings were created, in the GMT+7 the UI shows
+    (config.EVENT_TZ_*): the same moment MTTC counts from (custody.created_at).
+    An upload a minute after midnight in Bangkok is the new year there, whatever
+    UTC says."""
+    ts = custody.created_at(case_id, manifest)
+    try:
+        when = datetime.fromisoformat(ts)
+    except (TypeError, ValueError):
+        return "0000"
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return str(when.astimezone(timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))).year)

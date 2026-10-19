@@ -7,13 +7,14 @@ severity and status, the log type, the file it was found in, the assignee and
 when the activity was first seen.
 
 Building a row means reading the case's DuckDB, so a case's rows are cached
-against the modification time of what they come from - the case database, its
-review log (decisions and lifecycle share it) and the customer's id registry.
+against a fingerprint of what they come from - the case database, its review
+log (decisions and lifecycle share it), its custody log and the customer's id
+registry.
 """
 
 import threading
 
-from . import areas, case_views, finding_ids, lifecycle, review, storage
+from . import areas, case_views, custody, filestamp, finding_ids, lifecycle, review, storage
 from .rules import RULE_LABELS
 from .severity import WEIGHT
 
@@ -25,17 +26,12 @@ STATUS_RANK = {lifecycle.OPEN: 0, lifecycle.INVESTIGATING: 1, lifecycle.CONTAINE
 SEVERITIES = tuple(WEIGHT)
 
 
-def _mtime(path) -> float:
-    try:
-        return path.stat().st_mtime
-    except OSError:
-        return 0.0
-
-
 def _stamp(case_id: str, company_id: str) -> tuple:
     from . import db
-    ids = storage.customer_dir(company_id) / "findings" / "ids.jsonl"
-    return (_mtime(db.db_path(case_id)), _mtime(review.review_path(case_id)), _mtime(ids))
+    # The custody log is in it because each row's confidence grades the source's
+    # reliability from it (a failed integrity check moves B to E).
+    return filestamp.of(db.db_path(case_id), review.review_path(case_id),
+                        custody.custody_path(case_id), finding_ids.registry_path(company_id))
 
 
 def case_rows(manifest: dict) -> list[dict]:
@@ -47,7 +43,6 @@ def case_rows(manifest: dict) -> list[dict]:
         if hit and hit[0] == stamp:
             return hit[1]
 
-    log_type = case_views.log_type(manifest)
     rows = []
     for f in case_views.findings_view(case_id, manifest):
         lc = f["lifecycle"]
@@ -73,7 +68,7 @@ def case_rows(manifest: dict) -> list[dict]:
             "assignee": lc.get("assignee"),
             "review": f["review"]["status"],
             "confidence": f["confidence"],
-            "log_type": log_type,
+            "log_type": case_views.log_type(manifest, f["sample_row_id"]),
             "source_file": case_views.source_file(manifest, f["sample_row_id"]),
             "detected": f["ts_first"],
             "detected_ts": str(f["ts_min"]) if f.get("ts_min") else "",

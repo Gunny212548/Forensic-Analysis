@@ -87,6 +87,54 @@ def unit_related() -> None:
           "a long chain lists a capped number and still says how many there are")
 
 
+def unit_fixes() -> None:
+    """The review fixes that need no store: log type of line logs and zips, the
+    fingerprint of a growing file, the id year in Bangkok time."""
+    sys.path.insert(0, str(REPO))
+    import tempfile
+    from datetime import datetime, timezone
+    from app.services import case_views, filestamp, finding_ids
+
+    print("review fixes: log type, cache fingerprint, id year")
+    line = {"file_kind": "log", "mapping": {"line_profiles": [{"name": "OpenSSH sshd"}]}}
+    check(case_views.log_type(line) == "OpenSSH sshd", "a line log names the formats it was read by")
+    check(case_views.log_type({"file_kind": "csv", "mapping": {"name": "PAN-OS traffic log"}}) == "PAN-OS traffic log",
+          "a table names its documented profile")
+    check(case_views.log_type({"file_kind": "csv"}) == "csv", "no mapping falls back to the file kind")
+    zipm = {"file_kind": "zip", "members": [
+        {"row_id_first": 0, "row_id_last": 9, "kind": "csv", "mapping": {"name": "PAN-OS traffic log"}},
+        {"row_id_first": 10, "row_id_last": 19, "kind": "log",
+         "mapping": {"line_profiles": [{"name": "OpenSSH sshd"}]}}]}
+    check(case_views.log_type(zipm, 5) == "PAN-OS traffic log" and case_views.log_type(zipm, 12) == "OpenSSH sshd",
+          "a zip answers from the member holding the row")
+    check(case_views.log_type(zipm) == "PAN-OS traffic log (+1)", "and without a row, from all its members")
+
+    with tempfile.TemporaryDirectory() as d:
+        f = Path(d) / "log.jsonl"
+        gone = filestamp.of(f)
+        f.write_bytes(b"a\n")
+        one = filestamp.of(f)
+        f.write_bytes(b"a\nb\n")
+        mt = os.stat(f).st_mtime_ns
+        f.write_bytes(b"a\nb\nc\n")
+        os.utime(f, ns=(mt, mt))
+        check(gone != one and one != filestamp.of(f), "a missing file, a file and a longer file differ")
+        two = filestamp.of(f)
+        f.write_bytes(b"a\nb\nd\nx\n")
+        os.utime(f, ns=(mt, mt))
+        check(filestamp.of(f) != two, "a longer file differs even when its mtime did not move")
+
+    import app.services.custody as custody_mod
+    real = custody_mod.created_at
+    try:
+        custody_mod.created_at = lambda cid, m=None: "2026-12-31T18:00:00+00:00"
+        check(finding_ids._year("c", {}) == "2027", "an upload after midnight in Bangkok takes the new year")
+        custody_mod.created_at = lambda cid, m=None: "2026-12-31T16:59:00+00:00"
+        check(finding_ids._year("c", {}) == "2026", "and one before it keeps the old")
+    finally:
+        custody_mod.created_at = real
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("scratch")
@@ -107,6 +155,7 @@ def main() -> int:
                        input=pw + "\n", text=True, capture_output=True, check=True)
     sys.path.insert(0, str(repo))
     unit_related()
+    unit_fixes()
 
     from fastapi.testclient import TestClient
 
@@ -201,6 +250,24 @@ def main() -> int:
         check(t["total"] == t["scope_total"] and t["total"] == len(t["rows"]) and t["total"] > 0,
               f"every workflow finding of every customer is listed ({t['total']})")
         check(all(cols <= set(x) for x in t["rows"]), "each row has the columns of the design")
+        check(not any(x["log_type"] in ("log", "zip", "unknown") for x in t["rows"]),
+              "the log type is a log source, not the file kind: " + ", ".join(sorted({x["log_type"] for x in t["rows"]})))
+        # A reader in another process (the MCP server) must not write the id
+        # registry: it shows the ids that exist and never calls ensure().
+        from app.services import case_views, finding_ids, storage
+        real_ensure = finding_ids.ensure
+
+        def no_writes(*a, **k):
+            raise AssertionError("a read-only view assigned ids")
+        finding_ids.ensure = no_writes
+        try:
+            ro = case_views.findings_view(A, storage.load_manifest(A), assign_ids=False)
+            check(all(x["fd"] for x in ro if x["lifecycle"]["tracked"]),
+                  "a read-only view shows the ids already assigned without assigning any")
+        except AssertionError as exc:
+            check(False, str(exc))
+        finally:
+            finding_ids.ensure = real_ensure
         check(sum(t["by_severity"].values()) == t["scope_total"], "the header counts per severity add up")
         check(all(t["by_severity"][s] == sum(1 for x in t["rows"] if x["level"] == s) for s in t["by_severity"]),
               "and match the rows")

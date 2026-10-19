@@ -21,9 +21,13 @@ def custody_view(case_id: str, manifest: dict) -> dict:
     }
 
 
-def findings_view(case_id: str, manifest: dict) -> list[dict]:
+def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list[dict]:
     """Collapsed findings with everything an analyst - or an export - sees
-    on them: Admiralty confidence, review decision, lifecycle status."""
+    on them: Admiralty confidence, review decision, lifecycle status.
+
+    `assign_ids=False` is for a reader that must not write (the MCP server runs
+    in its own process, and the id registry's lock is in-process): it shows the
+    ids already handed out and leaves the rest empty."""
     findings = db.collapsed_findings(case_id)
     # Admiralty grading (confidence.py): source reliability needs the
     # manifest's mapping and evidence plus the custody log; cross-source
@@ -36,7 +40,7 @@ def findings_view(case_id: str, manifest: dict) -> list[dict]:
     flow = lifecycle.state(case_id)
     # FD-YYYY-nnnn for the findings that enter the workflow (finding_ids.py),
     # and the other findings of the same attack chain (related.py).
-    ids = finding_ids.ensure(case_id, manifest, findings)
+    ids = finding_ids.ensure(case_id, manifest, findings) if assign_ids else finding_ids.lookup(case_id)
     chains = related.chains(db.finding_edges(case_id))
     for f in findings:
         f["fd"] = ids.get(f["key"])
@@ -61,10 +65,7 @@ def created_at(case_id: str, manifest: dict) -> str | None:
     """When the case's findings were created - the first time the rule
     engine finished on it (custody `processed`), else the upload time. MTTC
     is measured from here (lifecycle.py); re-processing does not reset it."""
-    for e in custody.entries(case_id):
-        if e.get("action") == "processed":
-            return e.get("ts")
-    return manifest.get("uploaded_at")
+    return custody.created_at(case_id, manifest)
 
 
 def veris_line(case_id: str) -> str | None:
@@ -89,16 +90,34 @@ def source_file(manifest: dict, row_id: int) -> str | None:
     return manifest.get("original_filename")
 
 
-def log_type(manifest: dict) -> str:
-    """What kind of log this is, in the words of the documentation it was read
-    by (logsources.py), else the file kind."""
-    mapping = manifest.get("mapping") or {}
+def _mapping_name(mapping: dict) -> str | None:
+    """The log source a mapping names: a table's documented profile (`name`),
+    or the message formats a line log was read by (`line_profiles`)."""
     if mapping.get("name"):
         return mapping["name"]
-    names = [p.get("name") for p in mapping.get("profiles") or [] if p.get("name")]
+    names = [p["name"] for p in mapping.get("line_profiles") or [] if p.get("name")]
     if names:
         return names[0] if len(names) == 1 else f"{names[0]} (+{len(names) - 1})"
-    return manifest.get("file_kind") or "unknown"
+    return None
+
+
+def log_type(manifest: dict, row_id: int | None = None) -> str:
+    """What kind of log this is, in the words of the documentation it was read
+    by (logsources.py), else the file kind.
+
+    A zip has no mapping of its own - each member carries one - so the member
+    holding `row_id` answers; with no row, the distinct names of its members."""
+    members = manifest.get("members") or []
+    if members:
+        if row_id is not None:
+            for m in members:
+                lo, hi = m.get("row_id_first"), m.get("row_id_last")
+                if lo is not None and hi is not None and lo <= row_id <= hi:
+                    return _mapping_name(m.get("mapping") or {}) or m.get("kind") or "unknown"
+        names = list(dict.fromkeys(n for m in members if (n := _mapping_name(m.get("mapping") or {}))))
+        if names:
+            return names[0] if len(names) == 1 else f"{names[0]} (+{len(names) - 1})"
+    return _mapping_name(manifest.get("mapping") or {}) or manifest.get("file_kind") or "unknown"
 
 
 def finding_sources(case_id: str, manifest: dict, key: str, limit: int, offset: int = 0) -> dict:

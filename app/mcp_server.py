@@ -214,7 +214,7 @@ def tool_list_findings(args: dict) -> dict:
     _ready(m)
     min_level = args.get("min_level") or "informational"
     limit, offset = _page(args, 50)
-    findings = [f for f in _findings_view(m["case_id"], m)
+    findings = [f for f in _findings_view(m["case_id"], m, assign_ids=False)
                 if (f.get("lvl") or 0) >= WEIGHT[min_level]]
     findings.sort(key=lambda f: (-(f.get("lvl") or 0), -(f.get("cnt") or 0), f["key"]))
     return {"case_id": m["case_id"], "evidence_sha256": _evidence_sha(m),
@@ -268,7 +268,7 @@ def tool_get_veris(args: dict) -> dict:
     from .services.case_views import findings_view as _findings_view
     m = _case(args.get("case_id"))
     _ready(m)
-    record = veris.build(m["case_id"], m, _findings_view(m["case_id"], m))
+    record = veris.build(m["case_id"], m, _findings_view(m["case_id"], m, assign_ids=False))
     return {"case_id": m["case_id"], "veris": record,
             "note": None if record else "No high or critical finding - no incident record."}
 

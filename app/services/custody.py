@@ -69,6 +69,17 @@ def entries(case_id: str) -> list[dict]:
     return hashchain.entries(custody_path(case_id))
 
 
+def created_at(case_id: str, manifest: dict | None = None) -> str | None:
+    """When the case's findings were created: the first time the rule engine
+    finished on it (`processed`), else the upload time. MTTC counts from here and
+    a finding id takes its year from it; re-processing does not move it. The one
+    place this rule is written."""
+    for e in entries(case_id):
+        if e.get("action") == "processed" and e.get("ts"):
+            return e["ts"]
+    return (manifest if manifest is not None else (storage.load_manifest(case_id) or {})).get("uploaded_at")
+
+
 def record(case_id: str, action: str, actor: str, **details) -> dict:
     """Append one custody event to the hash-chained log (hashchain.py).
     Never rewrites earlier lines."""
