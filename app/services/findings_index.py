@@ -13,7 +13,7 @@ review log (decisions and lifecycle share it) and the customer's id registry.
 
 import threading
 
-from . import case_views, finding_ids, lifecycle, review, storage
+from . import areas, case_views, finding_ids, lifecycle, review, storage
 from .rules import RULE_LABELS
 from .severity import WEIGHT
 
@@ -61,6 +61,7 @@ def case_rows(manifest: dict) -> list[dict]:
             "company_name": manifest.get("company_name"),
             "project_name": manifest.get("project_name"),
             "rid": f["rid"],
+            "area": areas.AREA_OF.get(f["rid"]),
             "name": RULE_LABELS.get(f["rid"], f["rid"]),
             "descr": f["descr"],
             "host": f["srcip"] or f["username"],
@@ -92,7 +93,8 @@ def _matches(row: dict, q: str) -> bool:
 
 
 def listing(company_id: str | None = None, status: str | None = None, severity: str | None = None,
-            q: str | None = None, limit: int = 100, offset: int = 0) -> dict:
+            q: str | None = None, limit: int = 100, offset: int = 0,
+            area: str | None = None) -> dict:
     """Workflow findings for one customer, or for every customer. The counts in
     the header describe the customer scope, before the status / severity / text
     filters narrow the table."""
@@ -111,6 +113,7 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
     shown = [r for r in rows
              if (not status or r["status"] == status)
              and (not severity or r["level"] == severity)
+             and (not area or r["area"] == area)
              and (not q or _matches(r, q))]
     shown.sort(key=lambda r: (r["company_name"] or "", r["fd"] or ""))
     shown.sort(key=lambda r: r["detected_ts"], reverse=True)
@@ -122,6 +125,7 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
         "open_count": open_count,
         "by_severity": by_severity,
         "by_status": by_status,
+        "areas": [{"id": a["id"], "name": a["name"]} for a in areas.AREAS],
         "limit": limit,
         "offset": offset,
         "rows": shown[offset:offset + limit],

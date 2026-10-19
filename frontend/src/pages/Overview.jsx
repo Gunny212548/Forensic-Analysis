@@ -8,13 +8,16 @@ const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low
 const STATUS_EN = { queued: 'Queued', processing: 'Processing', ready: 'Ready', failed: 'Failed' }
 const ROLE_EN = { sources: 'source', destinations: 'destination', accounts: 'account' }
 
-/** Laid out as figma-export/Overview.svg, filled with what exists today.
+/** The Overview (redesigned 2026-10-19 at the user's request; the cards follow a
+ *  reference the user supplied, in this console's light palette).
  *
- *  The Figma page is about findings with a status (open findings, MTTC, an
- *  open-findings table); that lifecycle arrives in Sprint 3 and the real
- *  Overview stories in Sprint 5 (IAI-65..70). Until then every tile shows a case / finding /
- *  review number from GET /api/overview - never a placeholder figure - and
- *  the table is the case list (IAI-20). */
+ *  It leads with six detection areas (app/services/areas.py): one card each,
+ *  showing the findings in the status workflow that are not yet Resolved, how
+ *  many are still Open and how many findings the area holds in total (by level),
+ *  and when they were first seen. Every figure comes from GET /api/overview -
+ *  never a placeholder - and a card opens the Findings page on that area. Below
+ *  them sit what the page already had: the review backlog, severity, top
+ *  affected hosts, activity, techniques and the case list (IAI-20). */
 export default function Overview({ companyId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -107,11 +110,11 @@ export default function Overview({ companyId }) {
 
       <div className="kpis">
         <Kpi
-          label="Cases"
-          value={t.cases}
-          chip={t.uploaded_today ? `+${t.uploaded_today} today` : null}
+          label="Open findings"
+          value={fmtNum(t.open_findings)}
+          chip={t.new_findings ? `${fmtNum(t.new_findings)} new` : null}
           chipTone="danger"
-          sub={`${cs.critical} critical · ${cs.high} high · ${cs.medium} medium`}
+          sub="high and critical, not yet Resolved"
           tone="danger"
         />
         <Kpi
@@ -123,17 +126,40 @@ export default function Overview({ companyId }) {
           tone="ok"
         />
         <Kpi
-          label="Flagged events"
-          value={fmtNum(t.findings_critical + t.findings_high + t.findings_medium + t.findings_low)}
-          sub={`${fmtNum(t.findings_critical)} critical · ${fmtNum(t.findings_high)} high`}
+          label="Cases"
+          value={t.cases}
+          chip={t.uploaded_today ? `+${t.uploaded_today} today` : null}
+          chipTone="danger"
+          sub={`${cs.critical} critical · ${cs.high} high · ${cs.medium} medium`}
           tone="warn"
         />
         <Kpi
-          label="Customers"
-          value={t.customers}
-          sub={`${t.customers_with_cases} with cases`}
+          label="Flagged events"
+          value={fmtNum(t.findings_critical + t.findings_high + t.findings_medium + t.findings_low)}
+          sub={`${fmtNum(t.findings_critical)} critical · ${fmtNum(t.findings_high)} high`}
           tone="info"
         />
+      </div>
+
+      <div className="panel">
+        <div className="area-title">
+          <h2>Detection areas</h2>
+          <span className="muted">
+            {data.trend_days.length
+              ? `trend: findings first seen per day, ${data.trend_days[0]} to ${data.trend_days[data.trend_days.length - 1]}`
+              : 'no findings yet'}
+          </span>
+        </div>
+        <div className="area-grid">
+          {data.areas.map((a) => (
+            <AreaCard key={a.id} area={a} days={data.trend_days} />
+          ))}
+        </div>
+        <div className="field-hint cust-note">
+          The number is findings in the status workflow (high and critical) that are not yet Resolved. New is
+          those still Open; Total is every finding of the area by level, workflow or not. A card opens the
+          Findings page on that area.
+        </div>
       </div>
 
       <div className="ov-row">
@@ -283,6 +309,84 @@ export default function Overview({ companyId }) {
         </div>
       </div>
     </section>
+  )
+}
+
+const AREA_CHIPS = ['critical', 'high', 'medium', 'low']
+
+function AreaRow({ label, counts }) {
+  return (
+    <div className="area-row">
+      <span className="area-row-label">{label}</span>
+      {AREA_CHIPS.map((c) => (
+        <span
+          key={c}
+          className={`area-chip chip-lvl-${c}${counts[c] ? '' : ' zero'}`}
+          title={`${counts[c]} ${SEV_EN[c].toLowerCase()}`}
+        >
+          {counts[c]}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Red while a critical finding is open, amber for high, green when nothing is
+ *  open - decided from the open counts, not from a score. */
+function areaTone(a) {
+  if (a.open_by.critical) return 'danger'
+  if (a.open_by.high) return 'accent'
+  return 'ok'
+}
+
+function AreaCard({ area, days }) {
+  const tone = areaTone(area)
+  const open = AREA_CHIPS.filter((c) => area.open_by[c]).map((c) => `${area.open_by[c]} ${c}`)
+  return (
+    <a className={`area-card area-${tone}`} href={`#/findings/${area.id}`} title={area.about}>
+      <div className="area-head">
+        <h3>{area.name}</h3>
+        <span className="area-open" title={open.length ? `Open: ${open.join(', ')}` : 'Nothing open'}>
+          {fmtNum(area.open)}
+        </span>
+      </div>
+      <AreaRow label="New" counts={area.new} />
+      <AreaRow label="Total" counts={area.total} />
+      <Spark values={area.trend} days={days} />
+    </a>
+  )
+}
+
+/** Findings first seen per day as an area under a line. Plain SVG, no chart
+ *  library (nothing fetched at runtime, like the attack graph). Each card is
+ *  scaled to its own peak - the card says how many, the line says when. */
+function Spark({ values, days }) {
+  const W = 100
+  const H = 30
+  const peak = Math.max(0, ...values)
+  if (!values.length || peak === 0) {
+    return (
+      <svg className="spark spark-flat" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+        <line x1="0" y1={H - 1} x2={W} y2={H - 1} />
+      </svg>
+    )
+  }
+  const v = values.length === 1 ? [values[0], values[0]] : values
+  const step = W / (v.length - 1)
+  const line = v.map((n, i) => `${(i * step).toFixed(1)},${(H - 2 - (n / peak) * (H - 6)).toFixed(1)}`).join(' ')
+  const at = values.indexOf(peak)
+  return (
+    <svg
+      className="spark"
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={`peak ${peak} findings first seen on ${days[at]}`}
+    >
+      <title>{`Peak: ${peak} finding${peak === 1 ? '' : 's'} first seen on ${days[at]}`}</title>
+      <polygon className="spark-fill" points={`0,${H} ${line} ${W},${H}`} />
+      <polyline className="spark-line" points={line} />
+    </svg>
   )
 }
 

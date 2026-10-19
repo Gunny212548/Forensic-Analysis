@@ -321,6 +321,38 @@ def main() -> int:
         auth_row = row(W)
         check(auth_row["open"] >= 1, "the other customer is untouched")
 
+        print("Overview detection areas")
+        from app.services import areas as areas_mod, rules as rules_mod
+        check(all(len([a for a in areas_mod.AREAS if rid in a["rids"]]) == 1 for rid in rules_mod.RULE_LABELS),
+              "every rule belongs to exactly one area")
+        ov = c.get("/api/overview").json()
+        ar = ov["areas"]
+        check([a["id"] for a in ar] == list(areas_mod.AREA_IDS), "six areas, in order")
+        listing = c.get("/api/findings", params={"limit": 500}).json()
+        check(sum(a["open"] for a in ar) == ov["totals"]["open_findings"] == listing["open_count"],
+              f"the open numbers on the cards add up to the Findings badge ({listing['open_count']})")
+        check(all(sum(a["open_by"].values()) == a["open"] for a in ar), "open findings by level add up per card")
+        every_case = [x for cid in (A, F, Z, O) for x in findings(cid)]
+        check(sum(sum(a["total"].values()) for a in ar) == len(every_case),
+              f"Total counts every finding of every case ({len(every_case)})")
+        open_new = sum(1 for x in every_case if x["lifecycle"]["tracked"] and x["lifecycle"]["status"] == "Open")
+        check(sum(sum(a["new"].values()) for a in ar) == open_new == ov["totals"]["new_findings"],
+              f"New counts the findings still Open ({open_new})")
+        check(all(len(a["trend"]) == len(ov["trend_days"]) for a in ar) and 0 < len(ov["trend_days"]) <= 30,
+              "every card has one trend value per day on a shared axis (at most 30 days)")
+        check(sum(sum(a["trend"]) for a in ar) <= len(every_case) and sum(sum(a["trend"]) for a in ar) > 0,
+              "the trend counts findings first seen per day")
+        by_area = c.get("/api/findings", params={"area": "malware-c2"}).json()
+        check(by_area["total"] > 0 and all(x["area"] == "malware-c2" for x in by_area["rows"]),
+              "a card opens the Findings page on its area")
+        check(by_area["total"] == next(a for a in ar if a["id"] == "malware-c2")["open"] + sum(
+            1 for x in by_area["rows"] if x["status"] == "Resolved"),
+            "and the area's open count matches that list")
+        check(c.get("/api/findings", params={"area": "nope"}).status_code == 400, "an unknown area is 400")
+        scoped = c.get("/api/overview", params={"company_id": OTHER}).json()
+        check(scoped["totals"]["open_findings"] == c.get("/api/findings", params={"company_id": OTHER}).json()["open_count"],
+              "scoped to one customer, the cards follow it")
+
     print("FAILED: " + "; ".join(FAILED) if FAILED else "WORKFLOW OK")
     return 1 if FAILED else 0
 

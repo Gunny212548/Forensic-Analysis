@@ -20,7 +20,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from .. import config
-from . import db, lifecycle, review, storage
+from . import areas, db, lifecycle, review, storage
 from .severity import level_of
 
 TZ = timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))
@@ -109,10 +109,32 @@ def _case_facts(case_id: str) -> dict:
             entities.append({"entity": r["entity"], "role": role,
                              "score": r["score"], "max_lvl": r["max_lvl"]})
 
+    # Per detection area (areas.py): findings by level - all of them, and the
+    # ones still Open in the workflow - how many are not Resolved, and when each
+    # was first seen, for the card's trend.
+    area_facts: dict = {}
+    for f in collapsed:
+        aid = areas.AREA_OF.get(f["rid"])
+        if aid is None:
+            continue
+        a = area_facts.setdefault(aid, {"total": {}, "new": {}, "open": 0, "open_lv": {}, "days": {}})
+        c = areas.chip(f["level"])
+        a["total"][c] = a["total"].get(c, 0) + 1
+        if lifecycle.tracked(f):
+            status = flow.get(f["key"], {}).get("status", lifecycle.OPEN)
+            if status == lifecycle.OPEN:
+                a["new"][c] = a["new"].get(c, 0) + 1
+            if status != lifecycle.RESOLVED:
+                a["open"] += 1
+                a["open_lv"][c] = a["open_lv"].get(c, 0) + 1
+        if f.get("ts_min"):
+            day = str(f["ts_min"])[:10]
+            a["days"][day] = a["days"].get(day, 0) + 1
+
     facts = {"techniques": techniques, "unreviewed": unreviewed, "findings": len(keys),
              "entities": entities,
              "open_max_lvl": max(open_lvls) if open_lvls else None,
-             "wf_tracked": wf_tracked, "wf_open": len(wf_open_lvls),
+             "wf_tracked": wf_tracked, "wf_open": len(wf_open_lvls), "areas": area_facts,
              "wf_open_max_lvl": max(wf_open_lvls) if wf_open_lvls else None,
              "last_review": max(review_ts) if review_ts else None}
     with _lock:
@@ -140,6 +162,9 @@ def build(company_id: str | None = None) -> dict:
     tech_findings: Counter = Counter()
     tech_customers: dict[str, set] = {}
     entity_agg: dict[tuple, dict] = {}
+    area_agg = {aid: {"total": Counter(), "new": Counter(), "open": 0, "open_lv": Counter(),
+                      "days": Counter()}
+                for aid in areas.AREA_IDS}
     recent = []
 
     for m in manifests:
@@ -180,6 +205,13 @@ def build(company_id: str | None = None) -> dict:
             tech_cases[tid] += 1
             tech_findings[tid] += n
             tech_customers.setdefault(tid, set()).add(customer)
+        for aid, a in facts["areas"].items():
+            agg = area_agg[aid]
+            agg["total"].update(a["total"])
+            agg["new"].update(a["new"])
+            agg["open"] += a["open"]
+            agg["open_lv"].update(a["open_lv"])
+            agg["days"].update(a["days"])
         for e in facts["entities"]:
             # Per customer: the same address in two customers' cases is two
             # different hosts, and must not add up into one row.
@@ -216,6 +248,29 @@ def build(company_id: str | None = None) -> dict:
     for e in top_entities:
         e["score"] = round(e["score"], 1)
 
+    # One date axis for every card, so their trends can be compared: the last 30
+    # days of event time that any finding was first seen on, with empty days as 0.
+    seen = sorted({d for a in area_agg.values() for d in a["days"]})
+    trend_days: list[str] = []
+    if seen:
+        last = datetime.fromisoformat(seen[-1]).date()
+        first = max(datetime.fromisoformat(seen[0]).date(), last - timedelta(days=29))
+        trend_days = [(first + timedelta(days=i)).isoformat() for i in range((last - first).days + 1)]
+    area_cards = []
+    for a in areas.AREAS:
+        agg = area_agg[a["id"]]
+        trend = [agg["days"].get(d, 0) for d in trend_days]
+        area_cards.append({
+            "id": a["id"], "name": a["name"], "about": a["about"], "rules": list(a["rids"]),
+            "open": agg["open"],
+            "open_by": {c: agg["open_lv"].get(c, 0) for c in areas.CHIPS},
+            "new": {c: agg["new"].get(c, 0) for c in areas.CHIPS},
+            "total": {c: agg["total"].get(c, 0) for c in areas.CHIPS},
+            "trend": trend,
+        })
+    open_findings = sum(a["open"] for a in area_cards)
+    new_findings = sum(sum(a["new"].values()) for a in area_cards)
+
     used_companies = {m.get("company_id") for m in manifests if m.get("company_id")}
     return {
         "generated_at": now.isoformat(),
@@ -231,7 +286,10 @@ def build(company_id: str | None = None) -> dict:
             "findings_medium": totals["findings_medium"], "findings_low": totals["findings_low"],
             "unreviewed": totals["unreviewed"], "reviewable": totals["reviewable"],
             "cases_with_unreviewed": totals["cases_with_unreviewed"],
+            "open_findings": open_findings, "new_findings": new_findings,
         },
+        "areas": area_cards,
+        "trend_days": trend_days,
         "case_severity": {k: case_sev[k] for k in ("critical", "high", "medium", "low", "none")},
         "daily": [{"date": d.isoformat(), **{k: c[k] for k in ("critical", "high", "medium", "low", "none", "pending")}}
                   for d, c in daily.items()],

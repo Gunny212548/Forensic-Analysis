@@ -12,11 +12,12 @@ const PAGE = 50
  *  and the footnote says so rather than letting the table read as "all of them".
  *
  *  A row opens its case on the Review tab, scrolled to the finding. */
-export default function Findings() {
+export default function Findings({ areaId }) {
   const [companies, setCompanies] = useState([])
   const [companyId, setCompanyId] = useState('')
   const [status, setStatus] = useState('')
   const [severity, setSeverity] = useState('')
+  const [area, setArea] = useState(areaId || '')
   const [text, setText] = useState('')
   const [q, setQ] = useState('')
   const [offset, setOffset] = useState(0)
@@ -40,12 +41,12 @@ export default function Findings() {
 
   const load = useCallback(async () => {
     try {
-      setData(await listFindings({ companyId, status, severity, q, limit: PAGE, offset }))
+      setData(await listFindings({ companyId, status, severity, area, q, limit: PAGE, offset }))
       setError('')
     } catch (err) {
       setError(err.message)
     }
-  }, [companyId, status, severity, q, offset])
+  }, [companyId, status, severity, area, q, offset])
 
   useEffect(() => {
     load()
@@ -118,6 +119,14 @@ export default function Findings() {
             {STATUSES.map((s) => (
               <option value={s} key={s}>
                 {s}
+              </option>
+            ))}
+          </select>
+          <select value={area} onChange={pick(setArea)} aria-label="Detection area">
+            <option value="">Any area</option>
+            {(data.areas || []).map((a) => (
+              <option value={a.id} key={a.id}>
+                {a.name}
               </option>
             ))}
           </select>

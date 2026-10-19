@@ -115,11 +115,12 @@ export async function getFindingEvents(caseId, key, { limit = 25, offset = 0 } =
 
 /** Every finding in the status workflow, across cases (FR-4.4). `open_count`
  *  is what the Findings menu badge shows. */
-export async function listFindings({ companyId, status, severity, q, limit = 50, offset = 0 } = {}) {
+export async function listFindings({ companyId, status, severity, area, q, limit = 50, offset = 0 } = {}) {
   const p = new URLSearchParams({ limit, offset })
   if (companyId) p.set('company_id', companyId)
   if (status) p.set('status', status)
   if (severity) p.set('severity', severity)
+  if (area) p.set('area', area)
   if (q) p.set('q', q)
   return jsonOrThrow(await fetch(`/api/findings?${p}`), 'Could not load findings')
 }

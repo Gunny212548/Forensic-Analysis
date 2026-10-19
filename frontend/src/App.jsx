@@ -126,7 +126,7 @@ export default function App() {
       <main className="layout">
         {page === 'dashboard' && <Overview companyId={param || null} />}
         {page === 'upload' && <Upload user={user} />}
-        {page === 'findings' && <Findings />}
+        {page === 'findings' && <Findings areaId={param || null} key={param} />}
         {page === 'customers' && !param && <Customers />}
         {page === 'customers' && param && (
           // #/customers/<id> or #/customers/<id>/projects/<project id>
