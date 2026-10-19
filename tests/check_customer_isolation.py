@@ -59,6 +59,7 @@ def main() -> int:
     from fastapi.testclient import TestClient
 
     from app.main import app
+    from app.services import jobs
 
     c = TestClient(app)
     with c:
@@ -81,8 +82,9 @@ def main() -> int:
                 with open(uc / name, "rb") as fh:
                     m = c.post("/api/upload", files={"file": (name, fh)},
                                data={"company_id": co["company_id"]}).json()
-                # TestClient runs the background task before returning.
                 cases[co["company_id"]].append(m["case_id"])
+        # Uploads are queued (services/jobs.py): wait for the pipeline.
+        check(jobs.wait_idle(120), "the job queue drained")
         for co_id, ids in cases.items():
             for cid in ids:
                 m = c.get(f"/api/cases/{cid}").json()
@@ -134,6 +136,7 @@ def main() -> int:
         with open(uc / "nightfall-auth.log", "rb") as fh:
             again = c.post("/api/upload", files={"file": ("again.log", fh)},
                            data={"company_id": a["company_id"]}).json()["case_id"]
+        jobs.wait_idle(120)
         r = c.post("/api/cases/merge", json={"case_ids": [auth_a, again]})
         merged = r.json().get("case_id") if r.status_code == 200 else None
         check(merged is not None
@@ -166,6 +169,7 @@ def main() -> int:
               f"another customer's project is refused and no case is made ({r.status_code})")
         r = upload_a({"company_id": a["company_id"], "project_id": "../../users"})
         check(r.status_code == 409, f"a path-shaped project id is not a project ({r.status_code})")
+        jobs.wait_idle(120)
         r = c.post("/api/cases/merge", json={"case_ids": [p1["case_id"], p2["case_id"]]})
         m = c.get(f"/api/cases/{r.json().get('case_id')}").json() if r.status_code == 200 else {}
         check(m.get("project_id") == pid, f"a merge of one project's cases stays in it ({r.status_code})")
@@ -173,6 +177,8 @@ def main() -> int:
         m = c.get(f"/api/cases/{r.json().get('case_id')}").json() if r.status_code == 200 else {}
         check(r.status_code == 200 and not m.get("project_id"),
               f"a merge across projects is in no project ({r.status_code})")
+
+        jobs.wait_idle(120)  # the merged cases are processed too
 
         print("refusals")
         check(c.get("/api/cases/..%2F..%2Fusers").status_code in (404, 422),

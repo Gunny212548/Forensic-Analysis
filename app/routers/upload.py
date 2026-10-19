@@ -1,13 +1,12 @@
-import asyncio
 import hashlib
 import shutil
 import zipfile
 import zlib
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from .. import config
-from ..services import archive, custody, pipeline, storage
+from ..services import archive, custody, jobs, storage
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
@@ -52,17 +51,9 @@ async def upload_check(size: int = Query(0, ge=0)):
     }
 
 
-async def _run_pipeline(case_id: str, path, kind: str) -> None:
-    # Off the event loop: the pipeline is CPU/IO-bound sync work, and
-    # running it inline would stall every other request while a large
-    # file is parsed.
-    await asyncio.to_thread(pipeline.process_case, case_id, path, kind)
-
-
 @router.post("/upload")
 async def upload_log(
     request: Request,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     note: str = Form(""),
     company_id: str = Form(""),
@@ -192,5 +183,5 @@ async def upload_log(
     storage.update_case(case_id, **fields)
     manifest.update(fields)
 
-    background_tasks.add_task(_run_pipeline, case_id, dest, kind)
+    jobs.submit(case_id, dest, kind)  # queued; a worker thread runs the pipeline
     return manifest

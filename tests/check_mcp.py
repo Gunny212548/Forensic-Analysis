@@ -58,6 +58,10 @@ def setup(repo: Path, usecase_dir: Path, scratch: Path) -> tuple[dict, str, Path
         f"c.post('/api/auth/login', json={{'email': '{EMAIL}', 'password': '{PASSWORD}'}})\n"
         "with open(sys.argv[2], 'rb') as fh:\n"
         "    m = c.post('/api/upload', files={'file': ('nightfall.zip', fh)}, data={'company_name': 'MCP check'}).json()\n"
+        "import time\n"
+        "for _ in range(1200):\n"
+        "    if c.get('/api/cases/' + m['case_id']).json()['status'] in ('ready', 'failed'): break\n"
+        "    time.sleep(0.25)\n"
         "print(m['case_id'])\n"
     )
     out = subprocess.run([sys.executable, "-c", code, str(repo), str(zpath)], env=env,

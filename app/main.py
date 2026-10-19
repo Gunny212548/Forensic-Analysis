@@ -12,7 +12,7 @@ from .routers import overview as overview_router
 from .routers import rules as rules_router
 from .routers import upload as upload_router
 from . import config
-from .services import auth, storage
+from .services import auth, jobs, storage
 
 app = FastAPI(title="Forensic Analyzer")
 
@@ -88,6 +88,11 @@ async def on_startup():
             "%s customer/case record(s) are still in the old shared layout and are not "
             "shown; adding customers or cases is refused until you run: "
             "python tools/migrate_to_customers.py --apply", legacy)
+    # Start the pipeline workers, and queue again whatever a previous run
+    # left unfinished (services/jobs.py). Not while the store is in the
+    # old layout: those cases are not visible to it.
+    if not legacy:
+        jobs.start()
 
 
 @app.get("/api/health")

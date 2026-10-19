@@ -52,7 +52,7 @@ def sanitize_original_name(name: str) -> str:
 
 # ------------------------------------------------------- per-customer stores
 
-CASE_SUBDIRS = ("cases", "db", "raw", "analysis", "review", "custody")
+CASE_SUBDIRS = ("cases", "db", "raw", "analysis", "review", "custody", "jobs")
 
 # Ids are checked before they become a path component: a case or company id
 # arrives in a URL, and "../users" must never resolve to a file.

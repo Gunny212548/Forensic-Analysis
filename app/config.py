@@ -34,6 +34,11 @@ EVENT_TZ_SUFFIX = "+07:00"
 # SESSION_SECRET signs the cookie and, when unset, is generated once and kept
 # in AUTH_DIR so sessions survive a container restart.
 SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "12"))
+
+# How many cases the pipeline processes at once (services/jobs.py). More wait
+# in a queue: each ingest holds a DuckDB and a file stream, and ten at once is
+# an out-of-memory kill rather than ten times the speed.
+JOB_WORKERS = max(1, int(os.environ.get("JOB_WORKERS", "2")))
 # Where "can't sign in?" points on the login page (FR-1.2) - a mailto: or a
 # helpdesk URL. Empty shows the instruction without a link.
 IT_CONTACT_URL = os.environ.get("IT_CONTACT_URL", "")

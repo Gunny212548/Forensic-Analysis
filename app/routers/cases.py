@@ -6,9 +6,9 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Requ
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import (analysis, attack_layer, auth, confidence, custody, db, lifecycle, review,
-                        stix_export, storage, veris)
-from .upload import CHUNK, _run_pipeline
+from ..services import (analysis, attack_layer, auth, confidence, custody, db, jobs, lifecycle,
+                        review, stix_export, storage, veris)
+from .upload import CHUNK
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -182,7 +182,7 @@ def _concat_raw(sources: list, dest) -> tuple[int, str, list[str]]:
 
 
 @router.post("/merge")
-async def merge_cases(request: Request, background_tasks: BackgroundTasks, body: dict = Body(...)):
+async def merge_cases(request: Request, body: dict = Body(...)):
     """Concatenate several already-ingested line-log cases into one new case
     and run the normal pipeline over the whole thing.
 
@@ -315,7 +315,7 @@ async def merge_cases(request: Request, background_tasks: BackgroundTasks, body:
     storage.update_case(case_id, **fields)
     manifest.update(fields)
 
-    background_tasks.add_task(_run_pipeline, case_id, dest, "log")
+    jobs.submit(case_id, dest, "log")
     return manifest
 
 
