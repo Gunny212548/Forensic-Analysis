@@ -274,6 +274,7 @@ async def merge_cases(request: Request, body: dict = Body(...)):
     )
     case_id = manifest["case_id"]
     dest = storage.raw_path(case_id, "log")
+    jobs.begin(case_id)  # a restart during the concatenation fails the case (services/jobs.py)
 
     # Byte-level copy in chunks: syslog lines are self-delimited and carry no
     # cross-file state, so nothing has to be parsed here, and ~1GB sources
@@ -294,6 +295,7 @@ async def merge_cases(request: Request, body: dict = Body(...)):
     altered = [m["case_id"] for (_, _, m), got in zip(ordered, source_digests)
                if (m.get("evidence") or {}).get("sha256") not in (None, got)]
     if altered:
+        jobs.cancel(case_id)
         dest.unlink(missing_ok=True)
         storage.manifest_path(case_id).unlink(missing_ok=True)
         raise HTTPException(

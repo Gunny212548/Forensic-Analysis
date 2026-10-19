@@ -95,6 +95,13 @@ async def on_startup():
         jobs.start()
 
 
+@app.on_event("shutdown")
+async def on_shutdown():
+    # A deliberate stop (deploy, reboot): running jobs give their attempt back, so
+    # only a stop nobody announced counts against a file (services/jobs.py).
+    jobs.stop()
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}

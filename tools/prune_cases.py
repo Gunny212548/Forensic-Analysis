@@ -74,6 +74,7 @@ def case_files(data: Path, case_id: str) -> list[Path]:
         # (same digest as the copy kept), so the evidence itself survives;
         # this log only described the copy being removed.
         data / "custody" / f"{case_id}.jsonl",
+        data / "jobs" / f"{case_id}.json",
     ]
     found += list((data / "raw").glob(f"{case_id}.*"))
     return [p for p in found if p.exists()]
@@ -108,6 +109,9 @@ def main() -> int:
                     "case_id": case_id,
                     "store": data,
                     "uploaded_at": manifest.get("uploaded_at") or "",
+                    # A case still queued or processing is never pruned: a worker
+                    # would go on to run the deleted case (services/jobs.py).
+                    "busy": manifest.get("status") in ("queued", "processing"),
                     "reviewed": (data / "review" / f"{case_id}.jsonl").exists(),
                     "analysed": (data / "analysis" / f"{case_id}.json").exists(),
                 }
@@ -125,7 +129,7 @@ def main() -> int:
         )
         keep, rest = members[0], members[1:]
         for m in rest:
-            if args.keep_reviewed and m["reviewed"]:
+            if m["busy"] or (args.keep_reviewed and m["reviewed"]):
                 continue
             m["name"] = name
             m["kept_instead"] = keep["case_id"]

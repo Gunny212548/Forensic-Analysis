@@ -102,11 +102,15 @@ async def upload_log(
         project=project,
     )
     case_id = manifest["case_id"]
+    # Until the whole file is on disk a restart must fail this case, not leave it
+    # `queued` for ever (services/jobs.py).
+    jobs.begin(case_id)
     # The raw copy keeps the analyst's bytes as uploaded - compressed stays
     # compressed; the pipeline reads it through gzip/zip itself.
     dest = storage.raw_path(case_id, f"{kind}.gz" if compression == "gz" else kind)
 
     def discard() -> None:
+        jobs.cancel(case_id)
         dest.unlink(missing_ok=True)
         storage.manifest_path(case_id).unlink(missing_ok=True)
 

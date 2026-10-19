@@ -216,8 +216,10 @@ def load_manifest(case_id: str) -> dict | None:
             return json.loads(path.read_text(encoding="utf-8"))
         except FileNotFoundError:
             return None
-        except (PermissionError, json.JSONDecodeError):
+        except PermissionError:
             # Windows: the file is being swapped under us. Retry; give up loudly.
+            # Not JSONDecodeError: a rename is atomic, so a reader never sees half a
+            # manifest, and a corrupt one would only make every GET wait for nothing.
             if attempt == 39:
                 raise
             time.sleep(0.005 * (attempt + 1))

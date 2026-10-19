@@ -20,7 +20,10 @@ Consequences, reproduced by the test before the fix:
 - One `RLock` per case around the whole load-modify-save in `update_case`.
 - A temp file named per process and thread, so writers cannot share one.
 - `os.replace` retried briefly on `PermissionError` (Windows sharing violation);
-  `load_manifest` retried on `PermissionError` / `JSONDecodeError`.
+  `load_manifest` retried on `PermissionError` only. Not on `JSONDecodeError`: a rename is
+  atomic, so a reader never sees half a manifest, and a corrupt one (hand-edited, restored
+  from a backup) would only make every GET for that case wait seconds in a synchronous
+  call on the event loop. A first version retried it; code review showed a 3.9 s stall.
 
 ## Consequences
 
@@ -29,5 +32,7 @@ Consequences, reproduced by the test before the fix:
   reads saw no missing or torn manifest.
 - **In-process only.** The lock does not protect two processes. Same single-process
   assumption as ADR-001.
-- On Linux (production) `os.replace` is already atomic against readers, so the retry
-  loops never fire there; the lock and the unique temp name are what matter.
+- On Linux (production) `os.replace` is already atomic against readers and does not raise
+  `PermissionError`, so the retry loops never fire there; the lock and the unique temp name
+  are what matter. A corrupt manifest raises `JSONDecodeError` at once
+  (`check_manifest_atomic.py`, check 5).

@@ -4,13 +4,14 @@ torn.
 
     python tests/check_manifest_atomic.py <scratch dir>
 
-Four checks against storage.update_case / load_manifest:
+Five checks against storage.update_case / load_manifest:
 - N threads each set their own key 200 times: every key survives (no lost
   update from the load-modify-save window);
 - a late progress write cannot undo a status change made by another thread;
 - a reader polling during the writes never sees a missing or half-written
   manifest;
-- updating a case that does not exist is still a no-op.
+- updating a case that does not exist is still a no-op;
+- a corrupt manifest raises at once instead of retrying for seconds.
 
 stdlib + the app's own modules; no network.
 """
@@ -19,6 +20,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -101,6 +103,21 @@ def main() -> int:
         check(True, "updating an unknown case is a no-op")
     except Exception as exc:  # noqa: BLE001
         check(False, f"updating an unknown case is a no-op ({exc!r})")
+
+    # 4. a corrupt manifest raises at once (no retry loop holding up every reader)
+    import json
+    bad = storage.manifest_path(cid)
+    good = bad.read_text(encoding="utf-8")
+    bad.write_text("{ not json", encoding="utf-8")
+    t0 = time.monotonic()
+    try:
+        storage.load_manifest(cid)
+        raised = False
+    except json.JSONDecodeError:
+        raised = True
+    took = time.monotonic() - t0
+    bad.write_text(good, encoding="utf-8")
+    check(raised and took < 0.5, f"a corrupt manifest raises at once ({took:.2f}s)")
 
     print("FAILED: " + "; ".join(FAILED) if FAILED else "ALL OK")
     return 1 if FAILED else 0

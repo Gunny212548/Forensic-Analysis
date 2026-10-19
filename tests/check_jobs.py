@@ -3,15 +3,24 @@
     python tests/check_jobs.py <scratch dir>
 
 Uses a fake runner in place of pipeline.process_case, so it needs no DuckDB
-and takes a few seconds. Checks (services/jobs.py):
+and takes a few seconds. Checks (services/jobs.py, docs/adr/ADR-001):
 
 - at most JOB_WORKERS jobs run at once, however many are submitted, and every
-  one runs exactly once;
-- a finished job leaves no job file behind;
-- a job file left by a previous process (a restart mid-run) is queued again,
-  the case goes back to `queued`, and the custody log says `requeued`;
-- a job already tried MAX_ATTEMPTS times is not run again: the case is
-  `failed` with the reason and custody says `abandoned`;
+  one runs exactly once; a finished job leaves no job file;
+- a job file left by a previous process is queued again, the case goes back to
+  `queued`, and custody says `requeued`;
+- jobs that were running when the process died are suspects and run ALONE, so
+  one that was merely beside the culprit finishes and is not blamed;
+- a suspect already stopped MAX_ATTEMPTS times is abandoned (`failed`, custody
+  `abandoned`) and not run again;
+- a case that finished (`ready`) before its job file was removed is left alone,
+  even with attempts exhausted - recovery never overwrites an outcome;
+- a job whose case was deleted is removed, and recovery does not create the
+  `_unowned` store for it;
+- an upload cut off by a restart (state `receiving`) fails its case;
+- a graceful stop gives the running job's attempt back;
+- submitting a case that already has a job is refused and does not touch the
+  running job's file; calling start() again while a job runs requeues nothing;
 - a runner that raises fails its case and does not kill the worker;
 - custody chains stay intact through all of it.
 
@@ -44,29 +53,59 @@ def main() -> int:
 
     storage.ensure_root()
     company = storage.create_company("Jobs check")
+    store = Path(os.environ["DATA_DIR"]) / "customers" / company["company_id"]
 
     def new_case() -> str:
         m = storage.create_case("a.csv", "csv", 1, company_id=company["company_id"],
                                 company_name=company["name"])
         return m["case_id"]
 
+    def job_file(case_id: str, **fields) -> None:
+        job = {"case_id": case_id, "state": "queued", "path": str(scratch / "x.csv"),
+               "kind": "csv", "attempts": 0, "enqueued_at": "2026-01-01T00:00:00+00:00"}
+        job.update(fields)
+        jobs._write(case_id, job)
+
+    def actions(case_id: str) -> list[str]:
+        return [e["action"] for e in custody.entries(case_id)]
+
     lock = threading.Lock()
-    state = {"now": 0, "max": 0, "runs": {}, "seen_status": {}, "boom": set()}
+    st = {"now": 0, "max": 0, "runs": {}, "seen_status": {}, "boom": set(), "running": set(),
+          "block": {}, "suspects": set(), "violations": []}
 
     def runner(case_id, path, kind):
         with lock:
-            state["now"] += 1
-            state["max"] = max(state["max"], state["now"])
-            state["runs"][case_id] = state["runs"].get(case_id, 0) + 1
-            state["seen_status"][case_id] = storage.load_manifest(case_id)["status"]
+            st["now"] += 1
+            st["max"] = max(st["max"], st["now"])
+            st["runs"][case_id] = st["runs"].get(case_id, 0) + 1
+            st["seen_status"][case_id] = storage.load_manifest(case_id)["status"]
+            others = st["running"] - {case_id}
+            if others and (case_id in st["suspects"] or others & st["suspects"]):
+                st["violations"].append(case_id)
+            st["running"].add(case_id)
         try:
-            if case_id in state["boom"]:
+            storage.update_case(case_id, status="processing")
+            if case_id in st["boom"]:
                 raise RuntimeError("simulated crash")
-            time.sleep(0.25)
+            gate = st["block"].get(case_id)
+            if gate:
+                gate.wait(20)
+            else:
+                time.sleep(0.25)
             storage.update_case(case_id, status="ready")
         finally:
             with lock:
-                state["now"] -= 1
+                st["now"] -= 1
+                st["running"].discard(case_id)
+
+    def wait_running(case_id: str) -> bool:
+        end = time.monotonic() + 10
+        while time.monotonic() < end:
+            with lock:
+                if case_id in st["running"]:
+                    return True
+            time.sleep(0.01)
+        return False
 
     jobs.start(workers=2, runner=runner)
 
@@ -75,45 +114,117 @@ def main() -> int:
     for cid in ids:
         jobs.submit(cid, scratch / "x.csv", "csv")
     check(jobs.wait_idle(30), "6 submitted jobs all finished")
-    check(state["max"] == 2, f"never more than 2 at once (peak {state['max']})")
-    check(all(state["runs"].get(c) == 1 for c in ids), "each job ran exactly once")
+    check(st["max"] == 2, f"never more than 2 at once (peak {st['max']})")
+    check(all(st["runs"].get(c) == 1 for c in ids), "each job ran exactly once")
     check(all(storage.load_manifest(c)["status"] == "ready" for c in ids), "every case ended ready")
     check(jobs.pending() == [], "no job file left behind")
 
-    print("restart recovery")
-    left = new_case()
-    storage.update_case(left, status="processing", progress={"stage": "ingest", "pct": 40})
-    jobs._write(left, {"case_id": left, "path": str(scratch / "x.csv"), "kind": "csv",
-                       "attempts": 1, "enqueued_at": "2026-01-01T00:00:00+00:00"})
-    result = jobs.recover()
-    check(result["requeued"] == [left] and not result["gave_up"], "the leftover job was requeued")
-    check(jobs.wait_idle(30), "and it ran")
-    check(state["runs"].get(left) == 1, "exactly once")
-    check(state["seen_status"].get(left) == "queued", "the case read 'queued' (not stuck 'processing') when it restarted")
-    check(storage.load_manifest(left)["status"] == "ready", "and ended ready")
-    actions = [e["action"] for e in custody.entries(left)] if hasattr(custody, "entries") else []
-    if actions:
-        check("requeued" in actions, "custody records the requeue")
-    ok, why = custody.verify_chain(left)
-    check(ok, f"custody chain intact ({why})")
+    print("restart recovery: suspects run alone")
+    a, b = new_case(), new_case()
+    st["suspects"] = {a, b}
+    for cid in (a, b):
+        storage.update_case(cid, status="processing", progress={"stage": "ingest", "pct": 40})
+        job_file(cid, running=True, attempts=1)
+    n = new_case()  # a plain job submitted right behind them
+    jobs_before = st["max"]
+    out = jobs.recover()
+    jobs.submit(n, scratch / "x.csv", "csv")
+    check(sorted(out["requeued"]) == sorted([a, b]) and not out["gave_up"], "both leftover jobs were requeued")
+    check(jobs.wait_idle(30), "and they ran")
+    check(st["runs"].get(a) == 1 and st["runs"].get(b) == 1, "exactly once each")
+    check(st["seen_status"].get(a) == "queued", "the case read 'queued' (not stuck 'processing') when it restarted")
+    check(not st["violations"], f"no job ran beside a suspect ({st['violations']})")
+    check(all(storage.load_manifest(c)["status"] == "ready" for c in (a, b, n)),
+          "all ended ready - the innocent one was not blamed")
+    check("requeued" in actions(a) and custody.verify_chain(a)[0], "custody records the requeue, chain intact")
     check(jobs.pending() == [], "no job file left behind")
+    st["suspects"] = set()
 
-    print("a job that keeps killing the process")
+    print("a job that keeps stopping the process")
     poison = new_case()
     storage.update_case(poison, status="processing")
-    jobs._write(poison, {"case_id": poison, "path": str(scratch / "x.csv"), "kind": "csv",
-                         "attempts": jobs.MAX_ATTEMPTS, "enqueued_at": "2026-01-01T00:00:00+00:00"})
-    result = jobs.recover()
+    job_file(poison, running=True, attempts=jobs.MAX_ATTEMPTS)
+    out = jobs.recover()
     m = storage.load_manifest(poison)
-    check(result["gave_up"] == [poison] and not result["requeued"], "it was abandoned, not requeued")
-    check(m["status"] == "failed" and "interrupted" in (m.get("error") or ""), "case failed with the reason")
-    check(poison not in state["runs"], "the runner was not called")
-    check(custody.verify_chain(poison)[0], "custody chain intact")
+    check(out["gave_up"] == [poison] and not out["requeued"], "it was abandoned, not requeued")
+    check(m["status"] == "failed" and "stopped" in (m.get("error") or ""), "case failed with the reason")
+    check(poison not in st["runs"], "the runner was not called")
+    check("abandoned" in actions(poison) and custody.verify_chain(poison)[0], "custody says abandoned, chain intact")
+    check(jobs.pending() == [], "no job file left behind")
+
+    print("a case that finished before its job file was removed")
+    done = new_case()
+    storage.update_case(done, status="ready", total_rows=10)
+    job_file(done, running=True, attempts=jobs.MAX_ATTEMPTS)
+    out = jobs.recover()
+    m = storage.load_manifest(done)
+    check(out["settled"] == [done], "recovery settled it")
+    check(m["status"] == "ready" and not m.get("error"), "still ready: the outcome was not overwritten")
+    check(done not in st["runs"] and "abandoned" not in actions(done) and "requeued" not in actions(done),
+          "not re-run and no false custody entry")
+    check(jobs.pending() == [], "the stale job file was removed")
+
+    print("a job whose case was deleted")
+    gone = new_case()
+    job_file(gone, running=True, attempts=1)
+    storage.manifest_path(gone).unlink()
+    out = jobs.recover()
+    check(out["orphans"] == [gone] and gone not in st["runs"], "dropped, not run")
+    check(not (store.parent / "_unowned").exists(), "recovery did not create the _unowned store")
+    check(jobs.pending() == [], "the job file was removed")
+
+    print("an upload cut off by a restart")
+    cut = new_case()
+    jobs.begin(cut)
+    out = jobs.recover()
+    m = storage.load_manifest(cut)
+    check(out["interrupted_uploads"] == [cut], "recovery found it")
+    check(m["status"] == "failed" and "restarted before" in (m.get("error") or ""),
+          "the case failed with an upload-or-merge-again message")
+    check("upload_interrupted" in actions(cut) and cut not in st["runs"], "custody says so; nothing ran")
+    check(jobs.pending() == [], "the job file was removed")
+    cancelled = new_case()
+    jobs.begin(cancelled)
+    jobs.cancel(cancelled)
+    check(jobs.pending() == [], "a refused upload's job is cancelled")
+
+    print("a graceful stop gives the attempt back")
+    g = new_case()
+    st["block"][g] = threading.Event()
+    jobs.submit(g, scratch / "x.csv", "csv")
+    check(wait_running(g), "the job is running")
+    before = jobs._read(g)
+    jobs.stop()
+    after = jobs._read(g)
+    check(before["attempts"] == 1 and before["running"], "while running: attempt 1, running")
+    check(after["attempts"] == 0 and not after["running"], "after stop(): attempt returned, not running")
+    st["block"][g].set()
+    check(jobs.wait_idle(30), "the job still finished")
+    check(storage.load_manifest(g)["status"] == "ready" and jobs.pending() == [], "ready, no file left")
+    jobs.start(workers=2)  # a restart in the same process
+
+    print("a second submit, a second start()")
+    d = new_case()
+    st["block"][d] = threading.Event()
+    jobs.submit(d, scratch / "x.csv", "csv")
+    check(wait_running(d), "the job is running")
+    try:
+        jobs.submit(d, scratch / "x.csv", "csv")
+        refused = False
+    except jobs.JobActive:
+        refused = True
+    j = jobs._read(d)
+    check(refused and j and j["attempts"] == 1 and j["running"], "refused, and the running job's file is untouched")
+    res = jobs.start()
+    check(res == {} and storage.load_manifest(d)["status"] == "processing" and "requeued" not in actions(d),
+          "start() again requeued nothing and wrote no false custody entry")
+    st["block"][d].set()
+    check(jobs.wait_idle(30) and st["runs"].get(d) == 1, "it ran exactly once")
     check(jobs.pending() == [], "no job file left behind")
 
     print("a runner that raises")
     bad, good = new_case(), new_case()
-    state["boom"].add(bad)
+    st["boom"].add(bad)
     jobs.submit(bad, scratch / "x.csv", "csv")
     jobs.submit(good, scratch / "x.csv", "csv")
     check(jobs.wait_idle(30), "both finished")
