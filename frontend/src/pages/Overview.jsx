@@ -52,23 +52,14 @@ export default function Overview({ companyId }) {
       <div className="top-bar">
         <div>
           <h1>Security Operations Overview</h1>
+          {/* One line: whose data this is (named, never just counted - a customer
+              when scoped, how many when not) and how fresh it is. The page polls
+              by itself, so there is no refresh button. */}
           <div className="subtitle">
             <span className="live-dot" />{' '}
-            {t.last_upload ? `Last upload ${ago(t.last_upload)}` : 'No upload yet'} · {t.ready} of {t.cases}{' '}
-            {t.cases === 1 ? 'file' : 'files'} processed · updated {ago(data.generated_at)}
-          </div>
-          {/* Whose data every figure below is - named, never just counted. */}
-          <div className="ov-scope">
-            {scoped ? (
-              <>
-                Customer: <strong>{scoped.name}</strong>
-              </>
-            ) : (
-              <>
-                All customers:{' '}
-                <strong>{(data.customer_options || []).map((c) => c.name).join(', ') || 'none yet'}</strong>
-              </>
-            )}
+            {scoped ? <strong>{scoped.name}</strong> : `All customers (${(data.customer_options || []).length})`}
+            {' · '}
+            {t.last_upload ? `last upload ${ago(t.last_upload)}` : 'no upload yet'}
           </div>
         </div>
         <div className="actions">
@@ -89,9 +80,6 @@ export default function Overview({ companyId }) {
               </option>
             ))}
           </select>
-          <button type="button" className="secondary" onClick={load}>
-            Refresh
-          </button>
           <a className="btn-primary" href="#/upload">
             Upload log
           </a>
