@@ -141,27 +141,6 @@ export default function Overview({ companyId }) {
         />
       </div>
 
-      <div className="panel">
-        <div className="area-title">
-          <h2>Detection areas</h2>
-          <span className="muted">
-            {data.trend_days.length
-              ? `trend: findings first seen per day, ${data.trend_days[0]} to ${data.trend_days[data.trend_days.length - 1]}`
-              : 'no findings yet'}
-          </span>
-        </div>
-        <div className="area-grid">
-          {data.areas.map((a) => (
-            <AreaCard key={a.id} area={a} days={data.trend_days} />
-          ))}
-        </div>
-        <div className="field-hint cust-note">
-          The number is findings in the status workflow (high and critical) that are not yet Resolved. New is
-          those still Open; Total is every finding of the area by level, workflow or not. A card opens the
-          Findings page on that area.
-        </div>
-      </div>
-
       <div className="ov-row">
         <div className="panel ov-chart-panel">
           <h2>Cases uploaded per day</h2>
@@ -184,6 +163,27 @@ export default function Overview({ companyId }) {
               </span>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="area-title">
+          <h2>Detection areas</h2>
+          <span className="muted">
+            {data.trend_days.length
+              ? `trend: findings first seen per day, ${data.trend_days[0]} to ${data.trend_days[data.trend_days.length - 1]}`
+              : 'no findings yet'}
+          </span>
+        </div>
+        <div className="area-grid">
+          {data.areas.map((a) => (
+            <AreaCard key={a.id} area={a} days={data.trend_days} />
+          ))}
+        </div>
+        <div className="field-hint cust-note">
+          The number is findings in the status workflow (high and critical) that are not yet Resolved. New is
+          those still Open; Total is every finding of the area by level, workflow or not. A card opens the
+          Findings page on that area.
         </div>
       </div>
 
