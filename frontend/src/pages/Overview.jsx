@@ -1,28 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getOverview } from '../api.js'
-import { ago, fmtNum, severityBucket } from '../format.js'
+import { ago, fmtNum } from '../format.js'
 
 const POLL_MS = 15000
 const SEVS = ['critical', 'high', 'medium', 'low']
 const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', none: 'None' }
-const STATUS_EN = { queued: 'Queued', processing: 'Processing', ready: 'Ready', failed: 'Failed' }
 const ROLE_EN = { sources: 'source', destinations: 'destination', accounts: 'account' }
 
 /** The Overview (redesigned 2026-10-19 at the user's request; the cards follow a
  *  reference the user supplied, in this console's light palette).
  *
- *  It leads with six detection areas (app/services/areas.py): one card each,
- *  showing the findings in the status workflow that are not yet Resolved, how
- *  many are still Open and how many findings the area holds in total (by level),
- *  and when they were first seen. Every figure comes from GET /api/overview -
- *  never a placeholder - and a card opens the Findings page on that area. Below
- *  them sit what the page already had: the review backlog, severity, top
- *  affected hosts, activity, techniques and the case list (IAI-20). */
+ *  After the KPI row and the cases-per-day chart (with the severity breakdown
+ *  and the top affected hosts) come six detection areas (app/services/areas.py):
+ *  one card each, showing the findings in the status workflow that are not yet
+ *  Resolved, how many are still Open and how many findings the area holds in
+ *  total (by level), and when they were first seen. Every figure comes from
+ *  GET /api/overview - never a placeholder - and a card opens the Findings page
+ *  on that area. The findings table, the activity feed and the techniques list
+ *  were taken off this page (2026-10-19, at the user's request): findings have
+ *  their own page, and a case is reached from Customers or Findings.  */
 export default function Overview({ companyId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
-  const [sev, setSev] = useState('all')
-  const [q, setQ] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -38,18 +37,6 @@ export default function Overview({ companyId }) {
     const t = setInterval(load, POLL_MS)
     return () => clearInterval(t)
   }, [load])
-
-  const cases = useMemo(() => {
-    const list = data?.cases || []
-    const needle = q.trim().toLowerCase()
-    return list.filter((c) => {
-      const b = c.status === 'ready' ? severityBucket(c.severity) : null
-      if (sev !== 'all' && b !== sev) return false
-      if (!needle) return true
-      return [c.case_id, c.original_filename, c.company_name]
-        .some((v) => (v || '').toLowerCase().includes(needle))
-    })
-  }, [data, sev, q])
 
   if (error && !data) return <div className="panel empty">Could not load the overview: {error}</div>
   if (!data) return <div className="empty">Loading...</div>
@@ -184,128 +171,6 @@ export default function Overview({ companyId }) {
           The number is findings in the status workflow (high and critical) that are not yet Resolved. New is
           those still Open; Total is every finding of the area by level, workflow or not. A card opens the
           Findings page on that area.
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="ov-table-head">
-          <h2>
-            Findings <span className="muted mono">{cases.length} shown</span>
-          </h2>
-        </div>
-        <div className="ov-filters">
-          {['all', ...SEVS].map((s) => (
-            <button
-              type="button"
-              key={s}
-              className={`chip-btn${sev === s ? ' active' : ''}`}
-              onClick={() => setSev(s)}
-            >
-              {s === 'all' ? 'All' : SEV_EN[s]}
-            </button>
-          ))}
-          <input
-            type="text"
-            className="ov-search"
-            placeholder="Search cases, files, customers..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-        <div className="table-scroll">
-          <table className="ov-table">
-            <thead>
-              <tr>
-                <th>Case ID</th>
-                <th>File</th>
-                <th>Customer</th>
-                <th className="num">Events</th>
-                <th className="num">Flagged</th>
-                <th>Severity</th>
-                <th>Status</th>
-                <th>Uploaded</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!cases.length && (
-                <tr>
-                  <td colSpan={8} className="empty">
-                    {data.cases.length ? 'No case matches this filter' : 'No cases yet - upload a log to start'}
-                  </td>
-                </tr>
-              )}
-              {cases.map((c) => {
-                const ready = c.status === 'ready'
-                const b = ready ? severityBucket(c.severity) : null
-                const open = () => ready && (window.location.hash = `#/result/${c.case_id}`)
-                return (
-                  <tr key={c.case_id} className={ready ? 'clickable' : ''} onClick={open}>
-                    <td className="mono muted">{c.case_id.slice(-8)}</td>
-                    <td>
-                      {ready ? <a href={`#/result/${c.case_id}`}>{c.original_filename}</a> : c.original_filename}
-                      <div className="cell-sub">{c.file_kind}</div>
-                    </td>
-                    <td>
-                      {c.company_name || '—'}
-                      {c.project_name && <div className="cell-sub">{c.project_name}</div>}
-                    </td>
-                    <td className="num mono">{ready ? fmtNum(c.total_rows) : '—'}</td>
-                    <td className="num mono">{ready ? fmtNum(c.flagged_count) : '—'}</td>
-                    <td>{b ? <span className={`sev-tag sev-tag-${b}`}>{SEV_EN[b]}</span> : '—'}</td>
-                    <td>
-                      <span className={`status-pill st-${c.status}`} title={c.error || ''}>
-                        {STATUS_EN[c.status] || c.status}
-                        {c.status === 'processing' && c.progress
-                          ? ` ${c.progress.estimated ? '~' : ''}${c.progress.pct}%`
-                          : ''}
-                      </span>
-                    </td>
-                    <td className="mono muted">{ago(c.uploaded_at)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="ov-row">
-        <div className="panel ov-activity">
-          <h2>Recent activity</h2>
-          {!data.recent.length && <div className="empty">Nothing yet</div>}
-          <ul className="activity">
-            {data.recent.map((r, i) => (
-              <li key={i} className={`act-${r.level || 'muted'}`}>
-                <a href={`#/result/${r.case_id}`}>{r.text}</a>
-                {r.customer && <span className="cust-tag cust-tag-after">{r.customer}</span>}
-                <div className="mono muted">{ago(r.ts)}</div>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="panel ov-side">
-          <h2>
-            Techniques observed <span className="muted mono">MITRE ATT&amp;CK</span>
-          </h2>
-          {!data.techniques.length && <div className="empty">No techniques yet</div>}
-          <div className="tech-grid">
-            {data.techniques.map((tq) => (
-              <div className="tech-card" key={tq.id}>
-                <div className="mono accent">{tq.id}</div>
-                <div>{tq.name || '—'}</div>
-                <div className="tech-customers">
-                  {(tq.customers || []).map((c) => (
-                    <span className="cust-tag" key={c}>
-                      {c}
-                    </span>
-                  ))}
-                </div>
-                <div className="muted">
-                  {tq.cases} {tq.cases === 1 ? 'case' : 'cases'}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </section>
