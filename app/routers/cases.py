@@ -1,12 +1,13 @@
 import asyncio
 import hashlib
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import (analysis, attack_layer, auth, confidence, custody, db, jobs, lifecycle,
+from ..services import (analysis, attack_layer, auth, case_views, custody, db, jobs, lifecycle,
                         review, stix_export, storage, veris)
 from .upload import CHUNK
 
@@ -37,17 +38,6 @@ def _raw_file(case_id: str):
     return found[0] if found else None
 
 
-def _custody_view(case_id: str, manifest: dict) -> dict:
-    intact, problem = custody.verify_chain(case_id)
-    return {
-        "evidence": manifest.get("evidence"),
-        "standards": custody.STANDARDS,
-        "chain_intact": intact,
-        "chain_problem": problem,
-        "entries": custody.entries(case_id),
-    }
-
-
 @router.get("/{case_id}/attack-layer")
 async def get_attack_layer(case_id: str):
     """The case's techniques as an ATT&CK Navigator layer (format 4.5),
@@ -75,22 +65,12 @@ async def get_stix(case_id: str):
         raise HTTPException(404, "Case not found")
     if manifest.get("status") != "ready":
         raise HTTPException(409, f"Case is {manifest.get('status')}, not ready - nothing to export")
-    bundle = stix_export.build(case_id, manifest, _findings_view(case_id, manifest),
-                               _created_at(case_id, manifest))
+    bundle = stix_export.build(case_id, manifest, case_views.findings_view(case_id, manifest),
+                               case_views.created_at(case_id, manifest))
     return JSONResponse(
         bundle,
         headers={"Content-Disposition": f'attachment; filename="{case_id}-stix21.json"'},
     )
-
-
-def _veris_line(case_id: str) -> str | None:
-    """The computed VERIS classification as one prompt line (veris.py), or
-    None - a failure here must never stop the narrative."""
-    try:
-        manifest = storage.load_manifest(case_id) or {}
-        return veris.summary_line(veris.build(case_id, manifest, _findings_view(case_id, manifest)))
-    except Exception:  # noqa: BLE001
-        return None
 
 
 @router.get("/{case_id}/veris")
@@ -102,7 +82,7 @@ async def get_veris(case_id: str):
         raise HTTPException(404, "Case not found")
     if manifest.get("status") != "ready":
         raise HTTPException(409, f"Case is {manifest.get('status')}, not ready - nothing to export")
-    record = veris.build(case_id, manifest, _findings_view(case_id, manifest))
+    record = veris.build(case_id, manifest, case_views.findings_view(case_id, manifest))
     if record is None:
         raise HTTPException(409, "No high or critical finding - there is no incident to classify")
     return JSONResponse(
@@ -116,7 +96,7 @@ async def get_custody(case_id: str):
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
-    return _custody_view(case_id, manifest)
+    return case_views.custody_view(case_id, manifest)
 
 
 @router.post("/{case_id}/verify")
@@ -140,7 +120,7 @@ async def verify_evidence(case_id: str, request: Request):
         custody.record(case_id, "verified" if ok else "unverified", actor, sha256=actual,
                        purpose="on request",
                        **({} if ok else {"note": "no acquisition digest was recorded for this file"}))
-    return {"match": ok, "sha256": actual, **_custody_view(case_id, manifest)}
+    return {"match": ok, "sha256": actual, **case_views.custody_view(case_id, manifest)}
 
 
 def _concat_raw(sources: list, dest) -> tuple[int, str, list[str]]:
@@ -352,31 +332,27 @@ async def get_case_events(
     }
 
 
-def _findings_view(case_id: str, manifest: dict) -> list[dict]:
-    """Collapsed findings with everything an analyst - or an export - sees
-    on them: Admiralty confidence, review decision, lifecycle status."""
-    findings = db.collapsed_findings(case_id)
-    # Admiralty grading (confidence.py): source reliability needs the
-    # manifest's mapping and evidence plus the custody log; cross-source
-    # confirmation needs the zip members' row ranges.
-    confidence.annotate(
-        manifest, custody.entries(case_id), findings,
-        db.entity_members(case_id, manifest.get("members") or []),
-    )
-    state = review.current(case_id)
-    flow = lifecycle.state(case_id)
-    for f in findings:
-        r = state.get(f["key"])
-        f["review"] = r or {"status": review.UNREVIEWED, "actor": "",
-                            "reason_code": "", "note": "", "ts": None}
-        # Only high/critical findings enter the workflow (lifecycle.py); the
-        # rest stay visible here without a status.
-        if lifecycle.tracked(f):
-            lc = flow.get(f["key"]) or {"status": lifecycle.OPEN, "assignee": None, "history": []}
-            f["lifecycle"] = {"tracked": True, **lc, "csf": lifecycle.CSF[lc["status"]]}
-        else:
-            f["lifecycle"] = {"tracked": False}
-    return findings
+@router.get("/{case_id}/findings/events")
+async def get_finding_events(
+    case_id: str,
+    key: str = Query(..., max_length=300, description="finding_key: rid|srcip|username"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
+    """The events behind one finding, each with the file it came from: how a
+    finding is traced back to its source (FR-4.1). Not the finding's own rows
+    only - `total` is how many there are, `rows` is the page asked for."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    if manifest.get("status") != "ready":
+        raise HTTPException(409, f"Case is not ready yet (status: {manifest.get('status')})")
+    if not re.match(r"^R\d{4}\|", key) or key.count("|") != 2:
+        raise HTTPException(400, "key must be a finding key: rid|srcip|username")
+    res = await asyncio.to_thread(case_views.finding_sources, case_id, manifest, key, limit, offset)
+    if not res["total"]:
+        raise HTTPException(404, "No events for this finding in this case")
+    return res
 
 
 @router.get("/{case_id}/findings")
@@ -387,14 +363,14 @@ async def get_case_findings(case_id: str):
     if manifest is None:
         raise HTTPException(404, "Case not found")
 
-    findings = _findings_view(case_id, manifest)
+    findings = case_views.findings_view(case_id, manifest)
     counts = review.summary(case_id, [f["key"] for f in findings])
     return {
         "case_id": case_id,
         "findings": findings,
         "count": len(findings),
         "review_summary": counts,
-        "lifecycle_summary": lifecycle.summary(findings, _created_at(case_id, manifest)),
+        "lifecycle_summary": lifecycle.summary(findings, case_views.created_at(case_id, manifest)),
         "classifications": lifecycle.CLASSIFICATIONS,
         "assignees": [{"email": u["email"], "name": u.get("name") or u["email"]}
                       for u in sorted(auth.load_users().values(), key=lambda u: u["email"])],
@@ -405,16 +381,6 @@ async def get_case_findings(case_id: str):
         # Whether the decision history behind these statuses is untampered.
         "review_chain": review.verify(case_id),
     }
-
-
-def _created_at(case_id: str, manifest: dict) -> str | None:
-    """When the case's findings were created - the first time the rule
-    engine finished on it (custody `processed`), else the upload time. MTTC
-    is measured from here (lifecycle.py); re-processing does not reset it."""
-    for e in custody.entries(case_id):
-        if e.get("action") == "processed":
-            return e.get("ts")
-    return manifest.get("uploaded_at")
 
 
 @router.post("/{case_id}/lifecycle")
@@ -601,7 +567,7 @@ async def _run_map_reduce_job(case_id: str, plan: dict) -> None:
             profiles_for=lambda ips: db.source_profiles(case_id, ips),
             on_progress=progress,
             auto_retry_max_wait=analysis.BACKGROUND_RETRY_MAX_WAIT,
-            veris=_veris_line(case_id),
+            veris=case_views.veris_line(case_id),
             escalations=db.escalation_paths(case_id),
         )
     except Exception as exc:  # noqa: BLE001 - the job owns its own failure
@@ -682,7 +648,7 @@ async def analyze_case(case_id: str, background_tasks: BackgroundTasks, force: b
     try:
         result = await analysis.run_analysis(
             case_id, events, distinct_total, flagged, graph=graph,
-            profiles=profiles, risk=risk, veris=_veris_line(case_id),
+            profiles=profiles, risk=risk, veris=case_views.veris_line(case_id),
             escalations=db.escalation_paths(case_id),
         )
     except analysis.AnalysisNotConfigured as exc:

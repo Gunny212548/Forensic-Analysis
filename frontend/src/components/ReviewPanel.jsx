@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getFindings, postReview } from '../api.js'
 import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
+import FindingEvents from './FindingEvents.jsx'
 import Lifecycle from './Lifecycle.jsx'
 import RuleCard from './RuleCard.jsx'
 
@@ -21,6 +22,7 @@ export default function ReviewPanel({ caseId, focus }) {
   const [reasonNote, setReasonNote] = useState('')
   const [busyKey, setBusyKey] = useState('')
   const [openRule, setOpenRule] = useState('') // finding key whose rule card is open
+  const [openEvents, setOpenEvents] = useState('') // finding key whose source events are open
 
   const load = useCallback(async () => {
     setError('')
@@ -39,6 +41,14 @@ export default function ReviewPanel({ caseId, focus }) {
   // view and mark it briefly. After a frame, because the tab it lives in is
   // made visible in the same render that set `focus`.
   const [flash, setFlash] = useState('')
+  // Bring one finding of this case into view and mark it briefly - also for a
+  // chip that names a related finding.
+  const reveal = useCallback((key) => {
+    const el = document.getElementById(`rv-${key}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setFlash(key)
+    setTimeout(() => setFlash(''), 2500)
+  }, [])
   useEffect(() => {
     if (!focus || !data) return undefined
     const raf = requestAnimationFrame(() => {
@@ -160,6 +170,11 @@ export default function ReviewPanel({ caseId, focus }) {
             key={f.key}
           >
             <div className="rv-head">
+              {f.fd && (
+                <span className="rv-fd" title="Finding id (FD-year-number, numbered per customer)">
+                  {f.fd}
+                </span>
+              )}
               {f.level && (
                 <span
                   className={`sev-tag sev-tag-${f.level}`}
@@ -207,6 +222,39 @@ export default function ReviewPanel({ caseId, focus }) {
               {f.descr || ''} <MitreTags list={f.mitre} />
             </div>
             {openRule === f.key && <RuleCard rid={f.rid} />}
+            {/* Where the finding comes from (FR-4.1): the events behind it with
+                their source file, and the other findings of the same attack
+                chain (related.py: linked through pivot hosts, never through a
+                shared final target). */}
+            <div className="rv-trace">
+              <button
+                type="button"
+                className="rv-rid rv-rid-btn"
+                title="The events this finding stands for, and the file each came from"
+                aria-expanded={openEvents === f.key}
+                onClick={() => setOpenEvents(openEvents === f.key ? '' : f.key)}
+              >
+                Source events ({fmtNum(f.cnt)}) {openEvents === f.key ? '▴' : '▾'}
+              </button>
+              {f.related_count > 0 && (
+                <span className="rv-related">
+                  Same attack chain ({f.related_count}):
+                  {f.related.map((r) => (
+                    <button
+                      type="button"
+                      className="rv-chip"
+                      key={r.key}
+                      title={`Go to ${r.rid} ${r.srcip || r.username || ''}`}
+                      onClick={() => reveal(r.key)}
+                    >
+                      {r.rid} {r.srcip || r.username}
+                    </button>
+                  ))}
+                  {f.related_count > f.related.length && ` +${f.related_count - f.related.length} more`}
+                </span>
+              )}
+            </div>
+            {openEvents === f.key && <FindingEvents caseId={caseId} findingKey={f.key} />}
             {/* Why the level is above what the rule says on its own - an
                 attack-path pattern (severity.py) - so the analyst can check
                 the escalation instead of taking it on trust. */}

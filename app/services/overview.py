@@ -20,7 +20,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from .. import config
-from . import db, review, storage
+from . import db, lifecycle, review, storage
 from .severity import level_of
 
 TZ = timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))
@@ -90,6 +90,17 @@ def _case_facts(case_id: str) -> dict:
     open_lvls = [f["lvl"] or 0 for f in collapsed
                  if state.get(f["key"], {}).get("status", review.UNREVIEWED) == review.UNREVIEWED]
     unreviewed = len(open_lvls)
+
+    # The status workflow (lifecycle.py): only high/critical findings enter it,
+    # and one is open until it is Resolved. This - not the review backlog -
+    # decides whether a case is open on the Customers page (FR-6.1).
+    flow = lifecycle.state(case_id)
+    wf_tracked, wf_open_lvls = 0, []
+    for f in collapsed:
+        if lifecycle.tracked(f):
+            wf_tracked += 1
+            if flow.get(f["key"], {}).get("status", lifecycle.OPEN) != lifecycle.RESOLVED:
+                wf_open_lvls.append(f["lvl"] or 0)
     review_ts = [e["ts"] for e in review.log(case_id) if e.get("ts")]
 
     entities = []
@@ -101,6 +112,8 @@ def _case_facts(case_id: str) -> dict:
     facts = {"techniques": techniques, "unreviewed": unreviewed, "findings": len(keys),
              "entities": entities,
              "open_max_lvl": max(open_lvls) if open_lvls else None,
+             "wf_tracked": wf_tracked, "wf_open": len(wf_open_lvls),
+             "wf_open_max_lvl": max(wf_open_lvls) if wf_open_lvls else None,
              "last_review": max(review_ts) if review_ts else None}
     with _lock:
         _cache[case_id] = (stamp, facts)
@@ -244,13 +257,11 @@ def lvl_bucket(lvl: int | None) -> str | None:
 def customers() -> dict:
     """The Customers page (FR-6.1): case load per customer.
 
-    FR-6.1 counts a case as open while it has a finding that is not closed,
-    and the finding status workflow arrives in Sprint 3. Until then the
-    closest thing the system holds is the review backlog: a case is **open** while at least one of its
-    findings is unreviewed, **closed** once every finding has a decision (or
-    it has none), and the highest open severity is the worst unreviewed
-    finding. Cases still processing or failed are neither - they count only
-    towards the total. The status-based rule replaces this in IAI-79.
+    FR-6.1: a case is **open** while at least one finding in the status
+    workflow is not Resolved, and **closed** when every one is Resolved - or
+    none entered the workflow (only high and critical findings do). The highest
+    open severity is the worst finding still not Resolved. Cases still
+    processing or failed are neither: they count only towards the total.
     """
     manifests = storage.list_manifests()
     rows: dict = {}
@@ -270,9 +281,9 @@ def customers() -> dict:
         stamps = [m.get("uploaded_at")]
         if m.get("status") == "ready" and db.db_path(m["case_id"]).exists():
             facts = _case_facts(m["case_id"])
-            if facts["unreviewed"]:
+            if facts["wf_open"]:
                 r["open"] += 1
-                lvl = facts["open_max_lvl"]
+                lvl = facts["wf_open_max_lvl"]
                 if lvl is not None and (r["open_max_lvl"] is None or lvl > r["open_max_lvl"]):
                     r["open_max_lvl"] = lvl
             else:

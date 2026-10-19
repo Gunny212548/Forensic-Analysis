@@ -22,7 +22,8 @@ from itertools import chain, islice
 from pathlib import Path
 
 from .. import config
-from . import archive, custody, db, decode, intel, logsources, parsers, rules, severity, storage
+from . import (archive, custody, db, decode, finding_ids, intel, logsources, parsers, rules,
+               severity, storage)
 
 log = logging.getLogger(__name__)
 
@@ -591,6 +592,14 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
         con = None
 
         total_rows, flagged = db.counts(case_id)
+        # An id for every finding that enters the workflow (finding_ids.py) -
+        # before the case reads `ready`, so nothing that waits for `ready` finds
+        # it half-done. A failure here is not the case's failure: the ids are
+        # handed out again on first read.
+        try:
+            finding_ids.ensure(case_id)
+        except Exception:  # noqa: BLE001
+            log.exception("case %s: could not assign finding ids", case_id)
         storage.update_case(
             case_id,
             status="ready",

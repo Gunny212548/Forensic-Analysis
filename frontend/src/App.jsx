@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { AUTH_REQUIRED, getMe, logout } from './api.js'
+import { AUTH_REQUIRED, getMe, listFindings, logout } from './api.js'
 import Overview from './pages/Overview.jsx'
 import Upload from './pages/Upload.jsx'
 import Customers from './pages/Customers.jsx'
+import Findings from './pages/Findings.jsx'
 import CustomerDetail from './pages/CustomerDetail.jsx'
 import Result from './pages/Result.jsx'
 import Placeholder from './pages/Placeholder.jsx'
@@ -50,9 +51,42 @@ function useSession() {
   return [user, setUser]
 }
 
+/** The count beside the Findings menu item (FR-0.2): findings in the status
+ *  workflow that are not Resolved. null - no badge at all - until the server has
+ *  answered, so an unknown count is never shown as 0. It is asked again when the
+ *  page changes, because a status change on a case page changes it. */
+function useOpenFindings(user, page, param) {
+  const [open, setOpen] = useState(null)
+  useEffect(() => {
+    if (!user) return undefined
+    let dead = false
+    listFindings({ limit: 1 })
+      .then((r) => !dead && setOpen(r.open_count))
+      .catch(() => !dead && setOpen(null))
+    return () => {
+      dead = true
+    }
+  }, [user, page, param])
+  return open
+}
+
+/** #/result/<case id> or #/result/<case id>/<finding key, URL-encoded>. */
+function splitResult(param) {
+  const i = param.indexOf('/')
+  if (i < 0) return { caseId: param, findingKey: null }
+  let findingKey = null
+  try {
+    findingKey = decodeURIComponent(param.slice(i + 1)) || null
+  } catch {
+    // a malformed key just opens the case without a target
+  }
+  return { caseId: param.slice(0, i), findingKey }
+}
+
 export default function App() {
   const { page, param } = useHashRoute()
   const [user, setUser] = useSession()
+  const openFindings = useOpenFindings(user, page, param)
 
   // A new page opens at its top. The document is one scroll container
   // shared by every route, so without this a page opened from halfway down
@@ -81,13 +115,10 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* A case is opened from the Overview list, so that is what stays lit.
-          The open-findings count waits for the finding status workflow
-          (IAI-78); until then it is left unset and the badge does not
-          render. */}
+      {/* A case is opened from the Overview list, so that is what stays lit. */}
       <Sidebar
         active={page === 'result' ? 'dashboard' : page}
-        counts={{ findings: null }}
+        counts={{ findings: openFindings }}
         user={user}
         onLogout={signOut}
       />
@@ -95,12 +126,15 @@ export default function App() {
       <main className="layout">
         {page === 'dashboard' && <Overview companyId={param || null} />}
         {page === 'upload' && <Upload user={user} />}
+        {page === 'findings' && <Findings />}
         {page === 'customers' && !param && <Customers />}
         {page === 'customers' && param && (
           // #/customers/<id> or #/customers/<id>/projects/<project id>
           <CustomerDetail companyId={param.split('/')[0]} projectId={param.split('/')[2]} key={param} />
         )}
-        {page === 'result' && param && <Result caseId={param} key={param} />}
+        {page === 'result' && param && (
+          <Result {...splitResult(param)} key={param} />
+        )}
         {placeholder && <Placeholder title={placeholder.label} />}
       </main>
     </div>

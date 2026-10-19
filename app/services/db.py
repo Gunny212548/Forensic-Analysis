@@ -381,6 +381,29 @@ def finding_key(rid: str, srcip: str | None, username: str | None) -> str:
     return f"{rid}|{srcip or ''}|{username or ''}"
 
 
+def finding_edges(case_id: str) -> list[dict]:
+    """One row per collapsed finding with the addresses it reached: the input
+    of related.chains(). `dstips` are the distinct targets in its rows."""
+    if not db_path(case_id).exists():
+        return []
+    con = connect(case_id, read_only=True)
+    try:
+        rows = con.execute(
+            """
+            SELECT f.rid, r.srcip, r.username, max(f.lvl) AS lvl,
+                   list(DISTINCT r.dstip) FILTER (WHERE r.dstip IS NOT NULL) AS dstips
+            FROM findings f
+            JOIN raw_events r USING (row_id)
+            GROUP BY f.rid, r.srcip, r.username
+            """
+        ).fetchall()
+    finally:
+        con.close()
+    return [{"rid": rid, "srcip": src, "username": user, "lvl": lvl,
+             "level": level_of(lvl), "dstips": sorted(dsts or [])}
+            for rid, src, user, lvl, dsts in rows]
+
+
 def collapsed_findings(case_id: str) -> list[dict]:
     """Findings collapsed to one entry per (rule, source, account).
 

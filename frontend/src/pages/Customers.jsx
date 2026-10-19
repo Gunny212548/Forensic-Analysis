@@ -10,12 +10,10 @@ const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low
  *  data enters the system (decided 2026-10-05), so this page has no "Add
  *  customer" button although the Figma shows one.
  *
- *  "Open" is interim. FR-6.1 counts a case as open while it has a finding
- *  that is not closed, and the finding status workflow arrives in Sprint 3
- *  (IAI-79); until then a case is open while any of its findings is
- *  unreviewed. The footnote says
- *  so, because a number that silently means something else is worse than one
- *  that is labelled. */
+ *  "Open" follows the finding status workflow (IAI-79): a case is open while a
+ *  high or critical finding is not yet Resolved. The footnote states the rule,
+ *  because a number that silently means something else is worse than one that
+ *  is labelled. */
 export default function Customers() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -109,9 +107,9 @@ export default function Customers() {
           </table>
         </div>
         <div className="field-hint cust-note">
-          A case is open while any of its findings is unreviewed, closed once every finding has a decision.
-          Cases still processing or failed count only towards the total. Last activity is the latest upload
-          or review decision.
+          A case is open while any high or critical finding in it is not yet Resolved, and closed once every
+          one is - or none entered the workflow. Cases still processing or failed count only towards the
+          total. Last activity is the latest upload or review decision.
         </div>
       </div>
     </section>

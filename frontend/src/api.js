@@ -104,6 +104,26 @@ export async function getFindings(caseId) {
   )
 }
 
+/** The events behind one finding, each with the file it came from (FR-4.1). */
+export async function getFindingEvents(caseId, key, { limit = 25, offset = 0 } = {}) {
+  const q = new URLSearchParams({ key, limit, offset })
+  return jsonOrThrow(
+    await fetch(`/api/cases/${encodeURIComponent(caseId)}/findings/events?${q}`),
+    'Could not load the events behind this finding',
+  )
+}
+
+/** Every finding in the status workflow, across cases (FR-4.4). `open_count`
+ *  is what the Findings menu badge shows. */
+export async function listFindings({ companyId, status, severity, q, limit = 50, offset = 0 } = {}) {
+  const p = new URLSearchParams({ limit, offset })
+  if (companyId) p.set('company_id', companyId)
+  if (status) p.set('status', status)
+  if (severity) p.set('severity', severity)
+  if (q) p.set('q', q)
+  return jsonOrThrow(await fetch(`/api/findings?${p}`), 'Could not load findings')
+}
+
 /** One status change or assignment on a tracked finding. The server
  *  enforces every rule; a refusal comes back as an error with the reason. */
 export async function postLifecycle(caseId, body) {

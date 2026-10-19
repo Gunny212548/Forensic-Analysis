@@ -207,9 +207,9 @@ def _finding_summary(f: dict) -> dict:
 
 
 def tool_list_findings(args: dict) -> dict:
-    # Imported here: routers.cases pulls FastAPI, and only this tool needs
-    # the exact view the UI and the exports share.
-    from .routers.cases import _findings_view
+    # Imported here so the MCP server loads it only when this tool is called;
+    # it is the exact view the UI and the exports share (services/case_views.py).
+    from .services.case_views import findings_view as _findings_view
     m = _case(args.get("case_id"))
     _ready(m)
     min_level = args.get("min_level") or "informational"
@@ -265,7 +265,7 @@ def tool_get_escalations(args: dict) -> dict:
 
 
 def tool_get_veris(args: dict) -> dict:
-    from .routers.cases import _findings_view
+    from .services.case_views import findings_view as _findings_view
     m = _case(args.get("case_id"))
     _ready(m)
     record = veris.build(m["case_id"], m, _findings_view(m["case_id"], m))

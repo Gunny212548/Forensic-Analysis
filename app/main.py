@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from .routers import auth as auth_router
 from .routers import cases as cases_router
 from .routers import companies as companies_router
+from .routers import findings as findings_router
 from .routers import overview as overview_router
 from .routers import rules as rules_router
 from .routers import upload as upload_router
@@ -21,6 +22,7 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 app.include_router(auth_router.router)
 app.include_router(upload_router.router)
 app.include_router(cases_router.router)
+app.include_router(findings_router.router)
 app.include_router(companies_router.router)
 app.include_router(overview_router.router)
 app.include_router(rules_router.router)

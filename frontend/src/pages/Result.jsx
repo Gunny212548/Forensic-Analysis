@@ -61,7 +61,7 @@ export function readAnalysis(body) {
   return { report: body, job: null, failed: '' }
 }
 
-export default function Result({ caseId }) {
+export default function Result({ caseId, findingKey }) {
   const [manifest, setManifest] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [job, setJob] = useState(null)
@@ -78,6 +78,11 @@ export default function Result({ caseId }) {
     setFocus({ key })
     setTab('review')
   }, [])
+  // Opened from the Findings page (#/result/<case>/<finding key>): land on
+  // that finding in the Review tab.
+  useEffect(() => {
+    if (findingKey) cite(findingKey)
+  }, [findingKey, cite])
 
   // One place decides what a body means, so the POST answer and every poll
   // answer are treated identically.

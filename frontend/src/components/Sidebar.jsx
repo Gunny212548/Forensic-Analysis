@@ -10,7 +10,7 @@ export const NAV_GROUPS = [
     items: [
       { route: 'dashboard', label: 'Overview' },
       { route: 'upload', label: 'Upload' },
-      { route: 'findings', label: 'Findings', ready: false },
+      { route: 'findings', label: 'Findings' },
       { route: 'timeline', label: 'Timeline', ready: false },
     ],
   },
