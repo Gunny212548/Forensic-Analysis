@@ -432,6 +432,16 @@ def main() -> int:
               f"critical, unassigned = what that Findings filter lists ({un['total']})")
         check(t0["failed_cases"] == 0 and ov["review_case"] in (A, F, Z, O), "no failed cases; the review backlog names a case")
         check(ov["attention"] == [], "no evidence or audit-log problem yet")
+        wf_unrev = sum(1 for cid in (A, F, Z, O) for x in findings(cid)
+                       if x["lifecycle"]["tracked"] and x["review"]["status"] == "Unreviewed")
+        check(t0["awaiting_review"] == wf_unrev and t0["awaiting_review"] <= t0["unreviewed"],
+              f"'awaiting review' counts workflow findings only ({wf_unrev}, of {t0['unreviewed']} unreviewed in all)")
+        op = c.get("/api/findings", params={"status": "open"}).json()
+        check(op["total"] == op["open_count"] and all(x["status"] != "Resolved" for x in op["rows"]),
+              "status=open lists what the badge and the area cards count (not Resolved)")
+        check(c.get("/api/findings", params={"status": "nope"}).status_code == 400, "an unknown status is refused")
+        ovw = c.get("/api/overview", params={"company_id": W}).json()
+        check(ovw["company_id"] == W, "a scoped Overview says which customer its links carry")
         fd = ov["findings_daily"]
         tracked_total = c.get("/api/findings").json()["scope_total"]
         check(len(fd) == 14 and sum(d["critical"] + d["high"] for d in fd) == tracked_total,
@@ -457,6 +467,25 @@ def main() -> int:
         check(any(x["case_id"] == A and "custody" in x["reason"] for x in att), "an altered custody log is reported, with the case")
         cp.write_bytes(good)
         check(c.get("/api/overview").json()["attention"] == [], "and clears when the log is restored")
+
+        print("a case refused for integrity keeps its open findings in view (review #6)")
+        before = {x["key"] for x in c.get("/api/findings", params={"company_id": OTHER}).json()["rows"]}
+        raw = storage.raw_path(O, "csv")
+        raw.write_bytes(raw.read_bytes() + b"\n")  # the evidence changes after acquisition
+        jobs.submit(O, raw, "csv")
+        jobs.wait_idle(120)
+        mo = storage.load_manifest(O)
+        check(mo["status"] == "failed" and mo.get("error", "").startswith("IntegrityError"),
+              "re-processing altered evidence is refused")
+        rows = c.get("/api/findings", params={"company_id": OTHER}).json()["rows"]
+        check({x["key"] for x in rows} == before and rows and all(x["evidence_problem"] for x in rows),
+              "its workflow findings are still listed, each marked evidence_problem")
+        check(c.get(f"/api/cases/{O}/findings/events", params={"key": rows[0]["key"]}).status_code == 200,
+              "and their source events still open")
+        check(c.get(f"/api/cases/{O}/stix").status_code == 409, "exports stay refused")
+        ov2 = c.get("/api/overview").json()
+        check(ov2["failed_case"] == O and any(x["case_id"] == O for x in ov2["attention"]),
+              "the Overview links the failed case and lists its evidence problem")
 
     print("FAILED: " + "; ".join(FAILED) if FAILED else "WORKFLOW OK")
     return 1 if FAILED else 0

@@ -345,7 +345,9 @@ async def get_finding_events(
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
-    if manifest.get("status") != "ready":
+    # A case refused for integrity still lists its findings, so their events
+    # must open too - that is how an analyst checks them against the evidence.
+    if manifest.get("status") != "ready" and not case_views.integrity_refused(manifest):
         raise HTTPException(409, f"Case is not ready yet (status: {manifest.get('status')})")
     if not re.match(r"^R\d{4}\|", key) or key.count("|") != 2:
         raise HTTPException(400, "key must be a finding key: rid|srcip|username")

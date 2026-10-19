@@ -18,13 +18,15 @@ function initialFilters(param) {
   if (!param.includes('=')) return { area: param }
   const q = new URLSearchParams(param)
   return { area: q.get('area') || '', severity: q.get('severity') || '', status: q.get('status') || '',
-    unassigned: q.get('unassigned') === '1' }
+    unassigned: q.get('unassigned') === '1', companyId: q.get('company_id') || '' }
 }
 
 export default function Findings({ param }) {
   const init = initialFilters(param)
   const [companies, setCompanies] = useState([])
-  const [companyId, setCompanyId] = useState('')
+  // A link from a customer-scoped Overview carries the customer, so the list
+  // opens on the findings the number that was clicked counted.
+  const [companyId, setCompanyId] = useState(init.companyId || '')
   const [status, setStatus] = useState(init.status || '')
   const [severity, setSeverity] = useState(init.severity || '')
   const [area, setArea] = useState(init.area || '')
@@ -127,6 +129,7 @@ export default function Findings({ param }) {
           </select>
           <select value={status} onChange={pick(setStatus)} aria-label="Status">
             <option value="">Any status</option>
+            <option value="open">Not resolved</option>
             {STATUSES.map((s) => (
               <option value={s} key={s}>
                 {s}
@@ -205,6 +208,11 @@ export default function Findings({ param }) {
                     >
                       {r.fd}
                     </a>
+                    {r.evidence_problem && (
+                      <div className="cell-sub ev-bad" title="The case's evidence file no longer matches its acquisition digest">
+                        evidence changed
+                      </div>
+                    )}
                   </td>
                   <td>
                     <div title={r.descr}>{r.name}</div>

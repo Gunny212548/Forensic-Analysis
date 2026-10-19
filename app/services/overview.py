@@ -20,7 +20,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from .. import config
-from . import areas, custody, db, filestamp, finding_ids, findings_index, lifecycle, review, storage
+from . import areas, case_views, custody, db, filestamp, finding_ids, findings_index, lifecycle, review, storage
 from .severity import level_of
 
 TZ = timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))
@@ -161,7 +161,15 @@ def _case_facts(case_id: str) -> dict:
                                       "classification": (st or {}).get("classification")}})
     ms = lifecycle.summary(summ_in, custody.created_at(case_id))
 
+    # The Overview's "awaiting review" is the workflow's backlog: a high or
+    # critical finding nobody has decided on. Informational ones never ask for an
+    # alert (Sigma), and counting them kept the banner up after every workflow
+    # finding was Resolved.
+    wf_unreviewed = sum(1 for f in collapsed if lifecycle.tracked(f)
+                        and state.get(f["key"], {}).get("status", review.UNREVIEWED) == review.UNREVIEWED)
+
     facts = {"techniques": techniques, "unreviewed": unreviewed, "findings": len(keys),
+             "wf_unreviewed": wf_unreviewed,
              "custody_issue": custody_issue, "review_issue": review_issue, "created": created,
              "mttc_total": (ms["mttc_seconds"] or 0) * ms["mttc_n"], "mttc_n": ms["mttc_n"],
              "entities": entities,
@@ -200,7 +208,8 @@ def build(company_id: str | None = None) -> dict:
     created_days: Counter = Counter()      # (date, level) -> workflow findings created
     mttc_total, mttc_n = 0.0, 0
     attention: list[dict] = []             # cases with a custody / audit-log problem
-    review_case = None                     # the case with the most unreviewed findings
+    review_case = None                     # the case with the most workflow findings awaiting review
+    failed_case = None                     # the newest failed case, for the banner's link
     urgent_rows: list[dict] = []           # workflow findings not yet Resolved
     open_cases = 0
     recent = []
@@ -232,9 +241,12 @@ def build(company_id: str | None = None) -> dict:
                            "customer": customer,
                            "text": f"{m.get('original_filename')} uploaded"})
 
-        if m.get("status") != "ready" or not db.db_path(m["case_id"]).exists():
+        if m.get("status") == "failed" and failed_case is None:
+            failed_case = m["case_id"]
+        if not case_views.holds_findings(m):
             continue
         facts = _case_facts(m["case_id"])
+        totals["awaiting_review"] += facts["wf_unreviewed"]
         totals["unreviewed"] += facts["unreviewed"]
         totals["reviewable"] += facts["findings"]
         if facts["unreviewed"]:
@@ -251,8 +263,8 @@ def build(company_id: str | None = None) -> dict:
             if reason:
                 attention.append({"case_id": m["case_id"], "file": m.get("original_filename"),
                                   "customer": customer, "reason": reason})
-        if facts["unreviewed"] and (review_case is None or facts["unreviewed"] > review_case[1]):
-            review_case = (m["case_id"], facts["unreviewed"])
+        if facts["wf_unreviewed"] and (review_case is None or facts["wf_unreviewed"] > review_case[1]):
+            review_case = (m["case_id"], facts["wf_unreviewed"])
         if facts["wf_open"]:
             open_cases += 1
             urgent_rows += [r for r in findings_index.case_rows(m) if r["status"] != lifecycle.RESOLVED]
@@ -357,7 +369,9 @@ def build(company_id: str | None = None) -> dict:
             "mttc_target_hours": config.MTTC_TARGET_HOURS,
             "critical_unassigned": critical_unassigned,
             "failed_cases": totals["failed"],
+            "awaiting_review": totals["awaiting_review"],
         },
+        "failed_case": failed_case,
         "attention": attention,
         "review_case": review_case[0] if review_case else None,
         "findings_daily": findings_daily,
@@ -413,7 +427,7 @@ def customers() -> dict:
         r = row_for(m.get("company_id"), m.get("company_name") or "No customer")
         r["cases"] += 1
         stamps = [m.get("uploaded_at")]
-        if m.get("status") == "ready" and db.db_path(m["case_id"]).exists():
+        if case_views.holds_findings(m):
             facts = _case_facts(m["case_id"])
             if facts["wf_open"]:
                 r["open"] += 1

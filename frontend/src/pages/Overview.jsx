@@ -43,10 +43,13 @@ export default function Overview({ companyId }) {
   const sevTotals = Object.fromEntries(
     SEVS.map((s) => [s, data.areas.reduce((n, a) => n + (a.total[s] || 0), 0)]),
   )
+  // Drill-downs keep the customer this page is scoped to.
+  const scope = data.company_id ? `&company_id=${encodeURIComponent(data.company_id)}` : ''
   const todo = [
-    { n: t.critical_unassigned, label: 'critical findings unassigned', href: '#/findings/severity=critical&unassigned=1' },
-    { n: t.unreviewed, label: 'awaiting review', href: data.review_case ? `#/reports/${data.review_case}/findings` : '#/customers' },
-    { n: t.failed_cases, label: 'cases failed', href: '#/customers' },
+    { n: t.critical_unassigned, label: 'critical findings unassigned',
+      href: `#/findings/severity=critical&unassigned=1${scope}` },
+    { n: t.awaiting_review, label: 'awaiting review', href: data.review_case ? `#/reports/${data.review_case}/findings` : '#/customers' },
+    { n: t.failed_cases, label: 'cases failed', href: data.failed_case ? `#/reports/${data.failed_case}` : '#/customers' },
     { n: data.attention.length, label: 'evidence problems',
       href: data.attention.length ? `#/reports/${data.attention[0].case_id}` : '#/customers' },
   ].filter((x) => x.n > 0)
@@ -140,7 +143,7 @@ export default function Overview({ companyId }) {
         <h2 className="section-h">Detection areas</h2>
         <div className="area-grid">
           {data.areas.map((a) => (
-            <AreaCard key={a.id} area={a} days={data.trend_days} />
+            <AreaCard key={a.id} area={a} days={data.trend_days} scope={scope} />
           ))}
         </div>
       </div>
@@ -176,7 +179,7 @@ export default function Overview({ companyId }) {
         <div className="panel">
           <div className="area-title">
             <h2>Most urgent findings</h2>
-            <a href="#/findings" className="table-link">
+            <a href={`#/findings${scope ? `/${scope.slice(1)}` : ''}`} className="table-link">
               All findings →
             </a>
           </div>
@@ -257,11 +260,11 @@ function areaTone(a) {
   return 'ok'
 }
 
-function AreaCard({ area, days }) {
+function AreaCard({ area, days, scope }) {
   const tone = areaTone(area)
   const open = AREA_CHIPS.filter((c) => area.open_by[c]).map((c) => `${area.open_by[c]} ${c}`)
   return (
-    <a className={`area-card area-${tone}`} href={`#/findings/${area.id}`} title={area.about}>
+    <a className={`area-card area-${tone}`} href={`#/findings/area=${area.id}&status=open${scope}`} title={area.about}>
       <div className="area-head">
         <h3>{area.name}</h3>
         <span className="area-open" title={open.length ? `Open: ${open.join(', ')}` : 'Nothing open'}>

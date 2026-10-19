@@ -24,6 +24,9 @@ _lock = threading.Lock()
 STATUS_RANK = {lifecycle.OPEN: 0, lifecycle.INVESTIGATING: 1, lifecycle.CONTAINED: 2,
                lifecycle.RESOLVED: 3}
 SEVERITIES = tuple(WEIGHT)
+# A status filter that is not one status: every finding not yet Resolved - what
+# the Overview's area cards and the menu badge count.
+OPEN_FILTER = "open"
 
 
 def _stamp(case_id: str, company_id: str) -> tuple:
@@ -74,6 +77,7 @@ def case_rows(manifest: dict) -> list[dict]:
             "detected_ts": str(f["ts_min"]) if f.get("ts_min") else "",
             "events": f["cnt"],
             "related_count": f["related_count"],
+            "evidence_problem": case_views.integrity_refused(manifest),
         })
     with _lock:
         _cache[case_id] = (stamp, rows)
@@ -95,7 +99,7 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
     filters narrow the table."""
     rows = []
     for m in storage.list_manifests(company_id):
-        if m.get("status") == "ready" and m.get("company_id"):
+        if m.get("company_id") and case_views.holds_findings(m):
             rows += case_rows(m)
 
     by_severity = {s: 0 for s in SEVERITIES if WEIGHT[s] >= lifecycle.ADMIT_LEVEL}
@@ -106,7 +110,8 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
     open_count = sum(n for s, n in by_status.items() if s != lifecycle.RESOLVED)
 
     shown = [r for r in rows
-             if (not status or r["status"] == status)
+             if (not status or r["status"] == status
+                 or (status == OPEN_FILTER and r["status"] != lifecycle.RESOLVED))
              and (not severity or r["level"] == severity)
              and (not area or r["area"] == area)
              and (not unassigned or not r["assignee"])

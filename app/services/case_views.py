@@ -10,6 +10,24 @@ MCP server call it.
 from . import confidence, custody, db, finding_ids, lifecycle, related, review, storage, veris
 
 
+def integrity_refused(manifest: dict) -> bool:
+    """The last run was refused because the preserved file no longer matches its
+    acquisition digest (pipeline._verify_evidence). The refusal comes before the
+    case database is dropped, so the findings of the last good run are still there."""
+    return manifest.get("status") == "failed" and str(manifest.get("error") or "").startswith("IntegrityError")
+
+
+def holds_findings(manifest: dict) -> bool:
+    """Whether the workflow views list this case's findings: a ready case, and a
+    case refused for integrity. The second used to vanish from the Findings page,
+    the badge and the Customers count while its findings were still open - the
+    case most in need of attention looked like it had none. It is listed, marked
+    `evidence_problem`; exports stay refused (routers/cases.py)."""
+    if manifest.get("status") != "ready" and not integrity_refused(manifest):
+        return False
+    return db.db_path(manifest["case_id"]).exists()
+
+
 def custody_view(case_id: str, manifest: dict) -> dict:
     intact, problem = custody.verify_chain(case_id)
     return {

@@ -22,6 +22,9 @@ export default function FindingDetail({ caseId, findingKey }) {
     }
   }, [caseId])
 
+  // Refused for integrity (case_views.integrity_refused): still listed, with a warning.
+  const refused = manifest?.status === 'failed' && (manifest.error || '').startsWith('IntegrityError')
+
   return (
     <section className="page">
       <div className="top-bar">
@@ -44,10 +47,17 @@ export default function FindingDetail({ caseId, findingKey }) {
 
       <div className="panel">
         {error && <Empty>Could not load: {error}</Empty>}
-        {!error && manifest && manifest.status !== 'ready' && (
+        {!error && manifest && manifest.status !== 'ready' && !refused && (
           <Empty>This case is not ready - its findings are not available.</Empty>
         )}
-        {!error && (!manifest || manifest.status === 'ready') && (
+        {refused && (
+          <div className="rv-chain ev-bad">
+            The evidence file of this case no longer matches the digest recorded when it was acquired, and
+            re-processing was refused. This finding is from the last run on the unaltered file; check the
+            case&apos;s Evidence before acting on it.
+          </div>
+        )}
+        {!error && (!manifest || manifest.status === 'ready' || refused) && (
           <ReviewPanel
             caseId={caseId}
             onlyKey={findingKey}

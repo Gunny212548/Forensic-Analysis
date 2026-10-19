@@ -23,8 +23,9 @@ async def list_findings(
     the Findings menu badge shows (FR-0.2)."""
     if company_id is not None and storage.load_company(company_id) is None:
         raise HTTPException(404, "Customer not found")
-    if status is not None and status not in lifecycle.STATES:
-        raise HTTPException(400, f"status must be one of: {', '.join(lifecycle.STATES)}")
+    if status is not None and status not in (*lifecycle.STATES, findings_index.OPEN_FILTER):
+        raise HTTPException(400, "status must be one of: "
+                                 + ", ".join((*lifecycle.STATES, findings_index.OPEN_FILTER)))
     if severity is not None and severity not in findings_index.SEVERITIES:
         raise HTTPException(400, f"severity must be one of: {', '.join(findings_index.SEVERITIES)}")
     if area is not None and area not in areas.AREA_IDS:
