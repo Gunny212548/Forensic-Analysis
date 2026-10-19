@@ -20,7 +20,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from .. import config
-from . import areas, db, lifecycle, review, storage
+from . import areas, custody, db, finding_ids, findings_index, lifecycle, review, storage
 from .severity import level_of
 
 TZ = timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))
@@ -68,7 +68,8 @@ def _mtime(path) -> float:
 
 def _case_facts(case_id: str) -> dict:
     """Techniques, review backlog and top entities for one ready case."""
-    stamp = (_mtime(db.db_path(case_id)), _mtime(review.review_path(case_id)))
+    stamp = (_mtime(db.db_path(case_id)), _mtime(review.review_path(case_id)),
+             _mtime(custody.custody_path(case_id)))
     with _lock:
         hit = _cache.get(case_id)
         if hit and hit[0] == stamp:
@@ -131,7 +132,44 @@ def _case_facts(case_id: str) -> dict:
             day = str(f["ts_min"])[:10]
             a["days"][day] = a["days"].get(day, 0) + 1
 
+    # What needs attention: a custody chain that no longer verifies, or whose last
+    # integrity check failed (a later passing check clears it), and an altered
+    # review log.
+    custody_issue = None
+    intact, problem = custody.verify_chain(case_id)
+    if not intact:
+        custody_issue = f"custody chain: {problem}"
+    else:
+        last = next((e["action"] for e in reversed(custody.entries(case_id))
+                     if e.get("action") in ("verified", "integrity_failed")), None)
+        if last == "integrity_failed":
+            custody_issue = "the evidence file no longer matches its acquisition digest"
+    rv = review.verify(case_id)
+    review_issue = None if rv.get("intact", True) else f"decision history: {rv.get('problem')}"
+
+    # When each workflow finding was created (registry) and mean time to contain:
+    # created -> Contained, true positives only (lifecycle.summary).
+    reg = finding_ids.created(case_id)
+    created = []
+    summ_in = []
+    for f in collapsed:
+        if not lifecycle.tracked(f):
+            continue
+        if f["key"] in reg:
+            created.append((datetime.fromisoformat(reg[f["key"]]).astimezone(TZ).date().isoformat(),
+                            areas.chip(f["level"])))
+        st = flow.get(f["key"])
+        summ_in.append({"lifecycle": {"tracked": True, "status": (st or {}).get("status", lifecycle.OPEN),
+                                      "contained_at": (st or {}).get("contained_at"),
+                                      "classification": (st or {}).get("classification")}})
+    manifest = storage.load_manifest(case_id) or {}
+    created_at = next((e.get("ts") for e in custody.entries(case_id) if e.get("action") == "processed"),
+                      manifest.get("uploaded_at"))
+    ms = lifecycle.summary(summ_in, created_at)
+
     facts = {"techniques": techniques, "unreviewed": unreviewed, "findings": len(keys),
+             "custody_issue": custody_issue, "review_issue": review_issue, "created": created,
+             "mttc_total": (ms["mttc_seconds"] or 0) * ms["mttc_n"], "mttc_n": ms["mttc_n"],
              "entities": entities,
              "open_max_lvl": max(open_lvls) if open_lvls else None,
              "wf_tracked": wf_tracked, "wf_open": len(wf_open_lvls), "areas": area_facts,
@@ -165,6 +203,12 @@ def build(company_id: str | None = None) -> dict:
     area_agg = {aid: {"total": Counter(), "new": Counter(), "open": 0, "open_lv": Counter(),
                       "days": Counter()}
                 for aid in areas.AREA_IDS}
+    created_days: Counter = Counter()      # (date, level) -> workflow findings created
+    mttc_total, mttc_n = 0.0, 0
+    attention: list[dict] = []             # cases with a custody / audit-log problem
+    review_case = None                     # the case with the most unreviewed findings
+    urgent_rows: list[dict] = []           # workflow findings not yet Resolved
+    open_cases = 0
     recent = []
 
     for m in manifests:
@@ -205,6 +249,19 @@ def build(company_id: str | None = None) -> dict:
             tech_cases[tid] += 1
             tech_findings[tid] += n
             tech_customers.setdefault(tid, set()).add(customer)
+        mttc_total += facts["mttc_total"]
+        mttc_n += facts["mttc_n"]
+        for day, lvl in facts["created"]:
+            created_days[(day, lvl)] += 1
+        for reason in (facts["custody_issue"], facts["review_issue"]):
+            if reason:
+                attention.append({"case_id": m["case_id"], "file": m.get("original_filename"),
+                                  "customer": customer, "reason": reason})
+        if facts["unreviewed"] and (review_case is None or facts["unreviewed"] > review_case[1]):
+            review_case = (m["case_id"], facts["unreviewed"])
+        if facts["wf_open"]:
+            open_cases += 1
+            urgent_rows += [r for r in findings_index.case_rows(m) if r["status"] != lifecycle.RESOLVED]
         for aid, a in facts["areas"].items():
             agg = area_agg[aid]
             agg["total"].update(a["total"])
@@ -269,6 +326,19 @@ def build(company_id: str | None = None) -> dict:
             "trend": trend,
         })
     open_findings = sum(a["open"] for a in area_cards)
+
+    # Findings created per day (the registry's time, GMT+7) - high and critical only, the
+    # ones that enter the workflow - and the last 7 days against the 7 before.
+    days14 = [(today - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+    findings_daily = [{"date": d, "critical": created_days[(d, "critical")], "high": created_days[(d, "high")]}
+                      for d in days14]
+    last7 = sum(r["critical"] + r["high"] for r in findings_daily[7:])
+    prev7 = sum(r["critical"] + r["high"] for r in findings_daily[:7])
+    # Critical first, unassigned first, then the one that has waited longest.
+    urgent_rows.sort(key=lambda r: r["detected_ts"])
+    urgent_rows.sort(key=lambda r: (-r["lvl"], bool(r["assignee"])))
+    critical_unassigned = sum(1 for r in urgent_rows if r["level"] == "critical" and not r["assignee"])
+    last_upload = max((m.get("uploaded_at") for m in manifests if m.get("uploaded_at")), default=None)
     new_findings = sum(sum(a["new"].values()) for a in area_cards)
 
     used_companies = {m.get("company_id") for m in manifests if m.get("company_id")}
@@ -287,7 +357,19 @@ def build(company_id: str | None = None) -> dict:
             "unreviewed": totals["unreviewed"], "reviewable": totals["reviewable"],
             "cases_with_unreviewed": totals["cases_with_unreviewed"],
             "open_findings": open_findings, "new_findings": new_findings,
+            "open_cases": open_cases, "last_upload": last_upload,
+            "created_last7": last7, "created_prev7": prev7,
+            "mttc_seconds": (mttc_total / mttc_n) if mttc_n else None, "mttc_n": mttc_n,
+            "mttc_target_hours": config.MTTC_TARGET_HOURS,
+            "critical_unassigned": critical_unassigned,
+            "failed_cases": totals["failed"],
         },
+        "attention": attention,
+        "review_case": review_case[0] if review_case else None,
+        "findings_daily": findings_daily,
+        "urgent": [{k: r[k] for k in ("fd", "key", "case_id", "company_name", "name", "host", "level",
+                                      "status", "assignee", "detected", "log_type")}
+                   for r in urgent_rows[:5]],
         "areas": area_cards,
         "trend_days": trend_days,
         "case_severity": {k: case_sev[k] for k in ("critical", "high", "medium", "low", "none")},

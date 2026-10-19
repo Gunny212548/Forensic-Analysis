@@ -94,7 +94,7 @@ def _matches(row: dict, q: str) -> bool:
 
 def listing(company_id: str | None = None, status: str | None = None, severity: str | None = None,
             q: str | None = None, limit: int = 100, offset: int = 0,
-            area: str | None = None) -> dict:
+            area: str | None = None, unassigned: bool = False) -> dict:
     """Workflow findings for one customer, or for every customer. The counts in
     the header describe the customer scope, before the status / severity / text
     filters narrow the table."""
@@ -114,6 +114,7 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
              if (not status or r["status"] == status)
              and (not severity or r["level"] == severity)
              and (not area or r["area"] == area)
+             and (not unassigned or not r["assignee"])
              and (not q or _matches(r, q))]
     shown.sort(key=lambda r: (r["company_name"] or "", r["fd"] or ""))
     shown.sort(key=lambda r: r["detected_ts"], reverse=True)

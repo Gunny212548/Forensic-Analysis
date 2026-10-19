@@ -353,6 +353,44 @@ def main() -> int:
         check(scoped["totals"]["open_findings"] == c.get("/api/findings", params={"company_id": OTHER}).json()["open_count"],
               "scoped to one customer, the cards follow it")
 
+        print("Overview: attention, KPIs, urgent findings")
+        from app.services import custody as custody_mod
+        ov = c.get("/api/overview").json()
+        t0 = ov["totals"]
+        check(t0["last_upload"] is not None and t0["ready"] == 4, "last upload and processed files are reported")
+        check(t0["open_cases"] == sum(x["open"] for x in c.get("/api/companies/summary").json()["customers"]),
+              "open cases follow the same rule as the Customers page")
+        un = c.get("/api/findings", params={"unassigned": "true", "severity": "critical"}).json()
+        check(t0["critical_unassigned"] == un["total"] and all(not x["assignee"] for x in un["rows"]),
+              f"critical, unassigned = what that Findings filter lists ({un['total']})")
+        check(t0["failed_cases"] == 0 and ov["review_case"] in (A, F, Z, O), "no failed cases; the review backlog names a case")
+        check(ov["attention"] == [], "no evidence or audit-log problem yet")
+        fd = ov["findings_daily"]
+        tracked_total = c.get("/api/findings").json()["scope_total"]
+        check(len(fd) == 14 and sum(d["critical"] + d["high"] for d in fd) == tracked_total,
+              f"findings created per day: 14 days, all {tracked_total} workflow findings counted")
+        check(t0["created_last7"] == tracked_total and t0["created_prev7"] == 0, "7 days against the 7 before")
+        ur = ov["urgent"]
+        check(0 < len(ur) <= 5 and all(x["status"] != "Resolved" for x in ur), "the urgent list: at most 5, none Resolved")
+        order = [(-{"critical": 5, "high": 4}[x["level"]], bool(x["assignee"])) for x in ur]
+        check(order == sorted(order), "critical first, unassigned before assigned")
+        check(t0["mttc_seconds"] is None and t0["mttc_target_hours"] == 4.0, "no contained true positive yet: MTTC unknown, target 4 h")
+        z1 = tracked(Z)[0]
+        lc(Z, z1, "assign", assignee=B_EMAIL)
+        lc(Z, z1, "investigate")
+        lc(Z, z1, "contain", containment_actions="isolated the host")
+        c.post(f"/api/cases/{Z}/review", json={"finding_key": z1["key"], "action": "accept"})
+        lc(Z, z1, "resolve", classification="true_positive", summary="confirmed")
+        t1 = c.get("/api/overview").json()["totals"]
+        check(t1["mttc_n"] == 1 and t1["mttc_seconds"] is not None and t1["mttc_seconds"] >= 0, "a contained true positive gives a mean time to contain")
+        cp = custody_mod.custody_path(A)
+        good = cp.read_bytes()
+        cp.write_bytes(good + b'{"action": "forged"}\n')
+        att = c.get("/api/overview").json()["attention"]
+        check(any(x["case_id"] == A and "custody" in x["reason"] for x in att), "an altered custody log is reported, with the case")
+        cp.write_bytes(good)
+        check(c.get("/api/overview").json()["attention"] == [], "and clears when the log is restored")
+
     print("FAILED: " + "; ".join(FAILED) if FAILED else "WORKFLOW OK")
     return 1 if FAILED else 0
 

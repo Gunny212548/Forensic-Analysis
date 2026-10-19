@@ -39,6 +39,10 @@ SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "12"))
 # in a queue: each ingest holds a DuckDB and a file stream, and ten at once is
 # an out-of-memory kill rather than ten times the speed.
 JOB_WORKERS = max(1, int(os.environ.get("JOB_WORKERS", "2")))
+
+# The Overview compares mean time to contain (finding created -> Contained, true
+# positives only) with this target, in hours (IAI-65).
+MTTC_TARGET_HOURS = float(os.environ.get("MTTC_TARGET_HOURS", "4"))
 # Where "can't sign in?" points on the login page (FR-1.2) - a mailto: or a
 # helpdesk URL. Empty shows the instruction without a link.
 IT_CONTACT_URL = os.environ.get("IT_CONTACT_URL", "")

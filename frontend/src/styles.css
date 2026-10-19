@@ -174,6 +174,7 @@
   @media (max-width: 1100px) {
     .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .area-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .attn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ov-row { grid-template-columns: minmax(0, 1fr); }
   }
 
@@ -609,6 +610,28 @@
   .ws-overview-mini .chain-flow-wrap { padding-bottom: 8px; }
   .ws-overview-mini .chain-node { min-width: 130px; padding: 9px 12px; }
 
+  /* Overview: the attention row and the urgent list. */
+  .attn-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .attn { --tone: var(--ok); display: flex; flex-direction: column; gap: 2px; padding: 12px 14px;
+    border: 1px solid var(--panel-border); border-left: 4px solid var(--tone); border-radius: 6px;
+    background: var(--panel); text-decoration: none; color: inherit; }
+  a.attn:hover { box-shadow: 0 2px 10px rgba(18,21,28,.09); }
+  .attn-danger { --tone: var(--danger); }
+  .attn-accent { --tone: var(--accent); }
+  .attn-ok { --tone: var(--ok); }
+  .attn-value { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--tone); line-height: 1.1; }
+  .attn-label { font-size: 13px; font-weight: 600; }
+  .attn-hint { font-size: 11px; color: var(--muted); }
+  .attn-alert { margin: 12px 0 0; padding: 10px 14px 10px 28px; font-size: 12.5px; color: var(--danger);
+    background: var(--danger-tint); border: 1px solid var(--danger-border); border-radius: 6px; }
+  .attn-alert a { color: var(--danger); font-weight: 600; }
+  .urgent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .urgent li { display: grid; grid-template-columns: 112px 74px minmax(0, 1fr) auto; gap: 10px; align-items: start;
+    padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .urgent li:first-child { border-top: none; }
+  .urgent-main { display: flex; flex-direction: column; }
+  .urgent-unassigned { color: var(--danger); font-weight: 600; font-size: 12px; }
+
   /* Overview detection-area cards. */
   .area-title { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 14px; }
   .area-title h2 { margin: 0; }
@@ -665,7 +688,8 @@
 
   @media (max-width: 760px) {
     .layout { padding: 20px 16px 60px; }
-    .area-grid { grid-template-columns: minmax(0, 1fr); }
+    .area-grid, .attn-grid { grid-template-columns: minmax(0, 1fr); }
+    .urgent li { grid-template-columns: minmax(0, 1fr); }
     .ws { flex-direction: column; }
     .ws-nav {
       flex-direction: row; flex-wrap: nowrap; position: static; flex: none;

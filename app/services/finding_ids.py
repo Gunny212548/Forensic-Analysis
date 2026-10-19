@@ -39,6 +39,17 @@ def lookup(case_id: str) -> dict[str, str]:
             if e.get("case_id") == case_id and e.get("action") == "assigned"}
 
 
+def created(case_id: str) -> dict[str, str]:
+    """{finding_key: when the finding was given its id (UTC ISO)} - the moment it
+    entered the workflow, as recorded in the hash-chained registry."""
+    company_id = storage.case_company(case_id)
+    if not company_id:
+        return {}
+    path = storage.customer_dir(company_id) / "findings" / "ids.jsonl"
+    return {e["finding_key"]: e["ts"] for e in hashchain.entries(path)
+            if e.get("case_id") == case_id and e.get("action") == "assigned" and e.get("ts")}
+
+
 def ensure(case_id: str, manifest: dict | None = None, findings: list[dict] | None = None) -> dict[str, str]:
     """Give every tracked finding of the case an id (those that have one keep
     it) and return {finding_key: id}. Idempotent; new ids are numbered in the

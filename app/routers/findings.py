@@ -13,6 +13,7 @@ async def list_findings(
     status: str | None = None,
     severity: str | None = None,
     area: str | None = None,
+    unassigned: bool = False,
     q: str | None = Query(None, max_length=200),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -30,4 +31,4 @@ async def list_findings(
         raise HTTPException(400, f"area must be one of: {', '.join(areas.AREA_IDS)}")
     # Reads DuckDB for every case it has not cached: off the event loop.
     return await asyncio.to_thread(
-        findings_index.listing, company_id, status, severity, q, limit, offset, area)
+        findings_index.listing, company_id, status, severity, q, limit, offset, area, unassigned)

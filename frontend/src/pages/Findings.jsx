@@ -12,12 +12,23 @@ const PAGE = 50
  *  and the footnote says so rather than letting the table read as "all of them".
  *
  *  A row opens its case on the Review tab, scrolled to the finding. */
-export default function Findings({ areaId }) {
+/** `param` is an area id, or a query string - severity, status, area, unassigned. */
+function initialFilters(param) {
+  if (!param) return {}
+  if (!param.includes('=')) return { area: param }
+  const q = new URLSearchParams(param)
+  return { area: q.get('area') || '', severity: q.get('severity') || '', status: q.get('status') || '',
+    unassigned: q.get('unassigned') === '1' }
+}
+
+export default function Findings({ param }) {
+  const init = initialFilters(param)
   const [companies, setCompanies] = useState([])
   const [companyId, setCompanyId] = useState('')
-  const [status, setStatus] = useState('')
-  const [severity, setSeverity] = useState('')
-  const [area, setArea] = useState(areaId || '')
+  const [status, setStatus] = useState(init.status || '')
+  const [severity, setSeverity] = useState(init.severity || '')
+  const [area, setArea] = useState(init.area || '')
+  const [unassigned, setUnassigned] = useState(Boolean(init.unassigned))
   const [text, setText] = useState('')
   const [q, setQ] = useState('')
   const [offset, setOffset] = useState(0)
@@ -41,12 +52,12 @@ export default function Findings({ areaId }) {
 
   const load = useCallback(async () => {
     try {
-      setData(await listFindings({ companyId, status, severity, area, q, limit: PAGE, offset }))
+      setData(await listFindings({ companyId, status, severity, area, unassigned, q, limit: PAGE, offset }))
       setError('')
     } catch (err) {
       setError(err.message)
     }
-  }, [companyId, status, severity, area, q, offset])
+  }, [companyId, status, severity, area, unassigned, q, offset])
 
   useEffect(() => {
     load()
@@ -129,6 +140,17 @@ export default function Findings({ areaId }) {
                 {a.name}
               </option>
             ))}
+          </select>
+          <select
+            value={unassigned ? 'none' : ''}
+            onChange={(e) => {
+              setUnassigned(e.target.value === 'none')
+              setOffset(0)
+            }}
+            aria-label="Assignee"
+          >
+            <option value="">Any assignee</option>
+            <option value="none">Unassigned</option>
           </select>
           <select value={severity} onChange={pick(setSeverity)} aria-label="Severity">
             <option value="">Any severity</option>
