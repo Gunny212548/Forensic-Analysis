@@ -98,11 +98,7 @@ export default function Overview({ companyId }) {
         </div>
       </div>
 
-      <div className="panel">
-        <div className="area-title">
-          <h2>Needs your attention</h2>
-          <span className="muted">each one opens the place to deal with it</span>
-        </div>
+      <div className="attn-row">
         <div className="attn-grid">
           <Attn
             label="Critical, unassigned"
@@ -293,7 +289,6 @@ function Attn({ label, value, href, bad, hint }) {
     <>
       <span className="attn-value">{fmtNum(value)}</span>
       <span className="attn-label">{label}</span>
-      <span className="attn-hint">{value || !bad ? hint : 'Nothing to do'}</span>
     </>
   )
   return href && value ? (
@@ -301,7 +296,9 @@ function Attn({ label, value, href, bad, hint }) {
       {body}
     </a>
   ) : (
-    <div className={`attn attn-${tone}`}>{body}</div>
+    <div className={`attn attn-${tone}`} title={hint}>
+      {body}
+    </div>
   )
 }
 
