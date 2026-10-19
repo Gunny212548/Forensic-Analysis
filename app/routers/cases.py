@@ -7,9 +7,17 @@ from fastapi.responses import JSONResponse
 
 from .. import config
 from ..services import (analysis, analysis_jobs, attack_layer, auth, case_views, custody, db,
-                        lifecycle, merge, review, stix_export, storage, veris)
+                        authz, lifecycle, merge, review, stix_export, storage, veris)
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
+
+
+def _authorize(request: Request, action: str, company_id: str | None = None) -> None:
+    """Ask the authz seam (services/authz.py); a refusal is a 403."""
+    try:
+        authz.require(request.state.user, action, company_id)
+    except authz.Forbidden as exc:
+        raise HTTPException(403, str(exc))
 
 
 @router.get("")
@@ -104,6 +112,7 @@ async def verify_evidence(case_id: str, request: Request):
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
+    _authorize(request, authz.VERIFY, manifest.get("company_id"))
     raw = _raw_file(case_id)
     if raw is None:
         raise HTTPException(409, "The preserved original file is missing")
@@ -125,6 +134,7 @@ async def verify_evidence(case_id: str, request: Request):
 async def merge_cases_route(request: Request, body: dict = Body(...)):
     """Concatenate several already-ingested line-log cases into one new case
     and run the normal pipeline over it (rules in services/merge.py)."""
+    _authorize(request, authz.MERGE)
     try:
         return await merge.merge_cases(body, request.state.user["email"])
     except merge.MergeRefused as exc:
@@ -223,6 +233,7 @@ async def change_lifecycle(case_id: str, request: Request, body: dict = Body(...
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
+    _authorize(request, authz.LIFECYCLE, manifest.get("company_id"))
     key = (body.get("finding_key") or "").strip()
     finding = next((f for f in db.collapsed_findings(case_id) if f["key"] == key), None)
     if finding is None:
@@ -250,6 +261,7 @@ async def record_review(case_id: str, request: Request, body: dict = Body(...)):
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
+    _authorize(request, authz.REVIEW, manifest.get("company_id"))
 
     key = (body.get("finding_key") or "").strip()
     if not key:
