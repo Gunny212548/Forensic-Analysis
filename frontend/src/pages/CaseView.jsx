@@ -4,7 +4,6 @@ import { fmtNum, fmtTime, statusOf } from '../format.js'
 import { Empty, SeverityPill } from '../components/common.jsx'
 import Workspace from '../components/Workspace.jsx'
 import EventsTable from '../components/EventsTable.jsx'
-import ReviewPanel from '../components/ReviewPanel.jsx'
 import AttackGraph from '../components/AttackGraph.jsx'
 import MappingNote from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
@@ -61,7 +60,18 @@ export function readAnalysis(body) {
   return { report: body, job: null, failed: '' }
 }
 
-export default function Result({ caseId, findingKey }) {
+/** The case-level pages that replaced #/result: Reports (summary, chain,
+ *  recommendations, events, evidence), Attack Graph (graph and risk ranking) and
+ *  Timeline. One component so the AI analysis - its polling, its progress, its
+ *  failures - is handled in one place; `view` picks what is shown. A single
+ *  finding (review, workflow, source events) is #/finding/<case>/<key>. */
+export const VIEWS = {
+  reports: { title: 'Reports', route: 'reports' },
+  'attack-graph': { title: 'Attack Graph', route: 'attack-graph' },
+  timeline: { title: 'Timeline', route: 'timeline' },
+}
+
+export default function CaseView({ caseId, view = 'reports' }) {
   const [manifest, setManifest] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [job, setJob] = useState(null)
@@ -71,18 +81,10 @@ export default function Result({ caseId, findingKey }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeError, setAnalyzeError] = useState('')
   const [tab, setTab] = useState(undefined)
-  // A citation chip in the chain/timeline opens its finding in Review. An
-  // object, not the key, so citing the same finding twice still scrolls.
-  const [focus, setFocus] = useState(null)
+  // A citation chip in the chain/timeline opens its finding's page.
   const cite = useCallback((key) => {
-    setFocus({ key })
-    setTab('review')
-  }, [])
-  // Opened from the Findings page (#/result/<case>/<finding key>): land on
-  // that finding in the Review tab.
-  useEffect(() => {
-    if (findingKey) cite(findingKey)
-  }, [findingKey, cite])
+    window.location.hash = `#/finding/${caseId}/${encodeURIComponent(key)}`
+  }, [caseId])
 
   // One place decides what a body means, so the POST answer and every poll
   // answer are treated identically.
@@ -179,8 +181,14 @@ export default function Result({ caseId, findingKey }) {
   const tabs = useMemo(() => {
     if (!manifest || manifest.status !== 'ready') return []
     const out = []
+    const needAnalysis = (label) => (
+      <Empty>
+        {label} comes from the AI analysis, which this case does not have yet.{' '}
+        <a href={`#/reports/${caseId}`}>Run it from Reports</a>.
+      </Empty>
+    )
 
-    out.push({
+    if (view === 'reports') out.push({
       key: 'overview',
       label: 'Overview',
       node: (
@@ -242,19 +250,18 @@ export default function Result({ caseId, findingKey }) {
       ),
     })
 
-    out.push({
-      key: 'events',
-      label: 'Events',
-      count: manifest.flagged_count,
-      node: <EventsTable caseId={caseId} />,
-    })
-
-    out.push({ key: 'review', label: 'Review', node: <ReviewPanel caseId={caseId} focus={focus} /> })
-
-    out.push({ key: 'evidence', label: 'Evidence', node: <Evidence caseId={caseId} /> })
+    if (view === 'reports') {
+      out.push({
+        key: 'events',
+        label: 'Events',
+        count: manifest.flagged_count,
+        node: <EventsTable caseId={caseId} />,
+      })
+      out.push({ key: 'evidence', label: 'Evidence', node: <Evidence caseId={caseId} /> })
+    }
 
     if (analysis) {
-      out.push({
+      if (view === 'reports') out.push({
         key: 'chain',
         label: 'Attack Chain',
         count: (analysis.attack_chain || []).length,
@@ -262,7 +269,7 @@ export default function Result({ caseId, findingKey }) {
       })
 
       const edges = analysis.graph?.edges?.length || 0
-      if (edges) {
+      if (view === 'attack-graph' && edges) {
         out.push({
           key: 'graph',
           label: 'Attack Graph',
@@ -276,7 +283,7 @@ export default function Result({ caseId, findingKey }) {
         (risk.sources || []).length +
         (risk.destinations || []).length +
         (risk.accounts || []).length
-      if (riskCount) {
+      if (view === 'attack-graph' && riskCount) {
         out.push({
           key: 'risk',
           label: 'Risk Ranking',
@@ -285,7 +292,7 @@ export default function Result({ caseId, findingKey }) {
         })
       }
 
-      if (analysis.timeline?.length) {
+      if (view === 'timeline' && analysis.timeline?.length) {
         out.push({
           key: 'timeline',
           label: 'Timeline',
@@ -294,7 +301,7 @@ export default function Result({ caseId, findingKey }) {
         })
       }
 
-      if (analysis.recommendations?.length) {
+      if (view === 'reports' && analysis.recommendations?.length) {
         out.push({
           key: 'recs',
           label: 'Recommendations',
@@ -304,8 +311,20 @@ export default function Result({ caseId, findingKey }) {
       }
     }
 
+    if (view !== 'reports' && !out.length) {
+      out.push({
+        key: view,
+        label: VIEWS[view].title,
+        node: analysis
+          ? <Empty>This analysis has no {VIEWS[view].title.toLowerCase()} data.</Empty>
+          : job
+            ? <AnalysisProgress job={job} stale={false} stalled={stalled} />
+            : needAnalysis(VIEWS[view].title),
+      })
+    }
+
     return out
-  }, [manifest, analysis, analyzing, analyzeError, job, jobFailed, stalled, caseId, analyze, focus, cite])
+  }, [manifest, analysis, analyzing, analyzeError, job, jobFailed, stalled, caseId, analyze, cite, view])
 
   const [statusLabel] = statusOf(manifest?.status)
 
@@ -333,7 +352,10 @@ export default function Result({ caseId, findingKey }) {
               <a href="#/dashboard">&larr; Back to Overview</a>
             )}
           </div>
-          <h1>{manifest ? manifest.original_filename : caseId}</h1>
+          <h1>
+            {VIEWS[view].title}
+            <span className="muted"> · {manifest ? manifest.original_filename : caseId}</span>
+          </h1>
           <div className="subtitle">
             {manifest && (
               <>
@@ -344,7 +366,7 @@ export default function Result({ caseId, findingKey }) {
             )}
           </div>
         </div>
-        {manifest?.status === 'ready' && (
+        {manifest?.status === 'ready' && view === 'reports' && (
           // A second job would only race the first for the same per-minute
           // token budget, and the server refuses it anyway (already_running).
           <button className="secondary" disabled={analyzing || !!job} onClick={() => analyze(true)}>

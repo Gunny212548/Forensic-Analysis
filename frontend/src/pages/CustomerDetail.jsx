@@ -290,7 +290,7 @@ function CasesPanel({ cases, showProject = false }) {
                 <tr key={m.case_id}>
                   <td className="mono muted">{fmtTime(m.uploaded_at)}</td>
                   <td>
-                    {isReady ? <a href={`#/result/${m.case_id}`}>{m.original_filename}</a> : m.original_filename}
+                    {isReady ? <a href={`#/reports/${m.case_id}`}>{m.original_filename}</a> : m.original_filename}
                   </td>
                   {showProject && <td>{m.project_name || '—'}</td>}
                   <td>{m.evidence?.recorded_by || '—'}</td>

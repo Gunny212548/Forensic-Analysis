@@ -11,21 +11,21 @@ export const NAV_GROUPS = [
       { route: 'dashboard', label: 'Overview' },
       { route: 'upload', label: 'Upload' },
       { route: 'findings', label: 'Findings' },
-      { route: 'timeline', label: 'Timeline', ready: false },
+      { route: 'timeline', label: 'Timeline' },
     ],
   },
   {
     label: 'Investigate',
     items: [
       { route: 'customers', label: 'Customers' },
-      { route: 'attack-graph', label: 'Attack Graph', ready: false },
+      { route: 'attack-graph', label: 'Attack Graph' },
       { route: 'attack-map', label: 'ATT&CK Map', ready: false },
     ],
   },
   {
     label: 'Manage',
     items: [
-      { route: 'reports', label: 'Reports', ready: false },
+      { route: 'reports', label: 'Reports' },
       { route: 'settings', label: 'Settings', ready: false },
     ],
   },

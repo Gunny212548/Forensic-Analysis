@@ -5,7 +5,8 @@ import Upload from './pages/Upload.jsx'
 import Customers from './pages/Customers.jsx'
 import Findings from './pages/Findings.jsx'
 import CustomerDetail from './pages/CustomerDetail.jsx'
-import Result from './pages/Result.jsx'
+import CaseView, { VIEWS } from './pages/CaseView.jsx'
+import CasePicker from './components/CasePicker.jsx'
 import FindingDetail from './pages/FindingDetail.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import Login from './pages/Login.jsx'
@@ -24,7 +25,7 @@ function parseHash() {
 }
 
 /** Hash routing, kept rather than swapped for a router library.
- *  The URLs (#/dashboard, #/upload, #/result/<case_id>) are unchanged from
+ *  The URLs (#/dashboard, #/upload, #/reports/<case_id>) replace the old #/result/<case_id>, which still redirects) are unchanged from
  *  the pre-React page, so links an analyst pasted into a ticket still open
  *  the same case - and it needs no dependency and no server rewrite rule. */
 function useHashRoute() {
@@ -71,8 +72,9 @@ function useOpenFindings(user, page, param) {
   return open
 }
 
-/** #/result/<case id> or #/result/<case id>/<finding key, URL-encoded>;
- *  #/finding/<case id>/<finding key, URL-encoded> has the same shape. */
+/** #/finding/<case id>/<finding key, URL-encoded>. The old #/result/<case> and
+ *  #/result/<case>/<key> have the same shape and still open: a case lands on
+ *  its Reports page, a finding on its own page (see the redirect below). */
 function splitResult(param) {
   const i = param.indexOf('/')
   if (i < 0) return { caseId: param, findingKey: null }
@@ -97,10 +99,15 @@ export default function App() {
     window.scrollTo(0, 0)
   }, [page, param])
 
-  // A result route with no case id is a dead end; send it home. So is a
-  // finding route with no finding: its list is the Findings page.
+  // #/result was the old case page. Links pasted into tickets still work: a
+  // finding opens its page, a case opens its Reports; no case is a dead end.
   useEffect(() => {
-    if (page === 'result' && !param) window.location.hash = '#/dashboard'
+    if (page === 'result') {
+      const { caseId, findingKey } = splitResult(param)
+      if (!caseId) window.location.hash = '#/dashboard'
+      else if (findingKey) window.location.hash = `#/finding/${caseId}/${encodeURIComponent(findingKey)}`
+      else window.location.hash = `#/reports/${caseId}`
+    }
     if (page === 'finding' && !splitResult(param).findingKey) window.location.hash = '#/findings'
   }, [page, param])
 
@@ -136,9 +143,8 @@ export default function App() {
           // #/customers/<id> or #/customers/<id>/projects/<project id>
           <CustomerDetail companyId={param.split('/')[0]} projectId={param.split('/')[2]} key={param} />
         )}
-        {page === 'result' && param && (
-          <Result {...splitResult(param)} key={param} />
-        )}
+        {VIEWS[page] && !param && <CasePicker route={VIEWS[page].route} title={VIEWS[page].title} />}
+        {VIEWS[page] && param && <CaseView caseId={param} view={page} key={`${page}/${param}`} />}
         {page === 'finding' && splitResult(param).findingKey && (
           <FindingDetail {...splitResult(param)} key={param} />
         )}

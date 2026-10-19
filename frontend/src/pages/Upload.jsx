@@ -343,7 +343,7 @@ export default function Upload({ user }) {
                 pct={activeCase ? processingPct(manifests[activeCase]) : 0}
                 text={activeCase ? processingText(manifests[activeCase]) : 'Waiting for upload'}
                 tone={manifests[activeCase]?.status === 'failed' ? 'err' : ''}
-                link={manifests[activeCase]?.status === 'ready' ? `#/result/${activeCase}` : null}
+                link={manifests[activeCase]?.status === 'ready' ? `#/reports/${activeCase}` : null}
               />
             </div>
           )}
@@ -411,7 +411,7 @@ export default function Upload({ user }) {
                     <td>
                       {/* The file name opens the case once it can be read. */}
                       {ready ? (
-                        <a className="table-link" href={`#/result/${m.case_id}`}>
+                        <a className="table-link" href={`#/reports/${m.case_id}`}>
                           {m.original_filename}
                         </a>
                       ) : (

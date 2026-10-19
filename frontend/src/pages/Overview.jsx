@@ -45,10 +45,10 @@ export default function Overview({ companyId }) {
   )
   const todo = [
     { n: t.critical_unassigned, label: 'critical findings unassigned', href: '#/findings/severity=critical&unassigned=1' },
-    { n: t.unreviewed, label: 'awaiting review', href: data.review_case ? `#/result/${data.review_case}` : '#/customers' },
+    { n: t.unreviewed, label: 'awaiting review', href: '#/findings' },
     { n: t.failed_cases, label: 'cases failed', href: '#/customers' },
     { n: data.attention.length, label: 'evidence problems',
-      href: data.attention.length ? `#/result/${data.attention[0].case_id}` : '#/customers' },
+      href: data.attention.length ? `#/reports/${data.attention[0].case_id}` : '#/customers' },
   ].filter((x) => x.n > 0)
   // Red when it is a critical finding nobody owns, a failed case or tampered evidence;
   // a review backlog alone is only a nudge.
@@ -121,7 +121,7 @@ export default function Overview({ companyId }) {
         <ul className="attn-alert" role="alert">
           {data.attention.slice(0, 5).map((a) => (
             <li key={`${a.case_id}|${a.reason}`}>
-              <a href={`#/result/${a.case_id}`}>{a.file}</a> <span className="cust-tag">{a.customer}</span> - {a.reason}
+              <a href={`#/reports/${a.case_id}`}>{a.file}</a> <span className="cust-tag">{a.customer}</span> - {a.reason}
             </li>
           ))}
         </ul>
@@ -205,7 +205,7 @@ export default function Overview({ companyId }) {
           <ul className="activity">
             {data.recent.slice(0, 5).map((r, i) => (
               <li key={i} className={`act-${r.level || 'muted'}`}>
-                <a href={`#/result/${r.case_id}`}>{r.text}</a>
+                <a href={`#/reports/${r.case_id}`}>{r.text}</a>
                 {r.customer && <span className="cust-tag cust-tag-after">{r.customer}</span>}
                 <div className="mono muted">{ago(r.ts)}</div>
               </li>
