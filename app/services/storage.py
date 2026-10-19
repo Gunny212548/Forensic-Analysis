@@ -29,6 +29,8 @@ import json
 import os
 import re
 import secrets
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -160,6 +162,32 @@ def manifest_path(case_id: str) -> Path:
     return case_dir(case_id, "cases") / f"{case_id}.json"
 
 
+# One lock per case: update_case is load-modify-save, and the pipeline's
+# progress writer, the CSV estimator thread and the status changes all call
+# it for the same case. Without it the last writer silently drops the others'
+# keys (or puts an older `status` back).
+_case_locks: dict[str, threading.RLock] = {}
+_case_locks_guard = threading.Lock()
+
+
+def _case_lock(case_id: str) -> threading.RLock:
+    with _case_locks_guard:
+        return _case_locks.setdefault(case_id, threading.RLock())
+
+
+def _replace_retry(tmp: Path, path: Path) -> None:
+    # os.replace is atomic on POSIX. On Windows it fails with a sharing
+    # violation while a reader has the target open, so wait that out briefly.
+    for attempt in range(40):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 39:
+                raise
+            time.sleep(0.005 * (attempt + 1))
+
+
 def save_manifest(manifest: dict) -> None:
     # The manifest says whose case it is, and that decides where it goes:
     # this is the write that puts a new case into its customer's store.
@@ -170,18 +198,29 @@ def save_manifest(manifest: dict) -> None:
     _owner[manifest["case_id"]] = company_id
     # Write-then-rename: the pipeline now rewrites a manifest about once a
     # second to report progress (FR-2.5) while the UI polls it, and a reader
-    # must never catch a half-written file.
+    # must never catch a half-written file. The temp name is unique per
+    # writer, so two writers cannot clobber each other's half-written file.
     path = manifest_path(manifest["case_id"])
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
-    os.replace(tmp, path)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
+        _replace_retry(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def load_manifest(case_id: str) -> dict | None:
     path = manifest_path(case_id)
-    if not path.exists():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    for attempt in range(40):
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return None
+        except (PermissionError, json.JSONDecodeError):
+            # Windows: the file is being swapped under us. Retry; give up loudly.
+            if attempt == 39:
+                raise
+            time.sleep(0.005 * (attempt + 1))
 
 
 def list_manifests(company_id: str | None = None) -> list[dict]:
@@ -206,11 +245,12 @@ def list_manifests(company_id: str | None = None) -> list[dict]:
 
 
 def update_case(case_id: str, **fields) -> None:
-    manifest = load_manifest(case_id)
-    if manifest is None:
-        return
-    manifest.update(fields)
-    save_manifest(manifest)
+    with _case_lock(case_id):
+        manifest = load_manifest(case_id)
+        if manifest is None:
+            return
+        manifest.update(fields)
+        save_manifest(manifest)
 
 
 def update_status(case_id: str, status: str) -> None:
