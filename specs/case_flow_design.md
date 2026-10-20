@@ -191,6 +191,45 @@ Routes (`app/routers/cases.py`)
 Standards upgrades (OCSF verdict, validation records per ISO/IEC 27041, MTTC as an SP 800-55
 measure) are separate stories, after these.
 
+## Revision 2 (2026-10-20, the user, after IAI-89) - supersedes the parts it names
+
+Decided:
+- **No guessing what a log is.** The system identifies every uploaded file
+  automatically, by the Sigma logsource taxonomy (`sigma-appendix-taxonomy.md`, v2.1.0)
+  plus a documented format profile per product. Heuristic column matching goes. Where
+  the taxonomy names the source it is used as is (`windows/security`, `windows/sysmon`,
+  `linux/auth`, `linux/sshd`, `azure/signinlogs`, `m365/exchange`); where it does not
+  (Palo Alto, Check Point, Fortinet, Cisco ASA/FTD, CrowdStrike, VMware ESXi - verified
+  absent) the file is `category: firewall` or the nearest category, with the product kept
+  as a custom logsource value, and the case says so.
+- **Formats still missing are researched and tested**: each new product needs its
+  vendor's format document and a real file, and a test that the file is identified as
+  that product (and that the others are not).
+- **Triage must be complete before the next step** (replaces R3 for steps after Triage):
+  Investigate onwards are locked, and the server refuses to start an investigation while
+  the case has an Unreviewed finding.
+- **No assignee dropdown.** The finding's owner is the signed-in account that starts the
+  investigation; the reviewer of every decision, Undo included, is the signed-in account
+  (already so since FR-7.6).
+- **Attack Path becomes its own step after Respond, before Report**, built only from
+  validated findings; exported as MITRE Attack Flow 4.0. The case-wide graph leaves
+  Investigate. The separate Analyse step goes: AI assists in Triage (a suggestion, the
+  analyst decides) and drafts the report narrative.
+
+Order: Ingest -> Triage -> Investigate -> Respond -> Attack Path -> Report.
+
+Still open:
+- Q5 Attack Path input: findings triaged correct (accepted/modified) and not closed as
+  false or benign positive? (recommended)
+- Q6 AI suggestion in Triage shown on request rather than up front, so the analyst looks
+  at the evidence first (recommended; AI 600-1 Human-AI Configuration names automation
+  bias and over-reliance); every decision records what the AI suggested.
+- Q7 Remove Groq from code, config and documents, keeping its provider-independent
+  lessons rewritten for the local model (recommended).
+- Q8 A file whose format is not supported: kept as evidence (hash, custody) but not
+  analysed (recommended), or refused at upload.
+- Q9 ESXi lines with no vendor document ("observed"): keep, or treat as guessing and drop.
+
 ## Open questions
 
 - **Q1** A rejection for `better_technique` says the ATT&CK mapping is wrong, not that the
