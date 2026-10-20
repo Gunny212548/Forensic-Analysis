@@ -33,7 +33,8 @@ POST /api/upload
   → stream file to disk in 1MB chunks (never held in memory)
     .gz / .zip kept compressed in raw/ (services/archive.py, FR-2.3)
   → manifest status=queued, return case_id immediately
-  → BackgroundTask → asyncio.to_thread(pipeline.process_case)
+  → jobs.submit(): a job file + a bounded worker pool run pipeline.process_case
+    (services/jobs.py, gotcha #48; queued work survives a restart)
 
 pipeline.process_case  (services/pipeline.py)
   CSV  → fast path: DuckDB reads + decodes the file itself. The column
@@ -79,7 +80,13 @@ GET  /api/companies/summary                  Customers page: open/closed cases,
 GET  /api/companies/{id}/projects            the customer's projects (storage.py)
 GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
 GET  /api/cases/{id}/findings                collapsed findings + computed
-                                             confidence + review status
+                                             confidence + review status + FD id +
+                                             related findings (gotcha #49)
+GET  /api/cases/{id}/findings/events?key=    the events behind one finding, each
+                                             with its source file (gotcha #49)
+GET  /api/findings                           the Findings page: workflow findings
+                                             across cases, counts, open_count;
+                                             status=open = not Resolved (#51)
 POST /api/cases/{id}/review                  one analyst decision (appended)
 GET  /api/cases/{id}/review-log              full decision history
 GET  /api/cases/{id}/custody                 evidence digest + chain of custody,
@@ -101,21 +108,22 @@ POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
                                              schema + grounding check (#37)
 MCP (stdio, read-only)                       app/mcp_server.py - 12 tools over the
                                              same views; every call hash-chain
-                                             logged to mcp/access.jsonl (#38)
-GET  /api/overview                           KPIs, severity, techniques, top
-                                             entities, activity + case list
-                                             across all cases (services/
+                                             logged to mcp/access.jsonl (#38);
+                                             never assigns FD ids (#51)
+GET  /api/overview                           KPIs, MTTC, detection areas, attention,
+                                             findings per day, top entities,
+                                             urgent findings, activity (services/
                                              overview.py; per-case facts cached
-                                             on DuckDB/review-log mtime)
+                                             on a fingerprint of DuckDB, review
+                                             log, custody log and id registry;
+                                             gotchas #50, #51)
 ```
 
-**The Overview page is interim until findings have a status.** It follows
-`figma-export/Overview.svg`'s layout, but that design is status-shaped
-(open findings, MTTC, an open-findings table), and the finding lifecycle only
-arrives in Sprint 3 (IAI-45..49), with the real Overview stories in Sprint 5
-(IAI-65..70).
-Until then every tile is a case, finding, review or technique number, and the
-table is the case list (IAI-20). No figure is a placeholder. "Top affected"
+**The Overview was redesigned on 2026-10-19 (gotcha #50)** - an attention banner,
+a KPI strip, six detection-area cards, findings per day, top affected, urgent
+findings and recent activity, in the light palette; the status workflow it needed
+exists since Sprint 3 (gotcha #49). The case table is no longer on it. No figure is a
+placeholder. "Top affected"
 ranks by accumulated risk score, not by case count: ranked by count, the
 benign admin account seen in every seeded case came out first (gotcha #16
 again). **The page always says whose data it shows (2026-10-15, the
@@ -131,7 +139,8 @@ since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything
 of that customer and nothing of anyone else's: `customer.json` the customer
 record · `projects/` its projects, one JSON each · `cases/` manifests (small JSON) · `db/` per-case DuckDB · `raw/`
 original uploaded files, compressed ones kept compressed (audit trail) ·
-`analysis/` cached AI output · `review/` append-only analyst decision logs,
+`analysis/` cached AI output · `jobs/` one file per unfinished case (gotcha #48) ·
+`findings/ids.jsonl` the hash-chained FD-id registry (gotcha #49) · `review/` append-only analyst decision logs,
 one JSONL per case (see gotcha #19) · `custody/` hash-chained
 chain-of-custody logs, one JSONL per case (gotcha #28). Where older gotchas
 say `review/{case_id}.jsonl`, `raw/<case_id>.csv` and so on, read them as
@@ -163,7 +172,8 @@ anything. The page and its bundle stay public; they hold no data.
 - The session is an HMAC-signed cookie (`fa_session`, HttpOnly, 12h), not
   server state. Every request re-reads the account, so **removing a user
   ends their sessions at once**; what logout cannot do is revoke a copy of
-  the cookie taken before it expires. There is no login rate limit yet.
+  the cookie taken before it expires - but a password reset does end them (gotcha #47).
+  Failed sign-ins are throttled and every sign-in event is audit-logged (gotcha #47).
 - `role` is a stored display label only. Roles are undefined until IAI-14,
   so nothing is permitted or denied by it.
 - **The review actor comes from the session, not the request body.** It used
@@ -186,12 +196,19 @@ the `/static` mount, so `vite.config.js` sets `base: '/static/'` to match.
 ```
 frontend/src/
   App.jsx              session gate + hash router (#/dashboard, #/upload,
-                       #/result/<id>, and the menu routes of Sidebar.jsx)
+                       #/finding/<case>/<key>, #/reports|attack-graph|timeline
+                       [/<case>[/<tab>]], and the menu routes of Sidebar.jsx);
+                       the old #/result/<case>[/<key>] redirects (gotcha #51);
+                       signed out -> #/login, and signing in always
+                       lands on the Overview (the user's call, 2026-10-16)
   api.js               every call the UI makes, and nothing else
   format.js            fmtBytes/fmtTime/shortTs + the status & severity maps
-  pages/               Overview (#/dashboard) · Upload · Customers · CustomerDetail · Result · Login · Placeholder
+  pages/               Overview (#/dashboard) · Upload · Findings · FindingDetail
+                       · CaseView (Reports / Attack Graph / Timeline of one case)
+                       · Customers · CustomerDetail · Login · Placeholder
                        (menu pages whose story is not built yet)
   components/          Sidebar (app shell, FR-0) · Workspace (case tabs)
+                       CasePicker (a case page opened from the menu)
                        EventsTable · ReviewPanel · Lifecycle (status workflow)
                        RuleCard (Sigma/ADS) · Evidence (custody tab)
                        Mapping (log source note) · Veris
@@ -278,1331 +295,86 @@ cookie jar, or stop the container.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
-Numbered in the order they were written. #1-#29 run in order; #30-#46 were
-added on top of #29 newest-first, so they read #46, #45, #44 ... #30.
-
-**1. DuckDB `executemany()` is catastrophically slow — never bulk-insert with it.**
-Benchmarked here at ~300 rows/sec (20k rows = 65 seconds); a 65k-row file
-took 3.5 minutes end-to-end. It's a per-row prepared-statement call. The
-pipeline instead writes decoded rows to a staging CSV and lets DuckDB's CSV
-reader ingest it in one statement — same file now processes in ~6 seconds.
-(pandas/pyarrow would also work but add tens of MB of dependency for no
-gain here.)
-
-**2. Exact column-name matches must beat substring matches when decoding CSV.**
-Palo Alto exports have both `Action` (allow/deny — the one that matters) and
-`Log Action` (value: "Log Forwarding ALL"). A naive substring search finds
-`Log Action` first, `verdict` becomes garbage, and *every* firewall rule
-silently stops matching — the case processes "successfully" with 0 findings.
-`decode._find_field()` tries exact matches first for this reason.
-
-**3. Log lines without a hostname field break a naive syslog decoder.**
-Standard syslog is `TIMESTAMP HOSTNAME PROGRAM[PID]: MESSAGE`; VMware ESXi
-omits the hostname. A single greedy regex misparses the program as a
-hostname and no program-specific decoder ever matches.
-`decode._split_host_prog()` checks token-by-token instead.
-
-**4. Don't conflate a connection's *source* port with a *destination* port.**
-In `Connection from 1.2.3.4 port 53544` that's the client's ephemeral source
-port. Feeding it to a port-scan rule (which counts distinct *destination*
-ports) false-positives on any host that merely reconnects a lot. `decode.py`
-deliberately does not set `dstport` from SSH regex captures.
-
-**5. Groq output-token limits shape the whole prompt design.** *(Applies to
-`LLM_PROVIDER=groq`. Since 2026-10-12 the app runs a local Ollama model -
-see Environment / secrets; none of these limits bind it. Its output is
-graded by `tests/bench_llm.py` (#37), but its settings have not been swept
-the way this section's were.)*
-- **`qwen/qwen3.8-27b` is the only model now** — the gpt-oss branch (and its
-  `reasoning_effort: "low"` workaround for hidden reasoning tokens) is gone.
-  Everything below exists to make the schema fit qwen's budget.
-- qwen's **1000 OTPM** cap on this tier is *per minute across all requests*,
-  and Groq reserves the full `max_tokens` up front rather than charging
-  actual usage. With `MAX_COMPLETION_TOKENS=950` that means **one analysis
-  per minute**: a second `POST /analyze` inside the same minute is rejected
-  with a 429 (`Used 856, Requested 950`), not truncated. `run_analysis()`
-  retries in place when the API asks for <=25s and otherwise raises
-  `AnalysisRateLimited` → HTTP **429 + Retry-After**, so the UI says how
-  long to wait instead of showing a generic 502.
-- **Second sweep, after the graph moved to SQL** (8 configs on the Azure
-  case): `events=15` with `timeline<=6`, `attack_chain<=4`, `temp=0.2` is
-  still the right setting and needs no change. `events=20` and `events=25`
-  both hit `finish_reason: length` and the timeline *shrank* to 4 entries;
-  raising the timeline cap to 8 also ran out of budget and still produced 4.
-  The freed graph budget does not buy more coverage - it is already spent.
-- **First sweep (7 configs, one call each, graded against the
-  `tests/gen_usecase.py` ground truth — don't redo this by guesswork):**
-
-  | config | events | max_tokens | complete? | chain/timeline/recs | notes |
-  |---|---|---|---|---|---|
-  | base | 8 | 950 | yes | 4/2/3 | never mentions the successful root login |
-  | cov12 | 12 | 950 | yes | 4/2/3 | — |
-  | cov15 | 15 | 950 | yes | 4/2/3 | best narrative; success tagged T1078 |
-  | fast480 | 8 | 480 | **no** | 3/0/0 | loses recommendations + timeline |
-  | fast650 | 8 | 650 | **no** | 4/0/0 | loses recommendations + timeline |
-  | qual15 | 15 | 950 (+hardened prompt) | yes | 4/2/3 | no gain over cov15 |
-  | qual8 | 8 | 950 (+hardened prompt) | yes | 4/2/3 | no gain over base |
-
-- What that bought: `MAX_EVENTS_FOR_ANALYSIS` 8 → **15**. The model writes the
-  same ~950-token object regardless of how many events it gets, so the extra
-  input (+580 prompt tokens; input is not the capped resource) is free
-  coverage. At 8 events the severity cut dropped the **successful root login**
-  (lvl 3) before the model ever saw it, and the narrative never mentioned the
-  pivot of the whole attack; at 15 it is described and tagged `T1078.003`.
-- What did **not** work, so don't retry it:
-  - *Lowering `max_tokens` to fit two analyses in one minute* — at 650 and
-    480 the response loses `recommendations` and `timeline` entirely. The
-    schema needs ~800-950 tokens; there is no useful smaller setting.
-  - *Prompt hardening for the documented soft spots* (RFC1918-is-private,
-    benign-source, T1078-not-T1110) — no measurable effect at n=1, and it
-    costs ~180 prompt tokens. Raising coverage fixed the T1078 mis-tag
-    instead: the model wasn't reasoning badly, it was never given the
-    successful-login event.
-- Beware of grading heuristics: the first rubric flagged "host 10.10.1.5
-  exfiltrated to external IP 203.0.113.77" as an RFC1918 error because the
-  sentence contained both "external" and a private IP. Check what a
-  regression grader actually matched before believing it. Raising the event
-  count or loosening those caps brings truncation straight back.
-- `finish_reason: length` alone does **not** mean the output is damaged —
-  qwen can spend its last tokens on trailing whitespace after a complete
-  object (observed). `_meta.truncated` is therefore computed from
-  *missing top-level keys*, not from finish_reason.
-- When the JSON really is cut off mid-write, `_salvage_json()` rewinds to the
-  last completed value, closes the open brackets and parses that, so a
-  response that died inside `timeline` still delivers summary/attack_chain/
-  graph. `_meta.salvaged` records when this happened.
-- **The model does not draw the graph any more** — see gotcha #10. The
-  schema it is asked for is `summary → attack_chain → recommendations →
-  timeline`, and models generate keys in schema order, so that order *is*
-  the priority list when the budget runs out. Don't reorder casually.
-- `analysis._normalize_graph()` still exists only to render analyses cached
-  before that change (flat `"src|dst|label|mitre"` strings, or an older
-  nodes/edges object). Live runs never call it.
-- Check `_meta.finish_reason` and `_meta.usage` in a cached analysis if
-  output ever looks incomplete.
-
-**6. A row can legitimately match several rules.**
-Rules `INSERT` independently, so one row may produce multiple findings
-(a login failure that is also part of a brute-force burst is both).
-`flagged_count` counts `DISTINCT row_id` — don't switch it to `count(*)`.
-
-**7. "ready with 0 findings" on a firewall export means a schema mismatch, not a clean log.**
-This is the failure mode to be most suspicious of, because nothing errors.
-A real Check Point export ingested 45,209 rows and produced zero findings:
-every rule needs `srcip`, and `srcip` was NULL for every row. Diagnose by
-counting non-NULL canonical columns before assuming the log is boring:
-
-```sql
-SELECT count(ts), count(srcip), count(dstip), count(verdict), count(app) FROM raw_events;
-```
-
-Log sources differ in three ways that all had to be handled:
-- **Address format** — Check Point writes `object-name (1.2.3.4)`, Palo Alto
-  writes a bare IP. `decode.extract_ip()` / the SQL `regexp_extract` pull the
-  IP out and fall back to the original text so named entities survive.
-- **Column names** — `Source`/`Destination` vs `Source address`/
-  `Destination address`. Both are in `_FIELD_CANDIDATES`, specific ones
-  first. `_AVOID_SUBSTRINGS` stops the loose pass from grabbing
-  `Source User Name` as an IP.
-- **Verdict vocabulary** — `accept`/`reject`/`prevent` vs `allow`/`deny`.
-  `decode.normalize_verdict()` and the SQL `CASE` fold synonyms into the
-  canonical spellings so rules stay readable.
-
-**8. Not every log has a numeric port column.**
-Check Point names the service (`http`, `FW1_ica_services`) and has no port
-field at all, so `R2002` (distinct destination ports) can never fire on it.
-`R2003` counts distinct *services* for the same signal. When adding rules,
-check whether the field you depend on actually exists across log sources.
-
-**9. A filtered export changes which rules can fire.**
-The Check Point sample was exported after filtering SmartLog to one source
-IP, so it contained exactly one `srcip` and ~18 minutes of traffic (the
-console reported 96,418 matching rows; the CSV had 45,209). Consequences:
-"100% of traffic is malicious" is an artifact of the filter, not a finding,
-and a source-filtered or action-filtered export can silence correlation
-rules entirely — `R2004` only works because both the allowed and blocked
-rows for that IP were present. Ask what filter produced the file before
-reading anything into cross-source comparisons.
-
-**10. The attack graph is SQL, not AI — don't hand it back to the model.**
-`db.build_graph()` derives it from `findings` joined to `raw_events`:
-`srcip → coalesce(dstip, username)`, grouped per pair, rules merged into one
-edge, MITRE IDs unioned, sorted by severity then volume. The graph is not
-interpretation — every field an edge needs is already in the findings table,
-put there by the rule engine.
-
-Asking the model for it (the original design) cost real damage on qwen's
-budget: at 950 output tokens a firewall case returned four narrated stages
-and `missing_keys: [graph, recommendations, timeline]` — the picture gone,
-the prose intact. It also capped edges at whatever fit, and let node names
-drift from the evidence (an invented `Network` node appeared in testing).
-Derived in SQL the graph is exact, complete, free, and every edge traces
-back to real `row_id`s; the whole output budget goes to the narrative
-(measured after the switch: 915 tokens, `finish_reason: stop`, timeline back
-to 5 entries).
-
-The prompt now explicitly tells the model *not* to emit a graph, and
-`run_analysis(graph=...)` overwrites the key regardless. `_meta.graph_source`
-records which produced it (`rules` vs `model` for old cached output).
-
-**11. `action` on CSV, and why an auth verdict needs an account attached.**
-The line-log decoder was the only thing that ever set `action`, so R1000-R1004
-(and R2000, which builds on them) could not fire on *any* CSV — a real Azure AD
-sign-in export ingested 91 rows with 14 failures against one account and
-produced zero findings. `decode._FIELD_CANDIDATES["auth_status"]` +
-`pipeline._ingest_csv_sql`'s `action_expr` now map a sign-in outcome column
-onto `auth_success`/`auth_failed`.
-
-Two guards make that safe, and both were put there by a real false positive:
-- **Only the auth vocabulary translates** (`success`/`failure`/`failed`, and
-  `normalize_auth_status()`). A firewall `Action` column of allow/deny yields
-  NULL, so firewall traffic can never become an auth finding. Azure's
-  `Interrupted` (the MFA / keep-me-signed-in prompt) maps to nothing — it is
-  not a failed authentication.
-- **A username is required**, both as a mapped column and non-NULL on the row.
-  Without it an Exchange message-trace export (`MessageId, ..., Status`)
-  matched `Status` and turned **335 failed email deliveries into 335 failed
-  logins**. An authentication event is about an account; if nothing
-  authenticated, it isn't one.
-
-`R1000`/`R1001`/`R1002`/`R2000` also lost the word "SSH" from their `descr` and
-`RULE_LABELS`. They were written when auth.log was the only source; leaving
-"SSH brute-force" on an Azure AD web sign-in would propagate straight into the
-AI narrative, which trusts these labels (see the R2001 MITRE lesson).
-
-**12. "Resource" contains "source".**
-`decode.match_column()`'s loose pass matched Azure AD's `Resource` column for
-`srcip`, so an entire sign-in export decoded with resource names where its IPs
-belonged, and `Multifactor authentication result` (a paragraph of prose) as its
-`verdict`. Fixed by `_AVOID_SUBSTRINGS` (`resource`, plus `destination`/`source`
-cross-guards now that `ip address` is a srcip candidate) and by putting
-`status` ahead of `result` in the verdict candidates. Same family as gotcha #2 —
-when adding a candidate substring, check what else in a real header contains it.
-
-**13. Give the model the discriminating fact; don't instruct it to guess better.**
-Asked to analyse an Azure AD sign-in case, the model called 20 successful
-logins from one Thai ISP address "potential compromise" - the shape of the
-account's own user. It was not reasoning badly: it had counts and nothing
-else, so `success x20` and `success x12` looked alike. `db.source_profiles()`
-now computes, per source, `auth_ok / auth_fail / allow / deny / days_active /
-span / first_seen` over the whole case, and `_build_prompt()` appends it as a
-compact "Source profiles" table (~15 tokens per source; input is not the
-capped resource).
-
-Same case, before and after:
-- before: *"successful logins from 171.100.141.170, indicating potential
-  compromise"* - the habitual user, active on 4 separate days.
-- after: *"a burst of successful logins from 16 sources occurred on
-  2026-06-07, indicating a likely compromise"* - the `89.251.0.0/24` address
-  pool, which is the actual finding.
-
-This is the same lesson as the R2001 MITRE retag and the T1078 coverage fix:
-**every time the narrative was wrong, the cause was missing or mislabelled
-input, never the model's reasoning.** Prompt hardening for these soft spots
-was measured (gotcha #5 sweep) and did nothing. Compute the fact in SQL and
-hand it over.
-
-*Refined by a later ablation (8 configs, same case).* Once `R2005`/`R2006`
-existed, **every** config got the reading right - including one with no
-profiles and no risk table at all - because the finding text now says
-"Password spray against X from 14 distinct sources" and the model only has to
-repeat it. Re-run against rule-silent events (`R1000`/`R1001` only, the
-pre-R2005 situation) the difference reappears sharply:
-
-- with profiles: *"a mix of legitimate access from 171.100.141.170 ... a
-  coordinated burst of successful logins from the 89.251.0.0/24 subnet"*
-- without: *"20 successful logins from 171.100.141.170"* - leads with the
-  owner's own activity and never mentions the burst at all.
-
-So both layers earn their keep, in this order: **a rule that names the
-pattern is worth more than any prompt context**, and the profiles are the
-safety net for everything no rule covers yet. The profiles cost ~1,200 input
-tokens, and input is not the capped resource.
-
-**14. Per-source counters miss attacks that spread across sources.**
-`R2000` counts failures per `srcip` and needs 3; a real Azure export had 14
-distinct IPv4/IPv6 addresses each failing exactly once against one account,
-so nothing fired while the account was plainly being sprayed. Two rules cover
-the axis the per-source rules can't see:
-- `R2005` (T1110.003): one account, failures from >=5 distinct sources. Also
-  fires on the ESXi `auth.log` in the corpus - `root` was hit from 6 addresses.
-- `R2006` (T1078): one account, successes from >=4 distinct sources inside the
-  same hour. Caught 16 sources in `89.251.0.0/24` succeeding within minutes on
-  2026-06-07 - the single most suspicious thing in that case, which neither
-  the old rules nor the AI had flagged. Hour buckets are crude (a burst across
-  a boundary splits) but need no window function.
-
-Both leave `flagged_count` unchanged on that case - same rows, more rules per
-row, which is gotcha #6 working as intended.
-
-**15. Beaconing is a *regularity* test, and it only works on egress.**
-`R2007` measures the interval between consecutive connections for each
-src->dst pair and flags pairs whose intervals barely vary (jitter =
-stddev/mean). Nothing threshold-based can express this: on the customer's
-compromised host `R3000` flagged 12,281 rows and buried the four
-destinations that mattered.
-
-Calibrated on real data, not guessed: the true beacons sat at jitter
-0.43-0.55 (300-450 connections at ~40-minute intervals over 11 days to
-`72.154.7.0/24`, all `ssl`, all allowed) and ordinary bursty browsing at
-0.89-0.94. The cut at 0.6 separates them with room on both sides.
-
-**The egress restriction is not optional.** The first version, without it,
-added 16,599 findings to one previously-clean file - all of them Windows
-Delivery Optimization peer-to-peer updates (`ms-update-optimization-p2p`,
-port 7680, 10.x -> 10.x, 44 host pairs). Internal traffic is periodic by
-nature. Requiring a public IPv4 destination dropped every false positive and
-kept the true one; the cost is that internal C2 and lateral beaconing are out
-of scope. Even on egress, a legitimate update-check or telemetry endpoint is
-indistinguishable from C2 in the logs alone - the rule localises, the analyst
-identifies the destination.
-
-**16. Risk ranking needs diminishing returns, or it just ranks by volume.**
-`db.risk_scores()` accumulates finding severity per entity (source,
-destination, account) the way modern SIEM risk-based alerting does, because
-"which rule fired" does not answer "where do I look first" in a case with
-25,579 findings. A flat `sum(lvl)` ranked a scanned host with three noisy
-rules (79,500) *above* the actual C2 destination. Scoring per distinct rule
-with a log-dampened count - `sum(lvl * (1 + ln(n)))` - puts the three
-beaconing destinations on top instead, because it measures how many
-different ways an entity is implicated rather than how much traffic it moved.
-The ranking is sent to the model (it leads the summary with it) and rendered
-in the analysis panel.
-
-**17. Threat intel is offline on purpose, and it is just a JOIN.**
-`intel.py` parses whatever is in `DATA_DIR/intel/` into one canonical `ioc`
-table per case; `R3003` (known-bad destination, high) and `R3004`
-(known-bad source, medium) join it. Nothing about analysis touches the
-network - `tools/refresh_intel.py` downloads the feeds as a separate step, so
-a case can be worked air-gapped and re-running it over the same feed files
-gives the same findings, which matters when the output is evidence.
-
-- The parser is format-agnostic, not one-per-feed: comment-prefixed CSV
-  (abuse.ch Feodo, ThreatFox) or a bare list of addresses (blocklist.de,
-  CINS, Tor exit nodes), plus anything a customer hands over in either shape.
-  Only IP indicators are kept - the canonical schema has no URL, hash or
-  domain column to match one against. Private/loopback/multicast addresses
-  are dropped: a feed listing RFC1918 space would flag every internal flow.
-- `R3004` is deliberately *lower* severity than `R3003`. Feeds like
-  blocklist.de list any host that has ever probed anyone, so being scanned by
-  one is background noise; talking **to** C2 infrastructure is not. On the
-  corpus this is exactly what showed up - 2,480 hits, all inbound scanners
-  against the customer's public addresses (and allowed).
-- Indicators are loaded **after** ingest, filtered to addresses that appear
-  in the case's own traffic (`intel.fill`). An indicator nobody talked to
-  cannot produce a finding, and storing all ~43k in all 93 case files
-  inflated every DuckDB for nothing.
-- Feed snapshot at time of writing: 42,952 usable IPs from 5 feeds
-  (blocklist_de 24,577 / cins 14,724 / threatfox 2,365 / tor 1,286).
-  **Replaced 2026-10-14** when the whole store was reset: the old feed files
-  went with it (no backup), so the old R3004 counts cannot be reproduced.
-  Re-fetched: 44,514 (blocklist_de 25,729 / cins 14,759 / threatfox 2,846 /
-  tor 1,180). The baseline was re-taken on it - only `R3004` moved, in 6
-  files (`log_22_` 324 -> 318, `log_23_`/`log_24_` -> 319, `log_25_`/`log_26_`
-  100 -> 92, `log_27_` 68 -> 73), every other rule and every row count
-  identical. **A feed refresh moves R3003-R3006 by design**; re-take the
-  baseline after one and say so, as here.
-
-**18. Measure before optimising - twice here the bottleneck was not where it
-looked.** The corpus wall-clock moved from ~18s to ~60s when IOC matching
-landed, which looked like the per-case indicator load. It was not: measured
-directly, `intel.fill()` costs **13ms** and *all sixteen rules together* cost
-**56ms** on the largest case (65,534 rows). A Parquet copy of the feed was
-built to "fix" it, saved 5ms, and was removed again. Repeat runs of the
-unchanged corpus took 52s, 60s, 67s and 74s - the variance is host I/O for
-93 uploads, not anything the pipeline does. Time a stage before rewriting it.
-
-**19. Review state lives outside the case DuckDB, and reviews collapsed
-findings - both on purpose.**
-Requirements FR-2.4/2.7, FR-4.2/4.6, FR-5.6, FR-7.6 and NFR-9 all need the
-same thing underneath: an analyst decision attached to a finding, with
-history. `review.py` stores one JSON line per decision in
-`review/{case_id}.jsonl` and replays the file for current state.
-
-- **Outside the case DB** because `db.drop()` deletes the whole `.duckdb`
-  file when a case is re-processed. Verified: after a full re-process of the
-  25,579-row case, both decisions were still attached to their findings.
-- **Collapsed findings, not rows.** The review unit is
-  `finding_key = rid|srcip|username` - the same grouping
-  `top_distinct_findings()` already uses. That case has 20,063 finding rows
-  over 18,888 distinct events and **4** reviewable findings. Reviewing rows
-  one at a time is a requirement that cannot be met; four decisions take two
-  minutes. (Was 6 reviewable before R2002/R2003 were restricted to denied
-  traffic - see gotcha #23 - and the two that went away were the false
-  positives, so the ratio this bullet is making a point about got better,
-  not worse.)
-- **Append-only** gives FR-2.5 history, FR-7.6 actor/time/reason and NFR
-  auditability from one structure instead of three.
-- Rejections require a `reason_code` from a fixed set (FR-4.6) - the API
-  returns 400 without one, so mapping quality stays measurable.
-
-**20. Confidence is computed, not asked of the model - and rule *ids* are the
-wrong thing to count.**
-`db._confidence()` implements section 6 of the requirements: `low` when no
-timestamp parsed, `high` when the entity is implicated by >=2 rule
-**families** with >=5 supporting events, `medium` otherwise with an explicit
-`single-source` / `few-events` flag. A model scoring its own output cannot be
-audited; this can be explained in one sentence per finding.
-
-The first version counted distinct rule *ids* and returned `high` for
-everything, which is a metric that discriminates nothing. R2002 (port scan)
-and R2003 (service sweep) are one observation counted twice, and R2005 cannot
-fire unless R1000 already did - so rule ids over-credit. Families
-(R1 auth / R2 correlation / R3 network) are closer to independent evidence.
-After the change the same corpus gives: beacon case 4 high (was 6 before the
-R2002/R2003 deny restriction of gotcha #23 removed two false positives),
-Azure case 2 high / 69 medium (`few-events` - each source failed exactly
-once), Palo Alto 15 medium (`single-source`). All three re-measured
-2026-09-15.
-
-`timezone-unconfirmed` (FR-1.6) is flagged when `ts_raw` carries no zone -
-it fires on the Check Point export (`Jun 23, 2026 10:03:02 PM`) and stays
-quiet on the Palo Alto and Azure exports, which carry `+07:00` / `Z`. It is
-tested against the **source text**, never against the rendered `ts`: since
-gotcha #21 every row leaves ingest carrying `+07:00`, so testing the output
-would report every source as zone-confirmed. What the flag records is that
-the source itself never said and the GMT+7 rule was assumed.
-
-**21. Every timestamp is normalised to GMT+7, and both ingest paths used to
-get this wrong in opposite directions.**
-`config.EVENT_TZ_*` is the single policy: a timestamp that states an offset
-(`Z`, `+00:00`, `-03:00`) is **converted** into GMT+7; one that states none is
-**taken to already be** GMT+7. So `raw_events.ts` is always GMT+7 wall-clock
-and two rows from two log sources are directly comparable, which is the whole
-point - the deliverable is a timeline. `ts_raw` still keeps the source text
-verbatim.
-
-What it replaced, on the same file:
-- `pipeline._ingest_csv_sql` cast to `TIMESTAMP`, which silently converted
-  every offset-bearing row **to UTC**: a Palo Alto `+07:00` export stored
-  13:13 as 06:13.
-- `decode.parse_ts` dropped `tzinfo` **without converting**, keeping the UTC
-  wall clock: an Azure `03:12:00Z` stayed 03:12 instead of becoming 10:12.
-
-So the SQL path and the Python path disagreed by seven hours on the same
-input, and `db.top_distinct_findings()` then fed the model `ts_raw` (local)
-while the events table rendered `ts` (UTC) - the narrative and the evidence
-table quoted different times for the same event.
-
-- SQL does it with `try_cast(x AS TIMESTAMPTZ) AT TIME ZONE 'Asia/Bangkok'`
-  (ICU is already in the image; verified before writing it). `db.connect()`
-  sets `SET TimeZone` on **every** connection so a zone-less string means the
-  same thing wherever it is cast. The `try_strptime` fallbacks carry no offset
-  at all, so what they return is already GMT+7 and needs no conversion.
-- Python uses a fixed `timezone(timedelta(hours=7))` rather than
-  `zoneinfo`, so the image needs no tzdata. Asia/Bangkok has been +07:00 with
-  no DST since 1920, so the two spellings cannot disagree.
-- `db._fmt_ts()` stamps `+07:00` onto every rendered time and the prompt says
-  so in one line, so neither the analyst nor the model has to infer a zone.
-- `ts_first`/`ts_last` now come from `min(ts)`/`max(ts)`. They used to be
-  `min/max(ts_raw)`, which compares the **source text as strings** - it only
-  happens to order correctly for ISO input, so a Check Point
-  (`Jun 23, 2026...`) or Palo Alto (`04/06/2026...`) case reported a range
-  that was not its earliest and latest event.
-
-Verified 2026-09-15: six spellings of one instant (`Z`, `+07:00`, naive ISO,
-`07/06/2026`, `Jun 7, 2026 10:12:00 AM`, `-03:00`) all produce
-`2026-06-07 10:12:00` through both paths. Across 211 re-processed cases the
-row count did not move by one (2,278,792 before and after) and 557 sampled
-rows whose source states `+07:00` all match their source wall clock.
-
-**A re-process is required after any change here**, and the old cases will
-not tell you they are stale: they hold UTC and nothing flags it.
-
-**22. A TSV export decodes into one garbage column, and the findings it
-produces look plausible.**
-`pipeline._csv_header()` reads the header with `csv.reader(fh)`, whose
-delimiter is **comma, hardcoded**. Given a tab-separated Palo Alto export the
-whole header comes back as one field - verified, `_csv_header()` returns
-exactly 1 field for it - and `decode.match_column()` then loose-matches its
-candidates *inside that one giant string*. Measured on the real file:
-`ts`, `app` and `category` all resolve **to the same bogus column**, while
-`srcip`, `dstip` and `verdict` resolve to `None`, because the giant string
-also contains `destination`, `user` and `log action`, which the
-`_AVOID_SUBSTRINGS` guards of gotchas #2/#12 correctly reject. `ts` then
-parses to NULL because the value is a whole tab-joined row.
-
-The result is worse than the silent 0-findings of gotcha #7, because it is
-not silent: `R3002` fired **78 times** on one 102-row file purely because the
-row text contains `used-by-malware`. The findings read like real malware hits
-and are useless - no `srcip`, no `dstip`, nothing that can reach the attack
-graph. The comma-separated twin of the same export (same 102 rows, different
-md5) correctly yields `R3000` x78 with real `risk` values.
-
-DuckDB is not the problem: `read_csv` sniffs the tab itself and returns all
-117 columns for both files. The mapping is computed from the Python-read
-header, which is wrong, so the generated SQL references a column that does not
-exist, the fast path throws, and the Python fallback - `csv.DictReader`, comma
-again - decodes the file into a one-key dict. Confirmed from the stored data
-rather than inferred: the `raw` column of that case contains exactly one `=`
-(`<whole header>=<whole row>`), which only the Python decoder produces; the
-SQL path writes one `Col=value` pair per real column.
-
-**Fixed 2026-09-15.** `parsers.sniff_delimiter()` counts `,` `\t` `;` `|` in
-the header line and the result is handed to *all three* readers -
-`csv.DictReader`, `pipeline._csv_header()` and `read_csv(delim=...)` - so the
-header Python maps and the columns DuckDB returns cannot disagree about the
-shape of the file. Counting beats `csv.Sniffer` because the answer is
-explainable, and on a real 117-column export it is unambiguous (116 tabs vs 0
-commas); ties and empty headers fall back to comma. The tab export now
-ingests with all 102 rows carrying `ts`/`srcip`/`dstip`/`verdict`/`app`, and
-`R3002` x78 became `R3000` x78 - identical to its comma-separated twin, which
-is the whole point: same data, different format, same findings.
-
-Those two lines were the *entire* whole-corpus diff for the day's work, which
-is also the evidence that the `username` avoid-list, the R2007 off-by-one and
-the CGNAT filter changed no counts at all.
-
-**23. Restricting a correlation rule's threshold is not the same as
-restricting the rows it flags.**
-`R2002` (port scan) and `R2003` (service sweep) had no `WHERE` on the outer
-query at all, so **every row of a matching source was flagged**, allowed
-traffic included. `R2001` and `R2004` next to them always had one; the
-principle was there, it just was not applied to these two.
-
-Cost, measured: on `src10-8-3-215.csv` the pair flagged all 25,579 rows -
-including 18,972 `allow` rows of an ordinary workstation - which handed
-`db.risk_scores()` two `lvl 7` terms with `n=25,579` and pushed that source
-above real findings, while `db._confidence()` read the two rule families as
-independent evidence and returned `high` for both false positives.
-
-Both the count and the flagged rows are now deny-restricted. What justified
-the threshold staying at `>=10` / `>=20`, over 13,666 sources in the corpus:
-
-| per source | median | p90 | reach >=10 | reach >=20 |
-|---|---|---|---|---|
-| distinct destination ports | 1 | 1 | 15 | 0 |
-| distinct services | 1 | 1 | 25 | 6 |
-
-Every one of the 15 sources reaching >=10 ports is ordinary traffic, and
-deny-dominated sources top out at 1 port - so the deny filter removes 15 false
-positives and no true ones. Of the 6 sources reaching >=20 services only 2 are
-deny-dominated, one being the Check Point export, which carries **900**
-distinct services among its denied rows and only 8 among its allowed ones.
-The threshold was never the problem; counting rows that were allowed was.
-
-Effect on the corpus: `R2002 -94,301` and `R2003 -82,709` findings, no other
-rule moved by a single row, 4 files affected. The Check Point true positive
-survives, narrowed from 45,209 rows to the 42,223 that were actually refused
-(42,071 drops + 135 prevents + 17 rejects); its 2,978 accepted rows are a
-policy gap, which is `R2004`'s finding and not a sweep.
-
-**24. The workflow threshold matters - the obvious one opens 183 items.**
-Only findings that pass a threshold enter the status workflow (IAI-42); the
-rest stay visible at case level. Measured 2026-09-28 on 27 deduplicated real
-files (no intel feeds loaded), back when findings were to be grouped into
-*incidents* by attack-graph chain - a concept dropped on 2026-10-05 (see
-*Decisions* below). The counts are therefore **chain groups, not findings**;
-re-measure per finding before quoting them for the workflow. The `lvl`
-numbers below are the **old 0-15 scale**, replaced by Sigma levels on
-2026-10-12 (gotcha #26); re-express the threshold in levels before building
-IAI-42. The new levels already do part of this table's job: 20 corpus files
-dropped from High to Medium under them, the R3000-only noise included:
-
-| opening rule | chain groups | files with any |
-|---|---|---|
-| any finding lvl >= 7 (High) **or** >= 2 rule families | 183 | 25 |
-| any finding lvl >= 10 (Critical) **or** >= 2 rule families | **6** | 6 |
-
-The first rule is useless because `R3000` (high-risk app allowed) is lvl 8
-and fires alone on ordinary hosts: `dst10-8-2-37.csv` alone opened 38,
-`log(10).csv` 56. The second leaves exactly the real attacks - the beaconing
-host 10.8.3.215, host 10.8.2.37, the ESXi brute force/spray, the Azure spray,
-and both `gen_usecase` files. The 21 Palo Alto files that carry only `R3000`
-open none; their findings stay visible at case level. Families are the same
-R1/R2/R3 split `db._confidence()` uses (gotcha #20).
-
-The same grouping now defines **related findings** (IAI-43/44), shown on a
-finding rather than merged into a new object. Chain grouping links sources
-**only through pivots** (a target that is also a source). Linking through any
-shared target would relate every scanner hitting one public IP - graphs here
-are many-sources-to-one-target (see the attack-graph notes). But pivot-only
-linking **splits an account-centric attack**: the Azure spray (14 sources, one
-account) became 30 groups. `R2005`/`R2006` rows must instead be related by
-`username`, which
-takes that case to 1 and changes no other case. Pivots also never form
-through accounts - a username is never a `srcip` - so auth chains are
-single-hop by construction.
-
-**25. An upload is fully received and spooled to disk before the handler runs,
-so size and disk checks in `upload_log()` come too late.** Starlette parses the
-multipart form - writing the whole file into a `SpooledTemporaryFile` in `/tmp`
-(1MB in memory, the rest on disk) - before FastAPI calls the handler. The
-"stream to disk in 1MB chunks" in `upload_log()` is true for memory but not for
-disk or time: a 10 GB file has already crossed the network and landed in `/tmp`
-when the handler's size check first sees it, and it sits on disk twice until
-the spool is freed. Verified in the image (starlette 0.38.6,
-`formparsers.spool_max_size = 1MB`).
-
-So FR-2.2's refusals (`upload.capacity_problem()`: > `MAX_UPLOAD_BYTES` = 10
-GB, or free space on `DATA_DIR` < `UPLOAD_DISK_FACTOR` = 2.5x the size) run
-from **Content-Length in the middleware in `main.py`, before the body is
-read**. Measured: an 11 GB upload declared in headers with no body sent gets
-413 in 0.00s. The upload page also calls `GET /api/upload/check?size=` first,
-because a browser that is still sending may report a network error instead of
-the early 413/507. The 2.5x is not padding: spool copy + raw copy + DuckDB.
-The handler's own byte count stays authoritative for the limit, because that
-is the size *after* decompression. IAI-25 (.gz/.zip) must keep counting
-decompressed bytes there, since Content-Length only knows the compressed size.
-
-**26. Severity is a standard's level, not a number someone picked
-(2026-10-12).** Every rule used to carry a hand-chosen `lvl` on Wazuh's 0-15
-scale, bucketed by cut points nobody could cite (12+ critical, 7+ high...).
-Nothing about Wazuh was left in the code but that scale, and it could not
-answer "why is this High?". `severity.py` now grades in two layers, each
-backed by a published standard:
-
-- **Behaviour -> level: Sigma rules specification v2.1.0, `level` field.**
-  Each rule declares one of `informational / low / medium / high / critical`
-  in `rules.RULE_LEVEL`, chosen by the spec's own definitions (quoted in
-  `severity.py`). No single rule is `critical`: the spec reserves it for
-  near-certainty, which one log event almost never is.
-- **A refused row is capped at medium** (`apply_rules`). In the ODNI Cyber
-  Threat Framework a blocked attempt never crossed the intrusion boundary
-  between Engagement and Presence.
-- **Attack path -> escalation (ODNI CTF progression, MITRE ATT&CK tactics).**
-  `credential-compromise` (R2000 brute force, then a success from that same
-  source on that same account) raises the path to **high**.
-  `compromised-host` (two *different* allowed post-intrusion behaviours on
-  one source: R2007/R3003/R3002/R3001) raises it to **critical**. Rows go in
-  the `escalations` table and the UI quotes the reason on the finding.
-
-`findings.lvl` now stores the level's **weight** (1/2/4/8/16, doubling per
-level), not a free number - so `ORDER BY lvl`, the graph and
-`db.risk_scores()` keep working unchanged, and one `high` outweighs a
-`medium` plus a `low`. Labels always come from `severity.level_of(lvl)`.
-Measured: `risk_scores()` still puts the three beaconing destinations on top
-(gotcha #16).
-
-What the first version got wrong, so don't loosen it back:
-- **Credential compromise is high, not critical.** The first version made it
-  critical and also accepted mere R2005 (spray) membership. On the ESXi
-  `auth.log` that escalated `10.9.59.182`, which failed twice and got in 9
-  seconds later - a typo. A log cannot tell an attacker who guessed the
-  password from an owner who mistyped it, so it is not Sigma's
-  near-certainty, and it now needs R2000 (>=3 failures) from the same source.
-- **Pair on the source, not the account.** The Azure account owner logs in
-  successfully from their usual address while someone else sprays it; an
-  account-level pairing would have called the owner's own logins a
-  compromise (gotcha #13).
-
-Effect on the corpus (host run, 63 distinct files, no intel feeds; rows,
-flagged and every per-rule count identical to `tests/baseline.json`):
-20 cases High -> Medium (all without escalation - mostly the R3000-only
-Palo Alto noise of gotcha #24), 2 Medium -> Low, `src10-8-3-215.csv`
-High -> Critical (beaconing + 8 uploads of ~96 MB to `135.119.206.211`),
-`nightfall-firewall.csv` stays Critical (malware + large transfer from
-10.10.1.5), and the ESXi, Azure and `nightfall-auth.log` cases stay High.
-The planted brute-force -> root login is `credential-compromise`.
-
-There is no lateral-movement pattern yet: nothing in the corpus shows a
-compromised host attacking onward, so it could not be calibrated.
-**A re-process is required after any change here** - manifests carry the
-summary, and an old DuckDB still holds 0-15 numbers that `level_of()` will
-mis-read.
-
-**27. A column is read from the log source's documentation when one exists,
-and a guess says it is a guess (2026-10-12).** `decode.match_column()` maps
-any header by substring-matching column names, on purpose, so an unseen
-export still yields something. Gotchas #2, #12 and #22 are all that guessing
-going wrong. `logsources.py` now holds **profiles**: a header signature, then
-each canonical field from the column the log source documents for it, the
-value vocabulary that documentation lists, and the page it came from. The
-manifest's `mapping` records `documented` / `heuristic` / `unrecognised`
-and the UI states it on the case, with the doc links, so an analyst knows
-which mappings to check.
-
-- **Say "log source", not "vendor"** (the user's call: "vendor" misleads).
-  A log source is the product that wrote the log, as in Sigma's `logsource`
-  - PAN-OS traffic log, Entra ID sign-in log, OpenSSH sshd - not the company.
-  Microsoft alone ships the Entra sign-in log and the Exchange message trace,
-  two unrelated formats; the format is what a profile describes.
-- Profiles exist only where there is **both a format document and a real
-  file to test against**: PAN-OS traffic log, Microsoft Entra ID sign-in log
-  (CSV, and since 2026-10-14 its Azure Monitor JSON export - gotcha #39),
-  Exchange Online message trace. Line logs cite the message formats they
-  match (OpenSSH `auth.c` / `kex.c` / `session.c` / `packet.c`, Linux-PAM
-  `pam_unix`, Broadcom KB 321910 for ESXi, FortiOS Log Message Reference),
-  plus ESXi lines read as *observed* - real file, no published format
-  (gotcha #42). The Check Point SmartConsole export got its profile once
-  the real file was found again (gotcha #43); until then there was none,
-  because a profile no file has tested is a guess with a citation attached.
-- A documented profile still falls back **per field** when an export lacks
-  a column (the UI names the field). `gen_usecase`'s `nightfall-firewall.csv`
-  is exactly that: it has no `Category`, so its malware marker - written into
-  `Threat/Content Type` - is read by guess, flagged, and R3002 still fires.
-- A line log in which no documented format matched is `unrecognised`, not
-  `heuristic`: nothing was guessed, only timestamps and IPs were taken, and
-  no rule can fire. That is 28 of the corpus files (ESXi `hostd.log` & co.)
-  and it answers gotcha #7's "0 findings - schema mismatch or boring?" on
-  the page itself.
-
-What reading the documentation fixed - no count moved, but the values did:
-- PAN-OS `category` came from `Threat/Content Type`, which PAN-OS documents
-  as the log **subtype** (start/end/drop/deny). The documented `Category` is
-  the URL category - what R3002's `malware|command-and-control` is for.
-- Entra ID `username` came from `User`, the **display name** (an exact match
-  on "user" won). Microsoft documents `Username` as the UPN, the account.
-  **This changes finding keys** (`rid|srcip|username`, gotcha #19): a review
-  recorded against the display name no longer attaches after re-processing.
-- Entra ID `verdict` came from `Status` (a sign-in outcome read as a
-  firewall verdict). The profile maps no verdict for a sign-in.
-
-Measured: host run over 63 distinct corpus files, rows / flagged / every
-per-rule count identical to `tests/baseline.json`; 33 CSVs documented
-(31 PAN-OS - one with a guessed field - 1 Entra, 1 Exchange), 2 line logs
-documented, 28 unrecognised.
-
-**The Check Point benchmark was found again (2026-10-14):**
-`D:/logtest/Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv`, md5
-`1dd88109...` = the baseline entry. (On 2026-10-12 it was missing from the
-store and nobody looked outside `D:/forensic system`.) The store copy no
-longer exists - the store was reset - so `D:/logtest` is the copy.
-
-**28. Evidence is hashed when it arrives and re-hashed before every use
-(2026-10-12).** Until then nothing could show that the file analysed was the
-file handed over - every finding was uncitable as evidence. `custody.py`
-follows ISO/IEC 27037, NIST SP 800-86 and RFC 3227 (chain of custody), with
-SHA-256 from FIPS 180-4:
-
-- `upload_log()` hashes the bytes **as they stream to `raw/`** (compressed
-  stays compressed) - no second read of a 10 GB file - and writes the
-  manifest's `evidence` plus a custody `acquired` entry (who, from which
-  address, size, digest).
-- `pipeline.process_case()` re-hashes before every run and **refuses** on a
-  mismatch (`IntegrityError`, case `failed`). It checks before `db.drop()`,
-  so the last good findings are not destroyed by the refusal.
-- A merge is **derived** evidence: each source is re-hashed in the same pass
-  that concatenates it, the merge is refused (409) if any changed, and the
-  new case's first entry lists the sources and their digests.
-- `custody/{case_id}.jsonl` is append-only and **hash-chained** (each entry
-  carries `prev` + its own `hash`); `GET /custody` re-checks the chain on
-  every read. That detects an edit, a deletion or a reorder. It cannot stop
-  someone with write access from rebuilding the whole chain - only a digest
-  kept somewhere else (or an external timestamp) would.
-- `client_address` is the address **the server saw**. Behind Docker's port
-  mapping that can be the bridge gateway rather than the analyst's machine.
-
-Cases uploaded before this have no acquisition digest:
-`tools/backfill_custody.py --apply` hashes them now and marks the digest
-`retroactive` - it attests the file from that moment, not since upload, and
-the Evidence tab says so. A case without any digest is still processed, with
-an `unverified` custody entry. `prune_cases.py` removes a pruned duplicate's
-custody log with it (the kept copy has the same digest).
-
-Verified 2026-10-12 by an end-to-end API run (scratch DATA_DIR, 19 checks):
-digest equals the uploaded bytes, acquired -> verified -> processed, a
-one-byte append is caught by verify and by re-processing, a merge with an
-altered source gets 409, an edited custody line breaks the chain, backfill
-marks `retroactive` and skips cases that have a digest. Host parity
-unchanged (63 files).
-
-**29. Every rule is documented to the Sigma spec and the ADS framework, and
-its status is earned, not assigned (2026-10-12).** `rule_meta.py` gives each
-rule Sigma v2.1.0 metadata (UUID v4 `id`, `title`, `status`, `author`,
-`date`/`modified`, `references`, `logsource`, `falsepositives`, `level`,
-`tags` in Sigma's `attack.<tactic>` / `attack.t1234.001` form) and Palantir's
-ADS sections (Goal, Categorization, Strategy Abstract, Technical Context,
-Blind Spots and Assumptions, False Positives, Validation, Priority,
-Response). `GET /api/rules` serves it; a finding's rule id in the Review tab
-opens it, because accept/reject is exactly when an analyst needs the false
-positives and blind spots.
-
-- **Status is evidence.** `test` = fired correctly on real data with its
-  false positives examined (the gotcha is cited in `validation`);
-  `experimental` = synthetic hits only, or none. **No rule is `stable`**:
-  Sigma means "may be used in production", and one customer's corpus plus
-  synthetic files is not that. Result: 16 test, 4 experimental (R1002 and
-  R3002 synthetic-only - R3002's real hits were gotcha #22's decoding bug;
-  R3003 has only ever matched denied traffic; R3006 not measured).
-- **Metadata, not an export.** The detection stays SQL on this tool's
-  canonical schema. A Sigma `detection:` block written from it would look
-  portable to other SIEMs and not be - that needs field names from a shared
-  taxonomy first (OCSF, the schema step still to come).
-- **The tags cannot drift from the SQL.** `tests/check_rule_meta.py` (stdlib
-  + duckdb) fails if a rule lacks metadata, its documented techniques differ
-  from the ATT&CK ids its SQL writes, a status is not Sigma's, or an id
-  repeats. R1001/R1003/R1004 are untagged on purpose and say why.
-- `date` is 2026-09-15 for every rule - the first commit, the earliest the
-  history shows; the rules predate it.
+Each gotcha is a file of its own in `docs/gotchas/`, numbered as they were
+written (`docs/gotchas/23-*.md` is "gotcha #23" wherever the docs cite one).
+The line below is the rule; the file is the measurement, the history and what
+was tried and rejected. **Before changing code a gotcha names, read its file** -
+most of them were paid for with a silent wrong answer. A new gotcha gets the
+next number, a file, and one line here - not its evidence: they were moved out
+on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
+
+**Ingest and decoding** (`decode.py`, `parsers.py`, `pipeline.py`, `logsources.py`)
+- #1 Never bulk-insert with DuckDB `executemany()` (~300 rows/s): stage a CSV and bulk-load it in one statement.
+- #2 Exact column-name matches beat substring matches (`Action` vs `Log Action`), or every firewall rule silently stops matching.
+- #3 ESXi syslog has no hostname; `_split_host_prog()` reads token by token instead of one greedy regex.
+- #4 `Connection from X port N` is the client's *source* port; never set `dstport` from SSH captures.
+- #7 "ready with 0 findings" on a firewall export means a mapping problem: count the non-NULL canonical columns first.
+- #8 Check Point has no port column; R2003 counts services instead. Check a field exists across log sources before a rule depends on it.
+- #9 A source- or action-filtered export silences correlation rules; ask what filter produced the file.
+- #11 Auth outcome on CSV: only the auth vocabulary translates (never allow/deny), and a username is required on the row.
+- #12 "Resource" contains "source": check what else in a real header contains a candidate substring (`_AVOID_SUBSTRINGS`).
+- #22 Sniff the delimiter once and hand it to all three readers; a TSV read as CSV produces plausible garbage findings.
+- #25 Starlette spools the whole upload before the handler: size/disk refusals run from Content-Length in middleware.
+- #27 Columns come from a documented log source profile when one exists; a guess is labelled one. Say "log source", not "vendor".
+- #39 JSON is streamed, flattened to dotted keys and mapped like a CSV header; a guessed Entra JSON mapping found nothing.
+- #42 ESXi `auth.log` is read line by line; "observed" (real file, no published format) is its own honesty level.
+- #43 Check Point SmartConsole profile; every case reports coverage (rows not loaded, per-field counts).
+- #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
+- #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
+- #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+
+**Time**
+- #21 Every timestamp is normalised to GMT+7 (offset converted, no offset assumed GMT+7). A re-process is required after any change; old cases do not say they are stale.
+
+**Rules and severity** (`rules.py`, `severity.py`, `rule_meta.py`, `intel.py`)
+- #6 A row can match several rules; `flagged_count` counts `DISTINCT row_id`.
+- #14 Per-source counters miss spread attacks: R2005 spray (one account, many sources), R2006 multi-source logins in one hour.
+- #15 Beaconing (R2007) is a regularity test (jitter < 0.6) and only on public egress - internal traffic is periodic by nature.
+- #16 Risk ranking needs diminishing returns: `sum(lvl * (1 + ln(n)))` per distinct rule, or it ranks by volume.
+- #17 Threat intel is offline feed files JOINed per case; a feed refresh moves R3003-R3006 by design - re-take the baseline and say so.
+- #23 A correlation rule needs an outer `WHERE` on the evidence rows, not just a threshold (R2002/R2003 deny-restricted).
+- #24 Why the workflow threshold is not "high or 2 families" (183 items opened); measured on the old scale - see #33.
+- #26 Severity is a Sigma level; a refused row is capped at medium; escalation patterns (credential-compromise high, compromised-host critical). `findings.lvl` stores weights.
+- #29 Every rule carries Sigma + ADS metadata; status is earned (no rule is `stable`); `tests/check_rule_meta.py`.
+- #35 Intel feeds may be STIX 2.1 bundles; only pure IP-equality indicators are taken.
+
+**Findings, review and workflow** (`review.py`, `lifecycle.py`, `confidence.py`, `finding_ids.py`, `related.py`)
+- #19 Review state lives outside the case DuckDB, append-only, keyed by the collapsed finding `rid|srcip|username`.
+- #20 Confidence counts rule *families*, not ids; `timezone-unconfirmed` is tested on the source text, never on `ts`.
+- #30 Confidence is an Admiralty grade (reliability letter + credibility number).
+- #31 The review log is hash-chained; old unchained decisions are sealed, not rewritten.
+- #33 Finding lifecycle Open -> Investigating -> Contained -> Resolved; only Sigma high/critical enter it.
+- #49 FD ids per customer per year, written before `ready`; source events; related findings via pivot hosts; the Findings page.
+- #50 The Overview redesign, and the designs the user rejected - **do not re-propose them**.
+- #51 `#/result` retired (Reports / Attack Graph / Timeline / finding page); Sprint 3 review fixes; ADR-3/4; branches and worktrees; testing in a container; scripted-edit traps.
+
+**Evidence, storage, jobs and access** (`custody.py`, `storage.py`, `jobs.py`, `auth.py`, `mcp_server.py`)
+- #28 Evidence is SHA-256 hashed on arrival and re-hashed before every run; custody log hash-chained.
+- #38 Read-only MCP server over stdio; every call hash-chain logged; no write tool, no free SQL, no port.
+- #40 One store per customer under `customers/<id>/`; `case_dir()` is the only answer to "where is this case"; cross-customer merge is 409.
+- #41 Login accounts live in `AUTH_DIR`, apart from customer data; docker-compose deliberately does not set it.
+- #47 Sign-in throttled per account (not per address), audit-logged, and bound to the password hash.
+- #48 Work is queued, durable and bounded (`jobs.py`); manifests are written atomically. **One process only.**
+
+**AI narrative** (`analysis.py`, `llm.py`, `grounding.py`, `veris.py`)
+- #5 Groq's output-token limits and the measured sweeps (events 15, max_tokens 950); schema key order is the priority list. Groq only - not the local model.
+- #10 The attack graph is SQL (`db.build_graph()`), not AI - don't hand it back to the model.
+- #13 Every wrong narrative was missing input, never reasoning: compute the discriminating fact in SQL and hand it over; prompt hardening was measured to do nothing.
+- #36 VERIS 1.4 classification is computed, then handed to the model.
+- #37 The narrative is decoded inside a per-case JSON schema and grounding-checked; every query feeding the prompt needs a total `ORDER BY` tiebreak; citations `F<n>`.
+
+**Exports**
+- #32 ATT&CK Navigator layer (format 4.5).
+- #34 STIX 2.1 bundle (and why `stix2-validator` rejects every bundle).
+
+**Method**
+- #18 Measure before optimising: time a stage first; corpus wall-clock spread is host I/O.
 
 **`docs/STANDARDS.md` is the one-page map** of every pipeline step to its
 standard (or "internal method", with the nearest framework named and the
 method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
-
-**46. A PAN-OS export saved as "Unicode Text" was read as garbage, and
-nothing said so (2026-10-14, IAI-30).** `log(8)-01.txt` in the corpus is
-the same PAN-OS traffic log as `log(8).csv`, saved by Excel as UTF-16
-(BOM) and tab-separated. Named `.txt`, it was a line log read as UTF-8:
-37,555 rows (each NUL-split) and 0 findings, where its twin gives 18,776
-rows and R3000 x14,434 - gotcha #7's silent failure again.
-- `parsers.detect_encoding` reads the BOM; `open_text` and the SQL fast
-  path (`read_csv(..., encoding='utf-16')`, DuckDB 1.5.6) both use it.
-- `pipeline._is_profiled_table`: a `.log` / `.txt` whose first line is the
-  header of a documented profile is read as that table. Only a documented
-  header counts - general format detection stays IAI-26.
-- The case says both (`mapping.encoding`, `mapping.read_as`).
-Now the two files are identical: 18,776 / 14,434, same timestamps, every
-field 18,776; plain / .gz / .zip identical. Baseline: only `log_8_-01.txt`
-changed (37,555 / 0 -> 18,776 / 14,434); everything else in the corpus,
-Check Point, gen_usecase and tests/samples equal. All 90,923 sampled
-PAN-OS rows in the corpus are TRAFFIC (subtypes end / drop) - no THREAT or
-URL export has been seen.
-
-Observed once while testing, not fixed: a parity poll got a 404 for a case
-it had just uploaded; a rerun passed. Likely the manifest's
-write-then-rename on a Windows bind mount (test containers only - the
-production volume is a native Docker volume). If it is ever seen on the
-real store, `load_manifest` needs to retry on a known owner.
-
-**45. A FortiGate session that ended normally is an allowed session
-(2026-10-14, IAI-32).** `decode._forti_verdict`: the traffic-log `action`
-values of an allowed session - `accept`, and the session-end values
-`close`, `timeout`, `client-rst`, `server-rst`, plus `start` - become
-`allow` (FortiOS Log Message Reference, traffic log fields). Before, only
-`accept` did, so the allow-based rules (R3000, R3001, R2004, R2007 where it
-filters) did not see the rest. Other values keep their spelling.
-
-Real files: `D:/Trafficlog/` - a FortiGate-200F's traffic logs (`tlog`
-only, 46 files, 45.8 GB; the zips hold more of the same plus network-
-diagram PDFs). The header carries `device_id=`, not `devid=`.
-- 23 MB file (25,876 rows): allow 5,955 -> 8,027; R2004 251 -> 512, every
-  other rule equal; plain / .gz / .zip identical; 0 lines unrecognised.
-- 931 MB file (1,003,143 rows): R2004 9,477 -> 14,700, all else equal;
-  41 s = 22.6 MB/s on the Python path (gotcha #18's ~21 MB/s), so a 10 GB
-  file is ~7-8 minutes.
-- No FortiGate file is in the corpus, so parity (67 + Check Point +
-  gen_usecase + samples) is unchanged by construction.
-
-**44. The syslog header is read by RFC 5424 / RFC 3164 - and an RFC 3164
-year is inferred, and says so (2026-10-14, IAI-34).** `decode.decode_line`
-reads the envelope before any message format: an optional `<PRI>` (RFC
-5424 6.2.1 / 3164 4.1.1, facility = PRI // 8), then either an RFC 5424
-header (`1 TIMESTAMP HOST APP PROCID MSGID SD MSG`, nil `-`, STRUCTURED-DATA
-skipped with its `\]` escapes, BOM stripped) or a timestamp + `host
-prog[pid]:` (gotcha #3's split). What it fixed, each measured:
-- **An ISO timestamp with an offset lost the whole header.** `_ISO_TS_RE`
-  took `Z` or nothing, so rsyslog's RSYSLOG_FileFormat
-  (`2026-01-10T13:13:32.123456+07:00 host prog:`) matched no timestamp,
-  no host and no program, and no message format could fire.
-- **A `<PRI>` prefix did the same** - every network-received syslog line.
-- **Old Red Hat's `sshd(pam_unix)[pid]:`** was no program token: Loghub's
-  `Linux_2k.log` (real, 2,000 lines) gave 0 findings; now 361 (R1000 361,
-  R2000 356, R2005 239). The `(module)` part is dropped for the lookup.
-- **RFC 3164 has no year**, and `parse_ts` deliberately returned None, so
-  every such file had no timestamps at all (Loghub OpenSSH_2k: 1,123
-  findings, 0 times - no timeline, no window rule). Now
-  `decode.infer_year` puts it in the year of the case's upload time
-  (`REFERENCE_TIME`, a contextvar the pipeline sets around decoding), or
-  the year before when that is more than a day ahead (Dec 10 in a file
-  uploaded in October -> last year) - the rsyslog / Logstash practice.
-  **It is a guess and is labelled one**: `mapping.syslog.year_inferred`
-  (warning on the case) and the finding flag `year-inferred`
-  (`db._flags`, tested against the source text like `timezone-unconfirmed`).
-  Linux_2k is really from 2005 and reads as 2026 - nothing in the file can
-  say otherwise. Feb 29 in a non-leap year stays NULL.
-- **ESXi `shell.log`** (vmware-esxi profile, Broadcom KB 321910 + 306962):
-  `shell[pid]: [root]: <command>` -> `shell_command` with the account
-  (the `[user]: ` prefix is in real files, not in the KB example - optional),
-  `Interactive shell session started`, and `SSH login enabled/disabled`,
-  `ESXi shell login enabled/disabled` -> `ssh_enabled` etc. On the SUMMIT
-  host: 185/185 lines read (was 0), SSH switched on 10 times. No rule reads
-  these yet (IAI-82).
-
-`mapping.syslog` counts header kinds per file (rfc5424 / rfc3164 / iso,
-pri, year_inferred), shown with the RFC links. No rule moved: corpus (67),
-Check Point, gen_usecase and tests/samples parity identical; plain / .gz /
-.zip identical on all four test files. Loghub (`logpai/loghub`, research /
-academic use, commercial use unstated) was used in scratch only - **not
-committed**.
-
-**43. Check Point's SmartConsole export is read by its documentation, and
-every case now says how much of its file was read (2026-10-14, IAI-31).**
-Profile `checkpoint-smartconsole`: the columns are sk144192's *display
-names* (Time, Action, Source, Destination, Service, Source User Name...),
-which is what a SmartConsole / SmartView log export writes. The guess had
-already mapped the same columns (gotcha #7 fixed the hard part), so the
-benchmark is unchanged - 45,209 / 45,201, R2001 42,223, R2003 42,223, R2004
-2,978, identical plain / `.gz` / `.zip` - but the case now cites the
-source, and two values are read on purpose:
-- `Key Install` (5 rows) is a VPN key exchange, not a traffic decision -
-  verdict NULL (the human SOC report on this file reads it the same way).
-  An empty vocabulary entry means "not a verdict"; the SQL path wraps the
-  CASE in `NULLIF(..., '')` so it agrees with `decode_row`.
-- `Detect` (IPS saw, did not block) stays `detect` - neither allow nor deny.
-- `Time` has no zone; SmartConsole writes the exporting computer's zone and
-  the file does not say which. Read as GMT+7, flagged timezone-unconfirmed,
-  and the profile note says so.
-
-**Coverage on every case** (`pipeline._coverage`, the AC "unparseable rows
-counted and reported" for CSV/JSON/logs): `mapping.coverage` = rows in the
-case, `not_loaded` (decoded but refused by the staging bulk load - it
-reads with `ignore_errors=true`, which skipped a bad row **silently** while
-the manifest still counted it; `_ingest_file` now returns rows actually
-loaded), `time_unparsed`, and per mapped field the rows carrying a value -
-the gotcha #7 query on every case. On the Check Point file: time / source /
-destination 45,209, verdict 45,204, service 45,198, account 0 ("empty in
-every row"). Corpus parity unchanged, so no file had been losing rows.
-
-Not done (no real file - IAI-85): `fwm logexport` (semicolon, field names)
-and Log Exporter (syslog `key="value"`). Sources found while researching:
-sk144192 (field <-> display name), R81 CLI Reference `fwm logexport`,
-R81.20 Log Exporter guide; Elastic's integration has Log Exporter test
-fixtures (license unchecked).
-
-**42. ESXi's auth.log is now read line for line - and its most important
-lines were the ones not read (2026-10-14, IAI-29).** On the SUMMIT
-ransomware host's `auth.log` (776 lines) the decoder recognised 383; the
-rest kept a timestamp and maybe an IP, and no rule could ever see them.
-Among them, the only record of the attack itself: `User 'root' running
-command '/tmp/esxi_encryptor'`, `'chmod 777 /tmp/esxi_encryptor'`,
-`'rm -rf /.ash_history'`, `vim-cmd vmsvc/getallvms` loops. Now all 776 are
-read, each by a cited profile:
-
-| lines | action | profile (source) |
-|---|---|---|
-| `Session opened/closed for 'root' on /dev/char/pty/tN` (100) | `shell_session_open` / `_close` | `vmware-esxi` (Broadcom KB 321910) |
-| `login[]: root login on 'char/tty/1'` | `console_login` | `vmware-esxi` |
-| `pam_unix(...:session): session opened/closed for user root` (71) | `session_open` / `_close` | `linux-pam` (`pam_unix_sess.c`) |
-| `Did not receive identification string` / `Bad protocol version identification` (59) | `ssh_probe` | `openssh-sshd` (`kex.c`) |
-| `subsystem request for sftp by user root` (1) | `sftp_session` | `openssh-sshd` (`session.c`) |
-| `Connection closed by`, `Timeout, client not responding` | none | `openssh-sshd` (`packet.c`) |
-| `User 'root' running command '...'` (33) | `command_exec` | `vmware-esxi-observed` |
-| `pam_per_user: create_subrequest_handle()` (166) | none | `vmware-esxi-observed` |
-
-- **Profiles are per pattern set, not per program** (`decode._PROGRAM_PATTERNS`):
-  sshd writes pam_unix's and ESXi's messages under its own name, so a
-  line now cites the source that defines *it*.
-- **"observed" is its own honesty level.** VMware/Broadcom publish no format
-  for `running command` or `pam_per_user` (searched: KB 321910 shows the
-  session lines only; the Google/Mandiant UNC3944 write-up describes
-  auth.log without the format). Gotcha #27 says a profile needs a document
-  *and* a real file; these have only the file, and the command text is too
-  important to leave unread. So `vmware-esxi-observed` has no docs and
-  `observed: true`; the case page says "format observed in real logs, not
-  documented by the vendor", and a file read *only* that way is
-  `method: observed`, never `documented`.
-- **No rule moved**: no rule keys on the new actions. `auth.log` stays
-  776 / 329 with every per-rule count equal; plain, `.gz` and inside a
-  `.zip` are identical (rows, flagged, rules, actions, mapping); corpus
-  parity unchanged. The new actions are input for rules not yet written.
-- **The year was never wrong** - see *Scale notes*: the file has full ISO
-  timestamps, and the 2014 rows are `vpxuser` rotations (12 a year, every
-  30 days, vCenter's default). Which is also a finding for the rules:
-  **R1004 fires 138 times on that benign rotation** - follow-up, not parser.
-
-**41. Login accounts live apart from customer data (2026-10-14).** The
-user's requirement, after a reset of `/data` took every account with it:
-the database of who can sign in is separate from the customers'.
-`users.json` and `session_secret` are in `config.AUTH_DIR`, mounted as its
-own volume (`forensic-auth:/auth`), so wiping, backing up or handing over
-`forensic-data` never touches accounts or sessions (tested: `/data` wiped
-under a signed-in session - the session, a fresh login and the account all
-survived), and the two can be permissioned and backed up separately.
-
-- **The default is the sibling of `DATA_DIR`** (`/data` -> `/auth`), not a
-  fixed `/auth`, and docker-compose deliberately does **not** set
-  `AUTH_DIR`. The test harnesses (`check_mcp`, `check_customer_isolation`,
-  `bench_llm`) point `DATA_DIR` at a scratch store and create a throwaway
-  account; with a fixed `AUTH_DIR` in the container's environment those
-  accounts would land in the production account file. With the sibling
-  rule each scratch store gets a scratch `auth/` beside it (verified: after
-  both checks ran in the container, `/auth` still held exactly its one
-  account). Set `AUTH_DIR` explicitly only outside the container.
-- On startup the app warns if `users.json` / `session_secret` are still in
-  `DATA_DIR` - they are no longer read there.
-- `check_customer_isolation.py` now also fails if an account file appears
-  inside `DATA_DIR` (23 checks).
-
-**40. Each customer's evidence is in its own store - and a merge used to
-mix two customers (2026-10-14).** The user's requirement: adding a customer
-creates that customer's database, and one customer's data is never put
-together with another's. `storage.py` now keeps everything of a case under
-`customers/<company_id>/` (layout above); `case_dir()` is the one place
-that answers "which store holds this case" (a `case_id -> company_id` map,
-looked up on disk on a miss and cached - a case never changes customer),
-and `db.py`, `review.py` and `custody.py` build their paths on it.
-
-- **A store per customer, not a DuckDB per customer.** One file for all of
-  a customer's cases would lock every one of them while one processes (one
-  writer per file; MCP readers get a lock error - gotcha #38), and one bad
-  file would take every case of that customer with it. The folder gives
-  the same separation without either.
-- **Adding a customer creates its store**; `save_manifest` puts a case into
-  the store its manifest names; a case with no customer cannot be written
-  (`UnownedCase`) - FR-2.1 already required one, now it is also where the
-  case lives. Ids are regex-checked before they become a path.
-- **The merge bug it found:** `POST /merge` accepted cases of different
-  customers and filed the result under the first one - two customers'
-  evidence concatenated into one file. Now 409.
-- **`prune_cases.py` dedupes inside one store only.** The store held the
-  same monsoon zip under SUMMIT and under Bigfish; deduping across stores
-  would have deleted one customer's evidence because another has a copy.
-- **Overview / case list take `?company_id=`** (the UI's customer select;
-  a customer row on the Customers page opens its overview). Unscoped, they
-  still list every customer - read store by store.
-- **Migration:** `tools/migrate_to_customers.py` (dry run; `--apply`) moves
-  each case's files with `os.replace` (a rename - bytes untouched), hashes
-  the raw file before and after against the acquisition digest, moves the
-  manifest last, and appends a `relocated` custody entry, so the chain
-  moves intact. Refuses while a case is queued/processing; idempotent.
-  **Until it has run the app refuses new customers and cases (503):** the
-  old customers are invisible, and "Bigfish" typed on the upload form
-  would have become a second Bigfish with a new id (tested both ways).
-- Not per customer yet: accounts (any user sees every customer - RBAC is
-  IAI-14, deferred by the user), and the MCP access log.
-
-Verified on a branch-built container, scratch store: corpus parity (67),
-gen_usecase (4), `tests/samples` (2), `check_mcp` (44) and the new
-`tests/check_customer_isolation.py` (22: stores created, the same bytes
-uploaded for two customers land in two stores, nothing outside them,
-scoped views, cross-customer merge 409, path-shaped ids refused). The
-production store, copied, migrated 8 cases / 3 customers: chains intact,
-digests unchanged, row counts equal to the manifests.
-
-**39. JSON is streamed, flattened and mapped like a CSV header - and a
-guess at a real Entra JSON export found nothing (2026-10-14, IAI-35).**
-`parsers.iter_json` used to `read()` the whole file, JSON-lines included,
-and handed nested values to the decoder as stringified dicts. Now:
-
-- **Layouts**, stdlib only: JSON-lines a line at a time; a top-level array
-  element by element (`raw_decode` over a buffer trimmed as it goes - a
-  21 MB array read at a 6 MB peak); an object wrapping its records
-  (`Records`, `value`, ... - `WRAPPER_KEYS`); back-to-back pretty-printed
-  documents. **One pretty-printed object is still read whole** - the format
-  cannot stream. A broken first line is a JSON-lines file with a bad line,
-  not a pretty-printed document (only a first line ending `{` / `[` is), or
-  a 10 GB file would be read into memory to find that out.
-- **Records are flattened** to dotted keys (`properties.status.errorCode`);
-  a list of objects stays one JSON value (Entra's applied CA policies).
-- **Mapped once, like a CSV header**: the keys of the first 200 records go
-  through `logsources.resolve_keys` -> documented profile or guess, on the
-  manifest as `mapping` like any CSV. The guess sees camelCase keys as words
-  (`sourceIPAddress` -> "source ip address"); values are read by the
-  original key.
-- **Unreadable entries are rows, counted**: kept as `_raw` (decoded as a text
-  line), and `mapping.json` carries `layout`, `records`, `unparseable`, the
-  first 3 positions and `broken_at_byte` when an array breaks off. The
-  case page states it.
-
-**Guessing is not enough for a real export, and fails silently.** Splunk
-attack_data's two Entra password-spray captures (`tests/samples/`, Azure
-Monitor diagnostic JSON: an envelope around the Graph signIn object) gave
-31 rows and **0 findings** by guess - `properties.userDisplayName` won the
-loose "user" match (gotcha #27's trap again) and the numeric `errorCode` is
-no auth vocabulary, so no row had an outcome. The `entra-signin-azure-monitor`
-profile reads `properties.userPrincipalName`, `properties.ipAddress`,
-`properties.createdDateTime` (Graph: when the sign-in was initiated; the
-envelope `time` differs by 28 minutes in the capture) and maps errorCode
-`0` -> success and only the codes Microsoft's AADSTS reference names as
-credential failures (50126, 50034, 50053, 50056, 50064) -> failed.
-Microsoft publishes no "interrupted" list for errorCode, but its own code
-names say `KmsiInterrupt` (50140) / `...Interrupt` (50074, 50125); counting
-every non-zero code would turn a keep-me-signed-in prompt into a failed
-login. Unknown codes count as nothing, like `Interrupted` in the CSV.
-
-There is **no profile for the Graph / portal "Download JSON" shape** (the
-same signIn object without the envelope): no real file of it has been
-tested, and it would guess `userDisplayName` the same way.
-
-Measured: the two captures -> R1000 x31 + R2000 x31 (one source, 31
-accounts) and R1000 x31 alone (30 sources, 31 accounts, 26 s). **That
-second file is a distributed spray no rule sees** - R2000 needs 3 failures
-per source, R2005 5 sources per account, and each here has 1. And R2000
-names a one-source-many-accounts spray "brute-force" - the label the
-narrative will repeat. Both are rule work, not parser work.
-gen_usecase now also writes the firewall as a JSON array (documented
-PAN-OS profile) and as nested gzipped JSON-lines with two bad lines
-(guessed): same findings as the CSV and all 26 decoded rows identical.
-Corpus parity unchanged (67 files); baseline +4 (the twins, the captures).
-
-Validated in a container built from the branch on a scratch store, not on
-the host: the host has DuckDB 1.5.5 (the image pins 1.1.3), and under 1.5.5
-`intel.fill()`'s `read_csv` no longer sniffs the quotes in the IOC staging
-file (a ThreatFox note with commas, line 39,302) and every case fails.
-**Fixed the same day by the upgrade to DuckDB 1.5.6** (image and
-`requirements.txt`): `intel.fill()` now states the dialect it wrote
-(`auto_detect=false`, `delim`, `quote`, `escape`), as the stage read in
-`pipeline` already did. Verified on 1.5.6 in a container: corpus parity
-(67 files), gen_usecase, `tests/samples` and `check_mcp` (44) all OK; a case
-DuckDB written by 1.1.3 opens in 1.5.6 and one written by 1.5.6 opens in
-1.1.3, so a rollback reads the files written meanwhile. 1.5.6 has
-`connection.query_progress()`, so the CSV fast path's elapsed-time estimate
-(FR-2.5) could become a measurement - not done yet.
-
-**38. Cases are readable over MCP - read-only, stdio, every call logged
-(2026-10-14).** `app/mcp_server.py` is a Model Context Protocol server
-(spec 2025-11-25, newline-delimited JSON-RPC 2.0 on stdio) so any MCP
-client can investigate a case by asking for it instead of being handed a
-pre-cut prompt:
-
-```bash
-docker exec -i forensic-analyzer-forensic-analyzer-1 \
-    python -m app.mcp_server --actor you@example.com
-```
-
-12 tools, all annotated read-only: `list_cases`, `get_case` (custody
-status included), `list_findings`, `get_finding_events` (the raw rows behind
-a finding, with `row_id` and the original line), `get_source_profiles`,
-`get_risk_ranking`, `get_attack_graph`, `get_escalations`, `get_veris`,
-`get_rule`, `get_custody`, `get_analysis` (served with an "AI-generated -
-not evidence" notice). The `initialize` instructions tell the client it is
-an assistant, not the judge: quote the rule engine's levels and tags, cite
-a finding_key or row_ids for every claim, and treat uncited claims as
-hypotheses.
-
-What it deliberately does not do, so don't add it casually:
-- **No write tool.** Review, lifecycle and upload take their actor from a
-  session; a write over MCP would need its own authorisation story.
-- **No free SQL.** A query tool is a read-anything tool.
-- **No port.** stdio via `docker exec`: whoever can run that already reads
-  `/data`, so it needs no second auth system. `--actor` must be an account
-  in `users.json` (exit 2 otherwise) and goes on every access record.
-- **No SDK.** stdlib only; the `mcp` package brings its own
-  starlette/pydantic and the app pins fastapi 0.115 / starlette 0.38.6.
-
-Every `tools/call` - refusals included - appends to
-`DATA_DIR/mcp/access.jsonl` through `hashchain.py` (ISO/IEC 27037: access
-to evidence is recorded). Several MCP sessions are several *processes*, and
-hashchain's lock is in-process, so the append is wrapped in an `flock`.
-That lock is load-bearing, not belt-and-braces: with it removed,
-`tests/check_mcp.py`'s 3-server x 25-call burst broke the chain at entry 23
-("sequence number is 22"). A case id is regex-checked before it touches a
-path (`../users` is refused). A DuckDB file locked by a running pipeline
-comes back as a tool error, not a crash.
-
-**A cloud client takes the data off the machine.** The local narrative
-model keeps case data on the host; Claude Desktop/Code or any hosted model
-reading through this server does not. Decide per customer before wiring one
-up - nothing in the server can tell where its client sends what it reads.
-
-Verified with `tests/check_mcp.py` (44 checks, in the container on a
-scratch store: handshake, all 12 tools against the planted gen_usecase
-facts - digest equals the uploaded bytes, the brute force -> root
-escalation, rows per finding - every refusal, stdout purity, one access
-entry per call, chain intact, concurrent writers).
-
-**37. The narrative is schema-constrained to the case's own evidence, and
-its input is deterministic (2026-10-14).** Telling the model "use only the
-rule engine's ids" was measured not to be enough: qwen3.5:9b invented
-T1076 / T1552.004 / T1059 and an Execution stage in 3 runs - while the old
-schema line literally said "infer from context". `grounding.py` now:
-
-- **Builds a JSON schema per call** from what the prompt carries: technique
-  ids (from the events' `mitre`, plus `T1078` / Initial Access for a
-  `credential-compromise` escalation), stages = their ATT&CK tactics
-  (`rule_meta.TACTICS`), timestamps, levels, addresses and entities as
-  enums; caps 4 stages / 6 timeline / 3 recommendations; maxLength on free
-  text (a constrained string has no natural end - a `target` ran to a
-  paragraph in testing). Ollama 0.34.1 structured outputs (`format` =
-  schema) decode inside it, so an off-evidence id cannot be generated.
-  Map batches get the same treatment per batch. Groq gets no schema.
-- **Checks the free text afterwards** (`_meta.grounding`): any IP (CIDR
-  accepted if it covers a prompt IP), technique id (a parent of a supplied
-  sub-technique is fine), e-mail, ISO date or distinctive stage name that
-  the user prompt does not contain. Shown as a warning on the case, not
-  removed. Execution/Discovery/Collection/Impact are not checked in prose -
-  as English words they would flag everything.
-- **Records** temperature 0, seed 42, SHA-256 of prompt and schema, and the
-  allowed ids/stages in `_meta.reproducibility`.
-
-**The evidence the model saw was random - found while testing this.** Two
-runs of one case at temperature 0 / seed 42 differed. Ollama was not the
-cause (identical requests were byte-identical, even across a model unload);
-the prompt was. `top_distinct_findings`, `collapsed_findings`,
-`risk_scores` and `source_profiles` ordered by severity/count with no
-tiebreak, and `any_value()` picked any row's `descr`/`mitre`/`raw` - so 8
-builds of the monsoon prompt gave **8 different prompts and 6 different
-sets of events** at the top-50 cutoff. Now every such ORDER BY ends in a
-total tiebreak (rid, srcip, username / entity), `any_value` became
-`arg_min(..., row_id)` (the first occurrence), and `_chrono()` breaks
-timestamp ties. 8 builds -> 1 prompt on all three cases. Any new query that
-feeds the prompt needs the same.
-
-Measured (qwen3.5:9b, 3000 / 1200 tokens):
-- `tests/bench_llm.py` x3: 0 unsupported stages, 0 invented ids, 0
-  grounding warnings, the three runs byte-identical, 33 s (was 52 s).
-  Expected stages 3.0 of 6 - Persistence (R1004 is untagged) and Initial
-  Access are not reached; the schema allows Initial Access, the model did
-  not pick it.
-- Real cases, single call: ESXi / Palo Alto / monsoon all `stop`, 0
-  off-schema ids; ESXi twice -> byte-identical. Palo Alto map-reduce: 5
-  batches all `stop`, 140 s.
-- What it cannot catch: a wrong *relation* between real entities. The
-  bench summary says root was brute-forced "on 10.10.1.5" - both exist in
-  the case, the pairing is wrong. And the monsoon prose said "lateral
-  movement" before the stage-name check existed.
-- Allowed stages follow ATT&CK, not intuition: R2006 tags T1078, whose four
-  tactics include Persistence and Defense Evasion, so those are allowed on
-  the Entra/monsoon cases.
-
-**Citations (2026-10-14).** Every quoted finding carries `ref` `F<n>` (its
-rank in the pool, `grounding.assign_refs()`; a map-reduce pool is numbered
-once, so `F7` is the same finding in its batch, its digest and the reduce
-call). Each stage / timeline entry must give `refs` (enum of the prompt's
-refs, 1-5) and `basis: fact | inference`; map digests give `refs` too.
-`grounding.resolve()` adds `finding_keys`, `_meta.citations` counts them,
-and the UI's chips open the finding in Review. Old cached analyses lack the
-fields and render as before.
-
-- **The wrong-relation gap is now caught - by `check()`, not the schema.**
-  An address an entry names (`source_ip`, or in its description / event /
-  target; a CIDR covering a stated one is fine) must be stated by one of its
-  own citations (srcip or an IP in the finding's `descr`). Bench x3: every
-  run flags "brute-forced root on 10.10.1.5" citing R1000/R2000 - the auth
-  log never names its host, so linking it to the firewall's 10.10.1.5 is an
-  inference. On monsoon it flagged the Entra spray "succeeded via root login
-  from 10.8.1.50" (two unrelated members joined).
-- **Don't trust the model's `basis`.** qwen3.5:9b labelled every bench entry
-  `fact`, the flagged ones included; on real cases it chose `inference` 2
-  times in 29 entries. The relation check is what separates them.
-- **`_IPV4` used to miss every address that ends a sentence** - its
-  lookahead refused a following `.`, so "...access to 10.10.1.5." was never
-  read by `check()` (found building this). Now it refuses only a digit or
-  `.digit`.
-- Measured: bench x3 byte-identical, 24/24 entries cited, 0 invented ids or
-  stages, 36 s. Real cases all `stop`, every entry cited: ESXi 32 s, Entra
-  34 s, monsoon zip and Palo Alto map-reduce ~160 s with all 5 batches
-  `stop`. Not caught: a citation of the wrong *finding* when the prose names
-  no address - on ESXi "attacker used compromised root credentials" cites
-  the legitimate 10.9.3.91 login as well. And the Palo Alto chain listed
-  Command and Control twice; the schema does not forbid a repeated stage.
-- The case id is in the prompt, so the bench's "byte-identical" holds per
-  case: a fresh bench store (new case id) can give a different narrative -
-  3 vs 4 expected stages between two stores on 2026-10-14.
-
-**36. VERIS classification is computed, then handed to the model
-(2026-10-12).** `veris.py` builds a VERIS 1.4 incident record from the
-case's high/critical findings (none -> no record, `/veris` 409): Actor is
-the attacking side per rule (source for auth/scan/policy-gap rules,
-*destination* for C2/malware/exfil rules whose source is the victim);
-public -> `external` (variety/motive Unknown), private -> `actor.unknown`
-with a note, since an internal address is not an internal person. Action
-varieties map from rules; vectors from the log source (OpenSSH -> "Command
-shell", VERIS's remote shell; Entra -> "Web application"). Assets are
-counted as variety "Unknown" - nothing in a log says laptop vs VM host.
-security_incident follows the lifecycle (Confirmed on a closed TP). There
-is deliberately **no `victim`**: VERIS requires country, employee_count,
-industry and government on it, which no log holds.
-
-Validated: every record from both stores against vz-risk/veris
-`verisc-merged.json` (jsonschema, Draft 4) - all valid. The prompt gets one
-`summary_line()`; measured on the ESXi case with the local
-`qwen2.5:7b-instruct` (Ollama, not Groq): finish `stop`, 912 completion
-tokens, no missing keys, and the summary named brute force followed by use
-of the stolen credentials over SSH. Known soft spot: R2006 lists *every*
-source that succeeded in the burst hour, so the Entra owner's own address
-can appear among `actor.external`'s notes (gotcha #13's address).
-
-**35. Threat-intel feeds can be STIX 2.1 bundles (2026-10-12).** A `.json`
-file in `DATA_DIR/intel/` is read by `intel._parse_stix()` - the form a
-TAXII collection, OpenCTI or MISP exports. Only `indicator` objects whose
-pattern is *nothing but* `ipv4-addr`/`ipv6-addr` `value =` comparisons joined
-by OR are taken; anything that adds a condition (AND a port, WITHIN,
-ISSUBSET, other object paths, non-STIX pattern types) is skipped and
-counted, because keeping just the IP would widen "this address on port 443
-for 5 minutes" into "this address, always". Revoked indicators are skipped;
-`valid_until` is quoted in the note but **not** compared to the clock - that
-would make re-runs over the same feed differ (gotcha #17). The source shown
-on findings is the bundle's `created_by_ref` identity name. There is no
-TAXII client: fetching stays out-of-band, like `refresh_intel.py`.
-
-Found by testing the whole pipeline, not the parser: `build_staging()` had
-its own copy of the feed-suffix list without `.json`, so STIX feeds parsed
-fine and were never loaded. Both now read `intel.FEED_SUFFIXES`. Verified
-with a stix2-library-built feed covering every accept/skip case (exact
-match) and on `src10-8-3-215.csv`: R3003 fired on the three beacon
-destinations, quoting the feed and indicator name.
-
-**34. A case exports as a STIX 2.1 bundle (2026-10-12).** `stix_export.py`:
-identity (tool, customer), attack-pattern per technique (mitre-attack
-external ref), ipv4/ipv6/user-account SCOs with the spec's deterministic
-UUIDv5 ids, per collapsed finding an observed-data plus one sighting per
-technique (`confidence` = Admiralty credibility via STIX 2.1's mapping
-1->90 .. 5->10, 6 omitted), and one report naming the evidence SHA-256.
-Findings with no ATT&CK tag (R1001/R1003/R1004) are left out and counted in
-the report. SDO ids are UUIDv5 over case + finding, so re-exports update
-rather than duplicate. Shares `_findings_view()` with `/findings`.
-
-**How it was validated, and a trap:** the OASIS `stix2-validator` 3.3.1
-(pip, scratch venv, host Python 3.14) rejects *every* bundle - including one
-built by the `stix2` library itself - with "Cannot locate a schema ...
-cyber-observable-core.json": its install ships no schemas. Don't read that as
-a bundle bug. What was used instead: `stix2.parse(..., allow_custom=False)`
-(strict, all three store cases parse, no dangling refs, SCO ids equal the
-library's own computation), and every object checked with `jsonschema`
-against the official `oasis-open/cti-stix2-json-schemas` - all valid, and a
-deliberately broken bundle is caught (missing `sighting_of_ref`, bad
-timestamp).
-
-**33. Findings have a lifecycle, and only Sigma high/critical enter it
-(2026-10-12).** `lifecycle.py` implements the *Finding lifecycle* decision
-below (FR-4.1/4.5/4.7/4.8) aligned with NIST SP 800-61r3's CSF 2.0
-outcomes: Open (RS.MA-02 triage) -> Investigating (RS.AN-03, needs an
-assignee) -> Contained (RS.MI-01, containment actions required) -> Resolved
-(review decision + classification + summary required; a true positive only
-from Contained, benign/false positives straight from Investigating and out
-of MTTC). Reopen needs a note. Every change is an entry in the hash-chained
-review log (`kind: "lifecycle"`), so review state, status history and the
-audit trail are one file; `review.current()` ignores those entries. MTTC =
-first `processed` custody entry -> Contained, true positives only. Rules are
-enforced by `POST /lifecycle`, not just the UI. Built without Jira, at the
-user's word (it overlaps Sprint 3's IAI-45..49).
-
-**The workflow threshold (gotcha #24, IAI-42) is now "Sigma level high or
-critical"** - the spec's own "should trigger an internal alert and requires a
-prompt review". Measured 2026-10-12 on the store: Palo Alto case 1,516
-groups -> 3, monsoon zip 1,561 -> 12, Entra case 34 -> 6; on the 63-file
-corpus 366 -> 39, the R3000-only files -> 0. The old "or >= 2 rule
-families" clause was dropped: it admitted all 34 Entra groups (every spray
-source carries R1000 + R2005), and corroboration is now the Admiralty
-credibility's job (#30). This departs from the FR-4.3 wording ("Critical or
-2 families"), which was written for the 0-15 scale.
-
-Verified: 21 API checks (every refusal and the full TP and FP paths, MTTC,
-chain, overview feed) on a clean scratch store, and the full flow clicked
-through the UI on a scratch copy at 127.0.0.1:8097.
-
-**32. A case exports as an ATT&CK Navigator layer (2026-10-12).**
-`attack_layer.py` follows the Navigator's layer format 4.5 spec
-(`layers/spec/v4.5/layerformat.md` in mitre-attack/attack-navigator):
-`name`/`domain`/`versions` (layer "4.5", navigator "4.9.0", the spec's
-minimum), one technique entry per (technique, tactic) with the Navigator's
-hyphenated tactic names, `score` = the Sigma weight of the most severe
-finding using it (legend included), a comment naming the rules and counts,
-and the evidence SHA-256 in the layer metadata so a passed-on layer traces
-back to its file. Only a `ready` case exports (409 otherwise): a failed
-case can still hold findings from before an integrity refusal. Checked
-against the spec's required fields, ID format and the 14 Enterprise tactic
-names; it has not been loaded into the Navigator itself.
-
-**31. The review log is hash-chained too, and old decisions are sealed, not
-rewritten (2026-10-12).** `hashchain.py` is the chain custody.py had,
-shared: `review.append()` and `custody.record()` both go through it. Review
-files written before carry unchained lines; the first chained decision's
-`prev` is `seal:<SHA-256 of every byte before it>`, so from then on an edit
-to an old decision is caught ("the earlier unchained entries were
-changed"). The store's 2 review files are unsealed until their next
-decision, and the Review tab says so. A custody log is chained from line 1,
-so `custody.verify_chain()` treats any unchained line in it as a problem.
-Verified: the custody logs written by the old code still verify, the
-custody E2E (19 checks) passes on the refactor, and a seal/edit/delete/
-append test set passes.
-
-**30. Confidence is an Admiralty Code grade (2026-10-12).** `confidence.py`
-rates each collapsed finding e.g. `B2`: letter = source reliability (B
-documented mapping + acquisition digest verified; C retroactive/no digest or
-a guessed field; D guessed columns; E failed integrity check; F no mapping
-record; A never), number = credibility (1 same entity in another log source
-of the case; 2 >=2 rule families and >=5 events; 3 otherwise; 4 no parsed
-timestamp or `experimental` rule). Section 6's high/medium/low is kept and
-derived (1-2 high, 3 medium, 4-6 low): on the 63-file corpus the only label
-changes were 4 synthetic findings of experimental rules (medium -> low).
-Reliability is added in the `/findings` route (needs manifest + custody);
-the reasons show on hover in the Review tab. Verified: monsoon zip -
-10.8.1.50 appears in both the firewall and ESXi members -> grade 1.
 
 ## SENTRY-IR console (requirements Sept 2026, being built)
 
@@ -1633,14 +405,15 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
 - **IAI-22/23/25/27 upload** - customer required, 10 GB after
   decompression, 2.5x disk check, `.gz` streamed, `.zip` → one case,
   separate upload / processing percentages.
-- **IAI-20 case list** - lives in the interim Overview (see Architecture).
+- **IAI-20 case list** - was the table on the Overview; since 2026-10-19 the Overview has
+  no case table (gotcha #50) and cases are reached from Customers or Findings. The Jira
+  story still says Overview.
 - **IAI-18/19 Customers** - a customer is added on the Upload page only
   (see *Decisions*); the Customers page is read-only and shows, per
   customer, open cases of total / closed /
   highest open severity / last activity. FR-6.1 defines "open" by finding
-  status, so until Sprint 3 a case is open while any finding group is
-  **unreviewed** and the page footnotes that; the status rule is
-  **IAI-79**. Cases without a customer (pre-FR-2.1) are a "No customer" row
+  status: since Sprint 3 (IAI-79, gotcha #49) a case is open while a high or
+  critical finding in it is not Resolved. Cases without a customer (pre-FR-2.1) are a "No customer" row
   so the totals add up. A customer's name opens its **profile page**
   (`#/customers/<id>`, `CustomerDetail.jsx`, 2026-10-15 at the user's
   request, no story; laid out as a customer profile - header card, Profile
@@ -1671,7 +444,8 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
 
 Pages whose story has not come up render `pages/Placeholder.jsx` and appear
 dimmed in the menu (`ready: false` in `components/Sidebar.jsx`). Flip the flag
-when a page is built.
+when a page is built. Timeline, Attack Graph and Reports were flipped when `#/result`
+was retired (gotcha #51); ATT&CK Map and Settings are still placeholders.
 
 Decisions the user made, which the Figma does not show:
 - **There is no "incident" - the finding is the only unit (2026-10-05).**
@@ -1878,6 +652,14 @@ Two more checks, each for its own layer:
 - **MCP server** - `tests/check_mcp.py` (44 checks), run in the container
   as its docstring shows, because the concurrent-writer check needs Linux
   `flock` (gotcha #38).
+- **Job queue and manifests** - `tests/check_jobs.py` (45 checks, no DuckDB) and
+  `tests/check_manifest_atomic.py` (gotcha #48); run in the container or on the host.
+- **Finding workflow and Overview** - `tests/check_workflow.py <scratch> --repo /app`
+  (~100 checks: threshold, ids, source events, related findings, the Findings page,
+  every refusal and both close paths, Customers, the Overview figures, a forged
+  custody log); needs the container (`static/`). Gotcha #49 / #50.
+- **Authorisation seam** - `tests/check_authz.py [repo]` (ADR-3, gotcha #51): allows
+  everything today, and a denial becomes a 403.
 - **Customer isolation** - `tests/check_customer_isolation.py <scratch>
   --repo /app` (31 checks, gotchas #40/#41, and projects); run it in the container the same
   way as check_mcp. Run it after touching `storage.py`, any path helper or
