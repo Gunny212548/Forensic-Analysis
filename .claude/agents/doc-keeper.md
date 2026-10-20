@@ -58,6 +58,12 @@ inside one session. If a section has become a tutorial, cut it back.
 5. **Keep the existing shape**: the numbered gotchas, the measurement tables,
    the bold one-line lede per gotcha followed by the evidence. Match the
    surrounding prose density — it is dense on purpose.
+   **Gotchas live in `docs/gotchas/NN-slug.md`, one file each** (since
+   2026-10-20: CLAUDE.md had passed Claude Code's 150k-character limit).
+   CLAUDE.md keeps only a one-line rule per gotcha, grouped by area. A new
+   gotcha is a new file with the next number *and* its line in that index;
+   changing a gotcha's rule means changing its index line too. Keep CLAUDE.md
+   itself well under the limit - the evidence goes in the gotcha file.
 6. **When a baseline number changes, say in the file that it changed and why**,
    so a future parity run does not read a drift as a regression.
 

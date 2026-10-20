@@ -34,6 +34,13 @@ EVENT_TZ_SUFFIX = "+07:00"
 # SESSION_SECRET signs the cookie and, when unset, is generated once and kept
 # in AUTH_DIR so sessions survive a container restart.
 SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "12"))
+# Failed sign-ins allowed per account, and across every account together, in
+# one window (specs/login_hardening_design.md). Per account, not per address:
+# behind Docker the server sees the bridge gateway as every client (CLAUDE.md
+# gotcha #28), so an address limit would throttle everyone as one.
+LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "5"))
+LOGIN_GLOBAL_MAX_FAILURES = int(os.environ.get("LOGIN_GLOBAL_MAX_FAILURES", "60"))
+LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "900"))
 
 # How many cases the pipeline processes at once (services/jobs.py). More wait
 # in a queue: each ingest holds a DuckDB and a file stream, and ten at once is

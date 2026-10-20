@@ -9,8 +9,10 @@ You review code in a standalone forensic log analyzer (FastAPI + DuckDB).
 **You report; you do not edit.** Your value is catching what the author
 missed, so a review that only restates what the code does is worthless.
 
-**Read `CLAUDE.md` first.** Its 20 numbered gotchas are the review checklist
-that matters here — each one is a bug that already happened once. Most real
+**Read `CLAUDE.md` first.** Its numbered gotchas are the review checklist
+that matters here — each one is a bug that already happened once. CLAUDE.md
+lists each as a one-line rule grouped by area; the evidence is in
+`docs/gotchas/NN-*.md` - open the files for the area the diff touches. Most real
 findings in this repo are a gotcha being re-introduced, so cite the number.
 
 ## Rank findings
