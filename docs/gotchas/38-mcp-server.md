@@ -11,15 +11,30 @@ docker exec -i forensic-analyzer-forensic-analyzer-1 \
     python -m app.mcp_server --actor you@example.com
 ```
 
-12 tools, all annotated read-only: `list_cases`, `get_case` (custody
-status included), `list_findings`, `get_finding_events` (the raw rows behind
-a finding, with `row_id` and the original line), `get_source_profiles`,
-`get_risk_ranking`, `get_attack_graph`, `get_escalations`, `get_veris`,
-`get_rule`, `get_custody`, `get_analysis` (served with an "AI-generated -
-not evidence" notice). The `initialize` instructions tell the client it is
-an assistant, not the judge: quote the rule engine's levels and tags, cite
-a finding_key or row_ids for every claim, and treat uncited claims as
-hypotheses.
+17 tools, all annotated read-only: `list_cases`, `get_case` (custody
+status and the Sigma logsource the file was identified as), `list_findings`,
+`get_finding_events` (the raw rows behind a finding, with `row_id` and the
+original line), `get_source_profiles`, `get_risk_ranking`, `get_attack_graph`,
+`get_escalations`, `get_veris`, `get_rule`, `get_custody`, `get_analysis`
+(served with an "AI-generated - not evidence" notice). The `initialize`
+instructions tell the client it is an assistant, not the judge: quote the
+rule engine's levels and tags, cite a finding_key or row_ids for every claim,
+and treat uncited claims as hypotheses.
+
+**Since 2026-10-20 (branch `mcp-tools`), what the forensic flow needs:**
+`search_events` - the pivot of SP 800-86 §6.4.2: every event sharing an
+address (either side), an account (case-insensitive), a host or an event type,
+optionally inside a time window (ISO 8601, offsets converted to GMT+7), in time
+order; at least one filter is required, so it is never a read-everything call.
+`get_events` - rows by `row_id`, what a citation points at, naming the ids
+that do not exist. `get_timeline` - the whole case in event-time order, paged.
+`list_confirmed` - the finding groups the analyst confirmed (Accepted /
+Modified), by first event, with who decided; plus the undecided / rejected
+counts - the attack events to build a path from. `get_flow` - the six steps.
+Every row carries the event type (`event`, layer A, from `db.EVENT_TYPES` -
+the same words the events table shows) and its `context` facts (layer C),
+because all lists of events go through one query, `db._events`. The status
+workflow (lifecycle) is no longer served: Respond left the flow (story 1).
 
 What it deliberately does not do, so don't add it casually:
 - **No write tool.** Review, lifecycle and upload take their actor from a
@@ -46,8 +61,8 @@ model keeps case data on the host; Claude Desktop/Code or any hosted model
 reading through this server does not. Decide per customer before wiring one
 up - nothing in the server can tell where its client sends what it reads.
 
-Verified with `tests/check_mcp.py` (44 checks, in the container on a
-scratch store: handshake, all 12 tools against the planted gen_usecase
+Verified with `tests/check_mcp.py` (in the container on a
+scratch store: handshake, all 17 tools against the planted gen_usecase
 facts - digest equals the uploaded bytes, the brute force -> root
 escalation, rows per finding - every refusal, stdout purity, one access
 entry per call, chain intact, concurrent writers).

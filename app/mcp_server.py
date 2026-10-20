@@ -36,11 +36,12 @@ import json
 import re
 import sys
 import threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import config
-from .services import (auth, custody, db, hashchain, rule_meta, storage,
-                       veris)
+from .services import (auth, case_flow, custody, db, hashchain, review, rule_meta,
+                       storage, veris)
 from .services.rules import RULE_LABELS
 from .services.severity import LEVELS, WEIGHT
 
@@ -54,17 +55,24 @@ Forensic Analyzer case store, read-only.
 You are an assistant to the analyst, not the judge of the evidence:
 - Findings, their Sigma levels, ATT&CK ids, escalations and Admiralty
   grades are computed by the rule engine. Quote them; do not re-grade or
-  re-tag them.
+  re-tag them. A finding is a suggestion: the analyst confirms (Accepted /
+  Modified) or rejects it. list_confirmed returns what the analyst
+  confirmed - the attack events; build attack timelines and paths from those.
+- Every event carries its type (`event`: what it is, from the log source's
+  own documentation) and `context` (facts about it, never verdicts).
+- Follow a lead with search_events (by address, account, host, event type or
+  time window) and read cited rows with get_events.
 - Cite every statement: case_id plus a finding_key (rid|srcip|username) or
-  row_ids from get_finding_events. A claim you cannot cite is a hypothesis -
-  say so and name the evidence that would confirm it.
+  row_ids. A claim you cannot cite is a hypothesis - say so and name the
+  evidence that would confirm it.
 - get_analysis returns an AI-generated narrative. It is not evidence; check
-  it against get_finding_events before repeating it.
+  it against the rows before repeating it.
 - All times are GMT+7 (+07:00); every event was normalised to it at ingest.
 - Check get_case's custody status before relying on a case: a broken chain
   or a digest mismatch means the evidence cannot be vouched for.
 """
 
+GMT7 = timezone(timedelta(hours=7))
 _CASE_ID = re.compile(r"^case-\d{8}-\d{6}-[0-9a-f]{8}$")
 _RULE_ID = re.compile(r"^R\d{4}$")
 MAX_ROWS = 200
@@ -91,7 +99,8 @@ def _log_access(actor: str, tool: str, args: dict, outcome: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     entry = {"actor": actor, "tool": tool, "outcome": outcome,
              "arguments": {k: v for k, v in args.items() if k in
-                           ("case_id", "finding_key", "rule_id", "ips", "limit", "offset", "min_level")}}
+                           ("case_id", "finding_key", "rule_id", "ips", "limit", "offset", "min_level",
+                            "ip", "username", "host", "action", "since", "until", "row_ids")}}
     with _write_lock, open(path.with_suffix(".lock"), "a") as lock:
         try:
             import fcntl
@@ -175,7 +184,7 @@ def tool_get_case(args: dict) -> dict:
         "severity": m.get("severity"),
         "rules_matched": m.get("rules_matched"),
         "escalations": m.get("escalations"),
-        "mapping": {k: mapping.get(k) for k in ("method", "profile", "name", "fields", "docs")
+        "mapping": {k: mapping.get(k) for k in ("method", "profile", "name", "fields", "docs", "logsource")
                     if k in mapping} or None,
         "members": [{k: x.get(k) for k in ("name", "rows", "row_id_first", "row_id_last", "mapping")}
                     for x in (m.get("members") or [])] or None,
@@ -201,8 +210,10 @@ def _finding_summary(f: dict) -> dict:
         "ts_last": f.get("ts_last"),
         "admiralty": (f.get("admiralty") or {}).get("code"),
         "confidence": f.get("confidence"),
+        # The analyst's decision on the suggestion: Unreviewed, Accepted or
+        # Modified (confirmed), Rejected. The status workflow (Open ...
+        # Resolved) is not served since Respond left the flow (story 1).
         "review": (f.get("review") or {}).get("status"),
-        "lifecycle": (f.get("lifecycle") or {}).get("status") if (f.get("lifecycle") or {}).get("tracked") else None,
     }
 
 
@@ -304,6 +315,85 @@ def tool_get_analysis(args: dict) -> dict:
     }
 
 
+def _when(value, name: str):
+    """An ISO 8601 time from the client -> the naive GMT+7 the events are stored
+    in. A time with an offset is converted; one without is taken as GMT+7,
+    the zone every answer of this server is in."""
+    if value is None:
+        return None
+    try:
+        t = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise ToolError(f"{name} must be an ISO 8601 time, e.g. 2026-02-15T05:10:00+07:00") from None
+    if t.tzinfo is not None:
+        t = t.astimezone(GMT7).replace(tzinfo=None)
+    return t
+
+
+def tool_search_events(args: dict) -> dict:
+    m = _case(args.get("case_id"))
+    _ready(m)
+    if not any(args.get(k) for k in ("ip", "username", "host", "action", "since", "until")):
+        raise ToolError("give at least one of ip, username, host, action, since, until "
+                        "(get_timeline reads the whole case in order)")
+    limit, offset = _page(args, 50)
+    res = db.search_events(m["case_id"], ip=args.get("ip"), username=args.get("username"),
+                           host=args.get("host"), action=args.get("action"),
+                           since=_when(args.get("since"), "since"), until=_when(args.get("until"), "until"),
+                           limit=limit, offset=offset)
+    return {"case_id": m["case_id"], "evidence_sha256": _evidence_sha(m),
+            "total": res["total"], "offset": offset, "rows": res["rows"]}
+
+
+def tool_get_events(args: dict) -> dict:
+    m = _case(args.get("case_id"))
+    _ready(m)
+    ids = args.get("row_ids") or []
+    if not ids or not all(isinstance(i, int) and not isinstance(i, bool) and i >= 0 for i in ids):
+        raise ToolError("row_ids must be a non-empty list of row ids (integers)")
+    rows = db.events_by_id(m["case_id"], ids)
+    found = {r["row_id"] for r in rows}
+    return {"case_id": m["case_id"], "evidence_sha256": _evidence_sha(m), "rows": rows,
+            "missing": sorted(set(ids) - found) or None}
+
+
+def tool_get_timeline(args: dict) -> dict:
+    m = _case(args.get("case_id"))
+    _ready(m)
+    limit, offset = _page(args, 100)
+    total, _ = db.counts(m["case_id"])
+    return {"case_id": m["case_id"], "evidence_sha256": _evidence_sha(m), "order": "event time, then row",
+            "total": total, "offset": offset,
+            "rows": db.list_raw(m["case_id"], limit, offset, order="time")}
+
+
+def tool_list_confirmed(args: dict) -> dict:
+    from .services.case_views import findings_view as _findings_view
+    m = _case(args.get("case_id"))
+    _ready(m)
+    findings = _findings_view(m["case_id"], m, assign_ids=False)
+    status = lambda f: (f.get("review") or {}).get("status")  # noqa: E731
+    confirmed = [f for f in findings if status(f) in (review.ACCEPTED, review.MODIFIED)]
+    # ts_first is the zone-stamped text, so it sorts as written; unparsed last.
+    confirmed.sort(key=lambda f: (f.get("ts_first") or "￿", f["key"]))
+    out = []
+    for f in confirmed:
+        r = f.get("review") or {}
+        out.append({**_finding_summary(f),
+                    "decision": {k: r.get(k) for k in ("status", "actor", "ts", "reason_code", "note")}})
+    counts = {s: sum(1 for f in findings if status(f) == s)
+              for s in (review.UNREVIEWED, review.ACCEPTED, review.MODIFIED, review.REJECTED)}
+    return {"case_id": m["case_id"], "evidence_sha256": _evidence_sha(m),
+            "note": "Confirmed by the analyst - the attack events, in the order their first event "
+                    "happened. Undecided suggestions are not attack events yet.",
+            "counts": counts, "confirmed": out}
+
+
+def tool_get_flow(args: dict) -> dict:
+    m = _case(args.get("case_id"))
+    return case_flow.build(m["case_id"], m)
+
+
 def _page(args: dict, default: int) -> tuple[int, int]:
     limit = args.get("limit", default)
     offset = args.get("offset", 0)
@@ -329,14 +419,47 @@ TOOLS = {
                    "Every case in the store: file, customer, status, row counts, highest Sigma level, evidence SHA-256.",
                    _schema({"customer": {"type": "string", "description": "Substring of the customer name"}})),
     "get_case": (tool_get_case, "Case overview",
-                 "One case's manifest: counts, severity, matched rules, escalations, how the log was "
-                 "mapped (documented / heuristic / unrecognised), zip members, and custody status "
-                 "(acquisition digest, hash-chain check, last verification).",
+                 "One case's manifest: counts, severity, matched rules, escalations, what the log was "
+                 "identified as (its Sigma logsource and the documented profile it was read through, or "
+                 "unrecognised and not analysed), zip members, and custody status (acquisition digest, "
+                 "hash-chain check, last verification).",
                  _schema(_CASE_PROP, ["case_id"])),
     "list_findings": (tool_list_findings, "List findings",
-                      "Collapsed findings (one per rule|source|account), most severe first, with Sigma "
-                      "level, escalation, ATT&CK ids, Admiralty grade, analyst review status and lifecycle.",
+                      "Collapsed findings (one per rule|source|account) - the rules' suggestions - most "
+                      "severe first, with Sigma level, escalation, ATT&CK ids, Admiralty grade and the "
+                      "analyst's decision (review).",
                       _schema({**_CASE_PROP, "min_level": {"enum": list(LEVELS)}, **_PAGE_PROPS}, ["case_id"])),
+    "list_confirmed": (tool_list_confirmed, "Confirmed attack events",
+                       "The finding groups the analyst confirmed (Accepted / Modified), in the order "
+                       "their first event happened, each with who decided and when; plus how many are "
+                       "still undecided or rejected. Build attack timelines and paths from these.",
+                       _schema(_CASE_PROP, ["case_id"])),
+    "search_events": (tool_search_events, "Search events (pivot)",
+                      "Every event of the case sharing an address (either side), an account, a host or "
+                      "an event type (action), optionally within a time window, in time order - with "
+                      "row_id, the original line, the event type and context facts.",
+                      _schema({**_CASE_PROP,
+                               "ip": {"type": "string", "maxLength": 64},
+                               "username": {"type": "string", "maxLength": 256},
+                               "host": {"type": "string", "maxLength": 256},
+                               "action": {"type": "string", "maxLength": 64,
+                                          "description": "e.g. auth_failed, auth_success, invalid_user"},
+                               "since": {"type": "string", "maxLength": 40, "description": "ISO 8601"},
+                               "until": {"type": "string", "maxLength": 40, "description": "ISO 8601"},
+                               **_PAGE_PROPS}, ["case_id"])),
+    "get_events": (tool_get_events, "Events by row id",
+                   "The events with these row_ids, in time order - to read what a citation points at.",
+                   _schema({**_CASE_PROP, "row_ids": {"type": "array", "items": {"type": "integer"},
+                                                      "maxItems": MAX_ROWS}}, ["case_id", "row_ids"])),
+    "get_timeline": (tool_get_timeline, "Timeline",
+                     "Every event of the case in event-time order (unparsed times last), paged, with "
+                     "event type and context facts.",
+                     _schema({**_CASE_PROP, **_PAGE_PROPS}, ["case_id"])),
+    "get_flow": (tool_get_flow, "Case flow",
+                 "Where the case stands on its six steps (Ingest, Timeline, Attack events, Attack "
+                 "timeline, Attack path, Report), each with its state, what remains and the standards "
+                 "it follows.",
+                 _schema(_CASE_PROP, ["case_id"])),
     "get_finding_events": (tool_get_finding_events, "Rows behind a finding",
                            "The raw log rows a finding was raised on, with row_id, timestamp (GMT+7), "
                            "source text and the original line - what any statement must be checked against.",
@@ -396,6 +519,10 @@ def _check_args(schema: dict, args) -> dict:
             raise ToolError(f"{name} must be an integer")
         if kind == "array" and not isinstance(value, list):
             raise ToolError(f"{name} must be an array")
+        if "maxLength" in p and isinstance(value, str) and len(value) > p["maxLength"]:
+            raise ToolError(f"{name} is longer than {p['maxLength']} characters")
+        if "maxItems" in p and isinstance(value, list) and len(value) > p["maxItems"]:
+            raise ToolError(f"{name} has more than {p['maxItems']} items")
         if "enum" in p and value not in p["enum"]:
             raise ToolError(f"{name} must be one of {p['enum']}")
     return args

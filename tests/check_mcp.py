@@ -126,7 +126,7 @@ def main() -> int:
     check(c.send({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None,
           "a notification gets no reply")
     tools = c.request("tools/list")["result"]["tools"]
-    check(len(tools) == 12, f"12 tools listed (got {len(tools)})")
+    check(len(tools) == 17, f"17 tools listed (got {len(tools)})")
     check(all(t["annotations"]["readOnlyHint"] and not t["annotations"]["destructiveHint"]
               for t in tools), "every tool is annotated read-only")
     check(c.request("ping")["result"] == {}, "ping")
@@ -151,6 +151,7 @@ def main() -> int:
     check(not err and hi["total"] > 0 and all(f["level"] in ("high", "critical") for f in hi["findings"]),
           "list_findings min_level=high returns only high/critical")
     check(all(f["admiralty"] for f in findings), "every finding carries an Admiralty grade")
+    check(all("lifecycle" not in f for f in findings), "no status workflow is served (Respond left the flow)")
 
     top = findings[0]
     err, ev = c.call("get_finding_events", case_id=case_id, finding_key=top["finding_key"], limit=200)
@@ -180,6 +181,67 @@ def main() -> int:
     check(not err and r["status"]["chain_intact"] and len(r["entries"]) >= 2, "get_custody")
     err, r = c.call("get_analysis", case_id=case_id)
     check(not err and r["analysis"] is None, "get_analysis: none generated, said so")
+
+    print("pivot, timeline, confirmed events")
+    attacker = "10.20.30.40"
+    err, r = c.call("search_events", case_id=case_id, ip=attacker, limit=200)
+    rows = r.get("rows") or []
+    check(not err and r["total"] == len(rows) > 0
+          and all(attacker in (x["srcip"], x["dstip"]) for x in rows),
+          f"search_events ip: {r.get('total')} events, each with the address on either side")
+    times = [x["ts"] for x in rows if x["ts"]]
+    check(times == sorted(times), "search_events: in time order")
+    check(all(x["raw"] and "event" in x and isinstance(x["context"], list) for x in rows),
+          "search_events: original line, event type and context facts on every row")
+    err, r = c.call("search_events", case_id=case_id, username="ROOT", action="auth_failed")
+    check(not err and r["total"] > 0 and all(x["username"] == "root" and x["event"] == "Sign-in failed"
+                                            for x in r["rows"]),
+          f"search_events: account matched case-insensitively, event type named ({r.get('total')})")
+    err, w = c.call("search_events", case_id=case_id, ip=attacker,
+                    since="2026-02-15T05:10:00+07:00", until="2026-02-14T22:11:00Z")
+    check(not err and w["total"] > 0 and all("2026-02-15 05:10:00" <= x["ts"][:19] <= "2026-02-15 05:11:00"
+                                            for x in w["rows"]),
+          f"search_events: a time window, offsets converted to GMT+7 ({w.get('total')} events)")
+    err, r = c.call("search_events", case_id=case_id)
+    check(err, "search_events with no filter is refused - get_timeline reads the whole case")
+    err, r = c.call("search_events", case_id=case_id, since="yesterday")
+    check(err, "search_events refuses a time that is not ISO 8601")
+    err, r = c.call("search_events", case_id=case_id, ip="x" * 65)
+    check(err, "search_events refuses an over-long argument")
+
+    ids = [x["row_id"] for x in rows[:3]]
+    err, r = c.call("get_events", case_id=case_id, row_ids=ids + [10 ** 9])
+    check(not err and sorted(x["row_id"] for x in r["rows"]) == sorted(ids) and r["missing"] == [10 ** 9],
+          "get_events returns the cited rows and names the ones that do not exist")
+    err, r = c.call("get_events", case_id=case_id, row_ids=["1"])
+    check(err, "get_events refuses row ids that are not integers")
+
+    err, r = c.call("get_case", case_id=case_id)
+    total_rows = r["rows"]
+    err, r = c.call("get_timeline", case_id=case_id, limit=200)
+    t = [x["ts"] for x in r.get("rows") or [] if x["ts"]]
+    check(not err and r["total"] == total_rows and t == sorted(t),
+          f"get_timeline: all {total_rows} events counted, in time order")
+
+    err, r = c.call("get_flow", case_id=case_id)
+    check(not err and [s["id"] for s in r["steps"]] == ["ingest", "timeline", "attack-events",
+                                                         "attack-timeline", "attack-path", "report"],
+          "get_flow: the six steps")
+    err, r = c.call("list_confirmed", case_id=case_id)
+    check(not err and r["confirmed"] == [] and r["counts"]["Unreviewed"] == len(findings),
+          "list_confirmed: nothing confirmed while every suggestion is undecided")
+    login = next((f for f in findings if f["rule"] == "R2008"), None)
+    check(login is not None, "the planted root login is a finding (R2008)")
+    if login:
+        subprocess.run([sys.executable, "-c",
+                        "import sys; sys.path.insert(0, sys.argv[1]); from app.services import review; "
+                        "review.record_review(sys.argv[2], sys.argv[3], 'accept', sys.argv[4])",
+                        str(repo), case_id, login["finding_key"], EMAIL], env=env, check=True)
+        err, r = c.call("list_confirmed", case_id=case_id)
+        conf = r.get("confirmed") or []
+        check(not err and [x["finding_key"] for x in conf] == [login["finding_key"]]
+              and conf[0]["decision"]["actor"] == EMAIL and conf[0]["decision"]["status"] == "Accepted",
+              "list_confirmed: the analyst's confirmation, with who decided")
 
     print("refusals")
     for label, args in [("path traversal", {"case_id": "../users"}),

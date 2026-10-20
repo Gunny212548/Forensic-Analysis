@@ -122,7 +122,7 @@ POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
                                              LLM (Ollama now) for the narrative,
                                              decoded inside a per-case JSON
                                              schema + grounding check (#37)
-MCP (stdio, read-only)                       app/mcp_server.py - 12 tools over the
+MCP (stdio, read-only)                       app/mcp_server.py - 17 tools over the
                                              same views; every call hash-chain
                                              logged to mcp/access.jsonl (#38);
                                              never assigns FD ids (#51)
@@ -670,7 +670,7 @@ Two more checks, each for its own layer:
   ids, grounding warnings. Run it after touching `analysis.py`,
   `grounding.py` or anything that feeds the prompt; with the schema and
   seed in place the three runs should be byte-identical (gotcha #37).
-- **MCP server** - `tests/check_mcp.py` (44 checks), run in the container
+- **MCP server** - `tests/check_mcp.py` (all 17 tools, pivots, refusals, access log), run in the container
   as its docstring shows, because the concurrent-writer check needs Linux
   `flock` (gotcha #38).
 - **Job queue and manifests** - `tests/check_jobs.py` (45 checks, no DuckDB) and

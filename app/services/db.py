@@ -271,67 +271,143 @@ def finding_rows(case_id: str, key: str, limit: int, offset: int = 0) -> dict:
         con.close()
 
 
+# Layer A (specs/rules_review.md, D12): what an event is, named from the
+# `action` its log source profile wrote. The one place these words live - the
+# events table and the MCP tools both read `event` from here. An action not
+# listed is shown as written.
+EVENT_TYPES = {
+    "auth_failed": "Sign-in failed",
+    "auth_success": "Sign-in succeeded",
+    "invalid_user": "Unknown account",
+    "connection": "Connection opened",
+    "password_changed": "Password changed",
+    "session_open": "Session opened",
+    "session_close": "Session closed",
+    "ssh_probe": "SSH probe",
+    "ssh_enabled": "SSH enabled",
+    "ssh_disabled": "SSH disabled",
+}
+
+_EVENT_COLS = ["row_id", "ts", "ts_raw", "srcip", "dstip", "dstport", "username", "hostname",
+               "action", "verdict", "app", "risk", "raw"]
+
+
 def list_raw(case_id: str, limit: int, offset: int, order: str = "row") -> list[dict]:
-    """One page of events, each with its layer C facts (`context`).
+    """One page of events, each with its event type (`event`, layer A) and its
+    layer C facts (`context`)."""
+    if not db_path(case_id).exists():
+        return []
+    con = connect(case_id, read_only=True)
+    try:
+        return _events(con, "TRUE", [], order, limit, offset)
+    finally:
+        con.close()
+
+
+def search_events(case_id: str, *, ip: str | None = None, username: str | None = None,
+                  host: str | None = None, action: str | None = None,
+                  since=None, until=None, limit: int = 50, offset: int = 0) -> dict:
+    """Pivot (SP 800-86 6.4.2): every event that shares an address, an account
+    or a host with what the analyst is following, optionally inside a time
+    window, in time order. `ip` matches either side of the event; `since` and
+    `until` are naive GMT+7 datetimes, the zone every event was stored in."""
+    where, params = [], []
+    if ip:
+        where.append("(srcip = ? OR dstip = ?)")
+        params += [ip, ip]
+    if username:
+        where.append("lower(username) = lower(?)")
+        params.append(username)
+    if host:
+        where.append("lower(hostname) = lower(?)")
+        params.append(host)
+    if action:
+        where.append("action = ?")
+        params.append(action)
+    if since is not None:
+        where.append("ts >= ?")
+        params.append(since)
+    if until is not None:
+        where.append("ts <= ?")
+        params.append(until)
+    cond = " AND ".join(where) or "TRUE"
+    if not db_path(case_id).exists():
+        return {"total": 0, "rows": []}
+    con = connect(case_id, read_only=True)
+    try:
+        total = con.execute(f"SELECT count(*) FROM raw_events WHERE {cond}", params).fetchone()[0]
+        return {"total": total, "rows": _events(con, cond, params, "time", limit, offset)}
+    finally:
+        con.close()
+
+
+def events_by_id(case_id: str, row_ids: list[int]) -> list[dict]:
+    """The events with these row ids, in time order - what a citation points at."""
+    if not row_ids or not db_path(case_id).exists():
+        return []
+    con = connect(case_id, read_only=True)
+    try:
+        return _events(con, "row_id IN (SELECT unnest(?))", [sorted(set(row_ids))], "time",
+                       len(set(row_ids)), 0)
+    finally:
+        con.close()
+
+
+def _events(con, cond: str, params: list, order: str, limit: int, offset: int) -> list[dict]:
+    """The one query behind every list of events, so the table, the timeline
+    and the MCP tools describe an event the same way.
 
     Layer C (rules_review.md, D12): what is unusual about an event, stated as
     a fact and never as a verdict - so no threshold of ours is applied, and
     none of it is a finding. Computed for the page only, at read time: it
     replaced three rules (R2001 refused repeatedly, R3000 the vendor's app
     risk, R3006 a listed scanner refused) that turned these facts into
-    thousands of findings to review."""
-    if not db_path(case_id).exists():
-        return []
+    thousands of findings to review. `cond` is built by the callers above from
+    fixed fragments; every value in it is a bound parameter."""
     from .rules import DENY_VERDICTS
 
     # Time order puts rows with no parsed time last, and the row id breaks
     # ties so a page boundary never moves between two requests.
     sort, outer = (("ts NULLS LAST, row_id", "page.ts NULLS LAST, page.row_id") if order == "time"
                    else ("row_id", "page.row_id"))
-    con = connect(case_id, read_only=True)
-    try:
-        rows = con.execute(
-            f"""
-            WITH page AS (
-                SELECT row_id, ts, ts_raw, srcip, dstip, username, action, verdict,
-                       app, risk, raw
-                FROM raw_events ORDER BY {sort} LIMIT ? OFFSET ?
-            ),
-            refused AS (
-                SELECT srcip, count(*) AS n FROM raw_events
-                WHERE verdict IN {DENY_VERDICTS}
-                  AND srcip IN (SELECT srcip FROM page WHERE srcip IS NOT NULL)
-                GROUP BY srcip
-            )
-            SELECT page.*, refused.n
-            FROM page LEFT JOIN refused USING (srcip)
-            ORDER BY {outer}
-            """,
-            [limit, offset],
-        ).fetchall()
-        cols = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username",
-                "action", "verdict", "app", "risk", "raw", "src_refused"]
-        out = [dict(zip(cols, r)) for r in rows]
-        listed = _listed(con, {ip for r in out for ip in (r["srcip"], r["dstip"]) if ip})
-        for row in out:
-            row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings
-            ctx = []
-            if row["src_refused"]:
-                # A zip case holds several files in one table, so the count is
-                # over the evidence item, not over one file of it.
-                ctx.append(f"source refused {row['src_refused']:,} times in this evidence item")
-            # The vendor's application risk is a property of the application,
-            # not something unusual about the event: it travels as `risk` and
-            # the table shows it beside the application name.
-            for side in ("srcip", "dstip"):
-                if row[side] in listed:
-                    ctx.append(f"{'source' if side == 'srcip' else 'destination'} listed "
-                               f"by {listed[row[side]]}")
-            row["context"] = ctx
-            del row["src_refused"]
-        return out
-    finally:
-        con.close()
+    rows = con.execute(
+        f"""
+        WITH page AS (
+            SELECT {", ".join(_EVENT_COLS)}
+            FROM raw_events WHERE {cond} ORDER BY {sort} LIMIT ? OFFSET ?
+        ),
+        refused AS (
+            SELECT srcip, count(*) AS n FROM raw_events
+            WHERE verdict IN {DENY_VERDICTS}
+              AND srcip IN (SELECT srcip FROM page WHERE srcip IS NOT NULL)
+            GROUP BY srcip
+        )
+        SELECT page.*, refused.n
+        FROM page LEFT JOIN refused USING (srcip)
+        ORDER BY {outer}
+        """,
+        [*params, limit, offset],
+    ).fetchall()
+    out = [dict(zip(_EVENT_COLS + ["src_refused"], r)) for r in rows]
+    listed = _listed(con, {ip for r in out for ip in (r["srcip"], r["dstip"]) if ip})
+    for row in out:
+        row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings
+        row["event"] = EVENT_TYPES.get(row["action"], row["action"])
+        ctx = []
+        if row["src_refused"]:
+            # A zip case holds several files in one table, so the count is
+            # over the evidence item, not over one file of it.
+            ctx.append(f"source refused {row['src_refused']:,} times in this evidence item")
+        # The vendor's application risk is a property of the application,
+        # not something unusual about the event: it travels as `risk` and
+        # the table shows it beside the application name.
+        for side in ("srcip", "dstip"):
+            if row[side] in listed:
+                ctx.append(f"{'source' if side == 'srcip' else 'destination'} listed "
+                           f"by {listed[row[side]]}")
+        row["context"] = ctx
+        del row["src_refused"]
+    return out
 
 
 def _listed(con, ips: set[str]) -> dict[str, str]:

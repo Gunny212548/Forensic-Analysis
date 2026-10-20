@@ -5,22 +5,6 @@ import { Empty, MitreTags } from './common.jsx'
 
 const PAGE_SIZE = 100
 
-// Layer A (specs/rules_review.md): what the event is, from the `action` the
-// log source profile wrote. These replaced rules R1000-R1004, which made every
-// one of them a finding to review. An action not listed is shown as written.
-const EVENT_TYPE = {
-  auth_failed: 'Sign-in failed',
-  auth_success: 'Sign-in succeeded',
-  invalid_user: 'Unknown account',
-  connection: 'Connection opened',
-  password_changed: 'Password changed',
-  session_open: 'Session opened',
-  session_close: 'Session closed',
-  ssh_probe: 'SSH probe',
-  ssh_enabled: 'SSH enabled',
-  ssh_disabled: 'SSH disabled',
-}
-
 /** Paginated, server-side. A case can hold 65k+ rows and 25k findings, so
  *  the client never pulls the whole table - the offset lives here and every
  *  page is its own query. FR-11.2: every event of the case by default, the
@@ -141,7 +125,9 @@ function AllRows({ events }) {
             <td>{e.srcip || ''}</td>
             <td>{e.dstip || ''}</td>
             <td>{e.username || ''}</td>
-            <td>{EVENT_TYPE[e.action] || e.action || ''}</td>
+            {/* Layer A: the event type, named by the server (db.EVENT_TYPES)
+                so the table and the MCP tools use the same words. */}
+            <td>{e.event || ''}</td>
             <td>{e.verdict || ''}</td>
             <td>
               {e.app || ''}
