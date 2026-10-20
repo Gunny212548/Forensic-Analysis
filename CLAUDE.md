@@ -13,11 +13,27 @@ model since 2026-10-12; Groq before) writes the
 narrative around it — case summary, attack chain, timeline,
 recommendations.
 
+**Where it is going (the user, 2026-10-20 - read this first; gotcha #54).**
+The purpose is *forensic reconstruction from log files*, not SIEM alert grading:
+identify what each log is, put every event on one timeline, let the analyst
+confirm the attack events (the system and the AI only suggest), then build the
+attack timeline, the attack path and a graph of what the attacker did - which
+command, from which host, to which host. Flow: **Ingest -> Timeline -> Attack
+events -> Attack timeline -> Attack path / graph -> Report**; the Respond step
+(lifecycle, MTTC) is to be removed. **The 20 in-house rules stay** and SigmaHQ
+rules are added beside them (revision 5 - revision 4 had retired the in-house
+rules; reversed the same day after ADR-006 measured the cost). **Every step must cite a standard that was
+actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
+revisions 1-4 on branch `IAI-92-identify-logsource`; most of what follows still
+describes the code before that direction.
+
 Formats exercised against real data so far: VMware ESXi `auth.log`,
 Palo Alto CSV exports, Check Point SmartLog CSV exports, Entra ID sign-in
-CSV exports and their Azure Monitor JSON export (gotcha #39). The decoder is
-heuristic rather than per-log-source — it maps whatever columns a file happens
-to have onto one canonical schema (see gotcha #7 for what that costs).
+CSV exports and their Azure Monitor JSON export (gotcha #39). Every file is
+identified before it is read (gotcha #53, IAI-92 - on its branch): a documented
+format is read through its profile, anything else is kept as evidence and not
+analysed - **nothing is guessed**. On `main` the decoder still guesses columns a
+file has no profile for (gotcha #7 shows what that costs).
 
 It started as a spinoff of a separate project (`D:\Wazuh\wazuh-docker`'s
 `forensic-webapp`, which fed uploaded logs through a real Wazuh manager).
@@ -322,6 +338,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+- #53 Every file is identified before it is read, in Sigma logsource terms (`identify.py`); no column is guessed; a format without a reader, or none, is kept as evidence and not analysed. A file's name proves nothing - JSON-lines arrive as `.log`, exports start with a blank line.
 
 **Time**
 - #21 Every timestamp is normalised to GMT+7 (offset converted, no offset assumed GMT+7). A re-process is required after any change; old cases do not say they are stale.
@@ -337,6 +354,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #26 Severity is a Sigma level; a refused row is capped at medium; escalation patterns (credential-compromise high, compromised-host critical). `findings.lvl` stores weights.
 - #29 Every rule carries Sigma + ADS metadata; status is earned (no rule is `stable`); `tests/check_rule_meta.py`.
 - #35 Intel feeds may be STIX 2.1 bundles; only pure IP-equality indicators are taken.
+- #56 A rule only answers "known attack pattern?" (layer B); event type is layer A, context facts layer C (`db.list_raw`). R1000-R1004 / R2001 / R3000 / R3006 left the rule set (metadata `deprecated`); R2008 login-after-brute-force, R2009 measured spray; R2005 renamed (branch `rules-layers`). Parity needs the intel feeds or R3003-R3006 read 0.
 
 **Findings, review and workflow** (`review.py`, `lifecycle.py`, `confidence.py`, `finding_ids.py`, `related.py`)
 - #19 Review state lives outside the case DuckDB, append-only, keyed by the collapsed finding `rid|srcip|username`.
@@ -347,6 +365,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #49 FD ids per customer per year, written before `ready`; source events; related findings via pivot hosts; the Findings page.
 - #50 The Overview redesign, and the designs the user rejected - **do not re-propose them**.
 - #51 `#/result` retired (Reports / Attack Graph / Timeline / finding page); Sprint 3 review fixes; ADR-3/4; branches and worktrees; testing in a container; scripted-edit traps.
+- #52 The case page is six steps at `#/case/<id>/<step>` (IAI-89); `GET /flow` computes each step's state on the server and names its standards; old case links redirect. `sprint/4` merges Sprint 3's two branches.
 
 **Evidence, storage, jobs and access** (`custody.py`, `storage.py`, `jobs.py`, `auth.py`, `mcp_server.py`)
 - #28 Evidence is SHA-256 hashed on arrival and re-hashed before every run; custody log hash-chained.
@@ -369,6 +388,8 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 
 **Method**
 - #18 Measure before optimising: time a stage first; corpus wall-clock spread is host I/O.
+- #54 The product direction of 2026-10-20 - forensic reconstruction, Respond removed, in-house rules kept with SigmaHQ rules added beside them (the retirement was reversed after ADR-006: SigmaHQ has no correlation or failed-login rule, no firewall-traffic rule). **Read before designing anything.**
+- #55 A standard is cited only from a document actually read (`docs/standards/SOURCES.md`); PDFs are read with `pdftotext` (the web fetcher returns compressed streams); ISO pages refuse automated access.
 
 **`docs/STANDARDS.md` is the one-page map** of every pipeline step to its
 standard (or "internal method", with the nearest framework named and the
@@ -664,6 +685,11 @@ Two more checks, each for its own layer:
   --repo /app` (31 checks, gotchas #40/#41, and projects); run it in the container the same
   way as check_mcp. Run it after touching `storage.py`, any path helper or
   a route that lists or merges cases.
+- **Log identification** - `tests/check_identify.py [--corpus]` (gotcha #53, branch
+  IAI-92): each sample identified as its log source and no other, negatives
+  unrecognised; `--corpus` adds the real customer files. No store, no network.
+- **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states, and
+  every step citing a standard marked read in `docs/standards/SOURCES.md`.
 
 **`tests/check_parity.py` asserts it, so nobody has to read a table.** Until
 2026-09-15 every ingest change was validated by uploading files, curling
