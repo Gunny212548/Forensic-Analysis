@@ -99,6 +99,21 @@ def verify_chain(case_id: str) -> tuple[bool, str | None]:
     return v["intact"], v["problem"]
 
 
+def problem(case_id: str) -> str | None:
+    """Why this case's evidence cannot be relied on now, or None: a custody
+    chain that no longer verifies, or a last integrity check that failed (a
+    later passing check clears it). The Overview's attention list and the
+    case flow's Ingest step both ask this."""
+    intact, broken = verify_chain(case_id)
+    if not intact:
+        return f"custody chain: {broken}"
+    last = next((e["action"] for e in reversed(entries(case_id))
+                 if e.get("action") in ("verified", "integrity_failed")), None)
+    if last == "integrity_failed":
+        return "the evidence file no longer matches its acquisition digest"
+    return None
+
+
 def evidence(sha256: str, size: int, actor: str, retroactive: bool = False) -> dict:
     """The manifest's `evidence` block."""
     return {"sha256": sha256, "bytes": size, "algorithm": "SHA-256",

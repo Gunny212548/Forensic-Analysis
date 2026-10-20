@@ -35,10 +35,15 @@ What each implemented step does, and what it does not claim, is recorded in
 
 ## Proposed: the analyst flow and upgrades of internal methods (draft, 2026-10-20)
 
-**Nothing in this section is built yet.** It is the standards basis of the
-proposed case flow (six steps from upload to report) and of a plan to back
-the internal methods above with standards. Each row moves into the main table
-when its story is done. Decisions D1-D5 of the proposal are still open.
+The standards basis of the case flow (six steps from upload to report) and of
+a plan to back the internal methods above with standards. Decisions D1-D5 were
+taken as recommended (2026-10-20). **Built so far (IAI-89):** the six steps in
+this order, each step's standards (`app/services/case_flow.py`, served by
+`GET /api/cases/{id}/flow` and shown under every step), the state of each step
+computed from the case's records, and `tests/check_case_flow.py`, which fails
+if a step cites no standard marked read in `docs/standards/SOURCES.md`. The
+"Today" column below is what each step's *content* still lacks; a row moves
+into the main table when its story is done.
 
 ### Analyst flow - one case, six steps
 

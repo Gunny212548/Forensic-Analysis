@@ -5,27 +5,21 @@
  *  Overview keeps the #/dashboard URL: it is today's case list, and links
  *  pasted into tickets before the rename still land there. */
 export const NAV_GROUPS = [
+  // In the order of the work (specs/case_flow_design.md, D4): Timeline, Attack
+  // Graph, ATT&CK Map and Reports are steps of a case now, not menu pages.
   {
-    label: 'Monitor',
+    label: 'Work',
     items: [
       { route: 'dashboard', label: 'Overview' },
       { route: 'upload', label: 'Upload' },
+      { route: 'cases', label: 'Cases' },
       { route: 'findings', label: 'Findings' },
-      { route: 'timeline', label: 'Timeline' },
-    ],
-  },
-  {
-    label: 'Investigate',
-    items: [
-      { route: 'customers', label: 'Customers' },
-      { route: 'attack-graph', label: 'Attack Graph' },
-      { route: 'attack-map', label: 'ATT&CK Map', ready: false },
     ],
   },
   {
     label: 'Manage',
     items: [
-      { route: 'reports', label: 'Reports' },
+      { route: 'customers', label: 'Customers' },
       { route: 'settings', label: 'Settings', ready: false },
     ],
   },

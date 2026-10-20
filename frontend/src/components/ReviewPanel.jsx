@@ -14,7 +14,7 @@ const ORDER = { Unreviewed: 0, Modified: 1, Accepted: 2, Rejected: 3 }
  *  row - one case has 20,063 finding rows and 4 reviewable findings, and
  *  reviewing rows one at a time is a requirement that cannot be met
  *  (CLAUDE.md gotcha #19). Decisions are append-only server-side. */
-export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref = null }) {
+export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref = null, onChanged = null }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [rejecting, setRejecting] = useState(null) // finding key awaiting a reason
@@ -71,6 +71,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
       setReasonCode('')
       setReasonNote('')
       await load()
+      onChanged?.() // the case's step bar counts these decisions
     } catch (err) {
       setError(err.message)
     } finally {
@@ -310,7 +311,10 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
                 assignees={data.assignees}
                 classifications={data.classifications}
                 reviewed={st !== 'Unreviewed'}
-                onChanged={load}
+                onChanged={() => {
+                  load()
+                  onChanged?.()
+                }}
               />
             )}
 

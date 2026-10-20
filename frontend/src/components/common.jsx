@@ -50,7 +50,7 @@ export function Empty({ children, style }) {
 
 export function ResultLink({ caseId, ready, children }) {
   return (
-    <a className={`btn-link ${ready ? '' : 'disabled'}`} href={ready ? `#/reports/${caseId}` : '#'}>
+    <a className={`btn-link ${ready ? '' : 'disabled'}`} href={ready ? `#/case/${caseId}` : '#'}>
       {children}
     </a>
   )

@@ -5,15 +5,27 @@ import Upload from './pages/Upload.jsx'
 import Customers from './pages/Customers.jsx'
 import Findings from './pages/Findings.jsx'
 import CustomerDetail from './pages/CustomerDetail.jsx'
-import CaseView, { VIEWS } from './pages/CaseView.jsx'
-import CasePicker from './components/CasePicker.jsx'
+import CaseFlow from './pages/CaseFlow.jsx'
+import Cases from './pages/Cases.jsx'
 import FindingDetail from './pages/FindingDetail.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import Login from './pages/Login.jsx'
 import Sidebar, { NAV_GROUPS } from './components/Sidebar.jsx'
 
 const MENU = NAV_GROUPS.flatMap((g) => g.items)
-const PAGES = [...MENU.map((it) => it.route), 'result', 'finding']
+// The case page's older addresses, kept so links pasted into tickets still open.
+const LEGACY = ['result', 'reports', 'timeline', 'attack-graph']
+const PAGES = [...MENU.map((it) => it.route), 'case', 'finding', ...LEGACY]
+
+// Where each tab of the old Reports page lives now (specs/case_flow_design.md R13).
+const REPORTS_TAB_STEP = {
+  overview: 'analyse',
+  chain: 'analyse',
+  recs: 'analyse',
+  events: 'ingest',
+  evidence: 'ingest',
+  findings: 'triage',
+}
 
 function parseHash() {
   const h = window.location.hash.replace(/^#\/?/, '')
@@ -24,10 +36,11 @@ function parseHash() {
   }
 }
 
-/** Hash routing, kept rather than swapped for a router library.
- *  The URLs (#/dashboard, #/upload, #/reports/<case_id>) replace the old #/result/<case_id>, which still redirects) are unchanged from
- *  the pre-React page, so links an analyst pasted into a ticket still open
- *  the same case - and it needs no dependency and no server rewrite rule. */
+/** Hash routing, kept rather than swapped for a router library: it needs no
+ *  dependency and no server rewrite rule. A case is #/case/<case_id>/<step>;
+ *  every older case address (#/result, #/reports, #/timeline, #/attack-graph)
+ *  redirects to its step, so links an analyst pasted into a ticket still open
+ *  the same case. */
 function useHashRoute() {
   const [route, setRoute] = useState(parseHash)
   useEffect(() => {
@@ -74,7 +87,7 @@ function useOpenFindings(user, page, param) {
 
 /** #/finding/<case id>/<finding key, URL-encoded>. The old #/result/<case> and
  *  #/result/<case>/<key> have the same shape and still open: a case lands on
- *  its Reports page, a finding on its own page (see the redirect below). */
+ *  its current step, a finding on its own page (see the redirect below). */
 function splitResult(param) {
   const i = param.indexOf('/')
   if (i < 0) return { caseId: param, findingKey: null }
@@ -99,16 +112,24 @@ export default function App() {
     window.scrollTo(0, 0)
   }, [page, param])
 
-  // #/result was the old case page. Links pasted into tickets still work: a
-  // finding opens its page, a case opens its Reports; no case is a dead end.
+  // The older case addresses. Links pasted into tickets still work: a finding
+  // opens its page, a case opens the matching step (or the one it is on); no
+  // case is a dead end. replace() keeps the old address out of Back.
   useEffect(() => {
+    const go = (hash) => window.location.replace(hash)
     if (page === 'result') {
       const { caseId, findingKey } = splitResult(param)
-      if (!caseId) window.location.hash = '#/dashboard'
-      else if (findingKey) window.location.hash = `#/finding/${caseId}/${encodeURIComponent(findingKey)}`
-      else window.location.hash = `#/reports/${caseId}`
+      if (!caseId) go('#/cases')
+      else if (findingKey) go(`#/finding/${caseId}/${encodeURIComponent(findingKey)}`)
+      else go(`#/case/${caseId}`)
     }
-    if (page === 'finding' && !splitResult(param).findingKey) window.location.hash = '#/findings'
+    if (page === 'reports' || page === 'timeline' || page === 'attack-graph') {
+      const [caseId, tab] = param.split('/')
+      const step = page === 'reports' ? REPORTS_TAB_STEP[tab] : 'investigate'
+      go(caseId ? `#/case/${caseId}${step ? `/${step}` : ''}` : '#/cases')
+    }
+    if (page === 'case' && !param) go('#/cases')
+    if (page === 'finding' && !splitResult(param).findingKey) go('#/findings')
   }, [page, param])
 
   const placeholder = MENU.find((it) => it.route === page && it.ready === false)
@@ -126,9 +147,8 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* A case is opened from the Overview list, so that is what stays lit. */}
       <Sidebar
-        active={page === 'result' ? 'dashboard' : page === 'finding' ? 'findings' : page}
+        active={page === 'case' ? 'cases' : page === 'finding' ? 'findings' : page}
         counts={{ findings: openFindings }}
         user={user}
         onLogout={signOut}
@@ -143,11 +163,12 @@ export default function App() {
           // #/customers/<id> or #/customers/<id>/projects/<project id>
           <CustomerDetail companyId={param.split('/')[0]} projectId={param.split('/')[2]} key={param} />
         )}
-        {VIEWS[page] && !param && <CasePicker route={VIEWS[page].route} title={VIEWS[page].title} />}
-        {VIEWS[page] && param && (
-          // #/reports/<case> or #/reports/<case>/<tab>
-          <CaseView caseId={param.split('/')[0]} initialTab={param.split('/')[1]} view={page}
-                    key={`${page}/${param}`} />
+        {page === 'cases' && <Cases />}
+        {page === 'case' && param && (
+          // #/case/<case>/<step>. Keyed by the case only, so moving between
+          // steps keeps the page - and a running analysis - in place.
+          <CaseFlow caseId={param.split('/')[0]} stepId={param.split('/')[1] || null}
+                    key={param.split('/')[0]} />
         )}
         {page === 'finding' && splitResult(param).findingKey && (
           <FindingDetail {...splitResult(param)} key={param} />

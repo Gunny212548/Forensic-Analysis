@@ -691,7 +691,46 @@
   .fd-pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; }
   .fd-pager .muted { margin-right: auto; font-size: 12px; }
 
+  /* The case's six steps (StepBar.jsx). One row of equal steps joined by a
+     line; the state is in the number's colour and in words, never colour alone. */
+  .stepbar { display: flex; flex-direction: column; gap: 10px; }
+  .stepbar ol { list-style: none; margin: 0; padding: 0; display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--panel);
+    border: 1px solid var(--panel-border); border-radius: 4px; }
+  .stepbar .step + .step { border-left: 1px solid var(--line); }
+  .stepbar .step a { display: flex; gap: 10px; align-items: center; padding: 12px 14px;
+    color: var(--text); text-decoration: none; min-width: 0; }
+  .stepbar .step a:hover { background: var(--subtle); }
+  .stepbar .step a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .stepbar .step.current a { background: var(--subtle); box-shadow: inset 0 -3px 0 var(--accent); }
+  .step-n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    font: 600 12px/1 var(--mono); border: 1.5px solid var(--muted); color: var(--text-2); }
+  .step-done .step-n { background: var(--ok); border-color: var(--ok); color: var(--panel); }
+  .step-active .step-n { border-color: var(--accent); color: var(--accent); }
+  .step-blocked .step-n { border-color: var(--danger); color: var(--danger); }
+  .step-text { display: flex; flex-direction: column; min-width: 0; }
+  .step-title { font-weight: 600; font-size: 13px; }
+  .step-rec { color: var(--accent); font-weight: 500; }
+  .step-state { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .step-next { align-self: flex-end; }
+  .step-reason { font-size: 13px; padding: 8px 12px; margin-bottom: 14px; border-radius: 4px;
+    border-left: 3px solid var(--muted); background: var(--subtle); }
+  .step-reason.step-done { border-left-color: var(--ok); }
+  .step-reason.step-active { border-left-color: var(--accent); }
+  .step-reason.step-blocked { border-left-color: var(--danger); background: var(--danger-tint); }
+  .step-standards { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--line);
+    font-size: 11px; color: var(--muted); }
+
+  @media (max-width: 1100px) {
+    .stepbar ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .stepbar .step:nth-child(4) { border-left: none; }
+    .stepbar .step:nth-child(n+4) { border-top: 1px solid var(--line); }
+  }
+
   @media (max-width: 760px) {
+    .stepbar ol { grid-template-columns: minmax(0, 1fr); }
+    .stepbar .step + .step { border-left: none; border-top: 1px solid var(--line); }
+    .step-next { align-self: stretch; text-align: center; }
     .layout { padding: 20px 16px 60px; }
     .area-grid { grid-template-columns: minmax(0, 1fr); }
     .urgent li { grid-template-columns: minmax(0, 1fr); }

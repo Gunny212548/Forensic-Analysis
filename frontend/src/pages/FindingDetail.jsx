@@ -32,7 +32,10 @@ export default function FindingDetail({ caseId, findingKey }) {
           <div className="back-link">
             <a href="#/findings">Findings</a>
             {manifest?.company_name && <> › {manifest.company_name}</>}
-            {manifest?.original_filename && <> › {manifest.original_filename}</>}
+            {manifest?.original_filename && (
+              // Back to the case, on the step a finding is worked in.
+              <> › <a href={`#/case/${caseId}/investigate`}>{manifest.original_filename}</a></>
+            )}
           </div>
           <h1>Finding</h1>
           <div className="subtitle">

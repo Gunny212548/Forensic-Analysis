@@ -6,8 +6,8 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Requ
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import (analysis, analysis_jobs, attack_layer, auth, case_views, custody, db,
-                        authz, lifecycle, merge, review, stix_export, storage, veris)
+from ..services import (analysis, analysis_jobs, attack_layer, auth, case_flow, case_views, custody,
+                        db, authz, lifecycle, merge, review, stix_export, storage, veris)
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -225,6 +225,30 @@ async def get_case_findings(case_id: str):
         # Whether the decision history behind these statuses is untampered.
         "review_chain": review.verify(case_id),
     }
+
+
+@router.get("/{case_id}/flow")
+def get_case_flow(case_id: str):
+    """The case as six steps and where it stands on each (case_flow.py).
+    A plain `def`: it reads the case DuckDB and several logs, so FastAPI runs
+    it in its threadpool rather than on the event loop."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    return case_flow.build(case_id, manifest)
+
+
+@router.get("/{case_id}/graph")
+def get_case_graph(case_id: str):
+    """The attack graph and the risk ranking, straight from the findings in
+    SQL - the same two the narrative is built around (analysis_jobs), served
+    without it, so the Investigate step never waits for the AI."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    if not case_views.holds_findings(manifest):
+        raise HTTPException(409, f"Case is not ready yet (status: {manifest.get('status')})")
+    return {"graph": db.build_graph(case_id), "risk": db.risk_scores(case_id)}
 
 
 @router.post("/{case_id}/lifecycle")

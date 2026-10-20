@@ -97,6 +97,16 @@ export async function getEvents(caseId, { limit, offset, flagged = true }) {
   )
 }
 
+/** The case's six steps and where it stands on each (case_flow.py). */
+export async function getFlow(caseId) {
+  return jsonOrThrow(await fetch(`/api/cases/${encodeURIComponent(caseId)}/flow`), 'Could not load the case steps')
+}
+
+/** Attack graph and risk ranking from the findings in SQL - no AI needed. */
+export async function getGraph(caseId) {
+  return jsonOrThrow(await fetch(`/api/cases/${encodeURIComponent(caseId)}/graph`), 'Could not load the attack graph')
+}
+
 export async function getFindings(caseId) {
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/findings`),
@@ -181,7 +191,7 @@ export async function verifyEvidence(caseId) {
  *  returned meanwhile, 202 when nothing is cached yet and the body is only a
  *  progress stub. The HTTP code is therefore not what the caller reads -
  *  `analysis_status` ("ready" / "running" / "failed") is, and it is present on
- *  every body. See Result.jsx's readAnalysis(). */
+ *  every body. See CaseFlow.jsx's readAnalysis(). */
 export async function getAnalysis(caseId) {
   const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}/analysis`)
   checkSession(resp)

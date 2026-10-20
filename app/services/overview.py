@@ -132,15 +132,7 @@ def _case_facts(case_id: str) -> dict:
     # What needs attention: a custody chain that no longer verifies, or whose last
     # integrity check failed (a later passing check clears it), and an altered
     # review log.
-    custody_issue = None
-    intact, problem = custody.verify_chain(case_id)
-    if not intact:
-        custody_issue = f"custody chain: {problem}"
-    else:
-        last = next((e["action"] for e in reversed(custody.entries(case_id))
-                     if e.get("action") in ("verified", "integrity_failed")), None)
-        if last == "integrity_failed":
-            custody_issue = "the evidence file no longer matches its acquisition digest"
+    custody_issue = custody.problem(case_id)
     rv = review.verify(case_id)
     review_issue = None if rv.get("intact", True) else f"decision history: {rv.get('problem')}"
 
