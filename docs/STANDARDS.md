@@ -33,6 +33,82 @@ What each implemented step does, and what it does not claim, is recorded in
 `CLAUDE.md` gotchas #26 (severity), #27 (log source mapping), #28 (evidence),
 #29 (rule metadata) and #30 (confidence).
 
+## Proposed: the analyst flow and upgrades of internal methods (draft, 2026-10-20)
+
+**Nothing in this section is built yet.** It is the standards basis of the
+proposed case flow (six steps from upload to report) and of a plan to back
+the internal methods above with standards. Each row moves into the main table
+when its story is done. Decisions D1-D5 of the proposal are still open.
+
+### Analyst flow - one case, six steps
+
+The order of the steps is taken from a standard, not chosen: NIST SP 800-86
+divides forensics into Collection -> Examination -> Analysis -> Reporting.
+NIST SP 800-61 Rev. 3 allows this: "Organizations should use the incident
+response life cycle framework or model that suits them best" (p. 6). What each
+step must deliver is taken from the CSF 2.0 outcomes SP 800-61r3 is built on;
+step 4 comes from them, because SP 800-86 does not cover containment. ISO/IEC
+27043 is said to order an investigation the same way, but it has not been read
+(`docs/standards/SOURCES.md`), so it is not relied on.
+
+Which documents were read, the copies (with SHA-256) and the page of every
+sentence relied on: **`docs/standards/SOURCES.md`**. ISO documents marked
+*(not read)* below are cited as aligned-with only, until a copy is obtained.
+
+| Step | Standard | Done when | Today |
+|---|---|---|---|
+| 1 Ingest | SP 800-86 Collection; ISO/IEC 27037 (not read); RFC 3227; FIPS 180-4; CSF RS.AN-07; each log source's format documentation, RFC 5424 / 3164; ISO 8601 | case `ready`, acquisition digest verified | ✅ rows 1-3 |
+| 2 Triage | SP 800-86 Examination; CSF DE.AE-02, DE.AE-08, RS.MA-02, RS.MA-03; Sigma `level`; Admiralty Code; ATT&CK | no finding in scope left Unreviewed (scope: D2) | ⚠️ review in two places (finding page, Reports tab) |
+| 3 Investigate | SP 800-86 Analysis; ISO/IEC 27042 (not read); CSF RS.AN-03, RS.AN-06, RS.AN-08, DE.AE-03; ATT&CK, ODNI CTF | every high/critical finding has an assignee and is past Open | ⚠️ graph per case only; timeline is the AI's (IAI-60, IAI-61) |
+| 4 Respond | SP 800-61r3: CSF RS.MI-01, RS.MI-02, RS.MA | every workflow finding Resolved | ✅ row 14 |
+| 5 AI narrative | NIST AI RMF 1.0; NIST AI 600-1 (Confabulation, Human-AI Configuration); VERIS 1.4 | a narrative exists, or the step is skipped when AI is unavailable - no other step waits for it | ⚠️ rejected findings still reach the model; an Ollama outage is a 500 (IAI-59) |
+| 6 Report | SP 800-86 Reporting; CSF RS.CO-02, RS.CO-03; STIX 2.1; VERIS 1.4; ATT&CK Navigator 4.5 | a report naming the evidence digest | ⚠️ exports only; the gate is shown, not enforced (IAI-55, IAI-72/73) |
+| all | CSF RS.AN-06 (actions recorded, integrity and provenance preserved); RFC 3227 (custody); ISO/IEC 27037, ISO/IEC 27001:2022 A.8.15 (logging), A.8.3 (access restriction per customer), A.5.15 (access control - seam only until IAI-14) - all ISO here not read | - | ✅ / ⚠️ A.5.15 |
+| screen order | ISO 9241-110:2020 (not read): interaction principles - suitability for the task, self-descriptiveness, conformity with user expectations | - | ❌ |
+
+Every CSF 2.0 subcategory id above was checked against CSWP 29 (Appendix A,
+p. 21-22) on 2026-10-20; the text of each is in `docs/standards/SOURCES.md`.
+
+### Backing the internal methods with standards
+
+Three routes. **A - a standard's data model**: the method stays ours, its
+result is recorded in a published vocabulary. **B - method validation**: the
+method stays ours and is tested and documented the way a forensic lab does it -
+SWGDE 18-Q-001 v2.1, whose Section 6 lists what a test record holds (purpose
+and scope, who, date, procedure or scenarios, datasets with expected results,
+results and anomalies, identified limitations). `tests/gen_usecase.py` and
+`tests/check_parity.py` already do the testing; what is missing is that record.
+ISO/IEC 27041:2015 covers the same assurance in general terms but has not been
+read. **C - a measurement standard**: NIST SP 800-55 Vol. 1 (December 2024),
+whose 3.1.1 gives the fields of a measure (unique id, goal, scope, measure,
+type, formula, target, implementation evidence, time-based reference). ISO/IEC
+27004 is not needed for this.
+
+| Internal method (row) | Route | Result | Order |
+|---|---|---|---|
+| TP / benign TP / FP at close (14) | A: OCSF 1.9.0 Incident Finding `verdict_id` 2 True Positive / 5 Benign / 1 False Positive. Practice: FIRST CSIRT Services Framework 2.1, 5.2 ("qualified as an information security incident (true positive) or as a false alarm (false positive)"), Microsoft Defender XDR (the same three classes). SP 800-61r3 defines none of them (searched) | standard | 1 |
+| Lifecycle status (14) | A: OCSF `status_id` - Open -> New, Investigating and Contained -> In Progress, Resolved -> Resolved | stronger | 1 |
+| Rule validation (6) | B: SWGDE 18-Q-001 Section 6, one test record per rule | standard | 2 |
+| Related findings (18) | Practice: FIRST 5.2 names "automatically identifying related information security events" as part of triage. A: OCSF `finding_info_list`; export as MITRE Attack Flow 4.0 (STIX 2.1 extension). B: test record on real data - measured on synthetic data only (CLAUDE.md gotcha #51) | practice-backed, validated | 2 |
+| Escalation patterns (8), risk ranking (11) | Practice for risk ranking: FIRST 5.2 ("assigning risk scores based on the criticality of affected assets and identities"; "higher criticality should be analyzed before less critical ones"). B: test record per SWGDE Section 6 | practice-backed, validated | 2 |
+| MTTC (14) | C: documented with the SP 800-55v1 3.1.1 fields - goal, scope, measure ("average time from creation to Contained"), type (efficiency), formula, target `MTTC_TARGET_HOURS`, implementation evidence (id registry and review log), time-based reference. SP 800-55v1 names mean time to detect and to recovery (p. 23), not to contain | defined to a standard | 3 |
+| Acknowledging medium/low by rule (proposal D2) | Sigma 2.1.0: "While `low` and `medium` level events have an informative character, events with `high` and `critical` level should lead to immediate reviews by security analysts"; CSF DE.AE-08; FIRST 5.2 ("Recurring cases that can be automated should be identified and automated") | principle backed, procedure ours | - |
+| Detection areas (19) | none found; ATT&CK tactics too coarse on real data. Display only | stays internal | - |
+
+Considered and not recommended: **CISA SSVC** as the finding priority instead
+of the risk score - a published decision tree (Track / Track* / Attend / Act),
+but designed for vulnerabilities, and its mission-prevalence branch needs an
+asset inventory the tool does not have.
+
+OCSF `verdict_id` also offers **Duplicate** and **Insufficient Data**, which
+fit cases seen for real (a filtered export, CLAUDE.md gotcha #9). Adding them
+as close options is an open decision.
+
+**How far each source was read** is recorded per document in
+`docs/standards/SOURCES.md`: the NIST documents, SWGDE, FIRST, Sigma, OCSF and
+Attack Flow were read (2026-10-20); the ISO documents were not, and the order in
+which to obtain them is listed there.
+
 ## Where a standard is only "aligned with"
 
 Stated plainly so the claims stay accurate:
