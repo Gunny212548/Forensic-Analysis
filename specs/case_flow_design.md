@@ -230,6 +230,74 @@ Still open:
   analysed (recommended), or refused at upload.
 - Q9 ESXi lines with no vendor document ("observed"): keep, or treat as guessing and drop.
 
+## Revision 3 (2026-10-20, the user) - the purpose, and Respond removed
+
+Purpose, confirmed by the user: a **forensic tool for log files**. It identifies what
+each log is, puts every event in one timeline, helps the analyst find the attack
+events, and turns them into an attack timeline, an attack path and a graph of what the
+attacker did - which command, from which host, to which host. Severity grading stays
+only as a hint for what to look at first.
+
+Flow: **Ingest -> Timeline -> Attack events (system/AI suggests, analyst confirms,
+per event) -> Attack timeline -> Attack path / graph -> Report.**
+
+- **Respond is removed** (the user's call): no Contained / Resolved tracking, no
+  containment-action record, no MTTC. What to do next goes in the report as
+  recommendations. Code that depends on the lifecycle - `lifecycle.py`, the Findings
+  page status filters, the Overview's MTTC KPI, the Customers page's open/closed case
+  count, IAI-50 - is to be removed or re-based in a story of its own; nothing is
+  deleted before that story's design is agreed.
+- **The event schema must carry who / where / what**: actor, source host, destination
+  host, action, command or process, outcome. The canonical schema today keeps a
+  command only inside `raw`. Proposed basis: OCSF event classes (Authentication,
+  Network Activity, Process Activity `cmd_line`) - `docs/STANDARDS.md` row 4.
+- **AI in the attack-event step** suggests, cites event ids, and is checked before an
+  analyst sees it; its rules and their sources are in the AI section of the proposal.
+
+## Revision 4 (2026-10-20, the user) - detection from standard rules and data only (option C)
+
+The 20 in-house rules (R1000-R3006, `rules.py`) are retired. What suggests attack events
+from now on comes only from published rules and published data:
+
+1. **SigmaHQ rules** (3,799 at commit time of the count; Detection Rule License 1.1 -
+   use is free, but every match shown must name the rule's author) for the logsource
+   identify.py found. Coverage measured 2026-10-20: Entra ID sign-in 18, Linux sshd 1 +
+   syslog 22, Windows 2,424 (no reader yet); **PAN-OS, Check Point and FortiGate traffic
+   0** (one generic firewall rule; the 7 FortiGate rules are for admin/config logs).
+2. **Correlations taken from the examples in the Sigma correlation specification v2.1.0**
+   (logic and format both published): "Many failed logins" (`event_count`), failed logons
+   with many accounts per source (`value_count`), "Multiple Failed Logins Followed by
+   Successful Login" (`temporal_ordered`), "Possible Exfiltration" (`value_sum` of
+   bytes). Port scan and beaconing have no published example and are dropped.
+3. **Threat-intel matching** of addresses against the feeds in `DATA_DIR/intel/`
+   (STIX 2.1 and the published block lists) - standard data, no logic of ours beyond
+   the equality join.
+
+Consequences, stated so they are not discovered later:
+- Firewall traffic files keep only (2)'s exfiltration sum and (3); the brute-force,
+  scan, policy-gap and beaconing findings the corpus has today disappear. The analyst
+  reads the timeline, with the AI suggesting events (AI section).
+- Sigma rules match on their own field names: events must be stored in a standard
+  schema (OCSF, revision 3) and mapped with pySigma's OCSF processing pipeline, or an
+  equivalent mapping we document.
+- pySigma (LGPL-2.1, 2.0.1) has no DuckDB backend; its SQLite backend claims every
+  correlation type but uses SQLite-only SQL. A spike decides between running that
+  output on DuckDB, evaluating rules in SQLite, or a converter of our own for the
+  subset used.
+- `severity.py` escalation, `rule_meta.py` (the ADS documentation of our rules),
+  `areas.py`, confidence's rule families and the R-ids in the baseline, tests and
+  related findings all depend on the 20 rules and are re-based in the stories below.
+
+Still open:
+- Q10 Correlation thresholds: the spec examples' values (e.g. >= 100 failed logins in
+  an hour) as defaults, or set by the analyst per case? Proposed: spec values as
+  defaults, shown on the finding, adjustable per case later.
+
+Stories (to create): (a) spike - Sigma rules on DuckDB, and the OCSF field mapping;
+(b) OCSF event store; (c) Sigma rule engine with DRL attribution, SigmaHQ release
+pinned and its hash recorded; (d) the four spec correlations; (e) retire rules.py and
+re-base everything that reads R-ids; (f) baseline re-taken and explained.
+
 ## Open questions
 
 - **Q1** A rejection for `better_technique` says the ATT&CK mapping is wrong, not that the
