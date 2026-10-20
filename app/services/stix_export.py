@@ -18,8 +18,8 @@ learning this tool's schema. What is emitted:
   3->50, 4->30, 5->10; 6 has no value and is omitted).
 - one `report` that references all of it, naming the evidence SHA-256.
 
-Findings whose rule carries no ATT&CK technique (R1001 login success, R1003
-connection, R1004 password change - context, not techniques) have nothing
+Findings whose rule carries no ATT&CK technique (R2004 policy gap - a
+firewall observation, not a technique) have nothing
 to be a sighting *of*; they are left out and the report says how many.
 
 SDO/SRO ids are UUIDv5 under this tool's own namespace over the case and

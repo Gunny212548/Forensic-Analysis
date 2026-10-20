@@ -10,7 +10,7 @@ ask it to infer it. The AI narrative is then given this record as context.
 What goes in, and why each choice is what a log can support:
 
 - Only findings in the workflow (Sigma high/critical, lifecycle.py) - the
-  alert-worthy ones. Medium noise such as R3000 would otherwise turn every
+  alert-worthy ones. Medium noise such as the former R3000 would otherwise turn every
   internal user of a risky app into an "internal actor". A case with none
   has no VERIS record.
 - **Actor** is the attacking side of each finding: the source for auth,
@@ -49,24 +49,20 @@ GMT7 = timezone(timedelta(hours=7))
 
 # rule -> (VERIS action category, variety, whose address is the actor)
 ACTION = {
-    "R1000": ("hacking", "Brute force", "src"),
-    "R1002": ("hacking", "Brute force", "src"),
     "R2000": ("hacking", "Brute force", "src"),
     "R2005": ("hacking", "Brute force", "src"),
-    "R1001": ("hacking", "Use of stolen creds", "src"),
+    "R2009": ("hacking", "Brute force", "src"),
+    "R2008": ("hacking", "Use of stolen creds", "src"),
     "R2006": ("hacking", "Use of stolen creds", "src"),
-    "R2001": ("hacking", "Scan network", "src"),
     "R2002": ("hacking", "Scan network", "src"),
     "R2003": ("hacking", "Scan network", "src"),
     "R3004": ("hacking", "Scan network", "src"),
-    "R3006": ("hacking", "Scan network", "src"),
     "R2004": ("hacking", "Unknown", "src"),
     "R2007": ("malware", "C2", "dst"),
     "R3003": ("malware", "C2", "dst"),
     "R3005": ("malware", "C2", "dst"),
     "R3002": ("malware", "Downloader", "dst"),
     "R3001": ("malware", "Export data", "dst"),
-    "R3000": ("malware", "Unknown", "dst"),
 }
 _VECTOR = {"openssh-sshd": "Command shell", "entra-signin": "Web application"}
 

@@ -23,10 +23,14 @@ a text log:
 
 ## What they contain and what the app must find
 
-| file | records | shape | expected | measured 2026-10-14 |
+| file | records | shape | expected | measured 2026-10-20 |
 |---|---|---|---|---|
-| `azuread_signin.jsonl` | 31 | one source (82.1.1.35), 31 accounts, all `errorCode` 50126 | every row a failed sign-in, and the burst from one source correlated | R1000 x31, R2000 x31 - case `medium` |
-| `azure_ad_distributed_spray.jsonl` | 31 | 30 sources, 31 accounts, one 50126 each, within 26 s | every row a failed sign-in | R1000 x31 only - **no correlation rule sees a distributed spray** (each source fails once, each account from one source) |
+| `azuread_signin.jsonl` | 31 | one source (82.1.1.35), 31 accounts, all `errorCode` 50126 | every row a failed sign-in, and the burst from one source correlated | R2000 x31, **R2009 x31 (password spray)** - case `medium` |
+| `azure_ad_distributed_spray.jsonl` | 31 | 30 sources, 31 accounts, one 50126 each, within 26 s | every row a failed sign-in | **0 findings** - every row is a failed sign-in (layer A, on the event), and **no correlation rule sees a distributed spray** (each source fails once, each account from one source); a time window across sources is the next rules story |
+
+Until 2026-10-20 each failed sign-in was also a finding (R1000 x31 in both
+files); single sign-in events are the event type now, not findings
+(`specs/rules_review.md`).
 
 Read with the documented profile, no field guessed; the account is
 `properties.userPrincipalName`. Without the profile (guessing only) both files

@@ -33,7 +33,8 @@ Two layers, applied in this order after the rules have run:
 
      credential-compromise  high. A source brute-forced an account (R2000)
                             and later logged in to it from that same source -
-                            T1110 -> T1078. Not critical: the log cannot tell
+                            T1110 -> T1078. The login is R2008; this raises
+                            the attack's own rows to match. Not critical: the log cannot tell
                             an attacker who guessed the password from an
                             owner who mistyped it three times, and Sigma keeps
                             critical for near-certainty.
@@ -89,7 +90,9 @@ def level_of(lvl: int | None) -> str | None:
 
 
 # Everything an authentication attack leaves on the (source, account) pair.
-_AUTH_RULES = "('R1000', 'R1001', 'R1002', 'R2000', 'R2005', 'R2006')"
+# Single sign-in events are not findings since 2026-10-20 (rules.py, layer A);
+# the successful login itself is R2008, which is already high.
+_AUTH_RULES = "('R2000', 'R2005', 'R2006', 'R2008', 'R2009')"
 
 
 def _escalations() -> list[tuple[str, str]]:

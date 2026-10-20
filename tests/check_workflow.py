@@ -40,7 +40,7 @@ FAILED: list[str] = []
 FD = re.compile(r"^FD-\d{4}-\d{4}$")
 A_EMAIL, A_PW = "analyst@workflow.local", "workflow-throwaway-pw-1"
 B_EMAIL, B_PW = "lead@workflow.local", "workflow-throwaway-pw-2"
-AUTH_RULES = {"R1000", "R1001", "R1002", "R1003", "R1004", "R2000", "R2005", "R2006"}
+AUTH_RULES = {"R2000", "R2005", "R2006", "R2008", "R2009"}
 
 
 def check(ok: bool, what: str) -> None:
@@ -62,8 +62,8 @@ def unit_related() -> None:
     rows = [
         row("R2002", "1.1.1.1", ["2.2.2.2"]),           # attacker -> victim
         row("R3001", "2.2.2.2", ["3.3.3.3"]),           # victim pivots onward
-        row("R3000", "9.9.9.9", ["3.3.3.3"]),           # only shares the final target
-        row("R2005", "5.5.5.5", [], user="alice"),      # spray on an account
+        row("R3003", "9.9.9.9", ["3.3.3.3"]),           # only shares the final target
+        row("R2005", "5.5.5.5", [], user="alice"),      # guessing on an account
         row("R2006", "6.6.6.6", [], user="alice"),
         row("R2005", "7.7.7.7", [], user="bob"),        # another account
     ]

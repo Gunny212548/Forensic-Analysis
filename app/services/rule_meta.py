@@ -62,7 +62,7 @@ RULE_META: dict[str, dict] = {
     "R1000": {
         "id": "d8e0240f-a400-4d41-a280-0216641e2277",
         "title": "Authentication failure",
-        "status": "test",
+        "status": "deprecated",
         "techniques": ["T1110.001"],
         "category": "authentication", "log_sources": AUTH_SOURCES,
         "falsepositives": ["A user mistyping their own password"],
@@ -74,13 +74,14 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "Log sources with no auth outcome (firewall traffic) can never produce it.",
             "validation": "ESXi auth.log and the Entra ID export in the corpus; nightfall-auth.log "
                           "expects 8 (tests/README.md).",
-            "response": "Low on its own - read it through R2000/R2005 on the same source or account.",
+            "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A): every failed sign-in is shown on the event; R2000, R2005 and R2009 count them "
+                        "(specs/rules_review.md).",
         },
     },
     "R1001": {
         "id": "f22d1320-bb96-40e9-840b-d8877663c116",
         "title": "Successful authentication",
-        "status": "test",
+        "status": "deprecated",
         "techniques": [],
         "category": "authentication", "log_sources": AUTH_SOURCES,
         "falsepositives": ["Ordinary logins - this rule exists for context, not as an alert"],
@@ -91,14 +92,14 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "Cannot tell an owner from an attacker holding the password - that is "
                            "what credential-compromise (severity.py) and R2006 are for.",
             "validation": "ESXi and Entra ID corpus files; nightfall-auth.log expects 3.",
-            "response": "None alone. Raised to high by credential-compromise when it follows a "
-                        "brute force from the same source.",
+            "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A); the login after an attack is R2008 "
+                        "(specs/rules_review.md).",
         },
     },
     "R1002": {
         "id": "5015bccb-5e4d-47ae-a4db-08d914d52ec9",
         "title": "Login attempt for a non-existent account",
-        "status": "experimental",
+        "status": "deprecated",
         "techniques": ["T1110.003", "T1087"],
         "category": "authentication", "log_sources": ["openssh-sshd"],
         "falsepositives": ["Misconfigured automation using a removed account name"],
@@ -109,13 +110,14 @@ RULE_META: dict[str, dict] = {
                                  "which no profile maps yet.",
             "blind_spots": "Every log source except sshd.",
             "validation": "Synthetic only (nightfall-auth.log expects 3); no hit in the real corpus.",
-            "response": "Check whether the same source also brute-forced (R2000).",
+            "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A); R2009 counts non-existent accounts as part of a spray "
+                        "(specs/rules_review.md).",
         },
     },
     "R1003": {
         "id": "b3166831-2475-49c7-9ec8-330cb9478027",
         "title": "SSH connection opened",
-        "status": "test",
+        "status": "deprecated",
         "techniques": [],
         "category": "authentication", "log_sources": ["openssh-sshd"],
         "falsepositives": ["Every legitimate SSH session"],
@@ -126,13 +128,14 @@ RULE_META: dict[str, dict] = {
                                  "not stored as a destination port (gotcha #4).",
             "blind_spots": "sshd only.",
             "validation": "ESXi auth.log; nightfall-auth.log expects 4.",
-            "response": "None - informational.",
+            "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A) "
+                        "(specs/rules_review.md).",
         },
     },
     "R1004": {
         "id": "0c639136-db9e-48ff-8ecc-7e49c88b2465",
         "title": "Account password changed",
-        "status": "test",
+        "status": "deprecated",
         "techniques": [],
         "category": "authentication", "log_sources": ["linux-pam"],
         "falsepositives": ["Scheduled or self-service password rotation",
@@ -145,7 +148,8 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "No log source other than PAM; changes made in a directory service.",
             "validation": "ESXi auth.log: 138 rows, every one the vpxuser service account's "
                           "rotation; nightfall-auth.log expects 1.",
-            "response": "Check it against the timeline of any compromised account on the host.",
+            "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A) "
+                        "(specs/rules_review.md).",
         },
     },
     "R2000": {
@@ -162,14 +166,14 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "Low-and-slow guessing spread across sources - R2005 covers that axis "
                            "(gotcha #14). No time window: three failures months apart still count.",
             "validation": "ESXi auth.log; nightfall-auth.log expects 8.",
-            "response": "Look for a later success from the same source - severity.py raises that "
-                        "path to high (credential-compromise).",
+            "response": "Look for a later success from the same source - R2008 flags it and "
+                        "severity.py raises the path to high (credential-compromise).",
         },
     },
     "R2001": {
         "id": "0fba7271-1c22-4e20-9779-d1c5c60a081f",
         "title": "Repeated blocked connections from one source",
-        "status": "test",
+        "status": "deprecated",
         "techniques": ["T1595"],
         "category": "firewall", "log_sources": FIREWALL_SOURCES,
         "falsepositives": ["Internet background scanning of any public address",
@@ -181,7 +185,8 @@ RULE_META: dict[str, dict] = {
                                  "brute-force tag made the narrative misread port-scan denies.",
             "blind_spots": "Sources the firewall allowed.",
             "validation": "Palo Alto corpus; nightfall-firewall.csv expects 15.",
-            "response": "Low: confirm nothing from the same source was allowed (R2004).",
+            "response": "Deprecated 2026-10-20 - no longer a finding; now a context fact (layer C): the events table shows how often a source was refused "
+                        "(specs/rules_review.md).",
         },
     },
     "R2002": {
@@ -226,7 +231,7 @@ RULE_META: dict[str, dict] = {
         "id": "328ae7d5-8acd-46f2-a0d6-57e83dca8ae4",
         "title": "Traffic allowed from a mostly-blocked source",
         "status": "test",
-        "techniques": ["T1133"],
+        "techniques": [],
         "category": "firewall", "log_sources": FIREWALL_SOURCES,
         "falsepositives": ["A user who hits a few blocked sites among normal browsing "
                            "(excluded by the >=20 denies and 3x guard)"],
@@ -244,15 +249,17 @@ RULE_META: dict[str, dict] = {
     },
     "R2005": {
         "id": "ac38c2b7-cdc7-4edb-9890-f7ad338a2bba",
-        "title": "Password spray against one account",
+        "title": "Distributed password guessing against one account",
         "status": "test",
-        "techniques": ["T1110.003"],
+        "techniques": ["T1110.001"],
         "category": "authentication", "log_sources": AUTH_SOURCES,
         "falsepositives": ["A roaming user failing once from each of several networks"],
         "ads": {
             "goal": "Catch guessing spread across sources, which per-source counting misses.",
             "strategy": "Accounts with failures from >=5 distinct sources.",
-            "technical_context": "Pairs with R2000 on the other axis (gotcha #14).",
+            "technical_context": "Pairs with R2000 on the other axis (gotcha #14). Named a password "
+                                 "spray until 2026-10-20; ATT&CK's spraying (T1110.003) is many "
+                                 "accounts, which is R2009 - one account is guessing (T1110.001).",
             "blind_spots": "Sprays under 5 sources; no time window.",
             "validation": "Entra ID export (14 sources, one account) and ESXi root (6 sources).",
             "response": "Check every source that later succeeded on the account.",
@@ -295,10 +302,54 @@ RULE_META: dict[str, dict] = {
             "response": "High: identify the destination - the rule localises, the analyst decides.",
         },
     },
+    "R2008": {
+        "id": "8dbc6e85-be17-4f98-a13b-63d93edf1342",
+        "title": "Login succeeded after brute force",
+        "status": "test",
+        "techniques": ["T1078"],
+        "category": "authentication", "log_sources": AUTH_SOURCES,
+        "falsepositives": ["The owner mistyping a password three times and then getting it right "
+                           "from the same address"],
+        "ads": {
+            "goal": "Flag the login that followed an attack - the moment the attacker got in.",
+            "strategy": "A success for an account from a source R2000 counts as brute-forcing, "
+                        "after that source's first failure on the same account; the success rows "
+                        "are flagged.",
+            "technical_context": "Shares R2000's source condition (rules.BRUTE_FORCE_SOURCES). Was "
+                                 "severity.py raising an R1001 login finding until R1001 became an "
+                                 "event type (2026-10-20).",
+            "blind_spots": "A login from a different address than the attack; no time window yet - "
+                           "a success months after the failures still counts.",
+            "validation": "Same condition credential-compromise used on the ESXi auth.log and the "
+                          "Entra ID export; nightfall-auth.log expects 1.",
+            "response": "High: treat the account as compromised until the owner confirms the login.",
+        },
+    },
+    "R2009": {
+        "id": "0fad7436-42f6-4dd8-bae2-fd5bf1a35815",
+        "title": "Password spray from one source",
+        "status": "experimental",
+        "techniques": ["T1110.003"],
+        "category": "authentication", "log_sources": AUTH_SOURCES,
+        "falsepositives": ["A shared jump host or NAT address where several users mistype passwords"],
+        "ads": {
+            "goal": "Detect one source trying many accounts - ATT&CK's password spraying.",
+            "strategy": "Sources whose failed sign-ins and non-existent-account attempts name >=3 "
+                        "distinct accounts (case-insensitive); those rows are flagged.",
+            "technical_context": "Threshold measured 2026-10-20: 71 sources in the customers' own "
+                                 "logs each failed on exactly 1 account; recorded attacks reached "
+                                 "4 and 31 (rules.SPRAY_MIN_ACCOUNTS).",
+            "blind_spots": "A spray spread across many sources, each trying few accounts; no time "
+                           "window yet.",
+            "validation": "Splunk attack_data Entra spray capture (31 accounts from one source); "
+                          "nightfall-auth.log expects 11. Small real sample - experimental.",
+            "response": "Medium: list the accounts tried and check each for a later success (R2008).",
+        },
+    },
     "R3000": {
         "id": "6b3736f8-3d98-420e-9c6d-ec5d076724c1",
         "title": "High-risk application allowed",
-        "status": "test",
+        "status": "deprecated",
         "techniques": ["T1071"],
         "category": "firewall", "log_sources": ["paloalto-traffic"],
         "falsepositives": ["Sanctioned use of applications App-ID rates risk 4-5"],
@@ -309,7 +360,8 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "Log sources without an application risk rating.",
             "validation": "Palo Alto corpus; fires alone on ordinary hosts, which is why it is "
                           "medium (gotcha #24). nightfall-firewall.csv expects 6.",
-            "response": "Medium: decide whether the application is sanctioned.",
+            "response": "Deprecated 2026-10-20 - no longer a finding; now a context fact (layer C): the events table shows the vendor's application risk "
+                        "(specs/rules_review.md).",
         },
     },
     "R3001": {
@@ -400,7 +452,7 @@ RULE_META: dict[str, dict] = {
     "R3006": {
         "id": "5f0c3b68-50c0-4e51-9d35-0e55dcc1e7a0",
         "title": "Blocked inbound traffic from a known-bad address",
-        "status": "experimental",
+        "status": "deprecated",
         "techniques": ["T1595"],
         "category": "firewall", "log_sources": FIREWALL_SOURCES,
         "falsepositives": ["All of it, usually - the perimeter doing its job"],
@@ -410,7 +462,8 @@ RULE_META: dict[str, dict] = {
             "technical_context": "Informational by design.",
             "blind_spots": "None that matter for an alert.",
             "validation": "Not separately measured on the current corpus.",
-            "response": "None.",
+            "response": "Deprecated 2026-10-20 - no longer a finding; now a context fact (layer C): the events table shows the threat-intel listing "
+                        "(specs/rules_review.md).",
         },
     },
 }
@@ -501,6 +554,13 @@ def problems() -> list[str]:
                 out.append(f"{rid}: no tactic mapping for {t}")
         if rid not in RULE_LEVEL:
             out.append(f"{rid}: no Sigma level in RULE_LEVEL")
-    extra = set(RULE_META) - {rid for rid, _ in RULES}
+    # A rule taken out of rules.py keeps its metadata as `deprecated`, so a
+    # case processed before still explains its findings; anything else left
+    # behind is a stale entry.
+    running = {rid for rid, _ in RULES}
+    extra = {rid for rid in set(RULE_META) - running
+             if RULE_META[rid]["status"] != "deprecated"}
     out += [f"{rid}: metadata for a rule that does not exist" for rid in sorted(extra)]
+    out += [f"{rid}: deprecated but still in rules.py" for rid in sorted(running)
+            if RULE_META.get(rid, {}).get("status") == "deprecated"]
     return out

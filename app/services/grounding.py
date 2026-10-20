@@ -17,7 +17,7 @@ Two halves, both computed per call from the same facts:
 
 Stages come from the ATT&CK tactics of the tagged techniques (rule_meta's
 TACTICS, the same map the Sigma tags use) plus the attack-path escalations,
-never from the model. A rule without a technique tag (R1001, R1003, R1004)
+never from the model. A rule without a technique tag (R2004)
 therefore cannot put a stage on the chain: the narrative says less, and
 everything it does say has a rule behind it.
 

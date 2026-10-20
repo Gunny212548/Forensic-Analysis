@@ -144,6 +144,9 @@
   .cell-sub { font-size: 11px; color: var(--muted); }
   .raw-cell { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-family: var(--mono); font-size: 11px; }
+  /* Layer C facts on an event: neutral on purpose - a fact, not a severity. */
+  .context-chip { display: inline-block; font-size: 11px; color: var(--muted); background: var(--subtle);
+    border-radius: 999px; padding: 1px 8px; margin: 1px 4px 1px 0; white-space: nowrap; }
   .sev-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
     padding: 2px 9px; border-radius: 999px; }
   .sev-tag::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }

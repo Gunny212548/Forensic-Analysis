@@ -12,12 +12,10 @@
   "rules": {}
  },
  "KM23_ITSupport_InteractiveSignIns_2026-06-04_2026-06-11.csv": {
-  "flagged": 79,
+  "flagged": 38,
   "md5": "ffc6a9e77de9b10124b12e79baafd8c3",
   "rows": 91,
   "rules": {
-   "R1000": 14,
-   "R1001": 65,
    "R2005": 14,
    "R2006": 24
   }
@@ -33,7 +31,6 @@
   "md5": "1dd8810976d566023f67083a97961d9f",
   "rows": 45209,
   "rules": {
-   "R2001": 42223,
    "R2003": 42223,
    "R2004": 2978
   }
@@ -57,41 +54,34 @@
   "rules": {}
  },
  "ad_ssh.csv": {
-  "flagged": 95,
+  "flagged": 0,
   "md5": "f523560b5833fcfae2ae078710e38a89",
   "rows": 95,
-  "rules": {
-   "R3000": 95
-  }
+  "rules": {}
  },
  "auth.log": {
-  "flagged": 329,
+  "flagged": 63,
   "md5": "884c2572a65a72b413af840f1dfe8998",
   "rows": 776,
   "rules": {
-   "R1000": 39,
-   "R1001": 39,
-   "R1003": 113,
-   "R1004": 138,
    "R2000": 35,
-   "R2005": 39
+   "R2005": 39,
+   "R2008": 24
   }
  },
  "azure_ad_distributed_spray.jsonl": {
-  "flagged": 31,
+  "flagged": 0,
   "md5": "93860523578bb0f9a68f4aba11a9fcac",
   "rows": 31,
-  "rules": {
-   "R1000": 31
-  }
+  "rules": {}
  },
  "azuread_signin.jsonl": {
   "flagged": 31,
   "md5": "8cf574a029823ea89ebbfb3a87027816",
   "rows": 31,
   "rules": {
-   "R1000": 31,
-   "R2000": 31
+   "R2000": 31,
+   "R2009": 31
   }
  },
  "cisco_asa_generic_logs.log": {
@@ -119,21 +109,18 @@
   "rules": {}
  },
  "dst10-8-2-37.csv": {
-  "flagged": 299,
+  "flagged": 82,
   "md5": "d0aa0e05e1b09d5ab0099f97d0b20fdb",
   "rows": 5120,
   "rules": {
-   "R3000": 217,
    "R3001": 82
   }
  },
  "dst10-8-3-215.csv": {
-  "flagged": 4990,
+  "flagged": 0,
   "md5": "12c363684706c2e217ddfce2dcc586b3",
   "rows": 11969,
-  "rules": {
-   "R2001": 4990
-  }
+  "rules": {}
  },
  "esxupdate.log": {
   "flagged": 0,
@@ -172,48 +159,36 @@
   "rules": {}
  },
  "log.csv": {
-  "flagged": 33,
+  "flagged": 0,
   "md5": "857f3e790f79944a3afec6e4db7194a0",
   "rows": 35,
-  "rules": {
-   "R3000": 33
-  }
+  "rules": {}
  },
  "log_10_.csv": {
-  "flagged": 389,
+  "flagged": 103,
   "md5": "436b6d03d628b915f92cf7f3f4f80120",
   "rows": 7467,
   "rules": {
-   "R3000": 286,
    "R3001": 103
   }
  },
  "log_11_.csv": {
-  "flagged": 5908,
+  "flagged": 0,
   "md5": "2784103cc4e42ce1fc6fae791217f92e",
   "rows": 13881,
-  "rules": {
-   "R2001": 5906,
-   "R3000": 2
-  }
+  "rules": {}
  },
  "log_12_.csv": {
-  "flagged": 5908,
+  "flagged": 0,
   "md5": "2784103cc4e42ce1fc6fae791217f92e",
   "rows": 13881,
-  "rules": {
-   "R2001": 5906,
-   "R3000": 2
-  }
+  "rules": {}
  },
  "log_13_.csv": {
-  "flagged": 11324,
+  "flagged": 0,
   "md5": "30783b98503148a14fd697a51648c69c",
   "rows": 65534,
-  "rules": {
-   "R2001": 11314,
-   "R3000": 10
-  }
+  "rules": {}
  },
  "log_14_.csv": {
   "flagged": 0,
@@ -222,12 +197,10 @@
   "rules": {}
  },
  "log_15_.csv": {
-  "flagged": 25,
+  "flagged": 0,
   "md5": "98ae76e13e59329a8407733fb9230f4e",
   "rows": 59853,
-  "rules": {
-   "R3000": 25
-  }
+  "rules": {}
  },
  "log_16_.csv": {
   "flagged": 0,
@@ -254,12 +227,10 @@
   "rules": {}
  },
  "log_1_.csv": {
-  "flagged": 32,
+  "flagged": 0,
   "md5": "7cfba2aa8481f396032e4d7319f39bb8",
   "rows": 34,
-  "rules": {
-   "R3000": 32
-  }
+  "rules": {}
  },
  "log_20_.csv": {
   "flagged": 0,
@@ -274,135 +245,111 @@
   "rules": {}
  },
  "log_22_.csv": {
-  "flagged": 14832,
+  "flagged": 318,
   "md5": "e12f53cfdfeabcee0e68f6bbd17d31aa",
   "rows": 20530,
   "rules": {
-   "R3000": 14514,
    "R3004": 318
   }
  },
  "log_23_.csv": {
-  "flagged": 14833,
+  "flagged": 319,
   "md5": "c82c5160d0090404f2bf6468744944d9",
   "rows": 20531,
   "rules": {
-   "R3000": 14514,
    "R3004": 319
   }
  },
  "log_24_.csv": {
-  "flagged": 14833,
+  "flagged": 319,
   "md5": "c82c5160d0090404f2bf6468744944d9",
   "rows": 20531,
   "rules": {
-   "R3000": 14514,
    "R3004": 319
   }
  },
  "log_25_.csv": {
-  "flagged": 1067,
+  "flagged": 93,
   "md5": "e1af82c59a4860617421aaad052f01c3",
   "rows": 1941,
   "rules": {
-   "R3000": 976,
    "R3001": 1,
    "R3004": 92
   }
  },
  "log_26_.csv": {
-  "flagged": 1067,
+  "flagged": 93,
   "md5": "e1af82c59a4860617421aaad052f01c3",
   "rows": 1941,
   "rules": {
-   "R3000": 976,
    "R3001": 1,
    "R3004": 92
   }
  },
  "log_27_.csv": {
-  "flagged": 185,
+  "flagged": 74,
   "md5": "9fce9f35e55bd14bb300d728f3c10659",
   "rows": 1178,
   "rules": {
-   "R3000": 112,
    "R3001": 1,
    "R3004": 73
   }
  },
  "log_28_.csv": {
-  "flagged": 22,
+  "flagged": 0,
   "md5": "1749303b6de6a7cba00d299b1f95d96d",
   "rows": 22,
-  "rules": {
-   "R3000": 22
-  }
+  "rules": {}
  },
  "log_29_.csv": {
-  "flagged": 78,
+  "flagged": 0,
   "md5": "9c88ac73269f438fe5a46894f55ae00c",
   "rows": 102,
-  "rules": {
-   "R3000": 78
-  }
+  "rules": {}
  },
  "log_2_.csv": {
-  "flagged": 61,
+  "flagged": 0,
   "md5": "ab2f73884eed5b04144891d013759a9b",
   "rows": 63,
-  "rules": {
-   "R3000": 61
-  }
+  "rules": {}
  },
  "log_30_.csv": [
   {
-   "flagged": 78,
+   "flagged": 0,
    "md5": "9c88ac73269f438fe5a46894f55ae00c",
    "rows": 102,
-   "rules": {
-    "R3000": 78
-   }
+   "rules": {}
   },
   {
-   "flagged": 78,
+   "flagged": 0,
    "md5": "f7046aec183b27bc41fe7a4662f9cdc3",
    "rows": 102,
-   "rules": {
-    "R3000": 78
-   }
+   "rules": {}
   }
  ],
  "log_3_.csv": {
-  "flagged": 61,
+  "flagged": 0,
   "md5": "ab2f73884eed5b04144891d013759a9b",
   "rows": 63,
-  "rules": {
-   "R3000": 61
-  }
+  "rules": {}
  },
  "log_4_.csv": {
-  "flagged": 61,
+  "flagged": 0,
   "md5": "ab2f73884eed5b04144891d013759a9b",
   "rows": 63,
-  "rules": {
-   "R3000": 61
-  }
+  "rules": {}
  },
  "log_5_.csv": {
-  "flagged": 46,
+  "flagged": 0,
   "md5": "2313e67d66d27e477192f55f3067a5f4",
   "rows": 48,
-  "rules": {
-   "R3000": 46
-  }
+  "rules": {}
  },
  "log_6_.csv": {
-  "flagged": 46,
+  "flagged": 0,
   "md5": "e325db0439e505b901c2ec69da9a3f05",
   "rows": 48,
-  "rules": {
-   "R3000": 46
-  }
+  "rules": {}
  },
  "log_7_.csv": {
   "flagged": 0,
@@ -411,68 +358,63 @@
   "rules": {}
  },
  "log_8_-01.txt": {
-  "flagged": 14434,
+  "flagged": 0,
   "md5": "b0f5fa30be6ce5d3ea1f429bb09581cd",
   "rows": 18776,
-  "rules": {
-   "R3000": 14434
-  }
+  "rules": {}
  },
  "log_8_.csv": {
-  "flagged": 14434,
+  "flagged": 0,
   "md5": "e32746223b9eabd4767f99be7aea4927",
   "rows": 18776,
-  "rules": {
-   "R3000": 14434
-  }
+  "rules": {}
  },
  "log_9_.csv": {
-  "flagged": 48,
+  "flagged": 0,
   "md5": "7c47a4a677e7d74683564e6478a0a7de",
   "rows": 97,
-  "rules": {
-   "R2001": 48
-  }
+  "rules": {}
  },
  "nightfall-auth.log": {
-  "flagged": 19,
+  "flagged": 12,
   "md5": "8f27bc39aa9b21498601f0595a262ad8",
   "rows": 19,
   "rules": {
-   "R1000": 8,
-   "R1001": 3,
-   "R1002": 3,
-   "R1003": 4,
-   "R1004": 1,
-   "R2000": 8
+   "R2000": 8,
+   "R2008": 1,
+   "R2009": 11
   }
  },
- "nightfall-firewall-nested.jsonl.gz": {
-  "flagged": 0,
-  "md5": "9b8186bda8a960622e6cfc40d519300a",
-  "rows": 0,
-  "rules": {}
- },
+ "nightfall-firewall-nested.jsonl.gz": [
+  {
+   "flagged": 0,
+   "md5": "47b1f96169998f7aa0e60bc538032ae1",
+   "rows": 0,
+   "rules": {}
+  },
+  {
+   "flagged": 0,
+   "md5": "9b8186bda8a960622e6cfc40d519300a",
+   "rows": 0,
+   "rules": {}
+  }
+ ],
  "nightfall-firewall.csv": {
-  "flagged": 21,
+  "flagged": 18,
   "md5": "1576144a3f04ddd89990a7242c376438",
   "rows": 26,
   "rules": {
-   "R2001": 15,
    "R2002": 15,
-   "R3000": 6,
    "R3001": 2,
    "R3002": 1
   }
  },
  "nightfall-firewall.json": {
-  "flagged": 21,
+  "flagged": 18,
   "md5": "56e8d58d9035f0582ffd4611e167c631",
   "rows": 26,
   "rules": {
-   "R2001": 15,
    "R2002": 15,
-   "R3000": 6,
    "R3001": 2,
    "R3002": 1
   }
@@ -496,23 +438,19 @@
   "rules": {}
  },
  "src10-8-2-37.csv": {
-  "flagged": 6748,
+  "flagged": 2,
   "md5": "af57501854c1ceb0ad72723adb8f71a9",
   "rows": 8702,
   "rules": {
-   "R2001": 9,
-   "R3000": 6739,
    "R3001": 2
   }
  },
  "src10-8-3-215.csv": {
-  "flagged": 18888,
+  "flagged": 1175,
   "md5": "386d3134becb5c4923bc8a4b576459fe",
   "rows": 25579,
   "rules": {
-   "R2001": 6607,
    "R2007": 1167,
-   "R3000": 12281,
    "R3001": 8
   }
  },

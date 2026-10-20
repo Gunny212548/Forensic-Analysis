@@ -15,9 +15,21 @@ Rules insert lvl as NULL. The level is declared once per rule in RULE_LEVEL
 severity.escalate() for findings on a successful attack path.
 
 Rule id conventions:
-  R1xxx  single-event, host/auth logs
   R2xxx  correlation / aggregate
-  R3xxx  single-event, network/firewall (CSV)
+  R3xxx  single-event, network/firewall
+
+What is a rule and what is not (specs/rules_review.md, the user's D12/D13 of
+2026-10-20). A rule answers "does this fit a known attack pattern?" - layer B.
+"What is this event?" (layer A) is the event's own `action` / `verdict`,
+written by the log source profile; the former R1000-R1004 named exactly that
+and made every login a finding to review, so they are gone. "Is it unusual
+here?" (layer C) is a fact shown on the event (db.list_raw), never a finding;
+R2001 (refused repeatedly), R3000 (the vendor's app risk) and R3006 (a listed
+scanner refused) moved there. Their metadata stays in rule_meta.py, status
+`deprecated`, so cases processed before still show what their findings were.
+
+Correlation rules still count over the whole evidence item; time windows are
+the next story (rules_review.md Q18, measured on our own data).
 """
 
 import duckdb
@@ -29,74 +41,34 @@ DENY_VERDICTS = (
     "'reset-both', 'reset-client', 'reset-server', 'block-url')"
 )
 
-RULES: list[tuple[str, str]] = [
-    # ---------- R1xxx: single-event, auth / host logs ----------
-    ("R1000", """
-        INSERT INTO findings
-        SELECT row_id, 'R1000', NULL,
-               'Authentication failed for ' || coalesce(username, '?') ||
-               ' from ' || coalesce(srcip, '?'),
-               ['T1110.001']
-        FROM raw_events WHERE action = 'auth_failed'
-    """),
-    ("R1001", """
-        INSERT INTO findings
-        SELECT row_id, 'R1001', NULL,
-               'Login succeeded for ' || coalesce(username, '?') ||
-               ' from ' || coalesce(srcip, '?'),
-               []::VARCHAR[]
-        FROM raw_events WHERE action = 'auth_success'
-    """),
-    ("R1002", """
-        INSERT INTO findings
-        SELECT row_id, 'R1002', NULL,
-               'Login attempt with invalid user ''' || coalesce(username, '?') ||
-               ''' from ' || coalesce(srcip, '?'),
-               ['T1110.003', 'T1087']
-        FROM raw_events WHERE action = 'invalid_user'
-    """),
-    ("R1003", """
-        INSERT INTO findings
-        SELECT row_id, 'R1003', NULL,
-               'SSH connection opened from ' || coalesce(srcip, '?'),
-               []::VARCHAR[]
-        FROM raw_events WHERE action = 'connection'
-    """),
-    ("R1004", """
-        INSERT INTO findings
-        SELECT row_id, 'R1004', NULL,
-               'Password changed for ' || coalesce(username, '?'),
-               []::VARCHAR[]
-        FROM raw_events WHERE action = 'password_changed'
-    """),
+# A source counted as brute-forcing: R2000's condition, shared with R2008 so
+# "login after brute force" can never disagree with what R2000 flagged.
+BRUTE_FORCE_SOURCES = """
+    SELECT srcip, count(*) AS n FROM raw_events
+    WHERE action = 'auth_failed' AND srcip IS NOT NULL
+    GROUP BY srcip HAVING count(*) >= 3
+"""
 
+# R2009: distinct accounts one source failed against. Measured 2026-10-20 over
+# every source with a failed sign-in in the store and in the Entra export
+# KM23 (rules_review.md): all 71 sources in the customers' own logs failed
+# against exactly 1 account; the recorded attacks reached 4 (both synthetic
+# scenarios) and 31 (Splunk's Entra spray capture). 3 sits above everything
+# ordinary that was seen and below every attack. 71 sources from two real
+# files is a small sample, hence status experimental.
+SPRAY_MIN_ACCOUNTS = 3
+
+RULES: list[tuple[str, str]] = [
     # ---------- R2xxx: correlation ----------
-    ("R2000", """
+    ("R2000", f"""
         INSERT INTO findings
         SELECT e.row_id, 'R2000', NULL,
                'Repeated brute-force from ' || e.srcip ||
                ' (' || a.n || ' attempts)',
                ['T1110.001']
         FROM raw_events e
-        JOIN (SELECT srcip, count(*) AS n FROM raw_events
-              WHERE action = 'auth_failed' AND srcip IS NOT NULL
-              GROUP BY srcip HAVING count(*) >= 3) a ON e.srcip = a.srcip
+        JOIN ({BRUTE_FORCE_SOURCES}) a ON e.srcip = a.srcip
         WHERE e.action = 'auth_failed'
-    """),
-    # NOTE: tagged as Active Scanning, not Brute Force. Repeated *blocked*
-    # connections are network probing; calling them T1110 made the AI layer
-    # narrate port-scan denies as "brute-force attempts" in testing.
-    ("R2001", f"""
-        INSERT INTO findings
-        SELECT e.row_id, 'R2001', NULL,
-               'Repeated blocked connections from ' || e.srcip ||
-               ' (' || a.n || ' denies)',
-               ['T1595']
-        FROM raw_events e
-        JOIN (SELECT srcip, count(*) AS n FROM raw_events
-              WHERE verdict IN {DENY_VERDICTS} AND srcip IS NOT NULL
-              GROUP BY srcip HAVING count(*) >= 5) a ON e.srcip = a.srcip
-        WHERE e.verdict IN {DENY_VERDICTS}
     """),
     # A scan is a source being *refused* across many ports, so both the count
     # and the rows flagged are restricted to denied traffic. Without that
@@ -153,12 +125,16 @@ RULES: list[tuple[str, str]] = [
     # from the logs alone, without knowing the firewall's rule semantics. The
     # ratio guard keeps ordinary users (a few blocked sites, lots of normal
     # browsing) from matching.
+    # Untagged: it used to carry T1133, which ATT&CK defines as
+    # "external-facing remote services ... such as VPNs, Citrix" - an allowed
+    # connection is that only when the service is one, and nothing here knows
+    # (rules_review.md). A policy observation, not an adversary technique.
     ("R2004", f"""
         INSERT INTO findings
         SELECT e.row_id, 'R2004', NULL,
                'Traffic ALLOWED from ' || e.srcip ||
                ' despite ' || a.denies || ' blocks from the same source (possible policy gap)',
-               ['T1133']
+               []::VARCHAR[]
         FROM raw_events e
         JOIN (SELECT srcip,
                      count(*) FILTER (WHERE verdict IN {DENY_VERDICTS}) AS denies,
@@ -173,17 +149,21 @@ RULES: list[tuple[str, str]] = [
         WHERE e.verdict = 'allow'
     """),
 
-    # Password spray: one account, failures arriving from many different
+    # Distributed guessing: one account, failures arriving from many different
     # sources. R2000 counts failures per *source* and cannot see this - in a
     # real Azure AD export 14 distinct IPv4/IPv6 addresses each failed
     # exactly once against the same account, so every per-source counter
     # stayed at 1 while the account was plainly under attack.
+    # Was called "password spray" (T1110.003) until 2026-10-20; ATT&CK defines
+    # spraying as "a small list of commonly used passwords against many
+    # different accounts" - the opposite shape. Guessing one account's password
+    # is T1110.001 ("systematically guess the password"). Spraying is R2009.
     ("R2005", """
         INSERT INTO findings
         SELECT e.row_id, 'R2005', NULL,
-               'Password spray against ' || e.username || ' from ' ||
+               'Distributed password guessing against ' || e.username || ' from ' ||
                a.n || ' distinct sources',
-               ['T1110.003']
+               ['T1110.001']
         FROM raw_events e
         JOIN (SELECT username, count(DISTINCT srcip) AS n FROM raw_events
               WHERE action = 'auth_failed' AND username IS NOT NULL
@@ -214,6 +194,50 @@ RULES: list[tuple[str, str]] = [
               HAVING count(DISTINCT srcip) >= 4) a
           ON e.username = a.username AND date_trunc('hour', e.ts) = a.hr
         WHERE e.action = 'auth_success'
+    """),
+
+    # The login that followed the attack: a success for an account from a
+    # source that had brute-forced it (R2000's sources) and failed on that
+    # account earlier. This is "the attacker got in" - it used to exist only
+    # as severity.py raising an R1001 login-success finding, and R1001 is no
+    # longer a finding (layer A). Pairs on source *and* account, after the
+    # first failure, for the reasons severity.py gives (the owner logging in
+    # from home while someone else attacks the account is not this).
+    ("R2008", f"""
+        INSERT INTO findings
+        SELECT s.row_id, 'R2008', NULL,
+               'Login succeeded for ' || s.username || ' from ' || s.srcip ||
+               ' after ' || p.n || ' failed attempts from the same source',
+               ['T1078']
+        FROM raw_events s
+        JOIN (SELECT f.srcip, f.username, min(f.ts) AS first_fail, count(*) AS n
+              FROM raw_events f
+              JOIN ({BRUTE_FORCE_SOURCES}) b ON f.srcip = b.srcip
+              WHERE f.action = 'auth_failed' AND f.username IS NOT NULL
+              GROUP BY f.srcip, f.username) p
+          ON s.srcip = p.srcip AND s.username = p.username
+        WHERE s.action = 'auth_success' AND s.ts > p.first_fail
+    """),
+
+    # Password spraying as ATT&CK T1110.003 defines it: one source failing
+    # against many different accounts. A wrong password and a non-existent
+    # account both count - trying names that do not exist is part of it.
+    # Threshold measured, see SPRAY_MIN_ACCOUNTS. Accounts compared
+    # case-insensitively: Entra reports "Joe@x" and "joe@x" as one person.
+    ("R2009", f"""
+        INSERT INTO findings
+        SELECT e.row_id, 'R2009', NULL,
+               'Password spray from ' || e.srcip || ' (' || a.n ||
+               ' distinct accounts failed)',
+               ['T1110.003']
+        FROM raw_events e
+        JOIN (SELECT srcip, count(DISTINCT lower(username)) AS n FROM raw_events
+              WHERE action IN ('auth_failed', 'invalid_user')
+                AND srcip IS NOT NULL AND username IS NOT NULL
+              GROUP BY srcip
+              HAVING count(DISTINCT lower(username)) >= {SPRAY_MIN_ACCOUNTS}) a
+          ON e.srcip = a.srcip
+        WHERE e.action IN ('auth_failed', 'invalid_user') AND e.username IS NOT NULL
     """),
 
     # Beaconing: C2 gives itself away by *regularity*, not volume. Measure
@@ -302,14 +326,6 @@ RULES: list[tuple[str, str]] = [
     """),
 
     # ---------- R3xxx: single-event, network / firewall ----------
-    ("R3000", """
-        INSERT INTO findings
-        SELECT row_id, 'R3000', NULL,
-               'High-risk application ''' || coalesce(app, 'unknown') ||
-               ''' allowed (' || coalesce(srcip, '?') || ' -> ' || coalesce(dstip, '?') || ')',
-               ['T1071']
-        FROM raw_events WHERE verdict = 'allow' AND risk >= 4
-    """),
     ("R3001", """
         INSERT INTO findings
         SELECT row_id, 'R3001', NULL,
@@ -386,21 +402,8 @@ RULES: list[tuple[str, str]] = [
         WHERE e.verdict IS NULL OR e.verdict NOT IN {DENY_VERDICTS}
     """),
 
-    # Inbound from a listed host, blocked at the perimeter. This is the most
-    # routine event in the whole rule set - the internet scans everything and
-    # the firewall dropped it - so it is informational only, kept because an
-    # analyst still wants the perimeter's own hit rate visible.
-    ("R3006", f"""
-        INSERT INTO findings
-        SELECT e.row_id, 'R3006', NULL,
-               'BLOCKED inbound traffic from known-bad indicator ' || e.srcip ||
-               ' (denied at the perimeter) [' || i.source ||
-               CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
-               ['T1595']
-        FROM raw_events e
-        JOIN ioc i ON e.srcip = i.value AND i.type = 'ip'
-        WHERE e.verdict IN {DENY_VERDICTS}
-    """),
+    # (R3006, a listed source refused at the perimeter, is a layer C fact now:
+    # db.list_raw shows the listing on the event.)
 
     ("R3002", """
         INSERT INTO findings
@@ -417,7 +420,7 @@ RULES: list[tuple[str, str]] = [
 
 
 # Short human labels per rule, used to name edges in the SQL-built attack
-# graph (db.build_graph). R1000-R1002/R2000 are deliberately protocol-neutral:
+# graph (db.build_graph). The sign-in rules are deliberately protocol-neutral:
 # they used to say "SSH" because auth.log was the only source, but CSV auth
 # exports (Azure AD sign-ins) now set `action` too, and an SSH label on a web
 # sign-in propagates straight into the AI narrative. The `descr` written into findings is a full
@@ -425,26 +428,20 @@ RULES: list[tuple[str, str]] = [
 # form here. Add one whenever you add a rule; a rule with no entry falls
 # back to its id.
 RULE_LABELS: dict[str, str] = {
-    "R1000": "auth failed",
-    "R1001": "login success",
-    "R1002": "invalid user",
-    "R1003": "SSH connection",
-    "R1004": "password changed",
     "R2000": "brute-force",
-    "R2001": "blocked repeatedly",
     "R2002": "port scan",
     "R2003": "service sweep",
     "R2004": "allowed despite blocks",
-    "R2005": "password spray",
+    "R2005": "distributed guessing",
     "R2006": "multi-source logins",
     "R2007": "beaconing",
-    "R3000": "high-risk app allowed",
+    "R2008": "login after brute force",
+    "R2009": "password spray",
     "R3001": "large transfer",
     "R3002": "malware-flagged",
     "R3003": "known-bad destination (allowed)",
     "R3004": "known-bad source (allowed)",
     "R3005": "known-bad destination (blocked)",
-    "R3006": "known-bad source (blocked)",
 }
 
 
@@ -455,31 +452,17 @@ RULE_LABELS: dict[str, str] = {
 # "rarely an incident" (low), "review regularly" (medium) or "alert and
 # review promptly" (high)? Nothing here is critical - see severity.py.
 RULE_LEVEL: dict[str, str] = {
-    # One successful login or one TCP connection is what normal use looks
-    # like; they exist to give the other rules context.
-    "R1001": "informational",
-    "R1003": "informational",
-    # A listed scanner the perimeter refused: the firewall doing its job,
-    # kept only so its hit rate stays visible.
-    "R3006": "informational",
-    # Single failures, typos and password changes happen every day; they
-    # matter in volume, which is what R2000/R2005 measure.
-    "R1000": "low",
-    "R1002": "low",
-    "R1004": "low",
     # Scanning that the firewall refused: the internet does this to every
     # public address all day, but a sustained sweep is still worth a look.
-    "R2001": "low",
     "R2002": "low",
     "R2003": "low",
     # A real attack attempt, but nothing says it worked yet.
     "R2000": "medium",
     "R2005": "medium",
+    "R2009": "medium",
     "R3005": "medium",
     # Risky or unusual on their own, and each has a common innocent reading:
-    # a high-risk app a user is allowed to run, a backup upload, a scanner
-    # the policy happened to let through.
-    "R3000": "medium",
+    # a backup upload, a scanner the policy happened to let through.
     "R3001": "medium",
     "R3004": "medium",
     # Evidence that something crossed the perimeter or is talking out:
@@ -487,6 +470,7 @@ RULE_LEVEL: dict[str, str] = {
     "R2004": "high",
     "R2006": "high",
     "R2007": "high",
+    "R2008": "high",
     "R3002": "high",
     "R3003": "high",
 }

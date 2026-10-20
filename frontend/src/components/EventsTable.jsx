@@ -5,9 +5,21 @@ import { Empty, MitreTags } from './common.jsx'
 
 const PAGE_SIZE = 100
 
-// Only the two auth outcomes are an auth result; other actions (ssh_probe,
-// session_open, command_exec...) describe the event, not its outcome.
-const AUTH_RESULT = { auth_success: 'Success', auth_failed: 'Failed' }
+// Layer A (specs/rules_review.md): what the event is, from the `action` the
+// log source profile wrote. These replaced rules R1000-R1004, which made every
+// one of them a finding to review. An action not listed is shown as written.
+const EVENT_TYPE = {
+  auth_failed: 'Sign-in failed',
+  auth_success: 'Sign-in succeeded',
+  invalid_user: 'Unknown account',
+  connection: 'Connection opened',
+  password_changed: 'Password changed',
+  session_open: 'Session opened',
+  session_close: 'Session closed',
+  ssh_probe: 'SSH probe',
+  ssh_enabled: 'SSH enabled',
+  ssh_disabled: 'SSH disabled',
+}
 
 /** Paginated, server-side. A case can hold 65k+ rows and 25k findings, so
  *  the client never pulls the whole table - the offset lives here and every
@@ -112,9 +124,10 @@ function AllRows({ events }) {
           <th>source</th>
           <th>destination</th>
           <th>account</th>
-          <th>auth result</th>
+          <th>event</th>
           <th>verdict</th>
           <th>application</th>
+          <th>context</th>
           <th>raw message</th>
         </tr>
       </thead>
@@ -127,9 +140,20 @@ function AllRows({ events }) {
             <td>{e.srcip || ''}</td>
             <td>{e.dstip || ''}</td>
             <td>{e.username || ''}</td>
-            <td>{AUTH_RESULT[e.action] || ''}</td>
+            <td>{EVENT_TYPE[e.action] || e.action || ''}</td>
             <td>{e.verdict || ''}</td>
-            <td>{e.app || ''}</td>
+            <td>
+              {e.app || ''}
+              {e.risk != null ? ` · risk ${e.risk}/5` : ''}
+            </td>
+            {/* Layer C: facts about the event, never a verdict (db.list_raw). */}
+            <td>
+              {(e.context || []).map((c) => (
+                <span key={c} className="context-chip">
+                  {c}
+                </span>
+              ))}
+            </td>
             <td className="raw-cell" title={e.raw || ''}>
               {e.raw || ''}
             </td>

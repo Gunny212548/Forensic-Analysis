@@ -44,26 +44,30 @@ findings** — they're the false-positive check.
 
 ## Expected results
 
-`nightfall-auth.log` — 19 rows, 19 flagged:
+`nightfall-auth.log` — 19 rows, **12** flagged (since 2026-10-20, `specs/rules_review.md`):
 
 | rule | meaning | count |
 |---|---|---|
-| R1000 | SSH auth failed | 8 |
 | R2000 | repeated brute-force (same source) | 8 |
-| R1002 | invalid user | 3 |
-| R1001 | login success | 3 |
-| R1003 | connection opened | 4 |
-| R1004 | password changed | 1 |
+| R2009 | password spray: one source, >=3 accounts (root x8 + 3 invalid users) | 11 |
+| R2008 | login succeeded after brute force (the root login) | 1 |
 
-`nightfall-firewall.csv` — 26 rows, **21** flagged (5 benign rows unflagged):
+Single sign-in events (failed, succeeded, invalid user, connection, password
+change) are no longer findings: they are the event type (layer A), shown on
+every event. Until 2026-10-20 they were R1000-R1004 and the file had 19 flagged.
+
+`nightfall-firewall.csv` — 26 rows, **18** flagged (8 rows unflagged: the 5 benign
+ones and the 3 ordinary high-risk-app sessions):
 
 | rule | meaning | count |
 |---|---|---|
 | R2002 | port scan (>=10 distinct dst ports) | 15 |
-| R2001 | repeated blocked connections | 15 |
-| R3000 | high-risk app allowed | 6 |
 | R3001 | large outbound transfer | 2 |
 | R3002 | malware-flagged category | 1 |
+
+R2001 (refused repeatedly) and R3000 (high-risk app allowed) are layer C facts
+on the event since 2026-10-20 - the events table shows "source refused 15 times in this evidence item"
+and the application's vendor risk - and no longer findings (21 flagged before).
 
 A row can match several rules, so per-rule counts sum to more than the
 flagged-row count. `flagged_count` is DISTINCT rows.
@@ -75,7 +79,7 @@ The two JSON twins (IAI-35) carry the same 26 firewall rows:
 
 | file | layout | identified / read by | rows | flagged |
 |---|---|---|---|---|
-| `nightfall-firewall.json` | pretty-printed array, PAN-OS column names | documented PAN-OS profile (same as the CSV) | 26 | 21 |
+| `nightfall-firewall.json` | pretty-printed array, PAN-OS column names | documented PAN-OS profile (same as the CSV) | 26 | 18 |
 | `nightfall-firewall-nested.jsonl.gz` | gzipped JSON-lines, nested generic keys | **unrecognised** - no documented profile, so kept as evidence and not analysed | **0** | **0** |
 
 The JSON array must give **exactly the firewall table above**. The nested file
@@ -90,11 +94,11 @@ Not asserted by `check_parity.py` - check the case's `severity` and
 
 | file | case level | escalation |
 |---|---|---|
-| `nightfall-auth.log` | high | `credential-compromise` (17 findings): `10.20.30.40` brute-forced `root`, then logged in from the same address |
+| `nightfall-auth.log` | high | `credential-compromise` (17 findings: R2000 x8, R2009 x8 on root, R2008 x1): `10.20.30.40` brute-forced `root`, then logged in from the same address |
 | `nightfall-firewall.csv` | critical | `compromised-host` (3): `10.10.1.5` has both the malware-flagged and the two >50MB transfers |
 | both JSON twins | critical | the same as the CSV |
 
-`10.10.1.9`'s ordinary logins stay `informational`. If either file stops
+`10.10.1.9`'s ordinary logins produce no finding at all. If either file stops
 escalating, or the benign host starts, the attack-path patterns in
 `severity.py` have drifted.
 

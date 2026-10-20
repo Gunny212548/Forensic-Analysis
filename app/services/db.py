@@ -272,23 +272,78 @@ def finding_rows(case_id: str, key: str, limit: int, offset: int = 0) -> dict:
 
 
 def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
+    """One page of events, each with its layer C facts (`context`).
+
+    Layer C (rules_review.md, D12): what is unusual about an event, stated as
+    a fact and never as a verdict - so no threshold of ours is applied, and
+    none of it is a finding. Computed for the page only, at read time: it
+    replaced three rules (R2001 refused repeatedly, R3000 the vendor's app
+    risk, R3006 a listed scanner refused) that turned these facts into
+    thousands of findings to review."""
     if not db_path(case_id).exists():
         return []
+    from .rules import DENY_VERDICTS
+
     con = connect(case_id, read_only=True)
     try:
         rows = con.execute(
-            "SELECT row_id, ts, ts_raw, srcip, dstip, username, action, verdict, app, raw "
-            "FROM raw_events ORDER BY row_id LIMIT ? OFFSET ?",
+            f"""
+            WITH page AS (
+                SELECT row_id, ts, ts_raw, srcip, dstip, username, action, verdict,
+                       app, risk, raw
+                FROM raw_events ORDER BY row_id LIMIT ? OFFSET ?
+            ),
+            refused AS (
+                SELECT srcip, count(*) AS n FROM raw_events
+                WHERE verdict IN {DENY_VERDICTS}
+                  AND srcip IN (SELECT srcip FROM page WHERE srcip IS NOT NULL)
+                GROUP BY srcip
+            )
+            SELECT page.*, refused.n
+            FROM page LEFT JOIN refused USING (srcip)
+            ORDER BY page.row_id
+            """,
             [limit, offset],
         ).fetchall()
         cols = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username",
-                "action", "verdict", "app", "raw"]
+                "action", "verdict", "app", "risk", "raw", "src_refused"]
         out = [dict(zip(cols, r)) for r in rows]
+        listed = _listed(con, {ip for r in out for ip in (r["srcip"], r["dstip"]) if ip})
         for row in out:
             row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings
+            ctx = []
+            if row["src_refused"]:
+                # A zip case holds several files in one table, so the count is
+                # over the evidence item, not over one file of it.
+                ctx.append(f"source refused {row['src_refused']:,} times in this evidence item")
+            # The vendor's application risk is a property of the application,
+            # not something unusual about the event: it travels as `risk` and
+            # the table shows it beside the application name.
+            for side in ("srcip", "dstip"):
+                if row[side] in listed:
+                    ctx.append(f"{'source' if side == 'srcip' else 'destination'} listed "
+                               f"by {listed[row[side]]}")
+            row["context"] = ctx
+            del row["src_refused"]
         return out
     finally:
         con.close()
+
+
+def _listed(con, ips: set[str]) -> dict[str, str]:
+    """address -> the feeds that list it. A case processed before the `ioc`
+    table existed simply has no listings."""
+    if not ips:
+        return {}
+    try:
+        rows = con.execute(
+            "SELECT value, string_agg(DISTINCT source, ', ' ORDER BY source) FROM ioc "
+            "WHERE type = 'ip' AND value IN (SELECT unnest(?)) GROUP BY value",
+            [sorted(ips)],
+        ).fetchall()
+    except duckdb.CatalogException:
+        return {}
+    return dict(rows)
 
 
 # A timestamp is only trustworthy if the source said what zone it was in.
@@ -322,8 +377,9 @@ def _flags(row: dict) -> list[str]:
 
     Counting distinct rule *ids* would over-credit an entity: R2002 (port
     scan) and R2003 (service sweep) are the same observation counted twice,
-    and R2005 cannot fire without R1000 already having fired. Rule families
-    (R1 auth / R2 correlation / R3 network) are closer to independent
+    and R2000, R2005, R2008 and R2009 all read the same failed sign-ins. Rule
+    families (R2 correlation / R3 network; R1 single sign-in events stopped
+    being findings on 2026-10-20) are closer to independent
     evidence (gotcha #20)."""
     flags: list[str] = []
     if not row["ts_parsed"]:
