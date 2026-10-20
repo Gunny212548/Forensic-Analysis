@@ -298,6 +298,215 @@ Stories (to create): (a) spike - Sigma rules on DuckDB, and the OCSF field mappi
 pinned and its hash recorded; (d) the four spec correlations; (e) retire rules.py and
 re-base everything that reads R-ids; (f) baseline re-taken and explained.
 
+## Revision 5 (2026-10-20, the user) - the in-house rules stay; SigmaHQ is added beside them
+
+Supersedes revision 4's retirement of the in-house rules; the rest of revision 4 stands.
+Taken after spike (a) (`docs/adr/ADR-006-sigma-evaluation.md`): on the real Entra export
+2 of 19 SigmaHQ rules matched anything (one of them every row), SigmaHQ publishes no
+correlation rule and no failed-login base rule, so retiring R2005 would have lost the
+password spray the corpus holds.
+
+- **The 20 in-house rules (R1000-R3006) stay the primary detection**, as they are: each
+  carries a Sigma level and ADS documentation (gotcha #29) and is an "internal method" in
+  `docs/STANDARDS.md`.
+- **SigmaHQ rules run in addition**, on the logsources identify.py names, as ADR-006
+  decides: DuckDB dialect of pySigma's SQLite backend, the file's own fields, "not
+  applicable" per rule and file, author / status / level shown (DRL 1.1), SigmaHQ commit
+  and hash recorded on the case.
+- **Every finding says where it came from**: in-house (R-id) or SigmaHQ (rule id, author).
+  Sigma findings are stored apart, so the R-rule counts in `tests/baseline.json` do not move.
+- **The spec correlations are dropped from scope**: R2000, R2005 and R2006 already cover
+  many failed logins, spray and multi-source logins. Q11 is closed; Q10 applies only if a
+  spec correlation is added later.
+
+Stories, replacing revision 4's list: (a) spike - done, ADR-006; (b) OCSF event store -
+still needed for who / where / what (revision 3), no longer a detection prerequisite;
+(c) SigmaHQ engine beside `rules.py`, with provenance and "not applicable"; (d) and (e)
+dropped; (f) baseline: in-house counts unchanged, Sigma findings measured separately.
+
+Still open: Q12 (portal CSV value vocabulary) and Q13 (rules that match every row), both
+in ADR-006.
+
+## Revision 6 (2026-10-20, draft) - what each step of the forensic flow does
+
+Defines the six steps of revision 3, using the standards review in
+`docs/standards/forensic-process.md` (SP 800-86, RFC 3227, ACPO v5, SP 800-92, IR 8354 -
+all read). Replaces the step table, R1 and the "What each step shows" table of revision 1
+for the new flow. Nothing is built. Decisions D6-D9 at the end of this revision: the flow
+runs on the **project** (one investigation), each upload is one evidence item.
+
+Common to every step (ACPO principles 1 and 3, RFC 3227 §3.1, SP 800-92 fn 23): nothing
+changes `raw/` or `raw_events`; every analyst action is a hash-chained line; a view or a
+filter never deletes. A step may be revisited at any time (SP 800-86 fn 14: examination and
+analysis repeat).
+
+| # | Step | SP 800-86 phase | Question it answers |
+|---|---|---|---|
+| 1 | Ingest | Collection | What is this evidence, where did it come from, is it intact? |
+| 2 | Timeline | Examination | What happened, in order, across every source? |
+| 3 | Attack events | Analysis (validation) | Which events are part of the attack? |
+| 4 | Attack timeline | Analysis (reconstruction) | In what order did the attack happen, and where are the gaps? |
+| 5 | Attack path / graph | Analysis (reconstruction) | Who or what moved from which host to which host, doing what? |
+| 6 | Report | Reporting | What can be stated, how strongly, and what can't be? |
+
+### 1. Ingest
+
+- **System**: hash on arrival and before every run (have); identify each file, read it through
+  its profile or keep it unread as evidence (have, IAI-92); coverage per file (have);
+  **reproducibility record** per run on the custody log - application commit, profile id,
+  rule set (in-house rules version + SigmaHQ commit and hash), intel feed hashes (new).
+- **Analyst**: states the case question and known leads (Q15); records each file's
+  provenance - source system, export method and filter, exported by / when, the source's
+  time zone and any known clock offset (Q16).
+- **Output**: evidence items with digest, identification, coverage, provenance; the question.
+- **Done when**: every item is processed with its custody chain intact, and every item that
+  was not analysed says why. A missing provenance field is a warning, not a block.
+- **Standards**: SP 800-86 §3.1.2; RFC 3227 §2, §3.2, §4.1; ACPO P1, P3, 5.5, 5.10.3.
+- **Sub-processes** (walked through with the user, 2026-10-20):
+
+| # | Sub-process | By | Today |
+|---|---|---|---|
+| 1.1 | Open or pick the investigation (project); record its question and known leads | analyst | project yes, question no |
+| 1.2 | Receive the file (10 GB after decompression, .gz, .zip) | system | built |
+| 1.3 | SHA-256, who / when, custody chain starts | system | built |
+| 1.4 | Provenance: source system, export method and filter, exported by / when, source time zone, known clock offset | analyst | missing |
+| 1.5 | Identify the log; unknown or unreadable kept as evidence, not analysed | system | IAI-92 branch |
+| 1.6 | Read into events; original line and timestamp kept; time normalised to GMT+7 | system | built |
+| 1.7 | Coverage: rows read / not read, fields filled | system | built |
+| 1.8 | Detection rules (in-house + SigmaHQ) | system | **open - to be discussed (the user)** |
+| 1.9 | Reproducibility record: app, profile, rule and feed versions | system | missing |
+
+- **D10 - source time zone (1.6).** A zone the analyst records in provenance (1.4) replaces the
+  GMT+7 assumption for that source; without one, GMT+7 is assumed and flagged
+  `timezone-unconfirmed` as today. Every change is a recorded, reversible entry (RFC 3227 §2:
+  "For each timestamp provided, indicate whether UTC or local time is used").
+- **D11 - duplicate evidence.** A file whose SHA-256 matches an item already in the
+  investigation is accepted as its own evidence item, with a warning naming the match:
+  receiving the same file twice is itself a custody fact. Its events are not counted twice
+  on the timeline.
+
+- **D12 - what the system knows about an event comes in three layers** (the user, 2026-10-20).
+  A system cannot read an event the way an analyst does; everything it "knows" is written
+  down in advance, and an entry's meaning "often depends upon the context surrounding it"
+  (SP 800-92 §5.2.1).
+
+| Layer | Question | Known from | Example: `Failed password for root from 203.0.113.5` |
+|---|---|---|---|
+| A. Event type | What is this event? | the log source's own documentation - a fact, no judgement | sign-in failed, wrong password, account root, over SSH |
+| B. Known pattern | Does it fit a known attack pattern? | rules (in-house + SigmaHQ), threat intel, counts and sequences | 50 failures in 10 minutes from one address (R2000); address in a feed |
+| C. Context | Is it unusual here? | facts computed from the investigation's own data (SP 800-92 §5.2.2: newness, time of day, frequency) | address never seen before; 03:00; account never used from abroad |
+| Decision | Is it part of the attack? | **the analyst**, from A + B + C | confirmed in step 3 |
+
+  Every event gets layer A, not only flagged ones. Layer B finds only what it was written
+  for (SP 800-86 fn 107). Layer C states facts and never declares an event dangerous.
+- **D13 - R1000-R1004 become layer A.** They name what an event is (sign-in failed, sign-in
+  succeeded, account does not exist, SSH connection opened, password changed); they stop
+  being findings to review. The correlation rules keep counting the same events. Cost:
+  findings R1000-R1004 leave `tests/baseline.json` and the workflow counts - re-taken and
+  explained in the story that does it.
+- **D14 - layer A vocabulary from OCSF, read first.** The event classes (Authentication,
+  Network Activity, Process Activity, Account Change) are read from the OCSF schema and laid
+  against the events of our real files before a list is proposed. Each profile maps its
+  vendor's messages and codes onto it, every line citing the vendor document.
+- **D15 - an event no profile can type is shown as "type unknown"**, on the timeline like any
+  other, and listed by message pattern as "not yet understood" (SP 800-92 §5.2.1).
+
+### 2. Timeline
+
+- **System**: one time-ordered list of every event of the investigation, each with its source
+  file, original timestamp text (`ts_raw`) and raw line beside the normalised fields; the
+  zone each source was read in and any declared offset applied; per source, first and last
+  event and the silent periods drawn on the time axis (no threshold of ours); rule and
+  SigmaHQ matches shown as marks on events, not as a separate list. Lines a reader could not
+  parse are reachable from here.
+- **Analyst**: filters (source, time window, address, account, host, rule), pivots from any
+  value to every event across sources sharing it, starts from a lead of the question.
+- **Output**: none written - this step is a view (SP 800-92 fn 59: filtering does not alter
+  the logs). Saved filters are a convenience, not evidence.
+- **Done when**: never blocks; it is the workspace.
+- **Standards**: SP 800-86 §3.2, §6.4.2; SP 800-92 §3.2 (normalisation), §5.2.1; IR 8354 §2.3,
+  §4.7.1; RFC 3227 §2 (clock vs UTC).
+
+### 3. Attack events
+
+- **System**: suggestions come from three sources, each labelled - an in-house rule (R-id),
+  a SigmaHQ rule (id, author), the AI (on request, Q6; cites event ids; checked before
+  shown). Order of review is a hint from SP 800-92 §5.2.2's factors (rule level, newness,
+  intel match, frequency). A rule that could not run on a source is listed as not applicable.
+- **Analyst**: confirms or rejects (with a reason), per the unit decided in Q14; may add an
+  event no rule or AI suggested. Records what the AI suggested beside the decision.
+- **Output**: the set of confirmed attack events, each decision a hash-chained line
+  (review log, gotcha #19/#31).
+- **Done when**: no suggestion is left undecided (revision 2's gate), **or** the analyst
+  records that the remaining ones are out of scope, with a reason.
+- **Standards**: SP 800-86 §6.4.2 (validate interpreted data; fn 107 absence of an alert is not
+  benign); FIRST 5.2; IR 8354 §4.7.1 (verify AI results); AI 600-1 Human-AI Configuration.
+
+### 4. Attack timeline
+
+- **System**: the confirmed events only, in time order, grouped into steps by ATT&CK tactic
+  where the event carries one; gaps between steps are drawn as gaps with their duration;
+  every time shows its zone and whether it was inferred (`year-inferred`,
+  `timezone-unconfirmed`).
+- **Analyst**: writes, per gap, what is assumed and why (SP 800-86 §6.4.3: "assumptions
+  regarding the missing data"); records alternative hypotheses, each with supporting and
+  contradicting events; may mark the reconstruction "no conclusion yet".
+- **Output**: the attack timeline with assumptions and hypotheses - all hash-chained notes.
+- **Done when**: every gap has a note or is marked unexplained; at least one hypothesis is
+  recorded, or "no conclusion yet".
+- **Standards**: SP 800-86 §3.3, §3.4 (alternative explanations), §6.4.3; IR 8354 §4.7.
+
+### 5. Attack path / graph
+
+- **System**: built from the confirmed events only (Q5): a node is an address, host or
+  account **as observed in the logs** - never an identity; an edge is an action from one
+  node to another, labelled with what the event says (command, service, outcome) and citing
+  its events. NAT / spoofing caveat shown on external nodes (SP 800-86 §6.4.4). Exported as
+  MITRE Attack Flow 4.0. Same static-SVG geometry as today (gotcha #10).
+- **Analyst**: reviews it; a node or edge with no confirmed event cannot be drawn.
+- **Output**: the graph and its Attack Flow export.
+- **Done when**: generated from the current set of confirmed events (stale if the set changed).
+- **Standards**: SP 800-86 §3.3 (people, places, items, events and how they relate), §6.4.4;
+  IR 8354 §4.7.1 (link analysis); Attack Flow 4.0.
+- **Limit**: "which command" needs a command field; today a command exists only inside `raw`
+  (revision 3, OCSF). Until then edges carry service / action / outcome.
+
+### 6. Report
+
+- **System**: drafts sections from records, never from memory: the question; evidence items
+  with digests and provenance; method (the reproducibility record); attack timeline; attack
+  path; hypotheses; **limitations** (items not analysed, rules not applicable, coverage,
+  inferred times, silent periods, missing provenance); conversions applied (time zone,
+  field mapping); recommendations, including logging improvements. The AI may draft prose;
+  every factual sentence cites events, every opinion is marked as one.
+- **Analyst**: edits, approves, signs.
+- **Output**: a report file with its own SHA-256 on the custody log; STIX / VERIS / Navigator
+  exports as today.
+- **Done when**: approved by an analyst.
+- **Standards**: SP 800-86 §3.4; ACPO 6.3, 6.5.3, 6.5.4; RFC 3227 §2.4.
+
+### Decisions (revision 6, the user, 2026-10-20 - all as proposed)
+
+- **D6 (Q17) - the flow runs on the project.** A project is one investigation; each upload is
+  an evidence item in its Ingest step; steps 2-6 run across all of the project's items. An
+  upload with no project is a one-item investigation. Today an investigation with a
+  firewall export, an auth log and an Entra export is three cases whose timelines cannot
+  meet unless zipped or merged. Cost: IAI-89's case page becomes the evidence-item page and
+  the step bar moves to the project page; rules still run per item (their SQL is per DuckDB),
+  the timeline and everything after it read across items.
+- **D7 (Q14) - confirm per finding group, with exceptions.** The unit is the collapsed finding
+  (`rid|srcip|username`, gotcha #19). Inside a confirmed group the analyst may exclude single
+  events; an event no rule or AI suggested may be added on its own. One finding can hold
+  thousands of events (a Palo Alto file: 18,888 flagged rows), so per-event-only is not
+  workable.
+- **D8 (Q15) - the case question is required before the report.** Asked at Ingest, editable
+  any time, the report cannot be approved without it and opens with it.
+- **D9 (Q16) - provenance is optional.** Entered at upload or later in Ingest; a missing field
+  is a warning, never a block, and is listed under the report's limitations.
+
+Still open from revision 2: Q5 (attack path from confirmed events only - written that way
+above) and Q6 (AI suggestions on request).
+
 ## Open questions
 
 - **Q1** A rejection for `better_technique` says the ATT&CK mapping is wrong, not that the
