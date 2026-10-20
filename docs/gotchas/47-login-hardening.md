@@ -17,7 +17,10 @@ the proof.
 - **`AUTH_DIR/audit/login.jsonl`**, hash-chained via `hashchain.py`:
   `login_ok / login_failed / login_throttled / logout`. No password; an
   address matching no account is a 12-hex digest (people paste passwords into
-  the account field). A limit engaging is logged once per window. An
+  the account field), **keyed with the session secret** (`attempted_hmac`):
+  the first version was a bare SHA-256, which a dictionary of common
+  passwords reverses for anyone who can read the log (found in review,
+  2026-10-20). A limit engaging is logged once per window. An
   unwritable log is logged and swallowed rather than locking everyone out.
 - **The token carries `pv`**, a keyed hash of the stored password hash, so
   `create_user.py add` on an existing account (a reset) ends its old sessions.

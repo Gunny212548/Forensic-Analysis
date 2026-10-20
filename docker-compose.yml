@@ -24,7 +24,7 @@ services:
       # the OpenAI-compatible one ignores it and truncates the prompt at 4096.
       - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-16384}
       - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-600}
-      # Login (FR-1). SESSION_SECRET empty = generated once into /data.
+      # Login (FR-1). SESSION_SECRET empty = generated once into /auth.
       - IT_CONTACT_URL=${IT_CONTACT_URL:-}
       - SESSION_SECRET=${SESSION_SECRET:-}
       - SESSION_HOURS=${SESSION_HOURS:-12}

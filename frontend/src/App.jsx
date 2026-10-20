@@ -15,6 +15,7 @@ const PAGES = [...MENU.map((it) => it.route), 'result']
 function parseHash() {
   const h = window.location.hash.replace(/^#\/?/, '')
   const [page, ...rest] = h.split('/')
+  if (page === 'login') return { page: 'login', param: '' }
   return {
     page: PAGES.includes(page) ? page : 'dashboard',
     param: rest.join('/'),
@@ -54,6 +55,14 @@ export default function App() {
   const { page, param } = useHashRoute()
   const [user, setUser] = useSession()
 
+  // Signed out, the address says so: #/login. Signing in always lands on
+  // the Overview (the user's call, 2026-10-16) - not on the page a link
+  // pointed to. replace() keeps the login step out of the Back history.
+  useEffect(() => {
+    if (user === null && page !== 'login') window.location.replace('#/login')
+    if (user && page === 'login') window.location.replace('#/dashboard')
+  }, [user, page])
+
   // A new page opens at its top. The document is one scroll container
   // shared by every route, so without this a page opened from halfway down
   // another one started halfway down too (Upload showed only its table).
@@ -75,9 +84,9 @@ export default function App() {
 
   // Nothing renders until the session check answers, so a signed-out user
   // never sees the shell flash, and a signed-in one never sees the login form.
-  // The hash is left alone: signing in lands on the page the link pointed to.
   if (user === undefined) return null
   if (user === null) return <Login onLogin={setUser} />
+  if (page === 'login') return null
 
   return (
     <div className="app">

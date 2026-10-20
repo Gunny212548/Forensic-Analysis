@@ -21,6 +21,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import threading
@@ -28,6 +29,7 @@ import time
 from pathlib import Path
 
 from .. import config
+from . import hashchain
 
 COOKIE_NAME = "fa_session"
 DEFAULT_ROLE = "analyst"
@@ -141,8 +143,15 @@ def _unb64(text: str) -> bytes:
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-def issue_token(email: str) -> str:
-    payload = _b64(json.dumps({"email": email,
+def _password_version(user: dict) -> str:
+    """Changes whenever the stored password does, so a cookie issued before a
+    reset stops working. Keyed with the session secret: the token is signed
+    but readable, and this should not hand out a bare digest of the hash."""
+    return hmac.new(_secret(), user["password"].encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def issue_token(user: dict) -> str:
+    payload = _b64(json.dumps({"email": user["email"], "pv": _password_version(user),
                                "exp": int(time.time()) + config.SESSION_HOURS * 3600}).encode())
     sig = _b64(hmac.new(_secret(), payload.encode(), hashlib.sha256).digest())
     return f"{payload}.{sig}"
@@ -161,4 +170,117 @@ def user_from_token(token: str | None) -> dict | None:
         return None
     if data.get("exp", 0) < time.time():
         return None
-    return load_users().get(data.get("email"))
+    user = load_users().get(data.get("email"))
+    if user is None or not hmac.compare_digest(str(data.get("pv", "")), _password_version(user)):
+        return None  # no such account any more, or its password changed since
+    return user
+
+
+# --- sign-in throttle ------------------------------------------------------
+
+MAX_EMAIL = 254      # RFC 5321 path limit
+MAX_PASSWORD = 1024  # far above any real password; stops a megabyte reaching scrypt
+
+
+class Throttle:
+    """Failed sign-ins in a sliding window, per account and across all accounts.
+
+    In memory, so it resets on restart and is per process - fine for the one
+    uvicorn worker docker-compose runs (hashchain.py relies on the same).
+    An attempt is counted when it *starts*, before the password is checked,
+    and taken back if it succeeds: counting afterwards would let a burst of
+    parallel requests all pass the check before any of them was recorded.
+    Unknown accounts are counted exactly like known ones, so a 429 does not
+    say which addresses have an account."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._by_key: dict[str, list[float]] = {}
+        self._all: list[float] = []
+        self._noted: dict[str, float] = {}
+
+    def reset(self) -> None:
+        with self._lock:
+            self._by_key, self._all, self._noted = {}, [], {}
+
+    @staticmethod
+    def _wait(hits: list[float], limit: int, now: float) -> int:
+        # The failure that has to leave the window for the count to drop below
+        # the limit is the (len - limit)th, oldest first.
+        return max(1, int(hits[len(hits) - limit] + config.LOGIN_WINDOW_SECONDS - now) + 1)
+
+    def begin(self, key: str) -> tuple[int, float | None, str]:
+        """(0, token, "") when the attempt may go ahead, else (seconds to wait,
+        None, which limit refused it: "acct:<key>" or "all")."""
+        now = time.monotonic()
+        cutoff = now - config.LOGIN_WINDOW_SECONDS
+        with self._lock:
+            self._all = [t for t in self._all if t > cutoff]
+            hits = [t for t in self._by_key.get(key, ()) if t > cutoff]
+            if len(hits) >= config.LOGIN_MAX_FAILURES:
+                self._by_key[key] = hits
+                return self._wait(hits, config.LOGIN_MAX_FAILURES, now), None, f"acct:{key}"
+            if len(self._all) >= config.LOGIN_GLOBAL_MAX_FAILURES:
+                return self._wait(self._all, config.LOGIN_GLOBAL_MAX_FAILURES, now), None, "all"
+            hits.append(now)
+            self._by_key[key] = hits
+            self._all.append(now)
+            if len(self._by_key) > 1000:
+                self._by_key = {k: v for k, v in self._by_key.items() if v and v[-1] > cutoff}
+            return 0, now, ""
+
+    def succeed(self, key: str, token: float) -> None:
+        """A correct password: this attempt is no failure, and the account's
+        earlier slips are forgiven."""
+        with self._lock:
+            self._by_key.pop(key, None)
+            try:
+                self._all.remove(token)
+            except ValueError:
+                pass
+
+    def first_refusal(self, scope: str) -> bool:
+        """True once per limit per window - the audit log records that a limit
+        engaged, not every request turned away, or a flood of refused requests
+        would grow it without bound."""
+        now = time.monotonic()
+        with self._lock:
+            last = self._noted.get(scope)
+            if last is not None and now - last <= config.LOGIN_WINDOW_SECONDS:
+                return False
+            self._noted[scope] = now
+            if len(self._noted) > 1000:
+                self._noted = {k: v for k, v in self._noted.items()
+                               if now - v <= config.LOGIN_WINDOW_SECONDS}
+            return True
+
+
+throttle = Throttle()
+
+
+# --- sign-in audit ---------------------------------------------------------
+
+def audit_path() -> Path:
+    return Path(config.AUTH_DIR) / "audit" / "login.jsonl"
+
+
+def audit(event: str, *, account: str | None, client: str | None,
+          attempted: str | None = None) -> None:
+    """One hash-chained line per sign-in event (ISO/IEC 27001 A.8.15, like the
+    review and custody logs). Never the password. An address that matches no
+    account is recorded as a short digest, not as typed: people paste a
+    password into the account field.
+
+    A failure to write is logged and swallowed - an unwritable audit file must
+    not lock every analyst out of an internal tool - but it is not silent."""
+    entry = {"event": event, "account": account, "client": client}
+    if account is None and attempted is not None:
+        # Keyed: a bare SHA-256 of a pasted password is a dictionary lookup
+        # away for whoever reads this file. The same input still gives the
+        # same digest, so repeated attempts can be told apart and counted.
+        entry["attempted_hmac"] = hmac.new(_secret(), attempted.encode(errors="replace"),
+                                           hashlib.sha256).hexdigest()[:12]
+    try:
+        hashchain.append(audit_path(), entry)
+    except Exception:
+        logging.getLogger("forensic").exception("could not write the sign-in audit log")

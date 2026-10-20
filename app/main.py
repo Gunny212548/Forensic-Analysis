@@ -47,6 +47,27 @@ async def require_login(request: Request, call_next):
     return await call_next(request)
 
 
+# Added after require_login, so it wraps it: the headers go on the 401s too.
+# Only what is certain to be safe for this bundle: no framing (the review and
+# lifecycle buttons must not sit under an attacker's page), no MIME sniffing,
+# no referrer to other sites. A script-src CSP is not here - it has not been
+# tried against the built bundle in a browser (specs/login_hardening_design.md).
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "same-origin",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+}
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for name, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    return response
+
+
 # Multipart framing (boundaries, part headers, the small form fields) that
 # Content-Length counts on top of the file itself.
 MULTIPART_SLACK = 64 * 1024
