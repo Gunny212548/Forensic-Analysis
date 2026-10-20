@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getEvents } from '../api.js'
 import { LEVEL_EN, SEV_CLASS, fmtNum } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
+import ProfilePanel from './ProfilePanel.jsx'
 
 const PAGE_SIZE = 100
 
@@ -15,6 +16,8 @@ export default function EventsTable({ caseId, order = 'row' }) {
   const [offset, setOffset] = useState(0)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  // The source address whose behaviour profile is open, if any.
+  const [profileIp, setProfileIp] = useState(null)
 
   const load = useCallback(async () => {
     setError('')
@@ -71,7 +74,9 @@ export default function EventsTable({ caseId, order = 'row' }) {
             ? `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} findings (raw rows in the file: ${fmtNum(data.total_rows)})`
             : `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} events (${fmtNum(data.flagged_count)} flagged)`}
         </Empty>
-        <div className="table-scroll">{flagged ? <FlaggedRows events={data.events} /> : <AllRows events={data.events} />}</div>
+        <div className="table-scroll">
+          {flagged ? <FlaggedRows events={data.events} /> : <AllRows events={data.events} onProfile={setProfileIp} />}
+        </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           <button
             className="secondary"
@@ -95,12 +100,13 @@ export default function EventsTable({ caseId, order = 'row' }) {
   return (
     <>
       {toggle}
+      {profileIp && <ProfilePanel caseId={caseId} ip={profileIp} onClose={() => setProfileIp(null)} />}
       {body}
     </>
   )
 }
 
-function AllRows({ events }) {
+function AllRows({ events, onProfile }) {
   return (
     <table>
       <thead>
@@ -122,7 +128,16 @@ function AllRows({ events }) {
             {/* ts is the parsed GMT+7 event time; ts_raw is the source text,
                 shown only when nothing parsed (CLAUDE.md gotcha #21). */}
             <td>{e.ts || e.ts_raw || ''}</td>
-            <td>{e.srcip || ''}</td>
+            <td>
+              {/* Opens the address's behaviour profile above the table. */}
+              {e.srcip ? (
+                <button type="button" className="link-btn mono" onClick={() => onProfile(e.srcip)}>
+                  {e.srcip}
+                </button>
+              ) : (
+                ''
+              )}
+            </td>
             <td>{e.dstip || ''}</td>
             <td>{e.username || ''}</td>
             {/* Layer A: the event type, named by the server (db.EVENT_TYPES)

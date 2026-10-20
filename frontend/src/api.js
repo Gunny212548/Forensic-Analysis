@@ -89,6 +89,14 @@ export async function getCase(caseId) {
   return jsonOrThrow(await fetch(`/api/cases/${encodeURIComponent(caseId)}`), 'Case not found')
 }
 
+/** One source address's behaviour profile (profiles.py): layer C facts. */
+export async function getSourceProfile(caseId, ip) {
+  return jsonOrThrow(
+    await fetch(`/api/cases/${encodeURIComponent(caseId)}/profiles/source/${encodeURIComponent(ip)}`),
+    'Could not load the profile',
+  )
+}
+
 export async function getEvents(caseId, { limit, offset, flagged = true, order = 'row' }) {
   const q = new URLSearchParams({ limit, offset, only_flagged: flagged, order })
   return jsonOrThrow(

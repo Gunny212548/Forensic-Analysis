@@ -126,7 +126,7 @@ def main() -> int:
     check(c.send({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None,
           "a notification gets no reply")
     tools = c.request("tools/list")["result"]["tools"]
-    check(len(tools) == 17, f"17 tools listed (got {len(tools)})")
+    check(len(tools) == 19, f"19 tools listed (got {len(tools)})")
     check(all(t["annotations"]["readOnlyHint"] and not t["annotations"]["destructiveHint"]
               for t in tools), "every tool is annotated read-only")
     check(c.request("ping")["result"] == {}, "ping")
@@ -222,6 +222,19 @@ def main() -> int:
     t = [x["ts"] for x in r.get("rows") or [] if x["ts"]]
     check(not err and r["total"] == total_rows and t == sorted(t),
           f"get_timeline: all {total_rows} events counted, in time order")
+
+    err, r = c.call("get_profile", case_id=case_id, srcip=attacker)
+    s = (r.get("profile") or {}).get("sign_ins") or {}
+    check(not err and s.get("fail_max_1m") == 8 and s.get("accounts_failed") == 4
+          and s.get("success_after_fail_gap_s") == 119,
+          "get_profile: the attacker's 8 failures in a minute, 4 accounts, success 119 s after the first")
+    err, r = c.call("get_profile", case_id=case_id, srcip="192.0.2.1")
+    check(err, "get_profile refuses an address with no events")
+    err, r = c.call("list_unusual", case_id=case_id, by="fail_max_10m")
+    check(not err and r["profiles"] and r["profiles"][0]["srcip"] == attacker,
+          "list_unusual by failures in 10 min puts the attacker first")
+    err, r = c.call("list_unusual", case_id=case_id, by="severity")
+    check(err, "list_unusual refuses a fact it does not rank")
 
     err, r = c.call("get_flow", case_id=case_id)
     check(not err and [s["id"] for s in r["steps"]] == ["ingest", "timeline", "attack-events",

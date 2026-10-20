@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from .. import config
 from ..services import (analysis, analysis_jobs, attack_layer, auth, case_flow, case_views, custody,
-                        db, authz, lifecycle, merge, review, stix_export, storage, veris)
+                        db, authz, lifecycle, merge, profiles, review, stix_export, storage, veris)
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -36,6 +36,37 @@ async def get_case(case_id: str):
     if manifest is None:
         raise HTTPException(404, "Case not found")
     return manifest
+
+
+@router.get("/{case_id}/profiles/source")
+async def list_source_profiles(
+    case_id: str,
+    by: str = Query("fail_max_10m"),
+    limit: int = Query(20, ge=1, le=200),
+):
+    """Source addresses highest on one profile fact (profiles.py)."""
+    if storage.load_manifest(case_id) is None:
+        raise HTTPException(404, "Case not found")
+    if by not in profiles.RANKED:
+        raise HTTPException(422, f"by must be one of {sorted(profiles.RANKED)}")
+    try:
+        return {"case_id": case_id, "by": by, "profiles": profiles.sources_by(case_id, by, limit)}
+    except LookupError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.get("/{case_id}/profiles/source/{ip}")
+async def get_source_profile(case_id: str, ip: str):
+    """One source address's behaviour profile - layer C facts, not a verdict."""
+    if storage.load_manifest(case_id) is None:
+        raise HTTPException(404, "Case not found")
+    try:
+        found = profiles.source(case_id, ip)
+    except LookupError as exc:
+        raise HTTPException(409, str(exc))
+    if found is None:
+        raise HTTPException(404, f"No events from {ip} in this case")
+    return found
 
 
 def _raw_file(case_id: str):

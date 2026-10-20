@@ -23,7 +23,7 @@ from pathlib import Path
 
 from .. import config
 from . import (archive, custody, db, decode, finding_ids, identify, intel, logsources, parsers,
-               rules, severity, storage)
+               profiles, rules, severity, storage)
 
 log = logging.getLogger(__name__)
 
@@ -579,6 +579,9 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             con, on_rule=lambda i, n: progress.set("rules", INTEL_END + (99 - INTEL_END) * i / n))
         escalated = severity.escalate(con)
         sev_summary = severity.summary(con)
+        # Behaviour profiles (layer C facts, profiles.py): after the rules,
+        # because nothing in them is a finding and nothing below reads them.
+        profiles.build(con)
         con.close()
         con = None
 

@@ -283,6 +283,8 @@ EVENT_TYPES = {
     "password_changed": "Password changed",
     "session_open": "Session opened",
     "session_close": "Session closed",
+    "shell_session_open": "Shell opened",
+    "shell_session_close": "Shell closed",
     "ssh_probe": "SSH probe",
     "ssh_enabled": "SSH enabled",
     "ssh_disabled": "SSH disabled",
@@ -388,15 +390,23 @@ def _events(con, cond: str, params: list, order: str, limit: int, offset: int) -
         """,
         [*params, limit, offset],
     ).fetchall()
+    from . import profiles
+
     out = [dict(zip(_EVENT_COLS + ["src_refused"], r)) for r in rows]
     listed = _listed(con, {ip for r in out for ip in (r["srcip"], r["dstip"]) if ip})
+    # The source's behaviour profile, one line, where it has failures or
+    # refusals to describe (profiles.py) - it replaces the bare refused count.
+    profile_line = profiles.context_lines(con, {r["srcip"] for r in out if r["srcip"]})
     for row in out:
         row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings
         row["event"] = EVENT_TYPES.get(row["action"], row["action"])
         ctx = []
-        if row["src_refused"]:
-            # A zip case holds several files in one table, so the count is
-            # over the evidence item, not over one file of it.
+        if row["srcip"] in profile_line:
+            ctx.append(profile_line[row["srcip"]])
+        elif row["src_refused"]:
+            # A case processed before profiles existed. A zip case holds several
+            # files in one table, so the count is over the evidence item, not
+            # over one file of it.
             ctx.append(f"source refused {row['src_refused']:,} times in this evidence item")
         # The vendor's application risk is a property of the application,
         # not something unusual about the event: it travels as `risk` and

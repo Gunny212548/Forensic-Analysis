@@ -122,7 +122,7 @@ POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
                                              LLM (Ollama now) for the narrative,
                                              decoded inside a per-case JSON
                                              schema + grounding check (#37)
-MCP (stdio, read-only)                       app/mcp_server.py - 17 tools over the
+MCP (stdio, read-only)                       app/mcp_server.py - 19 tools over the
                                              same views; every call hash-chain
                                              logged to mcp/access.jsonl (#38);
                                              never assigns FD ids (#51)
@@ -354,6 +354,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #26 Severity is a Sigma level; a refused row is capped at medium; escalation patterns (credential-compromise high, compromised-host critical). `findings.lvl` stores weights.
 - #29 Every rule carries Sigma + ADS metadata; status is earned (no rule is `stable`); `tests/check_rule_meta.py`.
 - #35 Intel feeds may be STIX 2.1 bundles; only pure IP-equality indicators are taken.
+- #57 Behaviour profiles (`profiles.py`): per-source facts in SQL at ingest, ranked against the same evidence (none under 20), windows `[t, t+W]` for 1/10/60 min, n/a not 0; never a finding. ESXi logs each failed password twice - profiles and R2000 double-count (not fixed).
 - #56 A rule only answers "known attack pattern?" (layer B); event type is layer A, context facts layer C (`db.list_raw`). R1000-R1004 / R2001 / R3000 / R3006 left the rule set (metadata `deprecated`); R2008 login-after-brute-force, R2009 measured spray; R2005 renamed (branch `rules-layers`). Parity needs the intel feeds or R3003-R3006 read 0.
 
 **Findings, review and workflow** (`review.py`, `lifecycle.py`, `confidence.py`, `finding_ids.py`, `related.py`)
@@ -670,7 +671,7 @@ Two more checks, each for its own layer:
   ids, grounding warnings. Run it after touching `analysis.py`,
   `grounding.py` or anything that feeds the prompt; with the schema and
   seed in place the three runs should be byte-identical (gotcha #37).
-- **MCP server** - `tests/check_mcp.py` (all 17 tools, pivots, refusals, access log), run in the container
+- **MCP server** - `tests/check_mcp.py` (all 19 tools, pivots, refusals, access log), run in the container
   as its docstring shows, because the concurrent-writer check needs Linux
   `flock` (gotcha #38).
 - **Job queue and manifests** - `tests/check_jobs.py` (45 checks, no DuckDB) and
@@ -688,6 +689,8 @@ Two more checks, each for its own layer:
 - **Log identification** - `tests/check_identify.py [--corpus]` (gotcha #53, branch
   IAI-92): each sample identified as its log source and no other, negatives
   unrecognised; `--corpus` adds the real customer files. No store, no network.
+- **Behaviour profiles** - `tests/check_profiles.py [--repo DIR]` (gotcha #57): windows and their
+  edges, ranks and the 20-address floor, n/a, bytes to public addresses; duckdb only.
 - **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states, and
   every step citing a standard marked read in `docs/standards/SOURCES.md`.
 

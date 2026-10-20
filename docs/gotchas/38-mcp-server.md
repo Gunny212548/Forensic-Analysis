@@ -11,7 +11,7 @@ docker exec -i forensic-analyzer-forensic-analyzer-1 \
     python -m app.mcp_server --actor you@example.com
 ```
 
-17 tools, all annotated read-only: `list_cases`, `get_case` (custody
+19 tools, all annotated read-only: `list_cases`, `get_case` (custody
 status and the Sigma logsource the file was identified as), `list_findings`,
 `get_finding_events` (the raw rows behind a finding, with `row_id` and the
 original line), `get_source_profiles`, `get_risk_ranking`, `get_attack_graph`,
@@ -35,6 +35,8 @@ Every row carries the event type (`event`, layer A, from `db.EVENT_TYPES` -
 the same words the events table shows) and its `context` facts (layer C),
 because all lists of events go through one query, `db._events`. The status
 workflow (lifecycle) is no longer served: Respond left the flow (story 1).
+`get_profile` / `list_unusual` (branch `behaviour-profiles`) serve the behaviour
+profiles of gotcha #57 - counted in SQL, so the model reads facts it could not count.
 
 What it deliberately does not do, so don't add it casually:
 - **No write tool.** Review, lifecycle and upload take their actor from a
@@ -62,7 +64,7 @@ reading through this server does not. Decide per customer before wiring one
 up - nothing in the server can tell where its client sends what it reads.
 
 Verified with `tests/check_mcp.py` (in the container on a
-scratch store: handshake, all 17 tools against the planted gen_usecase
+scratch store: handshake, all 19 tools against the planted gen_usecase
 facts - digest equals the uploaded bytes, the brute force -> root
 escalation, rows per finding - every refusal, stdout purity, one access
 entry per call, chain intact, concurrent writers).

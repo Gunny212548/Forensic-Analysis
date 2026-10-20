@@ -40,7 +40,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import config
-from .services import (auth, case_flow, custody, db, hashchain, review, rule_meta,
+from .services import (auth, case_flow, custody, db, hashchain, profiles, review, rule_meta,
                        storage, veris)
 from .services.rules import RULE_LABELS
 from .services.severity import LEVELS, WEIGHT
@@ -100,7 +100,8 @@ def _log_access(actor: str, tool: str, args: dict, outcome: str) -> None:
     entry = {"actor": actor, "tool": tool, "outcome": outcome,
              "arguments": {k: v for k, v in args.items() if k in
                            ("case_id", "finding_key", "rule_id", "ips", "limit", "offset", "min_level",
-                            "ip", "username", "host", "action", "since", "until", "row_ids")}}
+                            "ip", "username", "host", "action", "since", "until", "row_ids",
+                            "srcip", "by")}}
     with _write_lock, open(path.with_suffix(".lock"), "a") as lock:
         try:
             import fcntl
@@ -389,6 +390,35 @@ def tool_list_confirmed(args: dict) -> dict:
             "counts": counts, "confirmed": out}
 
 
+def tool_get_profile(args: dict) -> dict:
+    m = _case(args.get("case_id"))
+    _ready(m)
+    try:
+        found = profiles.source(m["case_id"], args["srcip"])
+    except LookupError as exc:
+        raise ToolError(str(exc)) from None
+    if found is None:
+        raise ToolError(f"No events from {args['srcip']} in {m['case_id']}")
+    return {"case_id": m["case_id"], "evidence_sha256": _evidence_sha(m),
+            "note": "Behaviour profile - facts counted in SQL, ranked against the other addresses of "
+                    "this evidence. Not a verdict.",
+            "profile": found}
+
+
+def tool_list_unusual(args: dict) -> dict:
+    m = _case(args.get("case_id"))
+    _ready(m)
+    limit, _ = _page(args, 20)
+    try:
+        rows = profiles.sources_by(m["case_id"], args["by"], limit)
+    except LookupError as exc:
+        raise ToolError(str(exc)) from None
+    return {"case_id": m["case_id"], "evidence_sha256": _evidence_sha(m), "by": args["by"],
+            "note": "Highest first on that fact. Unusual is not malicious: read the rows "
+                    "(search_events) before saying what an address did.",
+            "profiles": rows}
+
+
 def tool_get_flow(args: dict) -> dict:
     m = _case(args.get("case_id"))
     return case_flow.build(m["case_id"], m)
@@ -455,6 +485,18 @@ TOOLS = {
                      "Every event of the case in event-time order (unparsed times last), paged, with "
                      "event type and context facts.",
                      _schema({**_CASE_PROP, **_PAGE_PROPS}, ["case_id"])),
+    "get_profile": (tool_get_profile, "Behaviour profile of an address",
+                    "One source address: sign-in failures / successes, accounts tried, the most "
+                    "failures and refusals in any 1, 10 and 60 minutes, success after failures, "
+                    "destinations, refused ports, bytes, hours active - and its rank against the "
+                    "other addresses of the same evidence. n/a where the log has no such events.",
+                    _schema({**_CASE_PROP, "srcip": {"type": "string", "maxLength": 64}},
+                            ["case_id", "srcip"])),
+    "list_unusual": (tool_list_unusual, "Addresses highest on a fact",
+                     "Source addresses of the case highest on one behaviour fact, with their profiles.",
+                     _schema({**_CASE_PROP, "by": {"enum": sorted(profiles.RANKED)},
+                              "limit": {"type": "integer", "minimum": 1, "maximum": MAX_ROWS}},
+                             ["case_id", "by"])),
     "get_flow": (tool_get_flow, "Case flow",
                  "Where the case stands on its six steps (Ingest, Timeline, Attack events, Attack "
                  "timeline, Attack path, Report), each with its state, what remains and the standards "

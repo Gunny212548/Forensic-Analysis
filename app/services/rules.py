@@ -49,6 +49,14 @@ BRUTE_FORCE_SOURCES = """
     GROUP BY srcip HAVING count(*) >= 3
 """
 
+# What R2007 treats as a public IPv4 destination - the same two expressions
+# written into its SQL below, kept here so behaviour profiles (profiles.py)
+# count "bytes to public addresses" over exactly the same ranges.
+# tests/check_profiles.py fails if R2007's SQL stops containing them verbatim.
+IPV4_RE = r"^[0-9]{1,3}(\.[0-9]{1,3}){3}$"
+NON_PUBLIC_IPV4_RE = (r"^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|"
+                      r"100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.|22[4-9]\.|23[0-9]\.|24[0-9]\.|25[0-5]\.)")
+
 # R2009: distinct accounts one source failed against. Measured 2026-10-20 over
 # every source with a failed sign-in in the store and in the Entra export
 # KM23 (rules_review.md): all 71 sources in the customers' own logs failed

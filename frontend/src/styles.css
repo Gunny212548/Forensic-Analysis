@@ -147,6 +147,15 @@
   /* Layer C facts on an event: neutral on purpose - a fact, not a severity. */
   .context-chip { display: inline-block; font-size: 11px; color: var(--muted); background: var(--subtle);
     border-radius: 999px; padding: 1px 8px; margin: 1px 4px 1px 0; white-space: nowrap; }
+  /* A value that opens something (a source address -> its behaviour profile). */
+  .link-btn { all: unset; cursor: pointer; color: var(--accent); }
+  .link-btn:hover, .link-btn:focus-visible { text-decoration: underline; }
+  /* Behaviour profile (layer C): neutral panel, facts in a plain table. */
+  .profile-panel { border: 1px solid var(--panel-border); border-radius: 4px; padding: 12px 14px; margin: 10px 0; }
+  .profile-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+  .profile-close { margin-left: auto; }
+  .profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .profile-facts td { padding: 3px 10px 3px 0; font-size: 12.5px; border: 0; }
   .sev-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
     padding: 2px 9px; border-radius: 999px; }
   .sev-tag::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
