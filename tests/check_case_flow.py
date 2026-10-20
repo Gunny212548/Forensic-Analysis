@@ -127,6 +127,15 @@ def main() -> int:
         check(fl["recommended"] == "attack-events", "the recommended step is Attack events")
         check(step(fl, "attack-timeline")["state"] == "not_started",
               "Attack timeline waits for a confirmed event")
+        check(step(fl, "attack-path")["state"] == "not_started",
+              f"Attack path is not done while nothing is confirmed ({step(fl, 'attack-path')['reason']})")
+
+        print("one suggestion confirmed, the rest undecided")
+        c.post(f"/api/cases/{Z}/review", json={"finding_key": fs[0]["key"], "action": "accept"})
+        fl = flow(Z)
+        ap = step(fl, "attack-path")
+        check(ap["state"] == "active" and ap["total"] == 1,
+              f"Attack path is in progress with one confirmed group ({ap['reason']})")
         check(step(fl, "report")["state"] == "blocked", f"Report is blocked: {step(fl, 'report')['reason']}")
 
         print("every suggestion confirmed")
@@ -137,6 +146,7 @@ def main() -> int:
         at = step(fl, "attack-timeline")
         check(at["state"] == "done" and at["total"] == len(fs),
               f"Attack timeline holds the {len(fs)} confirmed groups ({at['reason']})")
+        check(step(fl, "attack-path")["state"] == "done", "Attack path is done once every suggestion is decided")
         check(step(fl, "report")["state"] == "active", "the report gate opens")
         check(fl["recommended"] == "report", "the recommended step is Report")
 
@@ -150,6 +160,9 @@ def main() -> int:
         check(step(fl, "attack-events")["state"] == "done" and at["total"] == 0
               and "No attack event was confirmed" in at["reason"],
               f"nothing confirmed, and the attack timeline says so ({at['reason']})")
+        ap = step(fl, "attack-path")
+        check(ap["state"] == "done" and "no path" in ap["reason"],
+              f"...and the attack path says there is no path ({ap['reason']})")
 
         print("the timeline is in event-time order")
         r = c.get(f"/api/cases/{Z}/events", params={"only_flagged": "false", "order": "time", "limit": 1000})

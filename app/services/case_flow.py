@@ -83,7 +83,7 @@ def build(case_id: str, manifest: dict) -> dict:
         confirmed = [f for f in findings if f["review"]["status"] in CONFIRMED]
         _attack_events(findings, unreviewed, steps["attack-events"])
         _attack_timeline(findings, unreviewed, confirmed, steps["attack-timeline"])
-        _attack_path(findings, steps["attack-path"])
+        _attack_path(findings, unreviewed, confirmed, steps["attack-path"])
         _report(findings, unreviewed, steps["report"])
 
     ordered = [steps[i] for i in STEP_IDS]
@@ -159,12 +159,26 @@ def _attack_timeline(findings: list[dict], unreviewed: list[dict], confirmed: li
         step.update(state=DONE, reason="No attack event was confirmed")
 
 
-def _attack_path(findings: list[dict], step: dict) -> None:
-    if findings:
-        step.update(state=DONE, reason="Graph drawn from every finding of the case - from the confirmed "
-                                       "events only in story 7")
-    else:
+def _attack_path(findings: list[dict], unreviewed: list[dict], confirmed: list[dict],
+                 step: dict) -> None:
+    """The path is what the confirmed events show, so the step is done only
+    once every suggestion is decided - a graph being drawable is not the
+    analyst's work being finished. Until story 7 the graph itself still draws
+    every suggestion, which the reason says."""
+    note = " - the graph below still draws every suggestion until story 7"
+    step.update(total=len(confirmed))
+    if not findings:
         step.update(state=DONE, reason="No finding - nothing to draw")
+    elif unreviewed and not confirmed:
+        step.update(state=NOT_STARTED, reason=f"Waits for confirmed attack events{note}")
+    elif unreviewed:
+        step.update(state=ACTIVE, reason=f"{_plural(len(confirmed), 'confirmed group')}, "
+                                         f"{len(unreviewed)} not decided yet{note}")
+    elif confirmed:
+        step.update(state=DONE, reason=f"Every suggestion decided; {_plural(len(confirmed), 'confirmed group')}"
+                                       f"{note}")
+    else:
+        step.update(state=DONE, reason="No attack event was confirmed - there is no path to draw")
 
 
 def _report(findings: list[dict], unreviewed: list[dict], step: dict) -> None:
