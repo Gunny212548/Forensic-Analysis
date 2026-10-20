@@ -28,11 +28,17 @@ Rules worth keeping:
 - A case processed before profiles existed answers 409 "re-process it"; its events table
   falls back to the plain refused count.
 
-Found while checking it in the browser, **not fixed**: the ESXi `auth.log` writes one failed
-password twice - `pam_unix(...:auth): authentication failure` and, ~2 s later,
-`sshd: error: PAM: Authentication failure for root from ...` - and both decode to
-`auth_failed`. Profiles **and R2000** count each attempt twice (10.9.3.91: "6 failed" is
-about 3 attempts). A decoder fix (one event per attempt) moves R2000 counts and the baseline.
+Found while checking it in the browser, **fixed the same day** (branch `esxi-auth-dedupe`):
+one failed keyboard-interactive attempt is written twice - by pam_unix
+(`support.c`, `_unix_verify_password`: "authentication failure; ... rhost= user=") and,
+2-3 s later, by sshd (`auth-pam.c`, `sshpam_query`: "error: PAM: Authentication failure
+for root from ..."). Both decoded to `auth_failed`, so profiles **and R2000/R2005** counted
+each attempt twice. On the real ESXi `auth.log` all 5 pam_unix lines paired with an sshd
+line (same address and account), none alone. Now the sshd line is the attempt and the
+pam_unix line is `pam_auth_failure` ("PAM failure report"), cited to Linux-PAM `support.c`
+(it was wrongly cited to OpenSSH `auth.c`). Parity: only `auth.log` moved - R2000 35 -> 32,
+R2005 39 -> 34, flagged 63 -> 58; R2008 unchanged. On a password (not keyboard-interactive)
+attempt sshd writes `Failed password` instead, which was already its own line.
 
 Measured: 0.06-0.09 s per 65,534-row case (six largest corpus cases); a multi-GB file not
 measured. Parity unchanged on all 79 baseline files.

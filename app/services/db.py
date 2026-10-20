@@ -277,6 +277,8 @@ def finding_rows(case_id: str, key: str, limit: int, offset: int = 0) -> dict:
 # listed is shown as written.
 EVENT_TYPES = {
     "auth_failed": "Sign-in failed",
+    # pam_unix's report of a failure sshd also reports - not a second attempt.
+    "pam_auth_failure": "PAM failure report (same attempt as sshd's)",
     "auth_success": "Sign-in succeeded",
     "invalid_user": "Unknown account",
     "connection": "Connection opened",

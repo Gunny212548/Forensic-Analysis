@@ -165,9 +165,9 @@ _SSHD_PATTERNS = [
     ("auth_failed", re.compile(
         r"Failed password for (?:invalid user )?(?P<user>\S+) from (?P<ip>[\d.]+) port (?P<port>\d+)"
     )),
-    ("auth_failed", re.compile(
-        r"authentication failure;.*?rhost=(?P<ip>[\d.]+)(?:\s+user=(?P<user>\S+))?"
-    )),
+    # A failed keyboard-interactive/PAM attempt, as sshd reports it
+    # (auth-pam.c, sshpam_query: "PAM: %s for %s%.100s from %.100s"). This is
+    # the attempt; pam_unix's own report of the same check is _PAM_AUTH_PATTERNS.
     ("auth_failed", re.compile(
         r"error: PAM: Authentication failure for (?:illegal user )?(?P<user>\S+) from (?P<ip>[\d.]+)"
     )),
@@ -191,6 +191,20 @@ _SSHD_PATTERNS = [
 
 _PAM_PATTERNS = [
     ("password_changed", re.compile(r"password changed for (?P<user>\S+)")),
+]
+
+# pam_unix's report of a failed password check (support.c,
+# _unix_verify_password: "authentication failure; logname=%s uid=%d euid=%d
+# tty=%s ruser=%s rhost=%s user=%s"). Under sshd it is the *same* attempt sshd
+# reports a few seconds later ("error: PAM: Authentication failure ...", or
+# "Failed password ..." on the password path), so it is its own event type and
+# not auth_failed: counted as auth_failed it made every keyboard-interactive
+# failure two (gotcha #57 - the ESXi auth.log: 5 pam_unix lines, each paired
+# with an sshd line from the same address and account 2-3 s later, none alone).
+_PAM_AUTH_PATTERNS = [
+    ("pam_auth_failure", re.compile(
+        r"authentication failure;.*?rhost=(?P<ip>[\d.]+)(?:\s+user=(?P<user>\S+))?"
+    )),
 ]
 
 # pam_unix's session messages (pam_unix_sess.c), which sshd writes under its
@@ -246,7 +260,8 @@ _ESXI_OBSERVED_PATTERNS = [
 # (logsources.LINE_PROFILES) each set cites. Per pattern set, not per
 # program: sshd writes pam_unix's and ESXi's messages under its own name.
 _PROGRAM_PATTERNS = {
-    "sshd": [(_SSHD_PATTERNS, "openssh-sshd"), (_PAM_SESSION_PATTERNS, "linux-pam"),
+    "sshd": [(_SSHD_PATTERNS, "openssh-sshd"), (_PAM_AUTH_PATTERNS, "linux-pam"),
+             (_PAM_SESSION_PATTERNS, "linux-pam"),
              (_ESXI_PATTERNS, "vmware-esxi"), (_ESXI_OBSERVED_PATTERNS, "vmware-esxi-observed")],
     "passwd": [(_PAM_PATTERNS, "linux-pam")],
     "pam": [(_PAM_PATTERNS, "linux-pam")],

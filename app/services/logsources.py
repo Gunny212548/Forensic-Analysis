@@ -256,16 +256,24 @@ LINE_PROFILES: dict[str, dict] = {
                  ("OpenSSH portable - session.c (subsystem request)",
                   "https://github.com/openssh/openssh-portable/blob/master/session.c"),
                  ("OpenSSH portable - packet.c (connection closed)",
-                  "https://github.com/openssh/openssh-portable/blob/master/packet.c")],
+                  "https://github.com/openssh/openssh-portable/blob/master/packet.c"),
+                 # gotcha #57: the keyboard-interactive/PAM failure line.
+                 ("OpenSSH portable - auth-pam.c, sshpam_query() (\"PAM: %s for %s from %s\")",
+                  "https://github.com/openssh/openssh-portable/blob/master/auth-pam.c")],
     },
     "linux-pam": {
-        "name": "Linux-PAM pam_unix password change and session messages",
+        "name": "Linux-PAM pam_unix password change, session and authentication-failure messages",
         "docs": [("Linux-PAM - modules/pam_unix/pam_unix_passwd.c",
                   "https://github.com/linux-pam/linux-pam/blob/master/modules/pam_unix/"
                   "pam_unix_passwd.c"),
                  ("Linux-PAM - modules/pam_unix/pam_unix_sess.c",
                   "https://github.com/linux-pam/linux-pam/blob/master/modules/pam_unix/"
-                  "pam_unix_sess.c")],
+                  "pam_unix_sess.c"),
+                 # gotcha #57: "authentication failure; ... rhost= user=", the
+                 # module's own report of a check sshd also reports.
+                 ("Linux-PAM - modules/pam_unix/support.c, _unix_verify_password()",
+                  "https://github.com/linux-pam/linux-pam/blob/master/modules/pam_unix/"
+                  "support.c")],
     },
     # IAI-29. ESXi writes its shell-session and console-login lines into
     # auth.log; Broadcom documents them.
