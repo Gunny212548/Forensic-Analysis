@@ -9,6 +9,17 @@ first success after a failure and its gap, destinations, refused ports and servi
 `NON_PUBLIC_IPV4_RE`, checked to stay verbatim in R2007's SQL), hours active. Design and
 decisions: `specs/behaviour_profiles.md` (Q27-Q29).
 
+**Accounts too** (branch `esxi-auth-dedupe`): `profile_account`, per user name lower-cased
+("Joe" and "joe" are one account): failures / successes / unknown-account attempts, sources
+it failed and signed in from, the most distinct sources failing and signing in within any
+hour (a self-join, since a window frame cannot count distinct values), failure bursts in
+1 / 10 / 60 min, hosts (n/a where the log names none - ESXi, Entra), hours active. Ranked
+among accounts with sign-ins, same `MIN_CROWD`. Routes and MCP tools take a kind:
+`/profiles/{source|account}[/{value}]`, `get_profile(kind, value)`, `list_unusual(kind, by)`.
+On the real Entra export the one account signed in from 27 addresses, 16 of them inside one
+hour (2026-06-07 12:15-12:49, all `89.251.0.x`) - a fact for the analyst, unranked because
+the file holds one account.
+
 Why it exists: a rule compares a count with a fixed number, and the user's objection holds -
 a number set on one customer's data misfires on a customer with more traffic. A profile ranks
 each address against the other addresses **of the same evidence**, so a busy log is compared

@@ -16,8 +16,8 @@ export default function EventsTable({ caseId, order = 'row' }) {
   const [offset, setOffset] = useState(0)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
-  // The source address whose behaviour profile is open, if any.
-  const [profileIp, setProfileIp] = useState(null)
+  // The behaviour profile open above the table, if any: { kind, value }.
+  const [profile, setProfile] = useState(null)
 
   const load = useCallback(async () => {
     setError('')
@@ -75,7 +75,7 @@ export default function EventsTable({ caseId, order = 'row' }) {
             : `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} events (${fmtNum(data.flagged_count)} flagged)`}
         </Empty>
         <div className="table-scroll">
-          {flagged ? <FlaggedRows events={data.events} /> : <AllRows events={data.events} onProfile={setProfileIp} />}
+          {flagged ? <FlaggedRows events={data.events} /> : <AllRows events={data.events} onProfile={(kind, value) => setProfile({ kind, value })} />}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           <button
@@ -100,7 +100,9 @@ export default function EventsTable({ caseId, order = 'row' }) {
   return (
     <>
       {toggle}
-      {profileIp && <ProfilePanel caseId={caseId} ip={profileIp} onClose={() => setProfileIp(null)} />}
+      {profile && (
+        <ProfilePanel caseId={caseId} kind={profile.kind} value={profile.value} onClose={() => setProfile(null)} />
+      )}
       {body}
     </>
   )
@@ -129,9 +131,9 @@ function AllRows({ events, onProfile }) {
                 shown only when nothing parsed (CLAUDE.md gotcha #21). */}
             <td>{e.ts || e.ts_raw || ''}</td>
             <td>
-              {/* Opens the address's behaviour profile above the table. */}
+              {/* Opens the address's or account's behaviour profile above the table. */}
               {e.srcip ? (
-                <button type="button" className="link-btn mono" onClick={() => onProfile(e.srcip)}>
+                <button type="button" className="link-btn mono" onClick={() => onProfile('source', e.srcip)}>
                   {e.srcip}
                 </button>
               ) : (
@@ -139,7 +141,15 @@ function AllRows({ events, onProfile }) {
               )}
             </td>
             <td>{e.dstip || ''}</td>
-            <td>{e.username || ''}</td>
+            <td>
+              {e.username ? (
+                <button type="button" className="link-btn mono" onClick={() => onProfile('account', e.username)}>
+                  {e.username}
+                </button>
+              ) : (
+                ''
+              )}
+            </td>
             {/* Layer A: the event type, named by the server (db.EVENT_TYPES)
                 so the table and the MCP tools use the same words. */}
             <td>{e.event || ''}</td>

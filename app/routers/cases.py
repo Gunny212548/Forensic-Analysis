@@ -38,34 +38,48 @@ async def get_case(case_id: str):
     return manifest
 
 
-@router.get("/{case_id}/profiles/source")
-async def list_source_profiles(
+# Behaviour profiles (profiles.py): kind -> (one, highest-on-a-fact, the facts it ranks).
+_PROFILE_KINDS = {
+    "source": (profiles.source, profiles.sources_by, profiles.RANKED),
+    "account": (profiles.account, profiles.accounts_by, profiles.RANKED_ACCOUNT),
+}
+
+
+@router.get("/{case_id}/profiles/{kind}")
+async def list_profiles(
     case_id: str,
+    kind: str,
     by: str = Query("fail_max_10m"),
     limit: int = Query(20, ge=1, le=200),
 ):
-    """Source addresses highest on one profile fact (profiles.py)."""
+    """Source addresses or accounts highest on one profile fact."""
     if storage.load_manifest(case_id) is None:
         raise HTTPException(404, "Case not found")
-    if by not in profiles.RANKED:
-        raise HTTPException(422, f"by must be one of {sorted(profiles.RANKED)}")
+    if kind not in _PROFILE_KINDS:
+        raise HTTPException(404, f"No {kind} profiles - kinds are {sorted(_PROFILE_KINDS)}")
+    _, many, ranked = _PROFILE_KINDS[kind]
+    if by not in ranked:
+        raise HTTPException(422, f"by must be one of {sorted(ranked)}")
     try:
-        return {"case_id": case_id, "by": by, "profiles": profiles.sources_by(case_id, by, limit)}
+        return {"case_id": case_id, "kind": kind, "by": by, "profiles": many(case_id, by, limit)}
     except LookupError as exc:
         raise HTTPException(409, str(exc))
 
 
-@router.get("/{case_id}/profiles/source/{ip}")
-async def get_source_profile(case_id: str, ip: str):
-    """One source address's behaviour profile - layer C facts, not a verdict."""
+@router.get("/{case_id}/profiles/{kind}/{value}")
+async def get_profile(case_id: str, kind: str, value: str):
+    """One source address's or account's behaviour profile - layer C facts,
+    not a verdict."""
     if storage.load_manifest(case_id) is None:
         raise HTTPException(404, "Case not found")
+    if kind not in _PROFILE_KINDS:
+        raise HTTPException(404, f"No {kind} profiles - kinds are {sorted(_PROFILE_KINDS)}")
     try:
-        found = profiles.source(case_id, ip)
+        found = _PROFILE_KINDS[kind][0](case_id, value)
     except LookupError as exc:
         raise HTTPException(409, str(exc))
     if found is None:
-        raise HTTPException(404, f"No events from {ip} in this case")
+        raise HTTPException(404, f"No events for {kind} {value} in this case")
     return found
 
 

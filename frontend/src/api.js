@@ -89,10 +89,13 @@ export async function getCase(caseId) {
   return jsonOrThrow(await fetch(`/api/cases/${encodeURIComponent(caseId)}`), 'Case not found')
 }
 
-/** One source address's behaviour profile (profiles.py): layer C facts. */
-export async function getSourceProfile(caseId, ip) {
+/** A behaviour profile (profiles.py): layer C facts. kind is "source" (an
+ *  address) or "account". */
+export async function getProfile(caseId, kind, value) {
   return jsonOrThrow(
-    await fetch(`/api/cases/${encodeURIComponent(caseId)}/profiles/source/${encodeURIComponent(ip)}`),
+    await fetch(
+      `/api/cases/${encodeURIComponent(caseId)}/profiles/${kind}/${encodeURIComponent(value)}`,
+    ),
     'Could not load the profile',
   )
 }

@@ -223,17 +223,27 @@ def main() -> int:
     check(not err and r["total"] == total_rows and t == sorted(t),
           f"get_timeline: all {total_rows} events counted, in time order")
 
-    err, r = c.call("get_profile", case_id=case_id, srcip=attacker)
+    err, r = c.call("get_profile", case_id=case_id, kind="source", value=attacker)
     s = (r.get("profile") or {}).get("sign_ins") or {}
     check(not err and s.get("fail_max_1m") == 8 and s.get("accounts_failed") == 4
           and s.get("success_after_fail_gap_s") == 119,
-          "get_profile: the attacker's 8 failures in a minute, 4 accounts, success 119 s after the first")
-    err, r = c.call("get_profile", case_id=case_id, srcip="192.0.2.1")
+          "get_profile source: the attacker's 8 failures in a minute, 4 accounts, success 119 s after the first")
+    err, r = c.call("get_profile", case_id=case_id, kind="source", value="192.0.2.1")
     check(err, "get_profile refuses an address with no events")
-    err, r = c.call("list_unusual", case_id=case_id, by="fail_max_10m")
+    err, r = c.call("get_profile", case_id=case_id, kind="account", value="ROOT")
+    a = (r.get("profile") or {}).get("sign_ins") or {}
+    check(not err and r["profile"]["account"] == "root" and a.get("auth_failed") == 8
+          and a.get("sources_failed") == 1 and a.get("sources_succeeded") == 1,
+          "get_profile account: root failed 8 times from one source and signed in from it")
+    err, r = c.call("list_unusual", case_id=case_id, kind="source", by="fail_max_10m")
     check(not err and r["profiles"] and r["profiles"][0]["srcip"] == attacker,
           "list_unusual by failures in 10 min puts the attacker first")
-    err, r = c.call("list_unusual", case_id=case_id, by="severity")
+    err, r = c.call("list_unusual", case_id=case_id, kind="account", by="fail_max_10m")
+    check(not err and r["profiles"] and r["profiles"][0]["account"] == "root",
+          "list_unusual accounts by failures in 10 min puts root first")
+    err, r = c.call("list_unusual", case_id=case_id, kind="account", by="refused_ports")
+    check(err, "list_unusual refuses a fact that kind does not rank")
+    err, r = c.call("list_unusual", case_id=case_id, kind="source", by="severity")
     check(err, "list_unusual refuses a fact it does not rank")
 
     err, r = c.call("get_flow", case_id=case_id)

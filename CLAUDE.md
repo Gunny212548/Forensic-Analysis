@@ -354,7 +354,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #26 Severity is a Sigma level; a refused row is capped at medium; escalation patterns (credential-compromise high, compromised-host critical). `findings.lvl` stores weights.
 - #29 Every rule carries Sigma + ADS metadata; status is earned (no rule is `stable`); `tests/check_rule_meta.py`.
 - #35 Intel feeds may be STIX 2.1 bundles; only pure IP-equality indicators are taken.
-- #57 Behaviour profiles (`profiles.py`): per-source facts in SQL at ingest, ranked against the same evidence (none under 20), windows `[t, t+W]` for 1/10/60 min, n/a not 0; never a finding. ESXi logs one failed PAM attempt twice (pam_unix + sshd): only the sshd line is auth_failed (fixed, R2000 35->32 on auth.log).
+- #57 Behaviour profiles (`profiles.py`): per-source and per-account facts in SQL at ingest, ranked against the same evidence (none under 20), windows `[t, t+W]` for 1/10/60 min, n/a not 0; never a finding. ESXi logs one failed PAM attempt twice (pam_unix + sshd): only the sshd line is auth_failed (fixed, R2000 35->32 on auth.log).
 - #56 A rule only answers "known attack pattern?" (layer B); event type is layer A, context facts layer C (`db.list_raw`). R1000-R1004 / R2001 / R3000 / R3006 left the rule set (metadata `deprecated`); R2008 login-after-brute-force, R2009 measured spray; R2005 renamed (branch `rules-layers`). Parity needs the intel feeds or R3003-R3006 read 0.
 
 **Findings, review and workflow** (`review.py`, `lifecycle.py`, `confidence.py`, `finding_ids.py`, `related.py`)

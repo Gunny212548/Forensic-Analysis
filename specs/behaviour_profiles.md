@@ -1,7 +1,8 @@
 # Behaviour profiles - layer C facts about addresses, accounts and hosts
 
-Status: **approved and built for source addresses** (2026-10-20; Q27-Q29 as proposed - windows
-1 / 10 / 60 minutes, rank from 20 entities, sources first; accounts and hosts follow). Branch
+Status: **approved and built for source addresses and accounts** (2026-10-20; Q27-Q29 as
+proposed - windows 1 / 10 / 60 minutes, rank from 20 entities, sources first; accounts built
+on branch `esxi-auth-dedupe`; hosts follow). Branch
 `behaviour-profiles` off `mcp-tools`. A window is `[t, t + W]`, both ends included, so two
 events exactly W apart share it. Measured: 0.06-0.09 s per 65,534-row case; parity unchanged.
 The user's request: build behaviour profiles (item 1 of: profiles in SQL -> AI reads them

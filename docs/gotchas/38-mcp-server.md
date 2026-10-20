@@ -35,8 +35,8 @@ Every row carries the event type (`event`, layer A, from `db.EVENT_TYPES` -
 the same words the events table shows) and its `context` facts (layer C),
 because all lists of events go through one query, `db._events`. The status
 workflow (lifecycle) is no longer served: Respond left the flow (story 1).
-`get_profile` / `list_unusual` (branch `behaviour-profiles`) serve the behaviour
-profiles of gotcha #57 - counted in SQL, so the model reads facts it could not count.
+`get_profile` / `list_unusual` (branch `behaviour-profiles`; `kind` = source or account
+since `esxi-auth-dedupe`) serve the behaviour profiles of gotcha #57 - counted in SQL, so the model reads facts it could not count.
 
 What it deliberately does not do, so don't add it casually:
 - **No write tool.** Review, lifecycle and upload take their actor from a

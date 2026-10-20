@@ -63,13 +63,18 @@ def main() -> int:
         ev("10.5.5.5", i, verdict="deny", dst="10.1.1.1", port=str(port))
     ev("10.5.5.5", 100, verdict="allow", dst="8.8.8.8", port="443", sent=5000)
     ev("10.5.5.5", 110, verdict="allow", dst="192.168.1.10", port="445", sent=7000)
+    # An account signing in from 5 addresses inside an hour, then once more
+    # from a sixth two hours later; the name in two spellings.
+    for i in range(5):
+        ev(f"198.51.100.{i + 1}", 3600 + i * 600, "auth_success", "Roamer" if i % 2 else "roamer")
+    ev("198.51.100.99", 3600 + 3 * 3600, "auth_success", "roamer")
 
     con = duckdb.connect()
     con.execute(db.SCHEMA)
     con.executemany("INSERT INTO raw_events (row_id, ts, srcip, dstip, dstport, username, action, verdict, "
                     "bytes_sent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
     n = profiles.build(con)
-    check(n == 24 + 1 + 2 + 1, f"one profile per source address ({n})")
+    check(n == 24 + 1 + 2 + 1 + 6, f"one profile per source address ({n})")
 
     def get(ip):
         return profiles.get(con, ip, db._fmt_ts)
@@ -84,12 +89,15 @@ def main() -> int:
           "failures and unknown accounts counted together, on 3 accounts")
     check(a["success_after_fail_gap_s"] == 190, f"success 190 s after the first failure ({a.get('success_after_fail_gap_s')})")
     rank = a["rank"]
-    check(isinstance(rank, dict) and rank["among"] == 27
+    check(isinstance(rank, dict) and rank["among"] == 33
           and rank["percent_of_addresses_below"]["fail_max_10m"] >= 96,
-          f"ranked among the 27 sources with sign-ins, above at least 96% ({rank})")
+          f"ranked among the 33 sources with sign-ins, above at least 96% ({rank})")
+    # Ties share a rank: below an address with 1 failure are only the 6
+    # roaming-account addresses, which signed in but never failed.
     o = get("10.0.0.3")["sign_ins"]
-    check(o["fail_max_1m"] == 1 and o["rank"]["percent_of_addresses_below"]["fail_max_1m"] == 0,
-          "an ordinary source: 1 failure, nobody below it")
+    check(o["fail_max_1m"] == 1 and o["rank"]["percent_of_addresses_below"]["fail_max_1m"] == 18.2,
+          f"an ordinary source: 1 failure, above only the 6 of 33 with none "
+          f"({o['rank']['percent_of_addresses_below']['fail_max_1m']})")
 
     print("window edges")
     check(get("10.9.9.1")["sign_ins"]["fail_max_1m"] == 2, "60 s apart: one 1-minute window")
@@ -105,7 +113,7 @@ def main() -> int:
     check(isinstance(t["rank"], str) and "fewer than 20" in t["rank"],
           f"one firewall source is no crowd: not ranked ({t['rank']})")
     check(get("10.0.0.1")["traffic"].startswith("n/a"), "no firewall events -> traffic n/a")
-    check(get("198.51.100.1") is None, "an address with no events has no profile")
+    check(get("192.0.2.250") is None, "an address with no events has no profile")
 
     print("context line")
     lines = profiles.context_lines(con, {"203.0.113.9", "10.5.5.5", "10.0.0.1"})
@@ -121,6 +129,30 @@ def main() -> int:
         check(False, "an unranked fact is refused")
     except ValueError:
         check(True, "an unranked fact is refused")
+
+    print("accounts")
+    r = profiles.get_account(con, "ROAMER", db._fmt_ts)
+    s = r["sign_ins"] if r else {}
+    check(r is not None and r["account"] == "roamer" and s.get("auth_success") == 6,
+          "an account is matched case-insensitively and its two spellings are one account")
+    check(s.get("sources_succeeded") == 6 and s.get("success_sources_max_60m") == 5,
+          f"6 sources in all, 5 of them inside one hour ({s.get('sources_succeeded')}, "
+          f"{s.get('success_sources_max_60m')})")
+    check(r["hosts"].startswith("n/a"), "no host in the events -> hosts n/a")
+    acc = profiles.get_account(con, "acct1", db._fmt_ts)["sign_ins"]
+    check(acc["sources_failed"] == 1 and acc["fail_max_1m"] == 6,
+          f"acct1: failures from one source, 6 in a minute ({acc['fail_max_1m']})")
+    rank = r["sign_ins"]["rank"]
+    check(isinstance(rank, dict) and rank["among"] >= 20
+          and rank["percent_of_accounts_below"]["success_sources_max_60m"] > 90,
+          f"roamer ranked among {rank['among'] if isinstance(rank, dict) else rank} accounts, "
+          "above 90% on sources within an hour")
+    top = profiles.top_accounts(con, "success_sources_max_60m", 1, db._fmt_ts)
+    check(top and top[0]["account"] == "roamer", "top accounts by sources within an hour: roamer")
+    lines = profiles.account_lines(con, {"Roamer", "user3"})
+    check("signed in from 6 sources, most 5 within an hour" in lines.get("roamer", "")
+          and "user3" in lines, f"account lines: {lines}")
+    check(profiles.get_account(con, "nobody", db._fmt_ts) is None, "an unknown account has no profile")
 
     print("a case processed before profiles existed")
     old = duckdb.connect()

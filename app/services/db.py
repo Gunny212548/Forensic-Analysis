@@ -399,12 +399,15 @@ def _events(con, cond: str, params: list, order: str, limit: int, offset: int) -
     # The source's behaviour profile, one line, where it has failures or
     # refusals to describe (profiles.py) - it replaces the bare refused count.
     profile_line = profiles.context_lines(con, {r["srcip"] for r in out if r["srcip"]})
+    account_line = profiles.account_lines(con, {r["username"] for r in out if r["username"]})
     for row in out:
         row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings
         row["event"] = EVENT_TYPES.get(row["action"], row["action"])
         ctx = []
         if row["srcip"] in profile_line:
             ctx.append(profile_line[row["srcip"]])
+        if row["username"] and row["username"].lower() in account_line:
+            ctx.append(account_line[row["username"].lower()])
         elif row["src_refused"]:
             # A case processed before profiles existed. A zip case holds several
             # files in one table, so the count is over the evidence item, not

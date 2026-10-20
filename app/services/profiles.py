@@ -39,21 +39,48 @@ RANKED = {
 }
 
 
-def _window_max(event_filter: str, name: str) -> str:
-    """Per source, the most events of one kind inside any W-minute window,
-    for each W: every event opens a window [t, t + W] and the busiest one
-    counts. RANGE over the timestamp, so gaps in time are real gaps."""
+# The same for an account (lower-cased user name), ranked among the accounts
+# of the evidence that have sign-in events.
+RANKED_ACCOUNT = {
+    "fail_max_1m": "auth", "fail_max_10m": "auth", "fail_max_60m": "auth",
+    "sources_failed": "auth", "sources_succeeded": "auth",
+    "fail_sources_max_60m": "auth", "success_sources_max_60m": "auth",
+}
+
+
+def _window_max(event_filter: str, name: str, key: str = "srcip", source: str = "raw_events") -> str:
+    """Per key (a source address, or an account), the most events of one
+    kind inside any W-minute window, for each W: every event opens a window
+    [t, t + W] and the busiest one counts. RANGE over the timestamp, so gaps
+    in time are real gaps."""
     cols = ",\n".join(
-        f"count(*) OVER (PARTITION BY srcip ORDER BY ts "
+        f"count(*) OVER (PARTITION BY {key} ORDER BY ts "
         f"RANGE BETWEEN CURRENT ROW AND INTERVAL {w} MINUTE FOLLOWING) AS w{w}"
         for w in WINDOWS)
     maxes = ", ".join(f"max(w{w}) AS {name}_max_{w}m" for w in WINDOWS)
     return f"""
-        SELECT srcip, {maxes} FROM (
-            SELECT srcip, {cols}
-            FROM raw_events
-            WHERE {event_filter} AND srcip IS NOT NULL AND ts IS NOT NULL
-        ) GROUP BY srcip
+        SELECT {key}, {maxes} FROM (
+            SELECT {key}, {cols}
+            FROM {source}
+            WHERE {event_filter} AND {key} IS NOT NULL AND ts IS NOT NULL
+        ) GROUP BY {key}
+    """
+
+
+def _distinct_sources_max(action_filter: str, name: str) -> str:
+    """Per account, the most distinct source addresses among its events of
+    one kind inside any 60-minute window [t, t + 60 min]. A window frame
+    cannot count distinct values, so each event joins the account's events
+    of that kind in the following hour."""
+    return f"""
+        SELECT account, max(n) AS {name} FROM (
+            SELECT e.account, e.row_id, count(DISTINCT f.srcip) AS n
+            FROM acct e JOIN acct f
+              ON f.account = e.account AND f.{action_filter}
+             AND f.ts BETWEEN e.ts AND e.ts + INTERVAL 60 MINUTE
+            WHERE e.{action_filter} AND e.ts IS NOT NULL AND f.srcip IS NOT NULL
+            GROUP BY e.account, e.row_id
+        ) GROUP BY account
     """
 
 
@@ -121,7 +148,60 @@ def build(con: duckdb.DuckDBPyConnection) -> int:
         SELECT *, {rank_cols}
         FROM joined
     """)
+    _build_accounts(con)
     return con.execute("SELECT count(*) FROM profile_source").fetchone()[0]
+
+
+def _build_accounts(con: duckdb.DuckDBPyConnection) -> None:
+    """`profile_account`: per account (the user name, lower-cased - a sign-in
+    service treats "Joe" and "joe" as one person), where it signed in from,
+    how many places at once, failures and their bursts, hours active, and the
+    hosts it was used on where the log names one."""
+    con.execute("DROP TABLE IF EXISTS profile_account")
+    rank_cols = ",\n".join(
+        f"CASE WHEN crowd_auth < {MIN_CROWD} OR NOT coalesce(has_auth, false) THEN NULL "
+        f"ELSE (rank() OVER (PARTITION BY coalesce(has_auth, false) ORDER BY {fact}) - 1)::DOUBLE / crowd_auth "
+        f"END AS below_{fact}"
+        for fact in RANKED_ACCOUNT)
+    con.execute(f"""
+        CREATE TABLE profile_account AS
+        WITH acct AS (
+            SELECT lower(username) AS account, row_id, ts, srcip, hostname, action
+            FROM raw_events WHERE username IS NOT NULL AND username <> ''
+        ),
+        base AS (
+            SELECT account,
+                   count(*) AS events,
+                   min(ts) AS first_ts, max(ts) AS last_ts,
+                   count(DISTINCT CAST(ts AS DATE)) AS days_active,
+                   list(DISTINCT hour(ts) ORDER BY hour(ts)) FILTER (WHERE ts IS NOT NULL) AS hours,
+                   count(*) FILTER (WHERE action = 'auth_failed') AS auth_failed,
+                   count(*) FILTER (WHERE action = 'invalid_user') AS invalid_user,
+                   count(*) FILTER (WHERE action = 'auth_success') AS auth_success,
+                   count(DISTINCT srcip) FILTER (WHERE action IN {FAILED}) AS sources_failed,
+                   count(DISTINCT srcip) FILTER (WHERE action = 'auth_success') AS sources_succeeded,
+                   count(DISTINCT hostname) AS hosts,
+                   bool_or(hostname IS NOT NULL) AS has_host,
+                   bool_or(action IN ('auth_failed', 'invalid_user', 'auth_success')) AS has_auth
+            FROM acct GROUP BY account
+        ),
+        fails AS ({_window_max(f"action IN {FAILED}", "fail", key="account", source="acct")}),
+        fail_src AS ({_distinct_sources_max(f"action IN {FAILED}", "fail_sources_max_60m")}),
+        ok_src AS ({_distinct_sources_max("action = 'auth_success'", "success_sources_max_60m")}),
+        joined AS (
+            SELECT base.*,
+                   {", ".join(f"coalesce(fails.fail_max_{w}m, 0) AS fail_max_{w}m" for w in WINDOWS)},
+                   coalesce(fail_src.fail_sources_max_60m, 0) AS fail_sources_max_60m,
+                   coalesce(ok_src.success_sources_max_60m, 0) AS success_sources_max_60m,
+                   count(*) FILTER (WHERE base.has_auth) OVER () AS crowd_auth
+            FROM base
+            LEFT JOIN fails USING (account)
+            LEFT JOIN fail_src USING (account)
+            LEFT JOIN ok_src USING (account)
+        )
+        SELECT *, {rank_cols}
+        FROM joined
+    """)
 
 
 _FIELDS_AUTH = ["auth_failed", "invalid_user", "auth_success", "accounts_failed",
@@ -180,6 +260,101 @@ def top(con, by: str, limit: int, fmt_ts) -> list[dict]:
         raise LookupError("no behaviour profiles in this case - re-process it") from None
     cols = [d[0] for d in cur.description]
     return [_shape(dict(zip(cols, r)), fmt_ts) for r in cur.fetchall()]
+
+
+_FIELDS_ACCOUNT = ["auth_failed", "invalid_user", "auth_success", "sources_failed",
+                   "sources_succeeded", *[f"fail_max_{w}m" for w in WINDOWS],
+                   "fail_sources_max_60m", "success_sources_max_60m"]
+
+
+def _shape_account(row: dict, fmt_ts) -> dict:
+    out = {"account": row["account"], "events": row["events"],
+           "first_seen": fmt_ts(row["first_ts"]) or None, "last_seen": fmt_ts(row["last_ts"]) or None,
+           "days_active": row["days_active"], "hours_active": row["hours"] or [],
+           # A host only where the log names one (auth logs); n/a otherwise.
+           "hosts": row["hosts"] if row["has_host"] else "n/a - no host in these events"}
+    if not row["has_auth"]:
+        out["sign_ins"] = "n/a - no sign-in events for this account"
+        return out
+    facts = {f: row[f] for f in _FIELDS_ACCOUNT}
+    crowd = row["crowd_auth"]
+    ranks = {f: round(row[f"below_{f}"] * 100, 1) for f in RANKED_ACCOUNT if row[f"below_{f}"] is not None}
+    facts["rank"] = ({"percent_of_accounts_below": ranks, "among": crowd} if crowd >= MIN_CROWD
+                     else f"not ranked - {crowd} account(s) with sign-ins here, fewer than {MIN_CROWD}")
+    out["sign_ins"] = facts
+    return out
+
+
+def get_account(con, account: str, fmt_ts) -> dict | None:
+    """One account's profile (matched case-insensitively), or None."""
+    try:
+        cur = con.execute("SELECT * FROM profile_account WHERE account = lower(?)", [account])
+    except duckdb.CatalogException:
+        raise LookupError("no account profiles in this case - re-process it") from None
+    row = cur.fetchone()
+    if row is None:
+        return None
+    return _shape_account(dict(zip([d[0] for d in cur.description], row)), fmt_ts)
+
+
+def top_accounts(con, by: str, limit: int, fmt_ts) -> list[dict]:
+    if by not in RANKED_ACCOUNT:
+        raise ValueError(f"by must be one of {sorted(RANKED_ACCOUNT)}")
+    try:
+        cur = con.execute(f"SELECT * FROM profile_account WHERE {by} > 0 "
+                          f"ORDER BY {by} DESC, account LIMIT ?", [limit])
+    except duckdb.CatalogException:
+        raise LookupError("no account profiles in this case - re-process it") from None
+    cols = [d[0] for d in cur.description]
+    return [_shape_account(dict(zip(cols, r)), fmt_ts) for r in cur.fetchall()]
+
+
+def account_lines(con, accounts: set[str]) -> dict[str, str]:
+    """account (lower-cased) -> one line for the events table, where it has
+    failures or signed in from more than one place."""
+    if not accounts:
+        return {}
+    try:
+        rows = con.execute(
+            "SELECT account, auth_failed + invalid_user, sources_failed, sources_succeeded, "
+            "success_sources_max_60m, below_success_sources_max_60m, crowd_auth "
+            "FROM profile_account WHERE account IN (SELECT unnest(?))",
+            [sorted(a.lower() for a in accounts)]).fetchall()
+    except duckdb.CatalogException:
+        return {}
+    out = {}
+    for acct, fails, src_f, src_ok, most_1h, below, crowd in rows:
+        parts = []
+        if fails:
+            parts.append(f"account failed {fails} sign-ins from {src_f} source(s)")
+        if src_ok > 1:
+            rank = f", more than {below * 100:.0f}% of {crowd} accounts here" if below is not None else ""
+            parts.append(f"account signed in from {src_ok} sources, most {most_1h} within an hour{rank}")
+        if parts:
+            out[acct] = "; ".join(parts)
+    return out
+
+
+def account(case_id: str, name: str) -> dict | None:
+    from . import db
+    if not db.db_path(case_id).exists():
+        return None
+    con = db.connect(case_id, read_only=True)
+    try:
+        return get_account(con, name, db._fmt_ts)
+    finally:
+        con.close()
+
+
+def accounts_by(case_id: str, by: str, limit: int) -> list[dict]:
+    from . import db
+    if not db.db_path(case_id).exists():
+        return []
+    con = db.connect(case_id, read_only=True)
+    try:
+        return top_accounts(con, by, limit, db._fmt_ts)
+    finally:
+        con.close()
 
 
 def source(case_id: str, srcip: str) -> dict | None:
