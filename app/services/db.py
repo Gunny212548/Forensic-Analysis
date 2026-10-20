@@ -271,7 +271,7 @@ def finding_rows(case_id: str, key: str, limit: int, offset: int = 0) -> dict:
         con.close()
 
 
-def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
+def list_raw(case_id: str, limit: int, offset: int, order: str = "row") -> list[dict]:
     """One page of events, each with its layer C facts (`context`).
 
     Layer C (rules_review.md, D12): what is unusual about an event, stated as
@@ -284,6 +284,10 @@ def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
         return []
     from .rules import DENY_VERDICTS
 
+    # Time order puts rows with no parsed time last, and the row id breaks
+    # ties so a page boundary never moves between two requests.
+    sort, outer = (("ts NULLS LAST, row_id", "page.ts NULLS LAST, page.row_id") if order == "time"
+                   else ("row_id", "page.row_id"))
     con = connect(case_id, read_only=True)
     try:
         rows = con.execute(
@@ -291,7 +295,7 @@ def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
             WITH page AS (
                 SELECT row_id, ts, ts_raw, srcip, dstip, username, action, verdict,
                        app, risk, raw
-                FROM raw_events ORDER BY row_id LIMIT ? OFFSET ?
+                FROM raw_events ORDER BY {sort} LIMIT ? OFFSET ?
             ),
             refused AS (
                 SELECT srcip, count(*) AS n FROM raw_events
@@ -301,7 +305,7 @@ def list_raw(case_id: str, limit: int, offset: int) -> list[dict]:
             )
             SELECT page.*, refused.n
             FROM page LEFT JOIN refused USING (srcip)
-            ORDER BY page.row_id
+            ORDER BY {outer}
             """,
             [limit, offset],
         ).fetchall()

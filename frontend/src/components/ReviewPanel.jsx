@@ -3,7 +3,6 @@ import { getFindings, postReview } from '../api.js'
 import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
 import FindingEvents from './FindingEvents.jsx'
-import Lifecycle from './Lifecycle.jsx'
 import RuleCard from './RuleCard.jsx'
 
 // Unreviewed first, whatever its confidence: a high-confidence finding
@@ -152,21 +151,6 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
         </div>
       )}
 
-      {/* Only high/critical findings enter the workflow (lifecycle.py). MTTC
-          counts true positives from creation to Contained. */}
-      {data.lifecycle_summary && (
-        <div className="lc-summary">
-          Workflow ({data.lifecycle_summary.tracked} of {data.count} findings - high and critical):{' '}
-          {Object.entries(data.lifecycle_summary.counts)
-            .map(([k, v]) => `${k} ${v}`)
-            .join(' · ')}
-          {' · '}MTTC{' '}
-          {data.lifecycle_summary.mttc_seconds == null
-            ? 'n/a (no contained true positive yet)'
-            : `${(data.lifecycle_summary.mttc_seconds / 3600).toFixed(1)} h over ${data.lifecycle_summary.mttc_n}`}
-        </div>
-      )}
-
         </>
       )}
 
@@ -304,19 +288,10 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
               </div>
             )}
 
-            {f.lifecycle?.tracked && (
-              <Lifecycle
-                caseId={caseId}
-                finding={f}
-                assignees={data.assignees}
-                classifications={data.classifications}
-                reviewed={st !== 'Unreviewed'}
-                onChanged={() => {
-                  load()
-                  onChanged?.()
-                }}
-              />
-            )}
+            {/* No status workflow or assignee here since story 1: Respond was
+                removed (case_flow_design.md revision 3) and the owner of a
+                decision is the signed-in account (revision 2). The lifecycle
+                log stays on disk as an audit record. */}
 
             {rejecting === f.key ? (
               // FR-4.6: a rejection carries a structured reason, so mapping

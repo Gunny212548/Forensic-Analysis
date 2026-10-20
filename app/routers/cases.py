@@ -149,6 +149,8 @@ async def get_case_events(
     only_flagged: bool = True,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    # "time" for the Timeline step (event time, then row); "row" is file order.
+    order: str = Query("row", pattern="^(row|time)$"),
 ):
     manifest = storage.load_manifest(case_id)
     if manifest is None:
@@ -159,7 +161,7 @@ async def get_case_events(
         events = db.list_findings(case_id, limit, offset)
         total = flagged
     else:
-        events = db.list_raw(case_id, limit, offset)
+        events = db.list_raw(case_id, limit, offset, order=order)
         total = total_rows
 
     return {

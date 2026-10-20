@@ -48,7 +48,7 @@ export default function Overview({ companyId }) {
   const todo = [
     { n: t.critical_unassigned, label: 'critical findings unassigned',
       href: `#/findings/severity=critical&unassigned=1${scope}` },
-    { n: t.awaiting_review, label: 'awaiting review', href: data.review_case ? `#/case/${data.review_case}/triage` : '#/cases' },
+    { n: t.awaiting_review, label: 'awaiting review', href: data.review_case ? `#/case/${data.review_case}/attack-events` : '#/cases' },
     { n: t.failed_cases, label: 'cases failed', href: data.failed_case ? `#/case/${data.failed_case}/ingest` : '#/cases' },
     { n: data.attention.length, label: 'evidence problems',
       href: data.attention.length ? `#/case/${data.attention[0].case_id}/ingest` : '#/cases' },

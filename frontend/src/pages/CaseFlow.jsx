@@ -292,43 +292,40 @@ function StepBody({ step, caseId, manifest, ready, ai, reload }) {
           <Evidence caseId={caseId} />
           {ready && (
             <>
-              <div className="section-label">Events</div>
+              <div className="section-label">Events, in file order</div>
               <EventsTable caseId={caseId} />
             </>
           )}
         </>
       )
-    case 'triage':
-      // Every finding of the case, the ones outside the status workflow too.
+    case 'timeline':
+      // Every event by its time. One evidence item for now; across the
+      // project's files, with pivots and silent periods, in story 4.
+      return <EventsTable caseId={caseId} order="time" />
+    case 'attack-events':
+      // The rules suggest, the analyst confirms or rejects each finding group.
       return <ReviewPanel caseId={caseId} onChanged={reload} />
-    case 'investigate':
+    case 'attack-timeline':
+      return <AttackTimeline caseId={caseId} />
+    case 'attack-path':
+      return <GraphAndRisk caseId={caseId} />
+    case 'report':
       return (
         <>
-          <TrackedFindings caseId={caseId} mode="investigate" />
-          <GraphAndRisk caseId={caseId} />
-          {ai.analysis?.timeline?.length > 0 && (
-            <>
-              <div className="section-label">Timeline written by the AI</div>
-              <Timeline items={ai.analysis.timeline} onCite={cite} />
-            </>
-          )}
+          <ReportStep caseId={caseId} manifest={manifest} />
+          <div className="section-label">Narrative drafted by the AI</div>
+          <AnalyseStep ai={ai} cite={cite} />
         </>
       )
-    case 'respond':
-      return <TrackedFindings caseId={caseId} mode="respond" />
-    case 'analyse':
-      return <AnalyseStep ai={ai} cite={cite} />
-    case 'report':
-      return <ReportStep caseId={caseId} manifest={manifest} />
     default:
       return null
   }
 }
 
-/** The high and critical findings of the case - the ones in the status
- *  workflow - each opening its own page, where they are assigned, investigated,
- *  contained and resolved. Respond adds the time to contain. */
-function TrackedFindings({ caseId, mode }) {
+/** The finding groups the analyst confirmed (accepted or modified), in the
+ *  order their first event happened. Story 6 adds the gaps between them, the
+ *  assumptions written for each gap and the hypotheses. */
+function AttackTimeline({ caseId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   useEffect(() => {
@@ -343,56 +340,50 @@ function TrackedFindings({ caseId, mode }) {
 
   if (error) return <Empty>{error}</Empty>
   if (!data) return <Empty>Loading...</Empty>
-  const rows = data.findings.filter((f) => f.lifecycle?.tracked)
-  if (!rows.length) return <Empty>No high or critical findings - nothing enters the status workflow.</Empty>
-  const lc = data.lifecycle_summary || {}
+  // ts_first is the zone-stamped "YYYY-MM-DD HH:MM:SS+07:00" text, so it sorts
+  // as written; a group whose time did not parse goes last.
+  const rows = data.findings
+    .filter((f) => ['Accepted', 'Modified'].includes(f.review?.status))
+    .sort((a, b) => (a.ts_first || '￿').localeCompare(b.ts_first || '￿') || a.key.localeCompare(b.key))
+  if (!rows.length) {
+    return (
+      <Empty>
+        No attack event confirmed yet. <a href={stepHref(caseId, 'attack-events')}>Decide them in Attack events</a>.
+      </Empty>
+    )
+  }
   return (
-    <>
-      {mode === 'respond' && (
-        <div className="meta-line" style={{ marginTop: 0 }}>
-          {Object.entries(lc.counts || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}
-          {' · '}mean time to contain:{' '}
-          {lc.mttc_seconds != null
-            ? `${(lc.mttc_seconds / 3600).toFixed(1)} h over ${lc.mttc_n} true positive${lc.mttc_n === 1 ? '' : 's'}`
-            : 'no true positive contained yet'}
-        </div>
-      )}
-      <div className="table-scroll">
-        <table className="ov-table">
-          <thead>
-            <tr>
-              <th>Finding</th>
-              <th>Severity</th>
-              <th>Description</th>
-              <th>Review</th>
-              <th>Status</th>
-              <th>Assignee</th>
+    <div className="table-scroll">
+      <table className="ov-table">
+        <thead>
+          <tr>
+            <th>First event</th>
+            <th>Last event</th>
+            <th>What happened</th>
+            <th>ATT&amp;CK</th>
+            <th>Events</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((f) => (
+            <tr key={f.key}>
+              <td className="mono">{f.ts_first || ''}</td>
+              <td className="mono">{f.ts_last && f.ts_last !== f.ts_first ? f.ts_last : ''}</td>
+              <td>
+                <a className="table-link" href={`#/finding/${caseId}/${encodeURIComponent(f.key)}`}>
+                  {f.descr}
+                </a>
+                <div className="cell-sub">
+                  {f.fd || f.rid} · {LEVEL_EN[f.level] || f.level}
+                </div>
+              </td>
+              <td>{(f.mitre || []).join(', ')}</td>
+              <td>{fmtNum(f.cnt)}</td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((f) => (
-              <tr key={f.key}>
-                <td>
-                  <a className="table-link mono" href={`#/finding/${caseId}/${encodeURIComponent(f.key)}`}>
-                    {f.fd || f.rid}
-                  </a>
-                </td>
-                <td><span className={`sev-tag sev-tag-${f.level}`}>{LEVEL_EN[f.level] || f.level}</span></td>
-                <td>{f.descr}</td>
-                <td>{f.review?.status}</td>
-                <td>
-                  {f.lifecycle.status}
-                  {f.review?.status === 'Rejected' && f.lifecycle.status !== 'Resolved' && (
-                    <div className="cell-sub">rejected - not closed</div>
-                  )}
-                </td>
-                <td>{f.lifecycle.assignee || <span className="muted">unassigned</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -488,11 +479,11 @@ function ReportStep({ caseId, manifest }) {
       {data && (
         <div className={`rv-gate ${data.ready_for_report ? 'ok' : 'blocked'}`}>
           {data.ready_for_report ? (
-            'Every finding is reviewed - the report gate is open.'
+            'Every suggestion is decided - the report gate is open.'
           ) : (
             <>
-              {unreviewed} finding{unreviewed === 1 ? '' : 's'} not reviewed - a final report waits for them.{' '}
-              <a href={stepHref(caseId, 'triage')}>Go to Triage</a>
+              {unreviewed} suggestion{unreviewed === 1 ? '' : 's'} not decided - a final report waits for them.{' '}
+              <a href={stepHref(caseId, 'attack-events')}>Go to Attack events</a>
             </>
           )}
         </div>

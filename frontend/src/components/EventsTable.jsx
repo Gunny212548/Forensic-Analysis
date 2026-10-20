@@ -24,8 +24,9 @@ const EVENT_TYPE = {
 /** Paginated, server-side. A case can hold 65k+ rows and 25k findings, so
  *  the client never pulls the whole table - the offset lives here and every
  *  page is its own query. FR-11.2: every event of the case by default, the
- *  rule matches one click away. */
-export default function EventsTable({ caseId }) {
+ *  rule matches one click away. `order` "time" is the Timeline step: every
+ *  event by event time, then row (file order is "row"). */
+export default function EventsTable({ caseId, order = 'row' }) {
   const [flagged, setFlagged] = useState(false)
   const [offset, setOffset] = useState(0)
   const [data, setData] = useState(null)
@@ -34,11 +35,11 @@ export default function EventsTable({ caseId }) {
   const load = useCallback(async () => {
     setError('')
     try {
-      setData(await getEvents(caseId, { limit: PAGE_SIZE, offset, flagged }))
+      setData(await getEvents(caseId, { limit: PAGE_SIZE, offset, flagged, order }))
     } catch (err) {
       setError(err.message)
     }
-  }, [caseId, offset, flagged])
+  }, [caseId, offset, flagged, order])
 
   useEffect(() => {
     load()

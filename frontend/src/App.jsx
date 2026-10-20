@@ -19,12 +19,21 @@ const PAGES = [...MENU.map((it) => it.route), 'case', 'finding', ...LEGACY]
 
 // Where each tab of the old Reports page lives now (specs/case_flow_design.md R13).
 const REPORTS_TAB_STEP = {
-  overview: 'analyse',
-  chain: 'analyse',
-  recs: 'analyse',
+  overview: 'report',
+  chain: 'report',
+  recs: 'report',
   events: 'ingest',
   evidence: 'ingest',
-  findings: 'triage',
+  findings: 'attack-events',
+}
+
+// Revision 1's case steps (IAI-89) -> the step holding their content since
+// story 1 (specs/story1_case_flow_steps.md).
+const OLD_STEPS = {
+  triage: 'attack-events',
+  investigate: 'attack-path',
+  respond: 'attack-events',
+  analyse: 'report',
 }
 
 function parseHash() {
@@ -134,10 +143,15 @@ export default function App() {
     }
     if (page === 'reports' || page === 'timeline' || page === 'attack-graph') {
       const [caseId, tab] = param.split('/')
-      const step = page === 'reports' ? REPORTS_TAB_STEP[tab] : 'investigate'
+      const step =
+        page === 'reports' ? REPORTS_TAB_STEP[tab] : page === 'timeline' ? 'timeline' : 'attack-path'
       go(caseId ? `#/case/${caseId}${step ? `/${step}` : ''}` : '#/cases')
     }
     if (page === 'case' && !param) go('#/cases')
+    if (page === 'case' && param) {
+      const [caseId, step] = param.split('/')
+      if (OLD_STEPS[step]) go(`#/case/${caseId}/${OLD_STEPS[step]}`)
+    }
     if (page === 'finding' && !splitResult(param).findingKey) go('#/findings')
   }, [page, param])
 

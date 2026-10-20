@@ -55,7 +55,8 @@ export default function Cases() {
         <div>
           <h1>Cases</h1>
           <div className="subtitle">
-            Every case and the step it is on: Ingest, Triage, Investigate, Respond, Analyse, Report.
+            Every case and the step it is on: Ingest, Timeline, Attack events, Attack timeline, Attack path,
+            Report.
           </div>
         </div>
         <a className="btn-primary" href="#/upload">Upload a log</a>

@@ -1,19 +1,23 @@
-"""The case flow (IAI-89, specs/case_flow_design.md R1-R4), end to end through the API.
+"""The case flow (IAI-89, then story 1 - specs/story1_case_flow_steps.md), end to
+end through the API.
 
     python tests/check_case_flow.py <scratch dir> [--repo DIR]
 
 Builds a throwaway store, uploads gen_usecase's planted attack (both files in
-one zip, and the firewall alone) and walks a case through its six steps:
+one zip, and the firewall alone) and walks a case through its six steps -
+Ingest, Timeline, Attack events, Attack timeline, Attack path, Report:
 
 - the steps and their order, and that every step cites a standard that was
   read - one listed under "Read" in docs/standards/SOURCES.md (R4);
-- states computed from the case's own records: Ingest done, Triage waiting on
-  the unreviewed findings, Report's gate closed until they are reviewed;
-- the recommended step moves on as the analyst works: review everything ->
-  Investigate, start investigation on every high/critical finding -> Respond,
-  resolve them -> Report;
-- a rejected high/critical finding needs no investigation but is still waiting
-  in Respond until it is closed;
+- no Respond step: no status workflow and no assignee in the flow (revisions 2
+  and 3 of the case flow design);
+- states computed from the case's own records: Ingest and Timeline done,
+  Attack events waiting on the undecided suggestions, Attack timeline waiting
+  for a confirmed one, Report's gate closed until all are decided;
+- confirming every suggestion completes Attack events, fills the Attack
+  timeline and opens the Report; rejecting them all leaves an empty timeline
+  that says so;
+- the Timeline step's events come in event-time order;
 - an evidence problem blocks Ingest;
 - the attack graph and risk ranking are served without the AI (/graph).
 
@@ -30,7 +34,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 FAILED: list[str] = []
 EMAIL, PW = "analyst@flow.local", "flow-throwaway-pw-1"
-ORDER = ["ingest", "triage", "investigate", "respond", "analyse", "report"]
+ORDER = ["ingest", "timeline", "attack-events", "attack-timeline", "attack-path", "report"]
 
 
 def check(ok: bool, what: str) -> None:
@@ -108,62 +112,53 @@ def main() -> int:
         def findings(cid: str) -> list[dict]:
             return c.get(f"/api/cases/{cid}/findings").json()["findings"]
 
-        def lc(cid: str, f_: dict, action: str, **body) -> int:
-            return c.post(f"/api/cases/{cid}/lifecycle",
-                          json={"finding_key": f_["key"], "action": action, **body}).status_code
-
         print("a fresh case")
         fl = flow(Z)
         check([s["id"] for s in fl.get("steps", [])] == ORDER, "/flow returns the six steps in order")
+        check(not any(s["id"] in ("respond", "triage", "investigate", "analyse") for s in fl["steps"]),
+              "no Respond, Triage, Investigate or Analyse step")
         check(all(s["standards"] for s in fl["steps"]), "each step carries its standards")
         check(step(fl, "ingest")["state"] == "done", f"Ingest is done ({step(fl, 'ingest')['reason']})")
+        check(step(fl, "timeline")["state"] == "done", "Timeline is a view and never blocks")
         fs = findings(Z)
-        tracked = [f for f in fs if f["lifecycle"]["tracked"]]
-        tri = step(fl, "triage")
-        check(tri["state"] == "active" and tri["remaining"] == len(fs) == tri["total"],
-              f"Triage waits on every finding ({tri['remaining']} of {tri['total']})")
-        check(fl["recommended"] == "triage", "the recommended step is Triage")
-        check(step(fl, "analyse")["state"] == "optional", "Analyse is optional and not run")
+        ae = step(fl, "attack-events")
+        check(bool(fs) and ae["state"] == "active" and ae["remaining"] == len(fs) == ae["total"],
+              f"Attack events waits on every suggestion ({ae['remaining']} of {ae['total']})")
+        check(fl["recommended"] == "attack-events", "the recommended step is Attack events")
+        check(step(fl, "attack-timeline")["state"] == "not_started",
+              "Attack timeline waits for a confirmed event")
         check(step(fl, "report")["state"] == "blocked", f"Report is blocked: {step(fl, 'report')['reason']}")
-        check(bool(tracked), f"the case has high/critical findings ({len(tracked)})")
-        check(step(fl, "investigate")["state"] == "blocked",
-              "Investigate is blocked while no high/critical finding is triaged")
 
-        print("triage done")
+        print("every suggestion confirmed")
         for f_ in fs:
             c.post(f"/api/cases/{Z}/review", json={"finding_key": f_["key"], "action": "accept"})
         fl = flow(Z)
-        check(step(fl, "triage")["state"] == "done", "Triage is done when nothing is unreviewed")
+        check(step(fl, "attack-events")["state"] == "done", "Attack events is done when nothing is undecided")
+        at = step(fl, "attack-timeline")
+        check(at["state"] == "done" and at["total"] == len(fs),
+              f"Attack timeline holds the {len(fs)} confirmed groups ({at['reason']})")
         check(step(fl, "report")["state"] == "active", "the report gate opens")
-        check(fl["recommended"] == "investigate", "the recommended step moves to Investigate")
-
-        print("investigate, then respond")
-        for f_ in tracked:
-            lc(Z, f_, "assign", assignee=EMAIL)
-            lc(Z, f_, "investigate")
-        fl = flow(Z)
-        check(step(fl, "investigate")["state"] == "done", "Investigate is done when none is still Open")
-        check(fl["recommended"] == "respond" and step(fl, "respond")["remaining"] == len(tracked),
-              f"Respond is next, with {len(tracked)} to resolve")
-        codes = [lc(Z, f_, "resolve", classification="false_positive", summary="planted test data")
-                 for f_ in tracked]
-        check(all(code == 200 for code in codes), "every finding resolves")
-        fl = flow(Z)
-        check(step(fl, "respond")["state"] == "done", "Respond is done when all are Resolved")
         check(fl["recommended"] == "report", "the recommended step is Report")
 
-        print("a rejected high/critical finding")
-        ft = [f for f in findings(F) if f["lifecycle"]["tracked"]]
-        if ft:
+        print("every suggestion rejected")
+        ff = findings(F)
+        for f_ in ff:
             c.post(f"/api/cases/{F}/review",
-                   json={"finding_key": ft[0]["key"], "action": "reject", "reason_code": "misinterpretation"})
-            fl = flow(F)
-            inv, rsp = step(fl, "investigate"), step(fl, "respond")
-            check(inv["total"] == len(ft) - 1, "it needs no investigation")
-            check(rsp["remaining"] == len(ft) and "rejected but not closed" in rsp["reason"],
-                  f"it still waits in Respond until closed ({rsp['reason']})")
-        else:
-            check(False, "the firewall case has a high/critical finding")
+                   json={"finding_key": f_["key"], "action": "reject", "reason_code": "misinterpretation"})
+        fl = flow(F)
+        at = step(fl, "attack-timeline")
+        check(step(fl, "attack-events")["state"] == "done" and at["total"] == 0
+              and "No attack event was confirmed" in at["reason"],
+              f"nothing confirmed, and the attack timeline says so ({at['reason']})")
+
+        print("the timeline is in event-time order")
+        r = c.get(f"/api/cases/{Z}/events", params={"only_flagged": "false", "order": "time", "limit": 1000})
+        times = [e["ts"] for e in r.json()["events"]]
+        parsed = [t for t in times if t]
+        check(r.status_code == 200 and parsed == sorted(parsed) and times[:len(parsed)] == parsed,
+              f"{len(times)} events, ordered by time, unparsed last")
+        check(c.get(f"/api/cases/{Z}/events", params={"order": "bogus"}).status_code == 422,
+              "an unknown order is refused")
 
         print("evidence problem")
         custody.record(F, "integrity_failed", EMAIL, sha256="0" * 64, expected="1" * 64, purpose="test")

@@ -34,7 +34,7 @@ export default function FindingDetail({ caseId, findingKey }) {
             {manifest?.company_name && <> › {manifest.company_name}</>}
             {manifest?.original_filename && (
               // Back to the case, on the step a finding is worked in.
-              <> › <a href={`#/case/${caseId}/investigate`}>{manifest.original_filename}</a></>
+              <> › <a href={`#/case/${caseId}/attack-events`}>{manifest.original_filename}</a></>
             )}
           </div>
           <h1>Finding</h1>

@@ -89,8 +89,8 @@ export async function getCase(caseId) {
   return jsonOrThrow(await fetch(`/api/cases/${encodeURIComponent(caseId)}`), 'Case not found')
 }
 
-export async function getEvents(caseId, { limit, offset, flagged = true }) {
-  const q = new URLSearchParams({ limit, offset, only_flagged: flagged })
+export async function getEvents(caseId, { limit, offset, flagged = true, order = 'row' }) {
+  const q = new URLSearchParams({ limit, offset, only_flagged: flagged, order })
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/events?${q}`),
     'Could not load events',
