@@ -22,8 +22,8 @@ from itertools import chain, islice
 from pathlib import Path
 
 from .. import config
-from . import (archive, custody, db, decode, finding_ids, intel, logsources, parsers, rules,
-               severity, storage)
+from . import (archive, custody, db, decode, finding_ids, identify, intel, logsources, parsers,
+               rules, severity, storage)
 
 log = logging.getLogger(__name__)
 
@@ -117,25 +117,6 @@ def _q(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
-def _table_header(path: Path) -> list[str]:
-    """The first line of a file read as a delimited header (any encoding,
-    any of the sniffed delimiters) - [] when it is not one."""
-    try:
-        return _csv_header(path, parsers.sniff_delimiter(path))
-    except (OSError, csv.Error, UnicodeError):
-        return []
-
-
-def _is_profiled_table(path: Path) -> bool:
-    """A .log / .txt whose first line is the header of a documented log
-    source (logsources.PROFILES) is that log source's table, whatever its
-    name says: a PAN-OS export saved from Excel as "Unicode Text" is named
-    .txt (IAI-30). Only a documented header counts - general format
-    detection is IAI-26."""
-    header = _table_header(path)
-    return len(header) > 1 and logsources.match_profile(header) is not None
-
-
 def _csv_header(path: Path, delimiter: str) -> list[str]:
     with parsers.open_text(path, newline="") as fh:
         try:
@@ -155,10 +136,10 @@ def _ingest_csv_sql(con, path: Path, start: int = 0,
                     encoding: str = "utf-8-sig") -> tuple[int, dict | None]:
     """Ingest a CSV entirely inside DuckDB: it reads the file, maps source
     columns onto the canonical schema, and inserts - no row ever crosses
-    into Python. Column mapping is resolved once from the header - from the
-    log source's documentation when a profile matches (logsources.py), otherwise by
-    guessing from column names. A .csv.gz is read the same way - DuckDB
-    decompresses it as it reads.
+    into Python. Column mapping is resolved once from the header, from the
+    log source's documentation (logsources.py) - identify.py has already
+    refused any file no profile documents. A .csv.gz is read the same way -
+    DuckDB decompresses it as it reads.
 
     Row ids continue from `start`, so several files can share one case
     (a zip, FR-2.3). Returns (rows inserted, how the columns were mapped), or
@@ -175,7 +156,7 @@ def _ingest_csv_sql(con, path: Path, start: int = 0,
     if not header:
         return -1, None
 
-    mapping = logsources.resolve(header, decode.match_column)
+    mapping = logsources.resolve(header)
     if not any(mapping.columns.values()):
         return -1, None
     profile = mapping.profile
@@ -314,16 +295,15 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
     """Returns (rows, truncated, how the file was mapped)."""
     total = 0
     truncated = False
-    # A CSV is mapped once from its header, the same way the SQL fast path
-    # maps it (documented profile or guess). JSON has no header and is
-    # guessed row by row; line logs count which documented format read
-    # each line.
+    # A CSV is mapped once from its header by its documented profile, the
+    # same way the SQL fast path maps it; JSON by the keys of its first
+    # records; line logs count which documented format read each line.
     mapping = None
     json_stats: dict = {}
     rows = parsers.iter_rows(path, kind, progress, json_stats)
     if kind == "csv":
         header = _csv_header(path, parsers.sniff_delimiter(path))
-        mapping = logsources.resolve(header, decode.match_column)
+        mapping = logsources.resolve(header)
     elif kind == "json":
         # JSON has no header, so the first records stand in for one: their
         # keys, in order of first appearance, are mapped exactly as a CSV
@@ -332,7 +312,7 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
         head = list(islice(rows, JSON_HEADER_RECORDS))
         keys = list(dict.fromkeys(k for r in head if "_raw" not in r for k in r))
         if keys:
-            mapping = logsources.resolve_keys(keys, decode.match_column)
+            mapping = logsources.resolve(keys)
         rows = chain(head, rows)
     line_counts: Counter = Counter()
     # Which syslog header each line had (decode.decode_line, IAI-34).
@@ -359,7 +339,7 @@ def _write_stage(path: Path, kind: str, stage_path: Path, start: int = 0,
     elif kind == "log" or any(line_counts):
         described = logsources.line_mapping(line_counts)
     else:
-        described = {"method": "heuristic", "profile": None, "fields": {},
+        described = {"method": "unrecognised", "profile": None, "fields": {},
                      "heuristic_fields": [], "docs": [], "notes": []}
     if syslog_counts:
         # rfc5424 / rfc3164 / iso header lines, how many carried a <PRI>, and
@@ -422,8 +402,10 @@ def _coverage(con, start: int, written: int, mapping: dict) -> int:
     return loaded
 
 
-def _file_notes(mapping: dict, encoding: str, read_as: str | None) -> None:
-    """What the case page should say about how the file itself was read."""
+def _file_notes(mapping: dict, encoding: str, read_as: str | None, found: dict) -> None:
+    """What the case page should say about how the file itself was read, and
+    what it was identified as (identify.py)."""
+    mapping["logsource"] = found
     if encoding != "utf-8-sig":
         mapping["encoding"] = encoding
     if read_as:
@@ -435,9 +417,18 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
     """Decode one file into raw_events with row ids from `start`.
     `report(fraction, estimated)` gets this file's progress (FR-2.5).
     Returns (rows added, truncated, how its columns were mapped - logsources.py)."""
-    read_as = None
-    if kind == "log" and _is_profiled_table(path):
-        kind, read_as = "csv", "csv"
+    # What the file is, decided before a row is read (identify.py, IAI-92). A
+    # file that is not a documented format this tool reads is kept as evidence
+    # and not analysed - nothing is guessed from it.
+    found = identify.identify(path, kind)
+    read_as = found.get("read_as")
+    if read_as:
+        kind = read_as
+    if found["status"] != identify.SUPPORTED:
+        report(1.0)
+        return 0, False, {"method": found["status"], "profile": None, "name": found["name"],
+                          "fields": {}, "heuristic_fields": [], "docs": [], "notes": [],
+                          "logsource": found}
     encoding = parsers.detect_encoding(path)
     if kind == "csv" and not config.MAX_ROWS:
         # Fast path: DuckDB reads and decodes the CSV itself.
@@ -445,7 +436,7 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
         try:
             added, mapping = _ingest_csv_sql(con, path, start, encoding)
             if added >= 0:
-                _file_notes(mapping, encoding, read_as)
+                _file_notes(mapping, encoding, read_as, found)
                 return _coverage(con, start, added, mapping), False, mapping
         except Exception:  # noqa: BLE001
             log.warning("case %s: SQL CSV ingest failed for %s, falling back", case_id,
@@ -483,7 +474,7 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
                 """,
                 [str(stage_path)],
             )
-        _file_notes(mapping, encoding, read_as)
+        _file_notes(mapping, encoding, read_as, found)
         return _coverage(con, start, total, mapping), truncated, mapping
     finally:
         decode.REFERENCE_TIME.reset(year_ref)

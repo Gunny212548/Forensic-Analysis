@@ -23,6 +23,7 @@ DONE, ACTIVE, BLOCKED, NOT_STARTED, OPTIONAL = "done", "active", "blocked", "not
 STEPS = [
     {"id": "ingest", "title": "Ingest", "standards": [
         {"source": "NIST SP 800-86", "ref": "Collection phase"},
+        {"source": "Sigma rules specification", "ref": "logsource taxonomy appendix 2.1.0"},
         {"source": "NIST CSWP 29", "ref": "CSF 2.0 RS.AN-07"},
         {"source": "RFC 3227", "ref": "chain of custody"},
         {"source": "FIPS 180-4", "ref": "SHA-256"},
@@ -85,16 +86,40 @@ def build(case_id: str, manifest: dict) -> dict:
     return {"case_id": case_id, "steps": ordered, "recommended": recommended}
 
 
+def identified(manifest: dict) -> list[dict]:
+    """What each file of the case was identified as (identify.py) - one entry,
+    or one per zip member. Cases processed before IAI-92 have none."""
+    maps = [m.get("mapping") or {} for m in manifest.get("members") or []] or [manifest.get("mapping") or {}]
+    return [m["logsource"] for m in maps if m.get("logsource")]
+
+
+def logsource_label(found: dict) -> str:
+    sigma = " / ".join(f"{k}: {v}" for k, v in found.get("sigma", {}).items())
+    custom = f"custom product: {found['custom']}" if found.get("custom") else ""
+    return " · ".join(x for x in (sigma, custom) if x) or "-"
+
+
 def _ingest(case_id: str, manifest: dict, step: dict) -> None:
     status = manifest.get("status")
-    if status == "ready":
+    found = identified(manifest)
+    read = [f for f in found if f["status"] == "supported"]
+    if status == "ready" and found and not read:
+        # Kept as evidence, not analysed (Q8): say what it is, or that it is nothing known.
+        f = found[0]
+        what = (f"Identified as {f['name']} ({logsource_label(f)}) - no reader for it yet"
+                if f["status"] == "no_reader" else "Not a log format this tool can identify")
+        step.update(state=BLOCKED, reason=f"{what}; the file is kept as evidence and was not analysed")
+    elif status == "ready":
         problem = custody.problem(case_id)
+        names = ", ".join(dict.fromkeys(f["name"] for f in read))
+        skipped = len(found) - len(read)
+        prefix = (f"{names} - " if names else "") + (f"{skipped} file(s) not analysed - " if skipped else "")
         if problem:
             step.update(state=BLOCKED, reason=f"Evidence cannot be relied on: {problem}")
         elif not manifest.get("evidence"):
-            step.update(state=DONE, reason="Processed; no acquisition digest was recorded for this file")
+            step.update(state=DONE, reason=f"{prefix}processed; no acquisition digest was recorded for this file")
         else:
-            step.update(state=DONE, reason=f"{manifest.get('total_rows', 0):,} events read, digest verified")
+            step.update(state=DONE, reason=f"{prefix}{manifest.get('total_rows', 0):,} events read, digest verified")
     elif status == "failed":
         step.update(state=BLOCKED, reason=manifest.get("error") or "Processing failed")
     else:

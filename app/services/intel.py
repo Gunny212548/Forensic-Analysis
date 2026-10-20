@@ -26,8 +26,8 @@ from .. import config
 
 log = logging.getLogger(__name__)
 
-# Column names that hold the indicator itself, most specific first (same
-# precedence rule as decode._FIELD_CANDIDATES, and for the same reason).
+# Column names that hold the indicator itself, most specific first: an exact
+# name must win over a looser one, the lesson of gotcha #2.
 _VALUE_COLUMNS = ["ioc_value", "dst_ip", "ip_address", "indicator", "value",
                   "ip", "address"]
 # Columns worth carrying into the finding text, so an analyst reading

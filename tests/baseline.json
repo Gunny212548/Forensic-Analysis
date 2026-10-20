@@ -2,13 +2,13 @@
  "Game_Rules.txt": {
   "flagged": 0,
   "md5": "d4deb2333fd0d9a38e9788a01bbd6d02",
-  "rows": 38,
+  "rows": 0,
   "rules": {}
  },
  "Header.txt.txt": {
   "flagged": 0,
   "md5": "7a9b05031974c6abb809ab3be2fb674f",
-  "rows": 346,
+  "rows": 0,
   "rules": {}
  },
  "KM23_ITSupport_InteractiveSignIns_2026-06-04_2026-06-11.csv": {
@@ -41,19 +41,19 @@
  "Mail_itsupport_Header.txt": {
   "flagged": 0,
   "md5": "4094b354e008450f8d3edd37d949f928",
-  "rows": 79,
+  "rows": 0,
   "rules": {}
  },
  "New_Text_Document.txt": {
   "flagged": 0,
   "md5": "ef41e44827f1f98ae1575fd3f612dd57",
-  "rows": 17,
+  "rows": 0,
   "rules": {}
  },
  "_root_nohup_tmpesxi_encryptor_qpby.txt": {
   "flagged": 0,
   "md5": "2c308ed9b4c18f2d42bf50ca36befa27",
-  "rows": 225,
+  "rows": 0,
   "rules": {}
  },
  "ad_ssh.csv": {
@@ -94,16 +94,28 @@
    "R2000": 31
   }
  },
+ "cisco_asa_generic_logs.log": {
+  "flagged": 0,
+  "md5": "1d8821048c088628f945d34d8fc04062",
+  "rows": 0,
+  "rules": {}
+ },
  "configRP.log": {
   "flagged": 0,
   "md5": "a092ba006fff91ef20be821d1cd0d890",
-  "rows": 309,
+  "rows": 0,
+  "rules": {}
+ },
+ "crowdstrike_falcon.log": {
+  "flagged": 0,
+  "md5": "08685555b091658d2af7a4bb16902dff",
+  "rows": 0,
   "rules": {}
  },
  "dhclient.log": {
   "flagged": 0,
   "md5": "f7041cae6fb5a6e84f6d9fca58b42c57",
-  "rows": 42,
+  "rows": 0,
   "rules": {}
  },
  "dst10-8-2-37.csv": {
@@ -126,31 +138,37 @@
  "esxupdate.log": {
   "flagged": 0,
   "md5": "e922cb2679c93ce8c6433f100369bd20",
-  "rows": 1699,
+  "rows": 0,
   "rules": {}
  },
  "fdm.log": {
   "flagged": 0,
   "md5": "98a31f1419fc9df294ecd50b90b2bdd0",
-  "rows": 8235,
+  "rows": 0,
+  "rules": {}
+ },
+ "ftd_connection_events.log": {
+  "flagged": 0,
+  "md5": "420b06d338f87bab188ac9ccdf21a326",
+  "rows": 0,
   "rules": {}
  },
  "hostd-probe.log": {
   "flagged": 0,
   "md5": "19e3834e44e5e5bd9849a46a380bdc24",
-  "rows": 7705,
+  "rows": 0,
   "rules": {}
  },
  "hostd.log": {
   "flagged": 0,
   "md5": "b74af6c0a30353bc47d7bff7358b949b",
-  "rows": 69261,
+  "rows": 0,
   "rules": {}
  },
  "lacp.log": {
   "flagged": 0,
   "md5": "30b4501b520d681d2117d647bfea8786",
-  "rows": 95,
+  "rows": 0,
   "rules": {}
  },
  "log.csv": {
@@ -430,20 +448,14 @@
   }
  },
  "nightfall-firewall-nested.jsonl.gz": {
-  "flagged": 21,
-  "md5": "d52caabe528d95d6e31d7301df3ab749",
-  "rows": 28,
-  "rules": {
-   "R2001": 15,
-   "R2002": 15,
-   "R3000": 6,
-   "R3001": 2,
-   "R3002": 1
-  }
+  "flagged": 0,
+  "md5": "9b8186bda8a960622e6cfc40d519300a",
+  "rows": 0,
+  "rules": {}
  },
  "nightfall-firewall.csv": {
   "flagged": 21,
-  "md5": "8c49ca0e4dedf2374fe6fbfa01a770d2",
+  "md5": "1576144a3f04ddd89990a7242c376438",
   "rows": 26,
   "rules": {
    "R2001": 15,
@@ -455,7 +467,7 @@
  },
  "nightfall-firewall.json": {
   "flagged": 21,
-  "md5": "3cdbf83089f751fd3c7116ce4b3fb22b",
+  "md5": "56e8d58d9035f0582ffd4611e167c631",
   "rows": 26,
   "rules": {
    "R2001": 15,
@@ -468,13 +480,13 @@
  "rhttpproxy.log": {
   "flagged": 0,
   "md5": "c74a6720f91ef649dfb76ad0310c9b82",
-  "rows": 4860,
+  "rows": 0,
   "rules": {}
  },
  "sdrsinjector.log": {
   "flagged": 0,
   "md5": "543ab1e5364d966fbc96d798591d75f7",
-  "rows": 6484,
+  "rows": 0,
   "rules": {}
  },
  "shell.log": {
@@ -507,73 +519,85 @@
  "storagerm.log": {
   "flagged": 0,
   "md5": "cd8d8018cdd157490588f9cebce3492f",
-  "rows": 170,
+  "rows": 0,
   "rules": {}
  },
  "sysboot.log": {
   "flagged": 0,
   "md5": "7aa6e194676cc3dc5475e9a115d7291c",
-  "rows": 109,
+  "rows": 0,
   "rules": {}
  },
  "syslog.log": {
   "flagged": 0,
   "md5": "27fca3ffb04fa1a1bb71c14d58854705",
-  "rows": 9580,
+  "rows": 0,
   "rules": {}
  },
  "usb.log": {
   "flagged": 0,
   "md5": "4087ab91d0745c647b39d86c70470624",
-  "rows": 2764,
+  "rows": 0,
   "rules": {}
  },
  "vmauthd.log": {
   "flagged": 0,
   "md5": "c88bbf27e75500395705f2948344bb8c",
-  "rows": 5193,
+  "rows": 0,
   "rules": {}
  },
  "vmkdevmgr.log": {
   "flagged": 0,
   "md5": "61fa2b6c12c10448d177cf9bd89c33af",
-  "rows": 8888,
+  "rows": 0,
   "rules": {}
  },
  "vmkernel.log": {
   "flagged": 0,
   "md5": "74725d0b5badbe08dee33954a8b2a22a",
-  "rows": 2804,
+  "rows": 0,
   "rules": {}
  },
  "vmkeventd.log": {
   "flagged": 0,
   "md5": "813d0a8a22b31b1b95eb90d98e8c0af2",
-  "rows": 2322,
+  "rows": 0,
   "rules": {}
  },
  "vmksummary.log": {
   "flagged": 0,
   "md5": "53bde67cc145b9dfae273358b38b5495",
-  "rows": 834,
+  "rows": 0,
   "rules": {}
  },
  "vmkwarning.log": {
   "flagged": 0,
   "md5": "34f1cde19cc81c514c413778e390e401",
-  "rows": 3478,
+  "rows": 0,
   "rules": {}
  },
  "vobd.log": {
   "flagged": 0,
   "md5": "99c45f00175fe12b189b046fa0481349",
-  "rows": 666,
+  "rows": 0,
   "rules": {}
  },
  "vpxa.log": {
   "flagged": 0,
   "md5": "1d4ef42bc7c0854f426f67f4cb927e40",
-  "rows": 14639,
+  "rows": 0,
+  "rules": {}
+ },
+ "windows-security.log": {
+  "flagged": 0,
+  "md5": "222a710ea671c23629b1201b9015d91c",
+  "rows": 0,
+  "rules": {}
+ },
+ "windows-sysmon.log": {
+  "flagged": 0,
+  "md5": "3098cd8aa5a06241106f8ed274af946e",
+  "rows": 0,
   "rules": {}
  }
 }

@@ -56,20 +56,20 @@ HEADER = [
     "Domain", "Receive Time", "Type", "Threat/Content Type", "Source address",
     "Destination address", "Application", "Action", "Log Action",
     "Destination Port", "Bytes Sent", "Bytes Received", "Risk of app",
-    "Category of app", "High Res Timestamp",
+    "Category of app", "Category", "High Res Timestamp",
 ]
 
 rows = []
 
 
-def row(ts, src, dst, app, action, dport, sent, risk, threat="end", cat="networking"):
+def row(ts, src, dst, app, action, dport, sent, risk, threat="end", cat="networking", url_cat="any"):
     return {
         "Domain": "1", "Receive Time": "14/02/2026 22:09", "Type": "TRAFFIC",
         "Threat/Content Type": threat, "Source address": src,
         "Destination address": dst, "Application": app, "Action": action,
         "Log Action": "Log Forwarding ALL", "Destination Port": str(dport),
         "Bytes Sent": str(sent), "Bytes Received": "512", "Risk of app": str(risk),
-        "Category of app": cat, "High Res Timestamp": ts,
+        "Category of app": cat, "Category": url_cat, "High Res Timestamp": ts,
     }
 
 
@@ -90,7 +90,7 @@ rows.append(row("2026-02-15T01:41:52.400+07:00", VICTIM, EXFIL_DST, "ssl", "allo
 
 # stage 6c: one session flagged as malware
 rows.append(row("2026-02-15T02:02:02.500+07:00", VICTIM, EXFIL_DST, "ssl", "allow", 443,
-                8192, 5, threat="malware", cat="malware-c2"))
+                8192, 5, threat="malware", cat="malware-c2", url_cat="malware"))
 
 # benign noise: internal web browsing, low risk, allowed
 for i in range(5):
@@ -110,10 +110,12 @@ with open(out / "nightfall-firewall.csv", "w", encoding="utf-8", newline="") as 
 #                                      the documented profile, exactly as the
 #                                      CSV does.
 #   nightfall-firewall-nested.jsonl.gz JSON-lines, gzipped, nested and with
-#                                      generic key names (no profile: read by
-#                                      guessing), plus two lines that are not
-#                                      JSON - which must be kept, counted and
-#                                      produce no finding.
+#                                      generic key names, plus two lines that are
+#                                      not JSON. No documented profile matches, so
+#                                      since IAI-92 it is identified as
+#                                      unrecognised and kept as evidence, not
+#                                      analysed: 0 rows, 0 findings - nothing
+#                                      is guessed from it.
 (out / "nightfall-firewall.json").write_text(json.dumps(rows, indent=2), encoding="utf-8")
 
 

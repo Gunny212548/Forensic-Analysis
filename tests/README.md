@@ -68,19 +68,20 @@ findings** — they're the false-positive check.
 A row can match several rules, so per-rule counts sum to more than the
 flagged-row count. `flagged_count` is DISTINCT rows.
 
-The two JSON twins (IAI-35) carry the same 26 firewall rows, so they must
-give **exactly the firewall table above** - only the format differs:
+The firewall CSV carries PAN-OS's documented `Category` (URL category) column
+since IAI-92, so R3002's malware match reads it rather than a guessed column.
 
-| file | layout | read by | rows | flagged |
+The two JSON twins (IAI-35) carry the same 26 firewall rows:
+
+| file | layout | identified / read by | rows | flagged |
 |---|---|---|---|---|
 | `nightfall-firewall.json` | pretty-printed array, PAN-OS column names | documented PAN-OS profile (same as the CSV) | 26 | 21 |
-| `nightfall-firewall-nested.jsonl.gz` | gzipped JSON-lines, nested generic keys | guessed (`src.ip`, `dst.port`, `bytesSent`...) | **28** | 21 |
+| `nightfall-firewall-nested.jsonl.gz` | gzipped JSON-lines, nested generic keys | **unrecognised** - no documented profile, so kept as evidence and not analysed | **0** | **0** |
 
-The nested file's two extra rows are the two lines that are not JSON
-(`line 6`, `line 13`): kept in the case, reported on the mapping as
-`unparseable: 2`, and matched by no rule. Verified 2026-10-14: the decoded
-`ts / srcip / dstip / dstport / verdict / app / risk / bytes_sent / category`
-of all 26 rows are identical across the CSV and both JSON files.
+The JSON array must give **exactly the firewall table above**. The nested file
+was read by guessing its keys until IAI-92 (28 rows, 21 flagged); since then
+nothing is guessed, and its result is the test that an undocumented file is
+identified as unrecognised and produces nothing.
 
 ## Expected severity (CLAUDE.md gotcha #26)
 

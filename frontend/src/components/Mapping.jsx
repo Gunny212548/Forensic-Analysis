@@ -1,9 +1,18 @@
-/** How a file's columns were read (app/services/logsources.py): from the
- *  log source's own format documentation, guessed from column names, or not
- *  at all. "Log source" is the product that wrote the log (Sigma's
- *  `logsource`), never "vendor" - one company ships several log sources.
- *  A guessed mapping is the one thing here an analyst must check before
- *  trusting the findings, so it is stated as a warning, not a footnote. */
+/** What a file was identified as (app/services/identify.py) and how its
+ *  columns were read (logsources.py): from the log source's own format
+ *  documentation, or not at all - nothing is guessed since IAI-92; cases
+ *  processed before it can still show a guessed mapping, as a warning.
+ *  "Log source" is the product that wrote the log (Sigma's `logsource`),
+ *  never "vendor" - one company ships several log sources. */
+
+/** "category: firewall · custom product: paloalto_panos" - the Sigma
+ *  logsource values, then the product the taxonomy has no value for. */
+function logsourceLabel(found) {
+  const sigma = Object.entries(found.sigma || {}).map(([k, v]) => `${k}: ${v}`)
+  const parts = sigma.length ? [`Sigma logsource ${sigma.join(', ')}`] : ['no Sigma logsource value']
+  if (found.custom) parts.push(`product ${found.custom}`)
+  return parts.join(' · ')
+}
 
 const FIELD_EN = {
   ts: 'time',
@@ -160,12 +169,37 @@ function One({ mapping, name }) {
     </>
   )
 
+  // What the file was identified as before it was read (identify.py, IAI-92).
+  const found = mapping.logsource
+  const identity = found && found.status !== 'unrecognised' && (
+    <div className="map-note">
+      {label}Identified as <strong>{found.name}</strong> - {logsourceLabel(found)}.
+      <div className="map-sub">
+        {found.evidence}. {found.custom ? 'The Sigma logsource taxonomy has no product for this log source, so the product is named here and is not a Sigma value.' : ''}
+      </div>
+    </div>
+  )
+
+  if (mapping.method === 'no_reader') {
+    return (
+      <>
+        {identity}
+        <div className="map-note map-warn">
+          {label}This tool has no reader for this log source yet. The file is kept as evidence - its
+          digest and chain of custody are recorded - and was not analysed.
+        </div>
+      </>
+    )
+  }
+
   if (mapping.method === 'unrecognised') {
     return (
       <>
         <div className="map-note map-warn">
-          {label}No documented log format was recognised in this file. Only timestamps and IP
-          addresses were extracted, so no detection rule can fire on it.
+          {label}
+          {found
+            ? `Not a log format this tool can identify (${found.evidence}). The file is kept as evidence and was not analysed - nothing is guessed from it.`
+            : 'No documented log format was recognised in this file. Only timestamps and IP addresses were extracted, so no detection rule can fire on it.'}
         </div>
         {notes}
       </>
@@ -175,6 +209,7 @@ function One({ mapping, name }) {
   if (mapping.line_profiles) {
     return (
       <>
+      {identity}
       <div className="map-note">
         {label}Read with documented message formats:{' '}
         {mapping.line_profiles
@@ -198,11 +233,22 @@ function One({ mapping, name }) {
   }
 
   if (mapping.method === 'documented') {
+    // Cases processed before IAI-92 may still carry a guessed field.
     const guessed = mapping.heuristic_fields || []
+    const missing = mapping.missing_fields || []
     return (
       <>
-        <div className={`map-note${guessed.length ? ' map-warn' : ''}`}>
+        {identity}
+        <div className={`map-note${guessed.length || missing.length ? ' map-warn' : ''}`}>
           {label}Columns mapped from the log source's documentation: <strong>{mapping.name}</strong>.
+          {missing.length > 0 && (
+            <>
+              {' '}
+              This export lacks the documented column for {missing.map((f) => FIELD_EN[f] || f).join(', ')};
+              {missing.length === 1 ? ' it is' : ' they are'} left empty - nothing is guessed - and rules that need{' '}
+              {missing.length === 1 ? 'it' : 'them'} cannot fire on this file.
+            </>
+          )}
           {guessed.length > 0 && (
             <>
               {' '}

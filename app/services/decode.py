@@ -257,73 +257,6 @@ _PROGRAM_PATTERNS = {
     "SSH": [(_ESXI_SERVICE_PATTERNS, "vmware-esxi")],
 }
 
-# Column-name candidates for each canonical field, matched case-insensitively
-# as substrings. Order matters: the first hit wins.
-_FIELD_CANDIDATES = {
-    # "High Res Timestamp" first: it's unambiguous ISO8601 with an offset,
-    # unlike Palo Alto's "Receive Time" (DD/MM/YYYY, locale-ambiguous).
-    "ts": ["high res timestamp", "receive time", "generate time", "timestamp",
-           "@timestamp", "time", "date"],
-    # "source"/"destination" (Check Point) come last so Palo Alto's more
-    # specific "Source address" still wins when both could match.
-    "srcip": ["source address", "src ip", "srcip", "source ip", "src_ip",
-              "sourceip", "source", "ip address"],
-    "dstip": ["destination address", "dst ip", "dstip", "destination ip",
-              "dst_ip", "destinationip", "destination"],
-    "dstport": ["destination port", "dst port", "dstport", "dport"],
-    "username": ["source user", "destination user", "dst user", "user", "username", "account"],
-    # "status" before "result": Azure AD sign-in exports carry both a
-    # "Status" column (Success/Failure) and a "Multifactor authentication
-    # result" column holding a paragraph of prose.
-    "verdict": ["action", "status", "result", "verdict", "disposition"],
-    # Sign-in/logon outcome, kept separate from "verdict" because it maps to
-    # the semantic `action` column (auth_failed / auth_success) that the
-    # R1xxx and R2000 rules key off. Only the auth vocabulary is accepted -
-    # see normalize_auth_status() - so a firewall "Action" column full of
-    # allow/deny can never be read as an authentication outcome.
-    "auth_status": ["sign-in status", "signin status", "logon status",
-                    "authentication result", "status", "result"],
-    "app": ["application", "app", "service"],
-    "risk": ["risk of app", "risk"],
-    "bytes_sent": ["bytes sent", "bytessent", "bytes_sent"],
-    "category": ["threat/content type", "category of app", "characteristic of app",
-                 "threat name", "category"],
-}
-
-# Columns to ignore during the loose substring pass for a given field, so
-# "Source User Name" can't be mistaken for a source IP when a file has no
-# plain "Source" column.
-_AVOID_SUBSTRINGS = {
-    # "resource": Azure AD exports have a "Resource" column, and the loose
-    # pass for "source" matches the "source" inside "re-source" - which is
-    # how an Azure sign-in export ended up with resource names as its source
-    # IPs. "destination"/"source" cross-guards keep "Destination IP address"
-    # out of srcip and vice versa now that "ip address" is a candidate.
-    "srcip": ("user", "name", "zone", "country", "interface", "port",
-              "resource", "destination", "dest"),
-    "dstip": ("user", "name", "zone", "country", "interface", "port",
-              "resource", "source", "src"),
-    # "log action" holds "Log Forwarding ALL" in Palo Alto exports; the exact
-    # pass already prefers the real "Action" column, this stops the loose
-    # pass from picking it up when a file has no exact match at all.
-    # "statuscode" keeps Azure's "Token Protection - Sign In Session
-    # StatusCode" out of both.
-    "verdict": ("log action", "statuscode"),
-    "auth_status": ("statuscode",),
-    # "user" as a loose substring matches "User agent" and "User type" as
-    # readily as a real account column, and a non-NULL username is the guard
-    # that lets an auth_status column become an auth finding at all (gotcha
-    # #11) - so a browser version or "Member"/"Guest" landing here would
-    # carry failed-login findings under an account that is not one.
-    # Deliberately just these two. "User ID" was in an earlier draft and
-    # taken out: a user id *is* an account identifier, so blocking it would
-    # risk losing the username - and with it every auth finding - on a file
-    # whose only account column is that. Surveyed against the corpus first:
-    # every real file here (Palo Alto "Source User", Azure "Username"/"User",
-    # Check Point "Source User Name") resolves before the loose pass matters.
-    "username": ("agent", "type"),
-}
-
 # Firewall log sources spell the same verdict differently; rules are written
 # against the canonical spellings.
 VERDICT_ALIASES = {
@@ -371,50 +304,6 @@ def extract_ip(value: str | None) -> str | None:
         return None
     m = _IP_RE.search(str(value))
     return m.group(0) if m else str(value).strip() or None
-
-
-def _find_field(row: dict, field: str) -> str | None:
-    """Exact column-name matches win over substring matches. Without that,
-    Palo Alto's "Log Action" column (value: "Log Forwarding ALL") shadows
-    the real "Action" column (allow/deny), and every firewall rule silently
-    stops matching."""
-    lower_keys = {k.lower().strip(): k for k in row.keys()}
-    candidates = _FIELD_CANDIDATES.get(field, [])
-    avoid = _AVOID_SUBSTRINGS.get(field, ())
-
-    for cand in candidates:
-        orig_k = lower_keys.get(cand)
-        if orig_k is not None:
-            val = row.get(orig_k)
-            if val not in (None, ""):
-                return str(val)
-
-    for cand in candidates:
-        for lk, orig_k in lower_keys.items():
-            if cand in lk and not any(bad in lk for bad in avoid):
-                val = row.get(orig_k)
-                if val not in (None, ""):
-                    return str(val)
-    return None
-
-
-def match_column(header: list[str], field: str) -> str | None:
-    """Same precedence as _find_field(), but resolved once against a CSV
-    header instead of per row - used to build the SQL ingest for CSV files
-    so DuckDB can do the whole decode itself."""
-    lower_keys = {h.lower().strip(): h for h in header if h}
-    candidates = _FIELD_CANDIDATES.get(field, [])
-    avoid = _AVOID_SUBSTRINGS.get(field, ())
-
-    for cand in candidates:
-        if cand in lower_keys:
-            return lower_keys[cand]
-
-    for cand in candidates:
-        for lk, orig in lower_keys.items():
-            if cand in lk and not any(bad in lk for bad in avoid):
-                return orig
-    return None
 
 
 def _to_int(val: str | None) -> int | None:
@@ -577,10 +466,10 @@ def decode_line(line: str) -> dict:
 
 
 def decode_row(row: dict, kind: str, mapping=None) -> dict:
-    """`mapping` (logsources.Mapping), resolved once from a CSV header, reads
-    each field from its mapped column(s) - documented or guessed - so this
-    path and the SQL fast path decode a file identically. Without one
-    (JSON), columns are guessed row by row."""
+    """`mapping` (logsources.Mapping), resolved once from the documented
+    profile, reads each field from its mapped column(s), so this path and the
+    SQL fast path decode a file identically. Without one nothing is read -
+    no column is guessed (IAI-92)."""
     if kind == "json" and set(row.keys()) == {"_raw"}:
         return decode_line(row["_raw"])
 
@@ -588,7 +477,7 @@ def decode_row(row: dict, kind: str, mapping=None) -> dict:
 
     def get(field: str) -> str | None:
         if mapping is None:
-            return _find_field(row, field)
+            return None
         for col in mapping.columns.get(field, ()):
             val = row.get(col)
             bad = profile.null_values.get(col, ()) if profile else ()

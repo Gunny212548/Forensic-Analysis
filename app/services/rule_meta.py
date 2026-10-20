@@ -56,7 +56,7 @@ TACTICS = {
 }
 
 AUTH_SOURCES = ["openssh-sshd", "entra-signin"]
-FIREWALL_SOURCES = ["paloalto-traffic", "fortigate-traffic", "heuristic CSV firewall exports"]
+FIREWALL_SOURCES = ["paloalto-traffic", "checkpoint-smartconsole", "fortigate-traffic"]
 
 RULE_META: dict[str, dict] = {
     "R1000": {

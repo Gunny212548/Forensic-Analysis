@@ -7,22 +7,16 @@ of the Sigma specification's `logsource` (product / service). Not the
 company that made it: one company ships several log sources with unrelated
 formats, and the format is what a profile describes.
 
-The decoder has two ways to read a CSV:
-
-- **documented** - the header matches a profile below. Every canonical field
-  is read from the column the log source's documentation defines for it, and
-  its values are translated with the vocabulary that documentation lists.
-  Each profile cites the page it was built from, so any mapping can be
-  checked against the source instead of taken on trust.
-- **heuristic** - no profile matches (a log source we have no profile for, or
-  a file whose columns were renamed). The original name-guessing in
-  `decode.match_column()` still runs, because refusing an unknown file would
-  leave the analyst with nothing; but the case is marked as such, and the UI
-  tells the analyst to verify the mapping.
-
-A documented profile can still fall back field by field: if an export left
-out a column the profile names, that field is guessed and marked `heuristic`
-on its own, rather than silently left empty.
+A CSV or JSON file is read only through a profile below (IAI-92, the
+user's rule since 2026-10-20: nothing is guessed). Every canonical field is
+read from the column the log source's documentation defines for it, and its
+values are translated with the vocabulary that documentation lists. Each
+profile cites the page it was built from, so any mapping can be checked
+against the source instead of taken on trust. A file no profile matches is
+not read at all - identify.py keeps it as evidence and the case says so - and
+a column the documentation names but an export left out stays empty and is
+listed as missing. (Until IAI-92 a name-guessing fallback, decode.match_column,
+read such files and columns; gotchas #2, #12 and #22 were its failures.)
 
 Line logs are not column-mapped; their decoders match documented message
 formats (`LINE_PROFILES`), and the manifest counts which one read each line.
@@ -40,7 +34,6 @@ What a profile fixed, measured against the guesswork it replaced:
   leaves it empty.
 """
 
-import re
 from dataclasses import dataclass, field
 
 
@@ -302,6 +295,24 @@ LINE_PROFILES: dict[str, dict] = {
     },
 }
 
+# What each documented format is in the Sigma logsource taxonomy
+# (sigma-appendix-taxonomy.md v2.1.0, read 2026-10-20 - docs/standards/SOURCES.md).
+# `sigma` holds only values the taxonomy defines; where it has no product for
+# the log source (no firewall vendor, no ESXi), `custom` names it and the case
+# says the value is not the taxonomy's (identify.py, IAI-92).
+LOGSOURCE: dict[str, dict] = {
+    "paloalto-traffic": {"sigma": {"category": "firewall"}, "custom": "paloalto_panos"},
+    "checkpoint-smartconsole": {"sigma": {"category": "firewall"}, "custom": "checkpoint_smartconsole"},
+    "fortigate-traffic": {"sigma": {"category": "firewall"}, "custom": "fortinet_fortigate"},
+    "entra-signin": {"sigma": {"product": "azure", "service": "signinlogs"}},
+    "entra-signin-azure-monitor": {"sigma": {"product": "azure", "service": "signinlogs"}},
+    "exchange-message-trace": {"sigma": {"product": "m365", "service": "exchange"}},
+    "openssh-sshd": {"sigma": {"product": "linux", "service": "sshd"}},
+    "linux-pam": {"sigma": {"product": "linux", "service": "auth"}},
+    "vmware-esxi": {"sigma": {}, "custom": "vmware_esxi"},
+    "vmware-esxi-observed": {"sigma": {}, "custom": "vmware_esxi"},
+}
+
 # The syslog header itself (IAI-34) - read before any message format above.
 SYSLOG_DOCS = [
     {"title": "RFC 5424 - The Syslog Protocol", "url": "https://www.rfc-editor.org/rfc/rfc5424"},
@@ -321,12 +332,12 @@ class Mapping:
     """How one CSV file's columns were read."""
     profile: Profile | None
     columns: dict[str, tuple[str, ...]]   # field -> source column(s), () if unmapped
-    source: dict[str, str | None]          # field -> "documented" | "heuristic" | None
+    source: dict[str, str | None]          # field -> "documented" | None
 
     def describe(self) -> dict:
         """The manifest/API form: what the analyst sees."""
         out = {
-            "method": "documented" if self.profile else "heuristic",
+            "method": "documented" if self.profile else "unrecognised",
             "profile": self.profile.id if self.profile else None,
             "name": self.profile.name if self.profile else None,
             "docs": [{"title": t, "url": u} for t, u in self.profile.docs] if self.profile else [],
@@ -336,7 +347,11 @@ class Mapping:
                 for f, cols in self.columns.items() if cols
             },
         }
-        out["heuristic_fields"] = sorted(f for f, s in self.source.items() if s == "heuristic")
+        # Nothing is guessed any more (IAI-92); kept so older manifests and
+        # this one read alike.
+        out["heuristic_fields"] = []
+        out["missing_fields"] = sorted(
+            f for f in (self.profile.fields if self.profile else ()) if not self.columns.get(f))
         return out
 
 
@@ -348,62 +363,24 @@ def match_profile(header: list[str]) -> Profile | None:
     return None
 
 
-def resolve(header: list[str], heuristic) -> Mapping:
-    """Map a CSV header. `heuristic(header, field)` is the guessing fallback
-    (decode.match_column), passed in so this module has no import cycle."""
+def resolve(header: list[str]) -> Mapping:
+    """Map a CSV header - or a JSON file's keys (flattened, dotted) - by its
+    documented profile, and only by it (IAI-92): a column the documentation
+    names but the export dropped stays empty and is listed as missing, a field
+    the profile does not list is deliberately unmapped, and a header no profile
+    matches maps nothing. There is no guessing fallback any more; identify.py
+    decides before ingest whether a file is read at all."""
     by_norm = {_norm(h): h for h in header if h}
     profile = match_profile(header)
     columns: dict[str, tuple[str, ...]] = {}
     source: dict[str, str | None] = {}
     for f in CSV_FIELDS:
         cols: tuple[str, ...] = ()
-        src = None
-        if profile:
-            if f in profile.fields:
-                cols = tuple(by_norm[_norm(c)] for c in profile.fields[f] if _norm(c) in by_norm)
-                src = "documented" if cols else None
-                if not cols:
-                    # The export dropped a column the profile names: guess
-                    # it, and say so for this field.
-                    guess = heuristic(header, f)
-                    cols, src = ((guess,), "heuristic") if guess else ((), None)
-            # A field the profile does not list is deliberately unmapped -
-            # the documentation gives it no meaning in this log type.
-        else:
-            guess = heuristic(header, f)
-            if guess:
-                cols, src = (guess,), "heuristic"
+        if profile and f in profile.fields:
+            cols = tuple(by_norm[_norm(c)] for c in profile.fields[f] if _norm(c) in by_norm)
         columns[f] = cols
-        source[f] = src
+        source[f] = "documented" if cols else None
     return Mapping(profile, columns, source)
-
-
-_CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
-
-
-def key_words(key: str) -> str:
-    """A JSON key as the words a CSV header would spell it:
-    `sourceIPAddress` -> "source ip address", `status.errorCode` ->
-    "status error code" - so decode's candidate names ("source ip",
-    "ip address") recognise it."""
-    return " ".join(_CAMEL.sub(" ", key).replace(".", " ").replace("_", " ").lower().split())
-
-
-def resolve_keys(keys: list[str], heuristic) -> Mapping:
-    """Map a JSON file from the keys its records carry (flattened, dotted).
-    Profiles match the keys as written; the guessing fallback sees them as
-    words, and every mapped column is still the original key, which is what
-    a record is read by."""
-    by_words: dict[str, str] = {}
-    for k in keys:
-        by_words.setdefault(key_words(k), k)
-    words = list(by_words)
-
-    def guess(_header, f):
-        hit = heuristic(words, f)
-        return by_words[hit] if hit else None
-
-    return resolve(keys, guess)
 
 
 def line_mapping(counts: dict[str | None, int]) -> dict:

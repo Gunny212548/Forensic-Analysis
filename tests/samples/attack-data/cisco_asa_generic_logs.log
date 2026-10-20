@@ -1,0 +1,48 @@
+Oct 30 11:04:25 18.144.133.67 :2025-10-30T11:04:10Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.21, executed 'aaa local authentication attempts max-fail 5'
+Oct 30 11:04:25 18.144.133.67 :2025-10-30T11:04:10Z: %ASA-5-111008: User 'admin' executed the 'aaa local authentication attempts max-fail 5' command.
+Oct 30 10:56:07 18.144.133.67 :2025-10-30T10:55:52Z: %ASA-5-502103: User priv level changed: Uname: test-user12 From: 2 To: 14
+Oct 30 10:55:19 18.144.133.67 :2025-10-30T10:55:03Z: %ASA-5-502102: User deleted from local dbase: Uname: test-user1 Priv: 2 Encpass: *****
+Oct 30 10:43:39 18.144.133.67 :2025-10-30T10:43:23Z: %ASA-5-502101: New user added to local dbase: Uname: test-user1 Priv: 2 Encpass: *****
+Oct 30 11:06:44 18.144.133.67 :2025-10-30T11:06:29Z: %ASA-6-113006: User 'test-user12' locked out on exceeding '5' successive failed authentication attempts
+Oct 28 17:29:05 18.144.133.67 :2025-10-28T17:28:51Z: %ASA-5-111010: User 'enable_15', running 'CLI' from IP 0.0.0.0, executed 'copy running-config disk0:/lab-config.cfg'
+Oct 28 17:29:05 18.144.133.67 :2025-10-28T17:28:51Z: %ASA-5-111008: User 'enable_15' executed the 'copy running-config disk0:/lab-config.cfg' command.
+Oct 30 14:56:04 18.144.133.67 :2025-10-30T14:55:48Z: %ASA-5-111010: User 'enable_15', running 'CLI' from IP 0.0.0.0, executed 'packet-tracer input management udp 10.0.0.1 http 18.144.133.67 http detailed'
+Oct 30 14:56:04 18.144.133.67 :2025-10-30T14:55:48Z: %ASA-5-111008: User 'enable_15' executed the 'packet-tracer input management udp 10.0.0.1 http 18.144.133.67 http detailed' command.
+Oct 30 17:48:05 18.144.133.67 :2025-10-30T17:47:49Z: %ASA-7-111009: User 'enable_15' executed cmd: show capture
+Oct 30 17:48:01 18.144.133.67 :2025-10-30T17:47:45Z: %ASA-5-111010: User 'enable_15', running 'CLI' from IP 0.0.0.0, executed 'capture test-capture buffer 100000 interface management match tcp any4 any'
+Oct 30 17:48:01 18.144.133.67 :2025-10-30T17:47:45Z: %ASA-5-111008: User 'enable_15' executed the 'capture test-capture buffer 100000 interface management match tcp any4 any' command.
+Oct 30 17:52:49 18.144.133.67 :2025-10-30T17:52:33Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.21, executed 'no logging message 101001'
+Oct 30 17:52:49 18.144.133.67 :2025-10-30T17:52:33Z: %ASA-5-111008: User 'admin' executed the 'no logging message 101001' command.
+Nov 18 00:39:39 18.144.133.67 2025-11-15T00:08:44Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show processes
+Nov 18 00:39:28 18.144.133.67 2025-11-15T00:08:35Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show memory
+Nov 18 00:39:28 18.144.133.67 2025-11-15T00:08:35Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show ip
+Nov 18 00:39:26 18.144.133.67 2025-11-15T00:08:33Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show interface
+Nov 18 00:39:26 18.144.133.67 2025-11-15T00:08:33Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show cpu
+Nov 18 00:39:26 18.144.133.67 2025-11-15T00:08:33Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show conn
+Nov 18 00:39:26 18.144.133.67 2025-11-15T00:08:33Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show access-list
+Nov 18 00:38:09 18.144.133.67 2025-11-15T00:07:29Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show conn
+Nov 18 00:37:33 18.144.133.67 2025-11-15T00:06:59Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show nat
+Nov 18 00:36:11 18.144.133.67 2025-11-15T00:05:51Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show processes
+Nov 18 00:33:08 18.144.133.67 2025-11-15T00:03:18Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show ospf
+Nov 18 00:32:47 18.144.133.67 2025-11-15T00:03:01Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show eigrp interfaces
+Nov 18 00:32:31 18.144.133.67 2025-11-15T00:02:47Z ciscoasa : %ASA-7-111009: User 'enable_15' executed cmd: show ip
+Oct 30 14:35:24 18.144.133.67 :2025-10-30T14:35:08Z: %ASA-5-111010: User 'admin', running 'CLI' from IP 0.0.0.0, executed 'copy /noconfirm startup-config system: scp: smb: disk0:/startup-264.cfg'
+Oct 30 14:35:24 18.144.133.67 :2025-10-30T14:35:08Z: %ASA-5-111008: User 'admin' executed the 'copy /noconfirm startup-config system: scp: smb: disk0:/startup-264.cfg' command.
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.6, executed 'logging history Emergencies'
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111008: User 'admin' executed the 'logging history Emergencies' command.
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.6, executed 'logging monitor Emergencies'
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111008: User 'admin' executed the 'logging monitor Emergencies' command.
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.6, executed 'logging asdm Emergencies'
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111008: User 'admin' executed the 'logging asdm Emergencies' command.
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.6, executed 'logging mail Emergencies'
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111008: User 'admin' executed the 'logging mail Emergencies' command.
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.6, executed 'logging console Emergencies'
+Oct 28 15:44:43 18.144.133.67 :2025-10-28T15:44:28Z: %ASA-5-111008: User 'admin' executed the 'logging console Emergencies' command.
+Oct 28 15:41:36 18.144.133.67 :2025-10-28T15:41:21Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.6, executed 'logging asdm Alerts'
+Oct 28 15:41:36 18.144.133.67 :2025-10-28T15:41:21Z: %ASA-5-111008: User 'admin' executed the 'logging asdm Alerts' command.
+Oct 28 14:32:22 18.144.133.67 :2025-10-28T14:32:07Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.6, executed 'logging asdm Alerts'
+Oct 28 14:32:22 18.144.133.67 :2025-10-28T14:32:07Z: %ASA-5-111008: User 'admin' executed the 'logging asdm Alerts' command.
+Sep 29 14:28:24 18.144.133.67 :2025-09-29T14:28:22Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.3, executed 'logging trap NasList'
+Sep 29 14:28:24 18.144.133.67 :2025-09-29T14:28:22Z: %ASA-5-111008: User 'admin' executed the 'logging trap NasList' command.
+Sep 29 14:01:30 18.144.133.67 :2025-09-29T14:01:28Z: %ASA-5-111010: User 'admin', running 'N/A' from IP 89.245.16.3, executed 'logging trap NasList'
+Sep 29 14:01:30 18.144.133.67 :2025-09-29T14:01:28Z: %ASA-5-111008: User 'admin' executed the 'logging trap NasList' command.

