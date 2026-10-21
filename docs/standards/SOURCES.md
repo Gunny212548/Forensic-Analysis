@@ -30,6 +30,20 @@ download can be checked against it.
 | MITRE ATT&CK techniques T1110.001, T1110.003, T1133 | v1.7 (2026-05-12), v1.8 (2025-10-24), v2.5 (2026-05-12) | web: attack.mitre.org/techniques/T1110/001, /T1110/003, /T1133 | First description paragraph of each; used by `specs/rules_review.md` (R2005 and R2004 tags) |
 | Sigma correlation rules specification | 2.1.0 | web: github.com/SigmaHQ/sigma-specification commit `ba9251a`, `specification/sigma-correlation-rules-specification.md` | Correlation types and their examples (event_count, value_count, temporal, temporal_ordered, value_sum, value_avg); used by ADR-006 |
 
+### Practitioner methods (read 2026-10-21, `practitioner-methods.md`)
+
+Published methods, not standards: cited as *method* beside the standard a step cites. All
+read in full except where the row says otherwise. Downloaded with `curl --ssl-no-revoke`
+(the host's schannel could not reach a revocation server; certificates were still checked).
+
+| Document | Version | Copy (SHA-256, first 16) | What was checked |
+|---|---|---|---|
+| Carrier & Spafford, Defining Event Reconstruction of Digital Crime Scenes | J Forensic Sci 49(6), Nov 2004 (CERIAS TR 2004-37) | `files/Carrier-Spafford-2004-Event-Reconstruction.pdf` (`047be0f0e72cb27b`) | Whole paper: roles, event chain, the five reconstruction phases, construction steps 1-9, gaps as hypotheses |
+| Caltagirone, Pendergast & Betz, The Diamond Model of Intrusion Analysis | 2013 (activeresponse.org copy; the DTIC copy ADA586960 refused automated access) | `files/Caltagirone-2013-Diamond-Model.pdf` (`ed177039dcca97a7`) | §3-4.5 event, features, confidence, meta-features; §7 pivoting; §8-8.3 activity thread, hypothesis support, activity-attack graph. Not read: §5, §6, §9-12 |
+| Casey, Error, Uncertainty, and Loss in Digital Evidence | IJDE 1(2), Summer 2002 | `files/Casey-2002-Error-Uncertainty-Loss.pdf` (`b3bcee4c6e4a8fc0`) | §2.3 and Table 1 (certainty scale C0-C6) with its log examples; §3 opening (where log errors enter). Rest not read |
+| Heuer, Psychology of Intelligence Analysis | CIA Center for the Study of Intelligence, 1999 | `files/Heuer-1999-Psychology-of-Intelligence-Analysis.pdf` (`bc703f2140e39e14`) | Chapter 8, Analysis of Competing Hypotheses, p. 95-108 (the closing example on p. 109 not read). Other chapters not read |
+| Gudjonsson, Mastering the Super Timeline With log2timeline | GIAC GCFA paper, SANS 2010 | `files/Gudjonsson-2010-Super-Timeline.pdf` (`ec5a287b91f9e7dd`) | §1.1 background, problems, anti-forensics; §4 timeline analysis (4.2 context, 4.3 temporal proximity, 4.4 frequency). The tool chapters 2-3 not read |
+
 ### The sentences the design rests on
 
 - **SP 800-86** - "The process for performing digital forensics comprises the following basic
