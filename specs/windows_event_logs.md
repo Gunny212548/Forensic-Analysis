@@ -1,6 +1,7 @@
 # Windows event logs - Security, Sysmon and every format they arrive in
 
-Status: **design, waiting for the user's approval** (2026-10-21). The user: "ทำ Windows Security
+Status: **approved 2026-10-21** - Q40 `win_events` + MAP, Q41 4771 / 4776 typed but not counted,
+Q42 `evtx` (pyevtx-rs) for W2, Q43 GPL samples and exports from this machine kept outside the repo. The user: "ทำ Windows Security
 กับ Sysmon reader ต่อ"; formats: "ต้องรับทุกรูปแบบที่เป็น Windows Log"; tested on **lab samples**
 until a customer file exists. No Jira story yet (IAI-92 only *identifies* these files).
 
