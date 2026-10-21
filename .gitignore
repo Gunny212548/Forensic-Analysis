@@ -16,5 +16,9 @@ logtest/
 
 # Functional-spec PDFs are external reference, kept out of the code repo.
 *.pdf
+# Saved copies of vendor web pages that were read (docs/standards/SOURCES.md
+# names each with its SHA-256) - kept beside it like the PDFs, not in git.
+docs/standards/files/*.htm
+docs/standards/files/*.html
 # archify diagram output (generated, local only)
 .archify/

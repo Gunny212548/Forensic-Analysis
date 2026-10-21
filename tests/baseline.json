@@ -47,6 +47,15 @@
   "rows": 0,
   "rules": {}
  },
+ "Search_Report-2026_10_21-10_23_21_869.csv": {
+  "flagged": 11,
+  "md5": "8c4de33719e47bb8379c84e3d41536ac",
+  "rows": 20000,
+  "rules": {
+   "R3001": 2,
+   "R3004": 9
+  }
+ },
  "_root_nohup_tmpesxi_encryptor_qpby.txt": {
   "flagged": 0,
   "md5": "2c308ed9b4c18f2d42bf50ca36befa27",
@@ -127,6 +136,14 @@
   "md5": "e922cb2679c93ce8c6433f100369bd20",
   "rows": 0,
   "rules": {}
+ },
+ "eventlog-analyzer-search-export.csv": {
+  "flagged": 2,
+  "md5": "e1b7ff6a5d147122ba92e7970240661a",
+  "rows": 10,
+  "rules": {
+   "R3001": 2
+  }
  },
  "fdm.log": {
   "flagged": 0,

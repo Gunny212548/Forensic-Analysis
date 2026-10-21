@@ -22,8 +22,8 @@ from itertools import chain, islice
 from pathlib import Path
 
 from .. import config
-from . import (archive, custody, db, decode, finding_ids, identify, intel, logsources, parsers,
-               profiles, provenance, repro, rules, severity, storage)
+from . import (archive, checkpoint_le, custody, db, decode, finding_ids, identify, intel, logsources,
+               parsers, profiles, provenance, repro, rules, severity, storage)
 
 log = logging.getLogger(__name__)
 
@@ -430,6 +430,18 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
                           "fields": {}, "heuristic_fields": [], "docs": [], "notes": [],
                           "logsource": found}
     encoding = parsers.detect_encoding(path)
+    if found.get("profile") == checkpoint_le.PROFILE_ID:
+        # Check Point Log Exporter records inside an EventLog Analyzer export
+        # (IAI-85): its own SQL reader. No fallback - the generic paths would
+        # read the wrapper's columns, not the record.
+        stop, th = _estimate_while(report, expected_bytes or path.stat().st_size)
+        try:
+            added, mapping = checkpoint_le.ingest_sql(con, path, start, encoding)
+        finally:
+            stop.set()
+            th.join()
+        _file_notes(mapping, encoding, read_as, found)
+        return _coverage(con, start, added, mapping), False, mapping
     if kind == "csv" and not config.MAX_ROWS:
         # Fast path: DuckDB reads and decodes the CSV itself.
         stop, th = _estimate_while(report, expected_bytes or path.stat().st_size)

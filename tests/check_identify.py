@@ -44,6 +44,9 @@ CASES = [
      {"product": "azure", "service": "signinlogs"}, None),
     ("Entra ID Azure Monitor JSON (2)", S / "entra-azure-monitor/azuread_signin.jsonl", "json", "supported",
      {"product": "azure", "service": "signinlogs"}, None),
+    ("Check Point Log Exporter in an EventLog Analyzer export (synthetic)",
+     S / "checkpoint-log-exporter/eventlog-analyzer-search-export.csv", "csv", "supported", FIREWALL,
+     "checkpoint_log_exporter"),
 ]
 
 LOGTEST = Path("D:/forensic system/Logtest")
@@ -52,6 +55,8 @@ CORPUS = [
      "csv", "supported", FIREWALL, "paloalto_panos"),
     ("Check Point SmartConsole CSV", Path("D:/logtest/Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv"),
      "csv", "supported", FIREWALL, "checkpoint_smartconsole"),
+    ("Check Point Log Exporter, EventLog Analyzer export", Path("D:/logtest/Search_Report-2026_10_21-10_23_21_869.csv"),
+     "csv", "supported", FIREWALL, "checkpoint_log_exporter"),
     ("FortiGate traffic", Path("D:/Trafficlog/fortigate log-20260917T104408Z-1-001/fortigate log/Trafficlogs/"
                                "FG200FT923907508(root)_tlog_20260301-2219-20260302-0106.log"),
      "log", "supported", FIREWALL, "fortinet_fortigate"),

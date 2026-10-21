@@ -311,6 +311,8 @@ LINE_PROFILES: dict[str, dict] = {
 LOGSOURCE: dict[str, dict] = {
     "paloalto-traffic": {"sigma": {"category": "firewall"}, "custom": "paloalto_panos"},
     "checkpoint-smartconsole": {"sigma": {"category": "firewall"}, "custom": "checkpoint_smartconsole"},
+    # IAI-85 - read by checkpoint_le.py, not by a column Profile.
+    "checkpoint-log-exporter": {"sigma": {"category": "firewall"}, "custom": "checkpoint_log_exporter"},
     "fortigate-traffic": {"sigma": {"category": "firewall"}, "custom": "fortinet_fortigate"},
     "entra-signin": {"sigma": {"product": "azure", "service": "signinlogs"}},
     "entra-signin-azure-monitor": {"sigma": {"product": "azure", "service": "signinlogs"}},

@@ -30,7 +30,7 @@ from collections import Counter
 from itertools import islice
 from pathlib import Path
 
-from . import decode, logsources, parsers
+from . import checkpoint_le, decode, logsources, parsers
 
 SAMPLE_LINES = 2000
 SAMPLE_BYTES = 256 * 1024
@@ -90,6 +90,18 @@ def identify(path: Path, kind: str) -> dict:
 
 
 def _table(path: Path) -> dict | None:
+    # ManageEngine EventLog Analyzer's search export (IAI-85): a "Search
+    # Results" line before its header, the record in its Message column. Read
+    # only when that column holds Check Point Log Exporter records; any other
+    # export of it is named and kept, never guessed at.
+    ela = checkpoint_le.identify_ela(path)
+    if ela is not None:
+        kind, evidence = ela
+        if kind == "record":
+            return _result(SUPPORTED, checkpoint_le.LOGSOURCE, checkpoint_le.NAME, evidence,
+                           checkpoint_le.PROFILE_ID)
+        return _result(NO_READER, {"sigma": {}, "custom": "manageengine_eventlog_analyzer"},
+                       "ManageEngine EventLog Analyzer search export", evidence)
     try:
         delim = parsers.sniff_delimiter(path)
         with parsers.open_text(path, newline="") as fh:

@@ -290,6 +290,9 @@ EVENT_TYPES = {
     "ssh_probe": "SSH probe",
     "ssh_enabled": "SSH enabled",
     "ssh_disabled": "SSH disabled",
+    # A later Check Point Log Exporter record of a connection already logged
+    # (same loguid) - not a second connection (checkpoint_le.py, IAI-85).
+    "log_update": "Log update (same connection)",
 }
 
 _EVENT_COLS = ["row_id", "ts", "ts_raw", "srcip", "dstip", "dstport", "username", "hostname",
@@ -451,7 +454,9 @@ def _listed(con, ips: set[str]) -> dict[str, str]:
 # timeline (FR-1.6).
 # A source time that states its zone. Also run in SQL (pipeline, declared time
 # zones - provenance.py), so "states an offset" means the same in both places.
-TZ_MARKER_PATTERN = r"(?:Z|UTC|GMT|[+-]\d{2}:?\d{2})\s*$"
+# A bare Unix epoch (10 digits, or 13 in milliseconds) is UTC by definition -
+# Check Point Log Exporter's `time` (IAI-85).
+TZ_MARKER_PATTERN = r"(?:Z|UTC|GMT|[+-]\d{2}:?\d{2})\s*$|^\d{10}(?:\d{3})?$"
 _TZ_MARKER = re.compile(TZ_MARKER_PATTERN, re.I)
 # An RFC 3164 timestamp ("Aug 12 05:03:31"): the source gave no year, so the
 # one stored was inferred from the upload time (decode.infer_year, IAI-34).

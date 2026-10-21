@@ -44,6 +44,17 @@ read in full except where the row says otherwise. Downloaded with `curl --ssl-no
 | Heuer, Psychology of Intelligence Analysis | CIA Center for the Study of Intelligence, 1999 | `files/Heuer-1999-Psychology-of-Intelligence-Analysis.pdf` (`bc703f2140e39e14`) | Chapter 8, Analysis of Competing Hypotheses, p. 95-108 (the closing example on p. 109 not read). Other chapters not read |
 | Gudjonsson, Mastering the Super Timeline With log2timeline | GIAC GCFA paper, SANS 2010 | `files/Gudjonsson-2010-Super-Timeline.pdf` (`ec5a287b91f9e7dd`) | §1.1 background, problems, anti-forensics; §4 timeline analysis (4.2 context, 4.3 temporal proximity, 4.4 frequency). The tool chapters 2-3 not read |
 
+### Log source documentation (read 2026-10-21, IAI-85)
+
+| Document | Version | Copy (SHA-256, first 16) | What was checked |
+|---|---|---|---|
+| Check Point sk144192, Description of Fields in Check Point Logs | page as served 2026-10-21 | `files/CheckPoint-sk144192-Log-Fields.html` (`ff6f357ec160268b`) | The whole field table, 879 rows parsed from the saved page (an earlier web fetch read only its first 118k characters): every field `checkpoint_le.py` maps, `action`'s value list, `ifdir` listed as internal |
+| Check Point Log Exporter Administration Guide, *Format Configuration* | sc1.checkpoint.com/documents/Log_Exporter, dated 07 September 2026 | `files/CheckPoint-LogExporter-Format-Configuration.htm` (`52a5360c05ecd296`) | The syslog format's body delimiters, separators, value quoting and escapes |
+| same guide, *Appendix B - Additional Information* | as above | `files/CheckPoint-LogExporter-Appendix-B.htm` (`e51e286315eccaa0`) | Epoch time (Splunk `TIME_FORMAT = %s`, LEEF note); update logs in raw read-mode and `loguid` |
+| Check Point sk122323, Log Exporter | web | web: support.checkpoint.com/results/sk/sk122323 | The format list (Syslog, Splunk, CEF, LEEF, Generic, JSON, LogRhythm, RSA); no body layout |
+| Check Point R81 CLI Reference, `cp_log_export` | R81 | web: sc1.checkpoint.com/.../MDSG/cp_log_export.htm | `format` default `syslog`; `time-in-milli`; example action filter values incl. Prevent |
+| ManageEngine EventLog Analyzer user guide, *Report export and customization* | web | web: manageengine.com/products/eventlog/help/.../report-export-and-customization.html | Report export formats; **no layout for the search-result CSV** - the wrapper is observed, not documented |
+
 ### The sentences the design rests on
 
 - **SP 800-86** - "The process for performing digital forensics comprises the following basic
