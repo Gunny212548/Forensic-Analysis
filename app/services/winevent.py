@@ -17,8 +17,19 @@ Splunk's `XmlWinEventLog`): back-to-back `<Event>` elements with no root,
 an event free to span lines (4672's PrivilegeList holds newlines). Events are
 cut out of the stream at `</Event>` and parsed one at a time, so a damaged
 event is counted and kept as text, never fatal and never dropped. Later
-containers (.evtx, Splunk text, JSON, Event Viewer CSV) feed the same
-`event_rows()`.
+containers (Splunk text, JSON, Event Viewer CSV) feed the same
+`parse_event()` / `timeline_row()`.
+
+W2 reads **.evtx** (Event Viewer "Save All Events As", `wevtutil epl`, a copy
+of `winevt\\Logs`): the `evtx` library (pyevtx-rs, MIT - Q42) renders each
+record's Binary XML as event XML, which goes through `parse_event()` like W1.
+The library drops what it cannot decode **without saying so** (measured: a
+damaged chunk lost 138 of its 158 records, a cut file its last 165, no error
+either time), so every record is accounted for against the chunk headers
+(libyal's EVTX format document: a 4096-byte file header, then chunks of
+65,536 bytes, each `ElfChnk\\0` + the first and last event record identifier
+it holds): what a chunk says it holds and was not returned is counted as
+unreadable, and named, never dropped.
 
 Event types (layer A, D12) are named from each event's Microsoft page
 (Security) and the event headings of the Sysmon page; an event not listed has
@@ -28,9 +39,16 @@ events themselves (their `Data Name` attributes): the Sysmon page lists the
 events but not their fields.
 """
 
+import bisect
+import gzip
+import io
 import json
+import os
 import re
+import struct
+import tempfile
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from xml.etree import ElementTree
@@ -59,6 +77,23 @@ DOCS = (
      "threat-protection/auditing/event-4624"),
     ("Microsoft Sysinternals - Sysmon (events 1-29)",
      "https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon"),
+)
+
+# .evtx (W2) - libyal's EVTX format document: file header, then 64 KB chunks.
+EVTX_MAGIC = b"ElfFile\x00"
+EVTX_CHUNK_MAGIC = b"ElfChnk\x00"
+EVTX_HEADER = 4096
+EVTX_CHUNK = 65536
+_MAX_RECORDS = (EVTX_CHUNK - 512) // 28
+EVTX_PROFILE_ID = "windows-evtx"
+EVTX_NAME = "Windows event log (.evtx)"
+EVTX_DOCS = (
+    ("libyal - Windows XML Event Log (EVTX) format",
+     "https://github.com/libyal/libevtx/blob/main/documentation/"
+     "Windows%20XML%20Event%20Log%20(EVTX).asciidoc"),
+    ("evtx (pyevtx-rs) - the reader that renders each record's Binary XML",
+     "https://github.com/omerbenamram/pyevtx-rs"),
+    *DOCS,
 )
 
 # Channel -> Sigma logsource (taxonomy v2.1.0). Any other channel is
@@ -224,12 +259,46 @@ def iter_event_texts(path: Path, progress=None) -> Iterator[str]:
                 report(fh)
 
 
-def parse_event(text: str) -> dict | None:
-    """One event's System values and items, or None when it does not parse."""
+# Characters XML 1.0 does not allow, which Windows still writes into a value
+# (measured: garbage bytes in 4661's PrivilegeList). In event XML from any other
+# tool they are parsed through a private-use stand-in and put back, so the value
+# is kept as written.
+_ILLEGAL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+_STAND_IN = 0xF0000
+
+
+def _restore(s: str | None) -> str | None:
+    return s and "".join(chr(ord(c) - _STAND_IN) if _STAND_IN <= ord(c) < _STAND_IN + 32 else c
+                         for c in s)
+
+
+# The evtx library renders an empty value as the line break and indent of its
+# closing tag (Windows: empty). A value of only "\r" (seen in a Sysmon
+# SourceImage) is real and kept.
+_LIB_EMPTY = re.compile(r"^\n {2,}$")
+
+
+def parse_event(text: str, fixes: dict[str, str] | None = None,
+                empty_in_array: bool = False) -> dict | None:
+    """One event's System values and items, or None when it does not parse.
+    `fixes`: an .evtx record rendered by the evtx library - its GUID, FILETIME
+    and SYSTEMTIME values put in the form Windows renders them (evtx_typed_values),
+    and empty values made empty; `empty_in_array` from the same record."""
+    illegal = bool(_ILLEGAL.search(text))
+    if illegal and fixes is not None:
+        # Windows' own rendering (EvtRender, as `Get-WinEvent .ToXml()` shows
+        # it) writes such a character as "_": the .evtx gives what event XML of
+        # the same event would.
+        text, illegal = _ILLEGAL.sub("_", text), False
+    if illegal:
+        text = _ILLEGAL.sub(lambda m: chr(_STAND_IN + ord(m.group())), text)
     try:
         root = ElementTree.fromstring(text)
     except ElementTree.ParseError:
         return None
+    if illegal:
+        for el in root.iter():
+            el.text = _restore(el.text)
     system = root.find(_NS + "System")
     if system is None:
         return None
@@ -243,7 +312,16 @@ def parse_event(text: str) -> dict | None:
     data: dict[str, str] = {}
     event_data = root.find(_NS + "EventData")
     if event_data is not None:
-        for i, d in enumerate(event_data.findall(_NS + "Data"), 1):
+        i = 0
+        for d in event_data.findall(_NS + "Data"):
+            if fixes is not None and not empty_in_array and not d.get("Name") \
+                    and _LIB_EMPTY.match(d.text or ""):
+                # A null value, which the library renders as an empty unnamed
+                # item and Windows leaves out (EventLog 6005/6006). An empty
+                # string in an array looks the same and Windows keeps it, so a
+                # record holding one keeps every such item.
+                continue
+            i += 1
             # An unnamed item gets Winlogbeat's documented name, param<n>.
             data[d.get("Name") or f"param{i}"] = (d.text or "")
     user_data = root.find(_NS + "UserData")
@@ -251,6 +329,10 @@ def parse_event(text: str) -> dict | None:
         for holder in user_data:
             for child in holder:
                 data[_local(child.tag)] = (child.text or "")
+    time_created = sys("TimeCreated", "SystemTime")
+    if fixes is not None:
+        data = {k: "" if _LIB_EMPTY.match(v) else fixes.get(v, v) for k, v in data.items()}
+        time_created = fixes.get(time_created, time_created)
     try:
         event_id = int(sys("EventID") or "")
     except ValueError:
@@ -259,7 +341,7 @@ def parse_event(text: str) -> dict | None:
         "provider": (system.find(_NS + "Provider").get("Name")
                      if system.find(_NS + "Provider") is not None else None),
         "event_id": event_id,
-        "time_created": sys("TimeCreated", "SystemTime"),
+        "time_created": time_created,
         "record_id": sys("EventRecordID"),
         "channel": sys("Channel"),
         "computer": sys("Computer"),
@@ -339,9 +421,265 @@ def native_row(row_id: int, ev: dict) -> list:
             json.dumps(ev["data"], ensure_ascii=False)]
 
 
-def damaged_row(text: str) -> dict:
+def damaged_row(text: str, prefix: str = "[unreadable event XML] ") -> dict:
     """A piece of the file that is not a readable event: kept as text."""
     return {"ts": None, "ts_raw": None, "srcip": None, "dstip": None, "dstport": None,
             "username": None, "program": None, "hostname": None, "action": None, "verdict": None,
             "app": None, "risk": None, "bytes_sent": None, "category": None,
-            "raw": ("[unreadable event XML] " + re.sub(r"\s+", " ", text))[:4000]}
+            "raw": (prefix + re.sub(r"\s+", " ", text))[:4000]}
+
+
+# --- .evtx (W2) -------------------------------------------------------------
+
+@dataclass
+class Damage:
+    """Part of a container that is not a readable event: the text row it
+    becomes, and how many records it stands for (0 when unknown)."""
+    text: str
+    records: int
+
+
+def _evtx_parser(source, threads: int = 0):
+    # A compiled wheel, imported only where an .evtx is actually read.
+    from evtx import PyEvtxParser
+    return PyEvtxParser(source, number_of_threads=threads)
+
+
+def evtx_head_channels(path: Path) -> tuple[int, list[str]]:
+    """(records, their channels) in the first chunks of an .evtx, plain or
+    .gz - what identification names the file by. Reads the head only: the
+    records of complete chunks render without the rest of the file."""
+    opener = gzip.open if str(path).lower().endswith(".gz") else open
+    with opener(path, "rb") as fh:
+        head, taken = fh.read(EVTX_HEADER), 0
+        # The first four chunks, passing over damaged slots (the reader stops at one).
+        for _ in range(64):
+            block = fh.read(EVTX_CHUNK)
+            if not block or taken == 4:
+                break
+            if block[:8] == EVTX_CHUNK_MAGIC:
+                head, taken = head + block, taken + 1
+    records, channels = 0, []
+    for rec in _evtx_parser(io.BytesIO(head), threads=1).records():
+        if isinstance(rec, Exception):
+            continue
+        records += 1
+        m = re.search(r"<Channel>([^<]*)</Channel>", rec["data"])
+        if m and m.group(1).strip():
+            channels.append(m.group(1).strip())
+    return records, channels
+
+
+def evtx_chunks(path: Path) -> tuple[list[tuple[int, int, int, bool]], list[int]]:
+    """What the file says it holds: each chunk's (slot, first record id, last
+    record id, cut short by the end of the file) from its header, and the
+    64 KB slots that are neither a chunk nor empty (a damaged chunk header -
+    its records cannot be known). One small read per chunk."""
+    chunks, bad = [], []
+    with open(path, "rb") as fh:
+        size = fh.seek(0, io.SEEK_END)
+        slot = 0
+        while EVTX_HEADER + slot * EVTX_CHUNK < size:
+            offset = EVTX_HEADER + slot * EVTX_CHUNK
+            fh.seek(offset)
+            head = fh.read(40)
+            first, last = struct.unpack("<QQ", head[24:40]) if len(head) == 40 else (1, 0)
+            # A record takes at least 28 bytes of the chunk's 65,024: a header
+            # naming more is damaged, and its count would be invented.
+            if head[:8] == EVTX_CHUNK_MAGIC and 0 <= last - first < _MAX_RECORDS:
+                chunks.append((slot, first, last, offset + EVTX_CHUNK > size))
+            else:
+                fh.seek(offset)
+                if any(fh.read(EVTX_CHUNK)):  # a never-used slot is all zeros
+                    bad.append(slot)
+            slot += 1
+    return chunks, bad
+
+
+# Binary XML, as far as it is read here (libyal's EVTX document, "Binary XML"):
+# a record's event is a template instance - token 0x0c, the offset of its
+# template definition in the chunk (the definition follows inline when that
+# offset is its own position: 24-byte header + data size), then the value
+# count, a (size, type) descriptor per value and the values. Only the types the
+# library renders differently from Windows are taken; a nested Binary XML value
+# (type 0x21, how EventData is often carried) is read the same way.
+_RECORD_MAGIC = b"\x2a\x2a\x00\x00"
+_GUID, _FILETIME, _SYSTEMTIME, _BINXML, _STRING_ARRAY = 0x0F, 0x11, 0x12, 0x21, 0x81
+_FILETIME_EPOCH = datetime(1601, 1, 1)
+
+
+@dataclass
+class EvtxRecord:
+    """One record as the evtx library rendered it: {the library's form:
+    Windows' form} of its GUID, FILETIME and SYSTEMTIME values (`fixes`),
+    and whether a string array in it holds an empty string - the library
+    renders that, and a null value, alike as an empty unnamed item."""
+    xml: str
+    fixes: dict
+    empty_in_array: bool = False
+
+
+def _guid(v: bytes) -> tuple[str, str]:
+    d1, d2, d3 = struct.unpack_from("<IHH", v)
+    hexed = f"{d1:08X}-{d2:04X}-{d3:04X}-{v[8:10].hex().upper()}-{v[10:16].hex().upper()}"
+    return hexed, "{" + hexed.lower() + "}"  # the library's form, Windows' form
+
+
+def _filetime(v: bytes) -> tuple[str, str]:
+    ticks = struct.unpack("<Q", v)[0]
+    when = _FILETIME_EPOCH + timedelta(microseconds=ticks // 10)
+    stem = when.strftime("%Y-%m-%dT%H:%M:%S")
+    # The library truncates to the microsecond; Windows writes 100 ns.
+    return f"{stem}.{when.microsecond:06d}Z", f"{stem}.{ticks % 10_000_000:07d}Z"
+
+
+def _binxml_values(b: bytes, pos: int, fixes: dict, flags: dict, depth: int = 0) -> None:
+    if depth > 4:
+        return
+    if b[pos] == 0x0F:  # fragment header
+        pos += 4
+    if b[pos] != 0x0C:  # no template instance: no typed values to take
+        return
+    definition = struct.unpack_from("<I", b, pos + 6)[0]
+    pos += 10
+    if definition == pos:
+        pos += 24 + struct.unpack_from("<I", b, pos + 20)[0]
+    count = struct.unpack_from("<I", b, pos)[0]
+    if count > 4096:
+        raise ValueError("not a value count")
+    descriptors = [struct.unpack_from("<HB", b, pos + 4 + 4 * i) for i in range(count)]
+    pos += 4 + 4 * count
+    for size, kind in descriptors:
+        v = b[pos:pos + size]
+        if kind == _GUID and size == 16:
+            lib, win = _guid(v)
+            fixes[lib] = win
+        elif kind == _FILETIME and size == 8:
+            try:
+                lib, win = _filetime(v)
+                fixes[lib] = win
+            except OverflowError:  # past year 9999: left as the library renders it
+                pass
+        elif kind == _SYSTEMTIME and size == 16:
+            # year, month, day of week, day, hour, minute, second, milliseconds
+            y, mo, _, d, h, mi, s, ms = struct.unpack("<8H", v)
+            stem = f"{y:04d}-{mo:02d}-{d:02d}T{h:02d}:{mi:02d}:{s:02d}"
+            fixes[f"{stem}.{ms * 1000:06d}Z"] = f"{stem}.{ms * 10000:07d}Z"
+        elif kind == _BINXML and size:
+            _binxml_values(b, pos, fixes, flags, depth + 1)
+        elif kind == _STRING_ARRAY and size:
+            # UTF-16 strings, each ending in a NUL.
+            items = v.decode("utf-16-le", errors="replace").split("\x00")[:-1]
+            if "" in items:
+                flags["empty_in_array"] = True
+        pos += size
+
+
+def evtx_typed_values(chunk: bytes) -> dict[int, tuple[dict[str, str], bool]]:
+    """Record id -> (`fixes`, empty string in an array) for every record of
+    one chunk. A record whose Binary XML is not read here keeps the library's
+    form (no fix), never fails."""
+    out: dict[int, tuple[dict[str, str], bool]] = {}
+    end = min(len(chunk), struct.unpack_from("<I", chunk, 48)[0] if len(chunk) >= 52 else 0)
+    pos = 512  # the chunk header and its string / template tables
+    while pos + 28 <= end and chunk[pos:pos + 4] == _RECORD_MAGIC:
+        size, record_id = struct.unpack_from("<IQ", chunk, pos + 4)
+        if size < 28 or pos + size > len(chunk):
+            break
+        fixes: dict[str, str] = {}
+        flags: dict[str, bool] = {}
+        try:
+            _binxml_values(chunk, pos + 24, fixes, flags)
+        except (struct.error, IndexError, ValueError, OverflowError):
+            pass
+        out[record_id] = (fixes, flags.get("empty_in_array", False))
+        pos += size
+    return out
+
+
+class _Tally:
+    """Records returned per chunk, by record id (ids are unique in a file and
+    each chunk holds a contiguous range of them)."""
+
+    def __init__(self, chunks):
+        self.chunks = sorted(chunks, key=lambda c: c[1])
+        self.firsts = [c[1] for c in self.chunks]
+        self.got = [0] * len(self.chunks)
+
+    def add(self, record_id) -> int | None:
+        """Count one record; its chunk's slot, or None outside every chunk."""
+        if not isinstance(record_id, int):
+            return None
+        k = bisect.bisect_right(self.firsts, record_id) - 1
+        if k < 0 or record_id > self.chunks[k][2]:
+            return None
+        self.got[k] += 1
+        return self.chunks[k][0]
+
+    def short(self) -> Iterator[tuple[int, int, int, int, bool]]:
+        for (slot, first, last, cut), got in zip(self.chunks, self.got):
+            if got < last - first + 1:
+                yield slot, first, last, last - first + 1 - got, cut
+
+
+def _without_bad_slots(path: Path, scratch: Path | None) -> Path:
+    """A copy of the file header and every slot that starts with a chunk
+    signature: the reader stops at the first slot without one ("Failed to
+    parse chunk header"), which would lose every good chunk after it. Never
+    written beside the evidence."""
+    fd, name = tempfile.mkstemp(suffix=".evtx", dir=str(scratch) if scratch else None)
+    with open(path, "rb") as src, os.fdopen(fd, "wb") as dst:
+        dst.write(src.read(EVTX_HEADER))
+        while block := src.read(EVTX_CHUNK):
+            if block[:8] == EVTX_CHUNK_MAGIC:
+                dst.write(block)
+    return Path(name)
+
+
+def iter_evtx(path: Path, progress=None, errors: list | None = None,
+              scratch: Path | None = None) -> Iterator[EvtxRecord | Damage]:
+    """Each record of a plain .evtx as event XML, in file order; then a
+    Damage for every chunk whose header names records the reader did not
+    return, and for every slot that is not a chunk. `progress(fraction)` by
+    chunk; the reader's own error messages are appended to `errors`; a file
+    with a damaged slot is read from a copy without it, made in `scratch`."""
+    chunks, bad = evtx_chunks(path)
+    tally = _Tally(chunks)
+    slots = max(1, max([c[0] for c in chunks] + bad, default=0) + 1)
+    n = 0
+    source = _without_bad_slots(path, scratch) if bad else path
+    try:
+        with open(path, "rb") as fh:
+            typed_slot, typed = None, {}
+            for rec in _evtx_parser(str(source)).records():
+                if isinstance(rec, Exception):
+                    if errors is not None and len(errors) < 20:
+                        errors.append(str(rec)[:300])
+                    continue
+                slot = tally.add(rec.get("event_record_id"))
+                if slot is not None and slot != typed_slot:
+                    # Records come in file order: one chunk read per chunk.
+                    fh.seek(EVTX_HEADER + slot * EVTX_CHUNK)
+                    typed_slot, typed = slot, evtx_typed_values(fh.read(EVTX_CHUNK))
+                fixes, empty_in_array = (typed.get(rec.get("event_record_id"), ({}, False))
+                                         if slot is not None else ({}, False))
+                yield EvtxRecord(rec["data"], fixes, empty_in_array)
+                n += 1
+                if progress and slot is not None and n % 1000 == 0:
+                    progress(slot / slots)
+    except Exception as exc:  # noqa: BLE001 - the reader gave up; what is left is counted below
+        if errors is not None:
+            errors.append(f"reading stopped: {str(exc)[:300]}")
+    finally:
+        if source != path:
+            source.unlink(missing_ok=True)
+    for slot, first, last, missing, cut in tally.short():
+        offset = EVTX_HEADER + slot * EVTX_CHUNK
+        yield Damage(f"[unreadable EVTX records] chunk {slot} at byte {offset}: {missing} of "
+                     f"records {first}-{last} not readable"
+                     + (" - the file ends inside this chunk" if cut else ""), missing)
+    for slot in bad:
+        yield Damage(f"[unreadable EVTX chunk] chunk {slot} at byte {EVTX_HEADER + slot * EVTX_CHUNK}: "
+                     "its chunk header is damaged - how many records it held cannot be known", 0)
+    if progress:
+        progress(1.0)

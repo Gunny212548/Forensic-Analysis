@@ -30,7 +30,7 @@ describes the code before that direction.
 Formats exercised against real data so far: VMware ESXi `auth.log`,
 Palo Alto CSV exports, Check Point SmartLog CSV exports, Check Point Log Exporter
 records in a ManageEngine EventLog Analyzer export (gotcha #59), Windows Security and
-Sysmon event XML (lab captures, gotcha #60), Entra ID sign-in
+Sysmon event XML and .evtx (lab captures, gotcha #60), Entra ID sign-in
 CSV exports and their Azure Monitor JSON export (gotcha #39). Every file is
 identified before it is read (gotcha #53, IAI-92 - on its branch): a documented
 format is read through its profile, anything else is kept as evidence and not
@@ -344,7 +344,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
-- #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules; .evtx / Splunk text still no_reader (W2/W3).
+- #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; Splunk text still no_reader (W3).
 - #59 Check Point Log Exporter records inside a ManageEngine EventLog Analyzer search export (`checkpoint_le.py`): record documented, wrapper observed; fields via `regexp_extract_all`; update logs sharing a `loguid` are `log_update` rows with no verdict; epoch `time` states its zone.
 - #53 Every file is identified before it is read, in Sigma logsource terms (`identify.py`); no column is guessed; a format without a reader, or none, is kept as evidence and not analysed. A file's name proves nothing - JSON-lines arrive as `.log`, exports start with a blank line.
 
@@ -708,6 +708,10 @@ Two more checks, each for its own layer:
   unrecognised; `--corpus` adds the real customer files. No store, no network.
 - **Behaviour profiles** - `tests/check_profiles.py [--repo DIR]` (gotcha #57): windows and their
   edges, ranks and the 20-address floor, n/a, bytes to public addresses; duckdb only.
+- **Windows event logs** - `tests/check_windows.py <scratch> --repo /app [--evtx D:/logtest/windows]`
+  (gotcha #60): event XML from the committed samples; with `--evtx` (lab folder outside the repo,
+  copied into the container) every .evtx record counted against its chunk header and compared item
+  by item with Windows' own `.ToXml()` rendering. Check Point Log Exporter: `tests/check_checkpoint_le.py`.
 - **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states, and
   every step citing a standard marked read in `docs/standards/SOURCES.md`.
 
@@ -748,6 +752,11 @@ keeping, each of which was a bug in the checker before it was a feature:
 
 The Check Point benchmark is in the baseline but is not under `Logtest`;
 check it with `python tests/check_parity.py D:/logtest` (gotcha #43).
+Since W2 that run also covers `D:/logtest/windows` (gotcha #60): `.evtx` is a parity suffix,
+and the 278 EVTX-ATTACK-SAMPLES files (GPL-3.0, so outside the repo) plus two exports from this
+PC are in the baseline - 279 names, 127,519 rows, 0 flagged (no in-house rule fires on them; the
+Windows detections are the SigmaHQ story's). The clone's stray `.log` / `.txt` / `.json` files
+came in with them.
 
 **Real-world benchmark.** A Check Point export was analysed alongside the
 human SOC report written from the same data ("Firewall Port Scanning &

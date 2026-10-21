@@ -1,4 +1,262 @@
 {
+ "4624_LT3_AnonymousLogon_Localhost_-_JuicyPotato.evtx": {
+  "flagged": 0,
+  "md5": "004aea2c5b8f66304094429c6504f016",
+  "rows": 3,
+  "rules": {}
+ },
+ "4765_sidhistory_add_t1178.evtx": {
+  "flagged": 0,
+  "md5": "5f2d9a7383b9173a2cae6ae29a0f0dbd",
+  "rows": 3,
+  "rules": {}
+ },
+ "4794_DSRM_password_change_t1098.evtx": {
+  "flagged": 0,
+  "md5": "79662986ae3842d2159dd33882065fb9",
+  "rows": 1,
+  "rules": {}
+ },
+ "4799_remote_local_groups_enumeration.evtx": {
+  "flagged": 0,
+  "md5": "7054a6d8aa9ecd4b03c723b84a58a3ef",
+  "rows": 5,
+  "rules": {}
+ },
+ "ACL_ForcePwd_SPNAdd_User_Computer_Accounts.evtx": {
+  "flagged": 0,
+  "md5": "339b97597027c20f26c5e8204959bdc8",
+  "rows": 55,
+  "rules": {}
+ },
+ "CA_4624_4625_LogonType2_LogonProc_chrome.evtx": {
+  "flagged": 0,
+  "md5": "6fed95d86ae1ae216bccf6ca45207121",
+  "rows": 4,
+  "rules": {}
+ },
+ "CA_DCSync_4662.evtx": {
+  "flagged": 0,
+  "md5": "becffbf52ebce7b4532557a95f343b00",
+  "rows": 3,
+  "rules": {}
+ },
+ "CA_Mimikatz_Memssp_Default_Logs_Sysmon_11.evtx": {
+  "flagged": 0,
+  "md5": "4a82d6e3e36e2b807754a10e9f5b2364",
+  "rows": 1,
+  "rules": {}
+ },
+ "CA_PetiPotam_etw_rpc_efsr_5_6.evtx": {
+  "flagged": 0,
+  "md5": "5710a2b166af691ef750ee637ef6a36e",
+  "rows": 29109,
+  "rules": {}
+ },
+ "CA_chrome_firefox_opera_4663.evtx": {
+  "flagged": 0,
+  "md5": "04cc9fe95164447a5c6eea0b85eaffa8",
+  "rows": 5,
+  "rules": {}
+ },
+ "CA_hashdump_4663_4656_lsass_access.evtx": {
+  "flagged": 0,
+  "md5": "f7c6ca9355c92c87eb0377de38882e82",
+  "rows": 2,
+  "rules": {}
+ },
+ "CA_keefarce_keepass_credump.evtx": {
+  "flagged": 0,
+  "md5": "e4dc94ead836becba559fce9381fe56b",
+  "rows": 5,
+  "rules": {}
+ },
+ "CA_keepass_KeeThief_Get-KeePassDatabaseKey.evtx": {
+  "flagged": 0,
+  "md5": "ae62379fe2693311879dc437d38f960c",
+  "rows": 2,
+  "rules": {}
+ },
+ "CA_protectedstorage_5145_rpc_masterkey.evtx": {
+  "flagged": 0,
+  "md5": "d78b6f501ea45d9e576f54b023b9beef",
+  "rows": 1,
+  "rules": {}
+ },
+ "CA_sysmon_hashdump_cmd_meterpreter.evtx": {
+  "flagged": 0,
+  "md5": "974852aeabc87bab9a410f990bbe4305",
+  "rows": 9,
+  "rules": {}
+ },
+ "CA_teamviewer-dumper_sysmon_10.evtx": {
+  "flagged": 0,
+  "md5": "a76025f3a6f1409c6030ab4efce12598",
+  "rows": 1,
+  "rules": {}
+ },
+ "CVE-2020-0796_SMBV3Ghost_LocalPrivEsc_Sysmon_3_1_10.evtx": {
+  "flagged": 0,
+  "md5": "a34b9184f9e147e47dfc7c4e5eff8e03",
+  "rows": 4,
+  "rules": {}
+ },
+ "DACL_DCSync_Right_Powerview__Add-DomainObjectAcl.evtx": {
+  "flagged": 0,
+  "md5": "99c995e663c792b67510c2485c62902a",
+  "rows": 28,
+  "rules": {}
+ },
+ "DE_104_system_log_cleared.evtx": {
+  "flagged": 0,
+  "md5": "3c3e61b2c463ec22962f718055c26456",
+  "rows": 1,
+  "rules": {}
+ },
+ "DE_1102_security_log_cleared.evtx": {
+  "flagged": 0,
+  "md5": "0868ba6f10c24411f5536e05d50aaa1a",
+  "rows": 112,
+  "rules": {}
+ },
+ "DE_BYOV_Zam64_CA_Memdump_sysmon_7_10.evtx": {
+  "flagged": 0,
+  "md5": "7d9223fddf6ca9f4f3d8a329a02055b9",
+  "rows": 6,
+  "rules": {}
+ },
+ "DE_EventLog_Service_Crashed.evtx": {
+  "flagged": 0,
+  "md5": "9d08ab1e05747bf5d78cabbd31e11525",
+  "rows": 4,
+  "rules": {}
+ },
+ "DE_Fake_ComputerAccount_4720.evtx": {
+  "flagged": 0,
+  "md5": "849a25889682ebc328c0731a42dad7c8",
+  "rows": 2,
+  "rules": {}
+ },
+ "DE_KernelDebug_and_TestSigning_ON_Security_4826.evtx": {
+  "flagged": 0,
+  "md5": "4ceb2ee5f35d0c8043c1195218418e2e",
+  "rows": 6,
+  "rules": {}
+ },
+ "DE_Powershell_CLM_Disabled_Sysmon_12.evtx": {
+  "flagged": 0,
+  "md5": "b3487ac4dc5cbc318e0d54d639ad3466",
+  "rows": 1,
+  "rules": {}
+ },
+ "DE_ProcessHerpaderping_Sysmon_11_10_1_7.evtx": {
+  "flagged": 0,
+  "md5": "650a1b370e102f2588d9c71b5f9a26db",
+  "rows": 4,
+  "rules": {}
+ },
+ "DE_RDP_Tunnel_5156.evtx": {
+  "flagged": 0,
+  "md5": "951e2f89674d533807b832ae83d64360",
+  "rows": 101,
+  "rules": {}
+ },
+ "DE_RDP_Tunneling_4624.evtx": {
+  "flagged": 0,
+  "md5": "569be8374bf3c347ff942205d0434cf4",
+  "rows": 18,
+  "rules": {}
+ },
+ "DE_RDP_Tunneling_TerminalServices-RemoteConnectionManagerOperational_1149.evtx": {
+  "flagged": 0,
+  "md5": "631640630ce950ce28f7ee323cb8e9b6",
+  "rows": 228,
+  "rules": {}
+ },
+ "DE_UAC_Disabled_Sysmon_12_13.evtx": {
+  "flagged": 0,
+  "md5": "c74dbbbb03a575e737d58b74cbb25af7",
+  "rows": 3,
+  "rules": {}
+ },
+ "DE_WinEventLogSvc_Crash_System_7036.evtx": {
+  "flagged": 0,
+  "md5": "44e9c3d375ea1b8f6f6a123c7ea3693d",
+  "rows": 6,
+  "rules": {}
+ },
+ "DE_remote_eventlog_svc_crash_byt3bl33d3r_sysmon_17_1_3.evtx": {
+  "flagged": 0,
+  "md5": "8150e8a674ac4e12573f177857086943",
+  "rows": 11,
+  "rules": {}
+ },
+ "DE_renamed_psexec_service_sysmon_17_18.evtx": {
+  "flagged": 0,
+  "md5": "4659db1a689bcbbb4a41ab8acbaf00ec",
+  "rows": 11,
+  "rules": {}
+ },
+ "DE_suspicious_remote_eventlog_svc_access_5145.evtx": {
+  "flagged": 0,
+  "md5": "11c7a1059f417886a3343279d8b9c39b",
+  "rows": 8,
+  "rules": {}
+ },
+ "DE_sysmon-3-rdp-tun.evtx": {
+  "flagged": 0,
+  "md5": "873d25ef0849c1256dd3d4fe09b72fc7",
+  "rows": 73,
+  "rules": {}
+ },
+ "DE_timestomp_and_dll_sideloading_and_RunPersist.evtx": {
+  "flagged": 0,
+  "md5": "dd551286576e1b8af10b502d5034de3c",
+  "rows": 23,
+  "rules": {}
+ },
+ "DE_xp_cmdshell_enabled_MSSQL_EID_15457.evtx": {
+  "flagged": 0,
+  "md5": "81b6c1e2e5a86cbce4a1a9a988088660",
+  "rows": 4,
+  "rules": {}
+ },
+ "DFIR_RDP_Client_TimeZone_RdpCoreTs_104_example.evtx": {
+  "flagged": 0,
+  "md5": "34c99593137b9c47950aa8f7f506085c",
+  "rows": 21,
+  "rules": {}
+ },
+ "DSE_bypass_BYOV_TDL_dummydriver_sysmon_6_7_13.evtx": {
+  "flagged": 0,
+  "md5": "55e9dc4ea97f12aa0a0683e3c3702cf9",
+  "rows": 8,
+  "rules": {}
+ },
+ "Discovery_Remote_System_NamedPipes_Sysmon_18.evtx": {
+  "flagged": 0,
+  "md5": "872ab35acd9dfb30fe68a6d3d31ef096",
+  "rows": 20,
+  "rules": {}
+ },
+ "EfsPotato_sysmon_17_18_privesc_seimpersonate_to_system.evtx": {
+  "flagged": 0,
+  "md5": "6935625e162f87ce95be6739c4b0aef4",
+  "rows": 20,
+  "rules": {}
+ },
+ "Exec_sysmon_meterpreter_reversetcp_msipackage.evtx": {
+  "flagged": 0,
+  "md5": "829069d06e36c40e1e5c46eccce48d40",
+  "rows": 8,
+  "rules": {}
+ },
+ "Exec_via_cpl_Application_Experience_EventID_17_ControlPanelApplet.evtx": {
+  "flagged": 0,
+  "md5": "ab626a0c06d2d4b3989d6fb8ae76763c",
+  "rows": 4,
+  "rules": {}
+ },
  "Game_Rules.txt": {
   "flagged": 0,
   "md5": "d4deb2333fd0d9a38e9788a01bbd6d02",
@@ -9,6 +267,18 @@
   "flagged": 0,
   "md5": "7a9b05031974c6abb809ab3be2fb674f",
   "rows": 0,
+  "rules": {}
+ },
+ "ImpersonateUser-via_local_Pass_The_Hash_Sysmon_and_Security.evtx": {
+  "flagged": 0,
+  "md5": "c65bd578885afc2a910f665f32a3a286",
+  "rows": 14,
+  "rules": {}
+ },
+ "Invoke_TokenDuplication_UAC_Bypass4624.evtx": {
+  "flagged": 0,
+  "md5": "0688d52a80c672a1b9707087a895a0cf",
+  "rows": 1,
   "rules": {}
  },
  "KM23_ITSupport_InteractiveSignIns_2026-06-04_2026-06-11.csv": {
@@ -26,6 +296,180 @@
   "rows": 938,
   "rules": {}
  },
+ "LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx": {
+  "flagged": 0,
+  "md5": "28d3173f655430d2f28ed36193d1629d",
+  "rows": 6,
+  "rules": {}
+ },
+ "LM_5145_Remote_FileCopy.evtx": {
+  "flagged": 0,
+  "md5": "3cd9b43d1b44ea6742b562d780793d41",
+  "rows": 869,
+  "rules": {}
+ },
+ "LM_DCOM_MSHTA_LethalHTA_Sysmon_3_1.evtx": {
+  "flagged": 0,
+  "md5": "bc55522742410b5b79c766ad151846a9",
+  "rows": 2,
+  "rules": {}
+ },
+ "LM_ImageLoad_NFSH_Sysmon_7.evtx": {
+  "flagged": 0,
+  "md5": "57bbf71771dc1fcb6d8b292afa950794",
+  "rows": 2,
+  "rules": {}
+ },
+ "LM_NewShare_Added_Sysmon_12_13.evtx": {
+  "flagged": 0,
+  "md5": "183561b0857c7e7e5782a8521a3d9adf",
+  "rows": 3,
+  "rules": {}
+ },
+ "LM_PowershellRemoting_sysmon_1_wsmprovhost.evtx": {
+  "flagged": 0,
+  "md5": "f5c544fb3b39c7afdb1e51d8ee2753e0",
+  "rows": 1,
+  "rules": {}
+ },
+ "LM_REMCOM_5145_TargetHost.evtx": {
+  "flagged": 0,
+  "md5": "cd05cd694485edacf5e12fd779e54e75",
+  "rows": 30,
+  "rules": {}
+ },
+ "LM_Remote_Service01_5145_svcctl.evtx": {
+  "flagged": 0,
+  "md5": "a3f5dd974a403a9987a5fe95bc54b8d5",
+  "rows": 1,
+  "rules": {}
+ },
+ "LM_Remote_Service02_7045.evtx": {
+  "flagged": 0,
+  "md5": "ee97965ebf29283334ef2256b438677f",
+  "rows": 3,
+  "rules": {}
+ },
+ "LM_ScheduledTask_ATSVC_target_host.evtx": {
+  "flagged": 0,
+  "md5": "1fa713d1c9f2cc2a8ce45912d2070439",
+  "rows": 34,
+  "rules": {}
+ },
+ "LM_WMIC_4648_rpcss.evtx": {
+  "flagged": 0,
+  "md5": "ed3e19e3218e9c034ec22f0c5d783c31",
+  "rows": 5,
+  "rules": {}
+ },
+ "LM_WMI_4624_4688_TargetHost.evtx": {
+  "flagged": 0,
+  "md5": "8553f8eda7d812e96a63056928592f69",
+  "rows": 8,
+  "rules": {}
+ },
+ "LM_add_new_namedpipe_tp_nullsession_registry_turla_like_ttp.evtx": {
+  "flagged": 0,
+  "md5": "18c4b9d9839fbe17ac01d23a3dd44f58",
+  "rows": 1,
+  "rules": {}
+ },
+ "LM_dcom_shwnd_shbrwnd_mmc20_failed_traces_system_10016.evtx": {
+  "flagged": 0,
+  "md5": "6cb6d3a1224500a276a8d7aadb423737",
+  "rows": 4,
+  "rules": {}
+ },
+ "LM_impacket_docmexec_mmc_sysmon_01.evtx": {
+  "flagged": 0,
+  "md5": "095dbab74821dc6d550a0a4195c895dc",
+  "rows": 9,
+  "rules": {}
+ },
+ "LM_regsvc_DirectoryServiceExtPt_Lsass_NTDS_AdamXpn.evtx": {
+  "flagged": 0,
+  "md5": "c655e4b1afa92106bdd38fb6ca22bc38",
+  "rows": 6,
+  "rules": {}
+ },
+ "LM_renamed_psexecsvc_5145.evtx": {
+  "flagged": 0,
+  "md5": "4f8478211c8b985a70dff88dd6c3364e",
+  "rows": 22,
+  "rules": {}
+ },
+ "LM_sysmon_1_12_13_3_tsclient_SharpRdp.evtx": {
+  "flagged": 0,
+  "md5": "394d423026880824667468f064ef3dcb",
+  "rows": 9,
+  "rules": {}
+ },
+ "LM_sysmon_3_12_13_1_SharpRDP.evtx": {
+  "flagged": 0,
+  "md5": "88dbfcb7fa3b3a7f4e2a1a06a07b1d90",
+  "rows": 38,
+  "rules": {}
+ },
+ "LM_sysmon_3_DCOM_ShellBrowserWindow_ShellWindows.evtx": {
+  "flagged": 0,
+  "md5": "16abf859070d3cc5f4f12b0ee0b34882",
+  "rows": 3,
+  "rules": {}
+ },
+ "LM_sysmon_psexec_smb_meterpreter.evtx": {
+  "flagged": 0,
+  "md5": "451ccf3e4636b2c3d1d31e9cddc838e0",
+  "rows": 10,
+  "rules": {}
+ },
+ "LM_sysmon_remote_task_src_powershell.evtx": {
+  "flagged": 0,
+  "md5": "90a64edf870549ce04ab420dadb90bf1",
+  "rows": 3,
+  "rules": {}
+ },
+ "LM_tsclient_startup_folder.evtx": {
+  "flagged": 0,
+  "md5": "7a751997182331c0d16ff0e4046d2414",
+  "rows": 4,
+  "rules": {}
+ },
+ "LM_typical_IIS_webshell_sysmon_1_10_traces.evtx": {
+  "flagged": 0,
+  "md5": "c5b233cc3c6c153c2a10382a504dadf3",
+  "rows": 4,
+  "rules": {}
+ },
+ "LM_winrm_exec_sysmon_1_winrshost.evtx": {
+  "flagged": 0,
+  "md5": "8aa6d42063486f9e6227af3e568772e9",
+  "rows": 3,
+  "rules": {}
+ },
+ "LM_winrm_target_wrmlogs_91_wsmanShellStarted_poorLog.evtx": {
+  "flagged": 0,
+  "md5": "fa85db99f5ea07e62dfccabe0111f472",
+  "rows": 1,
+  "rules": {}
+ },
+ "LM_wmi_PoisonHandler_Mr-Un1k0d3r_sysmon_1_13.evtx": {
+  "flagged": 0,
+  "md5": "0f5f5728e3b4e41f5c2d9043ba883a15",
+  "rows": 15,
+  "rules": {}
+ },
+ "LM_wmiexec_impacket_sysmon_whoami.evtx": {
+  "flagged": 0,
+  "md5": "a4465d2aea66827a9a7eaf3eb8f2de02",
+  "rows": 7,
+  "rules": {}
+ },
+ "LM_xp_cmdshell_MSSQL_Events.evtx": {
+  "flagged": 0,
+  "md5": "d407dc2c2e70a42e4f5962dada9e22df",
+  "rows": 21,
+  "rules": {}
+ },
  "Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv": {
   "flagged": 45201,
   "md5": "1dd8810976d566023f67083a97961d9f",
@@ -35,16 +479,112 @@
    "R2004": 2978
   }
  },
+ "LsassSilentProcessExit_process_exit_monitor_3001_lsass.evtx": {
+  "flagged": 0,
+  "md5": "03814ae80dc5bd6068f5c830eae65cf5",
+  "rows": 2,
+  "rules": {}
+ },
+ "MSSQL_15281_xp_cmdshell_exec_failed_attempt.evtx": {
+  "flagged": 0,
+  "md5": "44fc760485e39f68902a1a1043bb6c4c",
+  "rows": 1,
+  "rules": {}
+ },
+ "MSSQL_multiple_failed_logon_EventID_18456.evtx": {
+  "flagged": 0,
+  "md5": "194b695c37fc1fc78d376ab47572d55f",
+  "rows": 10,
+  "rules": {}
+ },
  "Mail_itsupport_Header.txt": {
   "flagged": 0,
   "md5": "4094b354e008450f8d3edd37d949f928",
   "rows": 0,
   "rules": {}
  },
+ "NTLM2SelfRelay-med0x2e-security_4624_4688.evtx": {
+  "flagged": 0,
+  "md5": "e00de1c2a3b65e2560ea3d467135c9a1",
+  "rows": 11,
+  "rules": {}
+ },
+ "Network_Service_Guest_added_to_admins_4732.evtx": {
+  "flagged": 0,
+  "md5": "42a2d5817a5f56fa3a363422615bd6a5",
+  "rows": 2,
+  "rules": {}
+ },
  "New_Text_Document.txt": {
   "flagged": 0,
   "md5": "ef41e44827f1f98ae1575fd3f612dd57",
   "rows": 0,
+  "rules": {}
+ },
+ "PanacheSysmon_vs_AtomicRedTeam01.evtx": {
+  "flagged": 0,
+  "md5": "e7372acb103c54e580874248716d771a",
+  "rows": 565,
+  "rules": {}
+ },
+ "Persistence_Shime_Microsoft-Windows-Application-Experience_Program-Telemetry_500.evtx": {
+  "flagged": 0,
+  "md5": "b8bd5c3b703d3cb4414d62e6ffd07c20",
+  "rows": 7,
+  "rules": {}
+ },
+ "Persistence_Winsock_Catalog_Change_EventId_1.evtx": {
+  "flagged": 0,
+  "md5": "c785d94bb9478de00a2c81dc8c1c937d",
+  "rows": 2,
+  "rules": {}
+ },
+ "Powershell_4104_MiniDumpWriteDump_Lsass.evtx": {
+  "flagged": 0,
+  "md5": "78e767a761cc5ff71c333c6738f910e8",
+  "rows": 4,
+  "rules": {}
+ },
+ "PrivEsc_CVE-2020-1313_Sysmon_13_UScheduler_Cmdline.evtx": {
+  "flagged": 0,
+  "md5": "7918052d1096ae8236b3d98b1b396188",
+  "rows": 4,
+  "rules": {}
+ },
+ "PrivEsc_Imperson_NetSvc_to_Sys_Decoder_Sysmon_1_17_18.evtx": {
+  "flagged": 0,
+  "md5": "0c7c910250cf2961a049fb2f5a485466",
+  "rows": 13,
+  "rules": {}
+ },
+ "PrivEsc_NetSvc_SessionToken_Retrival_via_localSMB_Auth_5145.evtx": {
+  "flagged": 0,
+  "md5": "fd46233b75a3eae5a9a085452e16a38a",
+  "rows": 1,
+  "rules": {}
+ },
+ "PrivEsc_SeImpersonatePriv_enabled_back_for_upnp_localsvc_4698.evtx": {
+  "flagged": 0,
+  "md5": "6a6d8b66daaee7afade6c039a88a7ab8",
+  "rows": 2,
+  "rules": {}
+ },
+ "RemotePowerShell_MS_Windows-Remote_Management_EventID_169.evtx": {
+  "flagged": 0,
+  "md5": "4a62a15b5992c3258adda3660323b702",
+  "rows": 6,
+  "rules": {}
+ },
+ "RogueWinRM.evtx": {
+  "flagged": 0,
+  "md5": "47e50802169ea641cac0204d057a5923",
+  "rows": 7,
+  "rules": {}
+ },
+ "Runas_4624_4648_Webshell_CreateProcessAsUserA.evtx": {
+  "flagged": 0,
+  "md5": "eb322c299e5a34d200f66c8981656b44",
+  "rows": 3,
   "rules": {}
  },
  "Search_Report-2026_10_21-10_23_21_869.csv": {
@@ -56,6 +596,228 @@
    "R3004": 9
   }
  },
+ "Sysmon13_MachineAccount_Password_Hash_Changed_via_LsarSetSecret.evtx": {
+  "flagged": 0,
+  "md5": "74342cb695d47c5df598fafb9b40207f",
+  "rows": 4,
+  "rules": {}
+ },
+ "Sysmon_10_Evasion_Suspicious_NtOpenProcess_CallTrace.evtx": {
+  "flagged": 0,
+  "md5": "fa9521cab4d384918cd8ace8bac6fc30",
+  "rows": 1,
+  "rules": {}
+ },
+ "Sysmon_12_DE_AntiForensics_MRU_DeleteKey.evtx": {
+  "flagged": 0,
+  "md5": "565d6958abe4461f2fcea2e1929bda7d",
+  "rows": 3,
+  "rules": {}
+ },
+ "Sysmon_13_1_UACBypass_SDCLTBypass.evtx": {
+  "flagged": 0,
+  "md5": "9ec83ccafa113fe824de9cb4a6fa7bb0",
+  "rows": 5,
+  "rules": {}
+ },
+ "Sysmon_13_1_UAC_Bypass_EventVwrBypass.evtx": {
+  "flagged": 0,
+  "md5": "16bf02152b9a41dd3ccc24a1bcbce8ea",
+  "rows": 6,
+  "rules": {}
+ },
+ "Sysmon_13_Local_Admin_Password_Changed.evtx": {
+  "flagged": 0,
+  "md5": "e4bb5d0ee7e3749c45a73551d5561791",
+  "rows": 1,
+  "rules": {}
+ },
+ "Sysmon_7_Update_Session_Orchestrator_Dll_Hijack.evtx": {
+  "flagged": 0,
+  "md5": "10f2fb99c7b0dda536cdfd4d3be7c0bf",
+  "rows": 64,
+  "rules": {}
+ },
+ "Sysmon_7_dllhijack_cdpsshims_CDPSvc.evtx": {
+  "flagged": 0,
+  "md5": "2b4ee222b459f4cbe4ac57701b2f9c8a",
+  "rows": 13,
+  "rules": {}
+ },
+ "Sysmon_Exec_CompiledHTML.evtx": {
+  "flagged": 0,
+  "md5": "1d2e99f73395239380a0dfc8fe712bf8",
+  "rows": 2,
+  "rules": {}
+ },
+ "Sysmon_UACME_22.evtx": {
+  "flagged": 0,
+  "md5": "75d9293d19af0a2d4b1195b8a40dcf28",
+  "rows": 19,
+  "rules": {}
+ },
+ "Sysmon_UACME_23.evtx": {
+  "flagged": 0,
+  "md5": "fe0486c9de49592bf4af0189869171f1",
+  "rows": 8,
+  "rules": {}
+ },
+ "Sysmon_UACME_30.evtx": {
+  "flagged": 0,
+  "md5": "25004e5fcc9b955bf6a538b02f073bee",
+  "rows": 11,
+  "rules": {}
+ },
+ "Sysmon_UACME_32.evtx": {
+  "flagged": 0,
+  "md5": "fd4c9af666422c6d2d4223baac26c89e",
+  "rows": 8,
+  "rules": {}
+ },
+ "Sysmon_UACME_33.evtx": {
+  "flagged": 0,
+  "md5": "46625f5423dc02e0cbd6739d4cb770cb",
+  "rows": 9,
+  "rules": {}
+ },
+ "Sysmon_UACME_34.evtx": {
+  "flagged": 0,
+  "md5": "c13e7b646e5615ff2947d891a4ecce89",
+  "rows": 6,
+  "rules": {}
+ },
+ "Sysmon_UACME_36_FileCreate.evtx": {
+  "flagged": 0,
+  "md5": "2700536cc6dd49761323ad1b60de8c2d",
+  "rows": 13,
+  "rules": {}
+ },
+ "Sysmon_UACME_37_FileCreate.evtx": {
+  "flagged": 0,
+  "md5": "97bc1380d1c347cd1339ce2d2b3be737",
+  "rows": 7,
+  "rules": {}
+ },
+ "Sysmon_UACME_38.evtx": {
+  "flagged": 0,
+  "md5": "ecbc1ebcb331c6958823dfee2353d6e3",
+  "rows": 8,
+  "rules": {}
+ },
+ "Sysmon_UACME_39.evtx": {
+  "flagged": 0,
+  "md5": "669ca6cb119cba9604d8ccbde4bb3586",
+  "rows": 7,
+  "rules": {}
+ },
+ "Sysmon_UACME_41.evtx": {
+  "flagged": 0,
+  "md5": "613cbb9ecd7f373fcb798eb1686154c3",
+  "rows": 4,
+  "rules": {}
+ },
+ "Sysmon_UACME_43.evtx": {
+  "flagged": 0,
+  "md5": "8d4385ae2b9c15b0e93b45561adb59a7",
+  "rows": 5,
+  "rules": {}
+ },
+ "Sysmon_UACME_45.evtx": {
+  "flagged": 0,
+  "md5": "c8cce2f36d9a77d70415fb96251f9999",
+  "rows": 8,
+  "rules": {}
+ },
+ "Sysmon_UACME_53.evtx": {
+  "flagged": 0,
+  "md5": "3d0588c7c389090d66a8d4297a6b208b",
+  "rows": 14,
+  "rules": {}
+ },
+ "Sysmon_UACME_54.evtx": {
+  "flagged": 0,
+  "md5": "01755be698814618b0d9a91f94509e3b",
+  "rows": 10,
+  "rules": {}
+ },
+ "Sysmon_UACME_56.evtx": {
+  "flagged": 0,
+  "md5": "ef8b8467195c09f0bc396fe7219b8c26",
+  "rows": 15,
+  "rules": {}
+ },
+ "Sysmon_UACME_63.evtx": {
+  "flagged": 0,
+  "md5": "fdbd91358515cc30433d8402d899183c",
+  "rows": 3,
+  "rules": {}
+ },
+ "Sysmon_UACME_64.evtx": {
+  "flagged": 0,
+  "md5": "47995423a9204ebef016cb05006c4a98",
+  "rows": 530,
+  "rules": {}
+ },
+ "Sysmon_meterpreter_ReflectivePEInjection_to_notepad_.evtx": {
+  "flagged": 0,
+  "md5": "6493efcd19d54e3700ce40a88f8c600b",
+  "rows": 13,
+  "rules": {}
+ },
+ "Sysmon_uacme_58.evtx": {
+  "flagged": 0,
+  "md5": "40fbf2a0513cd6c0be4f07cf6903e86e",
+  "rows": 6,
+  "rules": {}
+ },
+ "System_7045_namedpipe_privesc.evtx": {
+  "flagged": 0,
+  "md5": "015133c9482d3733199cde12e1175fa0",
+  "rows": 1,
+  "rules": {}
+ },
+ "Tunna_rdp_tunnel_IIS.log": {
+  "flagged": 0,
+  "md5": "50addaa07d75e556e1c56ace54ad048b",
+  "rows": 0,
+  "rules": {}
+ },
+ "UACME_59_Sysmon.evtx": {
+  "flagged": 0,
+  "md5": "86adc8086af8e695672d8a044909e335",
+  "rows": 7,
+  "rules": {}
+ },
+ "UACME_61_Changepk.evtx": {
+  "flagged": 0,
+  "md5": "fd398f2a5175e7b545b47ccd4be25ee7",
+  "rows": 2,
+  "rules": {}
+ },
+ "WinDefender_Events_1117_1116_AtomicRedTeam.evtx": {
+  "flagged": 0,
+  "md5": "83ac4a5940fc446913cbae613d85b900",
+  "rows": 11,
+  "rules": {}
+ },
+ "Win_4985_T1186_Process_Doppelganging.evtx": {
+  "flagged": 0,
+  "md5": "3e5b8be74f7059c25d5cccf6d496581d",
+  "rows": 2,
+  "rules": {}
+ },
+ "Zerologon_CVE-2020-1472_DFIR_System_NetLogon_Error_EventID_5805.evtx": {
+  "flagged": 0,
+  "md5": "d7aea8552eeb2d4b1c17fd0ea363953d",
+  "rows": 2,
+  "rules": {}
+ },
+ "Zerologon_VoidSec_CVE-2020-1472_4626_LT3_Anonym_follwedby_4742_DC_Anony_DC.evtx": {
+  "flagged": 0,
+  "md5": "1b50a25a501bcfffa5b590c54cc08d9b",
+  "rows": 9,
+  "rules": {}
+ },
  "_root_nohup_tmpesxi_encryptor_qpby.txt": {
   "flagged": 0,
   "md5": "2c308ed9b4c18f2d42bf50ca36befa27",
@@ -66,6 +828,12 @@
   "flagged": 0,
   "md5": "f523560b5833fcfae2ae078710e38a89",
   "rows": 95,
+  "rules": {}
+ },
+ "apt10_jjs_sideloading_prochollowing_persist_as_service_sysmon_1_7_8_13.evtx": {
+  "flagged": 0,
+  "md5": "21a16b8754da1dccbf0e63c285581c22",
+  "rows": 11,
   "rules": {}
  },
  "auth.log": {
@@ -93,6 +861,18 @@
    "R2009": 31
   }
  },
+ "babyshark_mimikatz_powershell.evtx": {
+  "flagged": 0,
+  "md5": "bae10055162921bb5516f9811e46ca27",
+  "rows": 33,
+  "rules": {}
+ },
+ "bits_openvpn.evtx": {
+  "flagged": 0,
+  "md5": "7a9ac6cfa9532f800e1e8a4cf0dc2ab0",
+  "rows": 1537,
+  "rules": {}
+ },
  "cisco_asa_generic_logs.log": {
   "flagged": 0,
   "md5": "1d8821048c088628f945d34d8fc04062",
@@ -111,10 +891,118 @@
   "rows": 0,
   "rules": {}
  },
+ "dc_applog_ntdsutil_dfir_325_326_327.evtx": {
+  "flagged": 0,
+  "md5": "09b12a91b6c469fe1d487b697d79d20c",
+  "rows": 4,
+  "rules": {}
+ },
+ "de_PsScriptBlockLogging_disabled_sysmon12_13.evtx": {
+  "flagged": 0,
+  "md5": "5ac026e6c8c43626e7b5803988e62f43",
+  "rows": 2,
+  "rules": {}
+ },
+ "de_hiding_files_via_attrib_cmdlet.evtx": {
+  "flagged": 0,
+  "md5": "177dc2f7fc8d0102ef875eb8fba07d32",
+  "rows": 1,
+  "rules": {}
+ },
+ "de_portforward_netsh_rdp_sysmon_13_1.evtx": {
+  "flagged": 0,
+  "md5": "1e06a48bbad7982f9852b186fa3f1af0",
+  "rows": 3,
+  "rules": {}
+ },
+ "de_powershell_execpolicy_changed_sysmon_13.evtx": {
+  "flagged": 0,
+  "md5": "b8dc837f041eab2350d5994538cabe5b",
+  "rows": 5,
+  "rules": {}
+ },
+ "de_sysmon_13_VBA_Security_AccessVBOM.evtx": {
+  "flagged": 0,
+  "md5": "932e8d3fa9e1738eec60f4b35aa79eed",
+  "rows": 1,
+  "rules": {}
+ },
+ "de_unmanagedpowershell_psinject_sysmon_7_8_10.evtx": {
+  "flagged": 0,
+  "md5": "fe2babcb7f9baee8e0b85b584f1c0aa5",
+  "rows": 84,
+  "rules": {}
+ },
+ "dfir_rdpsharp_target_RdpCoreTs_168_68_131.evtx": {
+  "flagged": 0,
+  "md5": "d1dc36bff4ea06797eea6452b5189916",
+  "rows": 40,
+  "rules": {}
+ },
  "dhclient.log": {
   "flagged": 0,
   "md5": "f7041cae6fb5a6e84f6d9fca58b42c57",
   "rows": 0,
+  "rules": {}
+ },
+ "dicovery_4661_net_group_domain_admins_target.evtx": {
+  "flagged": 0,
+  "md5": "d6579a744c4ef45a0c547dda91a1a296",
+  "rows": 63,
+  "rules": {}
+ },
+ "discovery_UEFI_Settings_rweverything_sysmon_6.evtx": {
+  "flagged": 0,
+  "md5": "357574786f5c6f4f2364bc0a39a920fc",
+  "rows": 1,
+  "rules": {}
+ },
+ "discovery_bloodhound.evtx": {
+  "flagged": 0,
+  "md5": "5d7fcba0cbb0a1d688f1fd791b73386e",
+  "rows": 10,
+  "rules": {}
+ },
+ "discovery_enum_shares_target_sysmon_3_18.evtx": {
+  "flagged": 0,
+  "md5": "cd452b37fa1742a320190997b5de8af1",
+  "rows": 4,
+  "rules": {}
+ },
+ "discovery_local_user_or_group_windows_security_4799_4798.evtx": {
+  "flagged": 0,
+  "md5": "460015d4c34c82ddd9defc7eb374e022",
+  "rows": 3,
+  "rules": {}
+ },
+ "discovery_meterpreter_ps_cmd_process_listing_sysmon_10.evtx": {
+  "flagged": 0,
+  "md5": "247b44a2533ffcde754588e6c2f4cea5",
+  "rows": 52,
+  "rules": {}
+ },
+ "discovery_psloggedon.evtx": {
+  "flagged": 0,
+  "md5": "2a2ac935f72a78fca0b8d4dcd39e4a0e",
+  "rows": 4,
+  "rules": {}
+ },
+ "discovery_sysmon_18_Invoke_UserHunter_NetSessionEnum_DC-srvsvc.evtx": {
+  "flagged": 0,
+  "md5": "6fe1297eac3008768653154e82f0ea1c",
+  "rows": 1,
+  "rules": {}
+ },
+ "discovery_sysmon_1_iis_pwd_and_config_discovery_appcmd.evtx": {
+  "flagged": 0,
+  "md5": "ff30095450f37c5aa11eda668bbf50d9",
+  "rows": 40,
+  "rules": {}
+ },
+ "discovery_sysmon_3_Invoke_UserHunter_SourceMachine.evtx": {
+  "flagged": 0,
+  "md5": "f78d27beed121204d407b41d20e929ca",
+  "rows": 9,
   "rules": {}
  },
  "dst10-8-2-37.csv": {
@@ -131,10 +1019,46 @@
   "rows": 11969,
   "rules": {}
  },
+ "eop_appcontainer_il_broker_filewrite.evtx": {
+  "flagged": 0,
+  "md5": "2dc66bee3e582babf3163eed438ec3a0",
+  "rows": 3,
+  "rules": {}
+ },
  "esxupdate.log": {
   "flagged": 0,
   "md5": "e922cb2679c93ce8c6433f100369bd20",
   "rows": 0,
+  "rules": {}
+ },
+ "etw_rpc_zerologon.evtx": {
+  "flagged": 0,
+  "md5": "3263b1e61a5918748a6399bcccd647cf",
+  "rows": 415,
+  "rules": {}
+ },
+ "evasion_codeinj_odzhan_conhost_sysmon_10_1.evtx": {
+  "flagged": 0,
+  "md5": "d912ae66efed41a90cc48cca1ba43bb4",
+  "rows": 4,
+  "rules": {}
+ },
+ "evasion_codeinj_odzhan_spoolsv_sysmon_10_1.evtx": {
+  "flagged": 0,
+  "md5": "4c31ff9fad088f0bebc26333d043f218",
+  "rows": 4,
+  "rules": {}
+ },
+ "evasion_execution_imageload_wuauclt_lolbas.evtx": {
+  "flagged": 0,
+  "md5": "641e4b0c4cd9690754455446d353e382",
+  "rows": 3,
+  "rules": {}
+ },
+ "evasion_persis_hidden_run_keyvalue_sysmon_13.evtx": {
+  "flagged": 0,
+  "md5": "82350f689ef2f9f96e8c605fb7450afa",
+  "rows": 1,
   "rules": {}
  },
  "eventlog-analyzer-search-export.csv": {
@@ -144,6 +1068,144 @@
   "rules": {
    "R3001": 2
   }
+ },
+ "evtx_data.csv": {
+  "flagged": 0,
+  "md5": "f74ce83f220d5db823d1dd040170e8a4",
+  "rows": 0,
+  "rules": {}
+ },
+ "exec_driveby_cve-2018-15982_sysmon_1_10.evtx": {
+  "flagged": 0,
+  "md5": "4ee0fe59179776a64d05f1d56e191e26",
+  "rows": 2,
+  "rules": {}
+ },
+ "exec_emotet_ps_4104.evtx": {
+  "flagged": 0,
+  "md5": "86f46e3459f19d440e480ee2f3c1a545",
+  "rows": 1,
+  "rules": {}
+ },
+ "exec_emotet_ps_800_get-item.evtx": {
+  "flagged": 0,
+  "md5": "1bb9888b29c771431de85ddd76faf1df",
+  "rows": 1,
+  "rules": {}
+ },
+ "exec_emotet_ps_800_invoke-item.evtx": {
+  "flagged": 0,
+  "md5": "8753ca018a027b82460da3735de28e20",
+  "rows": 1,
+  "rules": {}
+ },
+ "exec_emotet_ps_800_new-item.evtx": {
+  "flagged": 0,
+  "md5": "8a9ba4925247a19e6a6af79ec3bb0d1a",
+  "rows": 1,
+  "rules": {}
+ },
+ "exec_emotet_ps_800_new-object.evtx": {
+  "flagged": 0,
+  "md5": "6fccb6d298d03c051cc206421602e926",
+  "rows": 1,
+  "rules": {}
+ },
+ "exec_emotet_sysmon_1.evtx": {
+  "flagged": 0,
+  "md5": "c3a11fb29de8b1bfea10073a7f741917",
+  "rows": 1,
+  "rules": {}
+ },
+ "exec_msxsl_xsl_sysmon_1_7.evtx": {
+  "flagged": 0,
+  "md5": "1b328dfe73dd9747ba921414c5947068",
+  "rows": 3,
+  "rules": {}
+ },
+ "exec_persist_rundll32_mshta_scheduledtask_sysmon_1_3_11.evtx": {
+  "flagged": 0,
+  "md5": "d3e8f074d8c6266b9199ab5b4e03124c",
+  "rows": 8,
+  "rules": {}
+ },
+ "exec_sysmon_1_11_lolbin_rundll32_openurl_FileProtocolHandler.evtx": {
+  "flagged": 0,
+  "md5": "1c76586d7edfe55775a324fbfd4345b3",
+  "rows": 11,
+  "rules": {}
+ },
+ "exec_sysmon_1_11_lolbin_rundll32_shdocvw_openurl.evtx": {
+  "flagged": 0,
+  "md5": "c38dcaaf94009addee942cb4d999a551",
+  "rows": 6,
+  "rules": {}
+ },
+ "exec_sysmon_1_11_lolbin_rundll32_zipfldr_RouteTheCall.evtx": {
+  "flagged": 0,
+  "md5": "d38785f694aeb2a07c00a39128ecdf90",
+  "rows": 2,
+  "rules": {}
+ },
+ "exec_sysmon_1_7_jscript9_defense_evasion.evtx": {
+  "flagged": 0,
+  "md5": "0f5f30f580d89975a97e575f921d86f6",
+  "rows": 3,
+  "rules": {}
+ },
+ "exec_sysmon_1_ftp.evtx": {
+  "flagged": 0,
+  "md5": "ccc52d03dd18161e607039a70c44716c",
+  "rows": 4,
+  "rules": {}
+ },
+ "exec_sysmon_1_lolbin_pcalua.evtx": {
+  "flagged": 0,
+  "md5": "d556baa022ba4a13d91da6305b399ce8",
+  "rows": 3,
+  "rules": {}
+ },
+ "exec_sysmon_1_lolbin_renamed_regsvr32_scrobj.evtx": {
+  "flagged": 0,
+  "md5": "4cb23280435a84867ec93adfac491e1c",
+  "rows": 2,
+  "rules": {}
+ },
+ "exec_sysmon_1_lolbin_rundll32_advpack_RegisterOCX.evtx": {
+  "flagged": 0,
+  "md5": "ea1294fdaf1013270e14bd9e9fe3d447",
+  "rows": 2,
+  "rules": {}
+ },
+ "exec_sysmon_1_rundll32_pcwutl_LaunchApplication.evtx": {
+  "flagged": 0,
+  "md5": "2cc3fc58578662bed716b07f9d17a5bd",
+  "rows": 1,
+  "rules": {}
+ },
+ "exec_sysmon_lobin_regsvr32_sct.evtx": {
+  "flagged": 0,
+  "md5": "6f5ee2b7f59e9bd838b89ab8f98fa695",
+  "rows": 3,
+  "rules": {}
+ },
+ "exec_wmic_xsl_internet_sysmon_3_1_11.evtx": {
+  "flagged": 0,
+  "md5": "efbd1421c33144cdb772af9471599cb5",
+  "rows": 8,
+  "rules": {}
+ },
+ "execution_evasion_visual_studio_prebuild_event.evtx": {
+  "flagged": 0,
+  "md5": "5def2204a77d39eb776f57df7df3b525",
+  "rows": 29,
+  "rules": {}
+ },
+ "faxhell_sysmon_7_1_18_3_bindshell_dllhijack.evtx": {
+  "flagged": 0,
+  "md5": "4b5e4d9cc294f4f62618e8e486cef038",
+  "rows": 10,
+  "rules": {}
  },
  "fdm.log": {
   "flagged": 0,
@@ -169,10 +1231,34 @@
   "rows": 0,
   "rules": {}
  },
+ "kerberos_pwd_spray_4771.evtx": {
+  "flagged": 0,
+  "md5": "82d715de876f66f9cec81aac124d83e2",
+  "rows": 12,
+  "rules": {}
+ },
  "lacp.log": {
   "flagged": 0,
   "md5": "30b4501b520d681d2117d647bfea8786",
   "rows": 0,
+  "rules": {}
+ },
+ "lateral_movement_startup_3_11.evtx": {
+  "flagged": 0,
+  "md5": "1f4923398ae495a3a5623c9287080234",
+  "rows": 2,
+  "rules": {}
+ },
+ "lm_remote_registry_sysmon_1_13_3.evtx": {
+  "flagged": 0,
+  "md5": "408212c9becc8fa1cb608c28eb47430b",
+  "rows": 4,
+  "rules": {}
+ },
+ "lm_sysmon_18_remshell_over_namedpipe.evtx": {
+  "flagged": 0,
+  "md5": "4c99d62bdabf3fbcf4c8965bec59ac03",
+  "rows": 7,
   "rules": {}
  },
  "log.csv": {
@@ -392,6 +1478,30 @@
   "rows": 97,
   "rules": {}
  },
+ "maldoc_mshta_via_shellbrowserwind_rundll32.evtx": {
+  "flagged": 0,
+  "md5": "32453bd3afa853a96ef172b102d550d3",
+  "rows": 11,
+  "rules": {}
+ },
+ "meterpreter_migrate_to_explorer_sysmon_8.evtx": {
+  "flagged": 0,
+  "md5": "0ea6204c3fc88ba31776497d5a58e989",
+  "rows": 1,
+  "rules": {}
+ },
+ "net_share_drive_5142.evtx": {
+  "flagged": 0,
+  "md5": "a51d35dd5e9c87de78b74145b7a9a857",
+  "rows": 2,
+  "rules": {}
+ },
+ "netlogon_log_CVE-2020-1472_ZeroLogon.txt": {
+  "flagged": 0,
+  "md5": "27a4e2c2496b1b3f05fbd92c9745d91b",
+  "rows": 0,
+  "rules": {}
+ },
  "nightfall-auth.log": {
   "flagged": 12,
   "md5": "8f27bc39aa9b21498601f0595a262ad8",
@@ -436,10 +1546,226 @@
    "R3002": 1
   }
  },
+ "panache_sysmon_vs_EDRTestingScript.evtx": {
+  "flagged": 0,
+  "md5": "63339e2428faf52e563f575c8362b30b",
+  "rows": 122,
+  "rules": {}
+ },
+ "persist_bitsadmin_Microsoft-Windows-Bits-Client-Operational.evtx": {
+  "flagged": 0,
+  "md5": "3313cd0bb0a5face04a0271ac2b941ad",
+  "rows": 6,
+  "rules": {}
+ },
+ "persist_firefox_comhijack_sysmon_11_13_7_1.evtx": {
+  "flagged": 0,
+  "md5": "3dc2e1d50d20cfb3d571e927a5194fd9",
+  "rows": 19,
+  "rules": {}
+ },
+ "persist_turla_outlook_backdoor_comhijack.evtx": {
+  "flagged": 0,
+  "md5": "5656ab58b05c41f9e50f77ad7ed886c5",
+  "rows": 3,
+  "rules": {}
+ },
+ "persist_valid_account_guest_rid_hijack.evtx": {
+  "flagged": 0,
+  "md5": "3cc154761dfc18762e0298a9a6822696",
+  "rows": 4,
+  "rules": {}
+ },
+ "persistence_SilentProcessExit_ImageHijack_sysmon_13_1.evtx": {
+  "flagged": 0,
+  "md5": "7a5942d00a3b0771e58b9c729056e1b1",
+  "rows": 13,
+  "rules": {}
+ },
+ "persistence_accessibility_features_osk_sysmon1.evtx": {
+  "flagged": 0,
+  "md5": "4aededb78553804ae5ef0d4dd42ccf01",
+  "rows": 3,
+  "rules": {}
+ },
+ "persistence_hidden_local_account_sysmon.evtx": {
+  "flagged": 0,
+  "md5": "bba715b95825a947e39c7febd11ce07e",
+  "rows": 1,
+  "rules": {}
+ },
+ "persistence_pendingGPO_sysmon_13.evtx": {
+  "flagged": 0,
+  "md5": "306a1ae3cc31dbe2068feec68a991688",
+  "rows": 4,
+  "rules": {}
+ },
+ "persistence_security_dcshadow_4742.evtx": {
+  "flagged": 0,
+  "md5": "d33a8b638417b980cd9076c245e591c5",
+  "rows": 10,
+  "rules": {}
+ },
+ "persistence_startup_UserShellStartup_Folder_Changed_sysmon_13.evtx": {
+  "flagged": 0,
+  "md5": "34f362d064b94cd56428a75424cd9790",
+  "rows": 1,
+  "rules": {}
+ },
+ "persistence_sysmon_11_13_1_shime_appfix.evtx": {
+  "flagged": 0,
+  "md5": "b23944dd6af3aa29ce4513264f950cd4",
+  "rows": 237,
+  "rules": {}
+ },
+ "phish_windows_credentials_powershell_scriptblockLog_4104.evtx": {
+  "flagged": 0,
+  "md5": "aeef1e25b9ec43808e8fa37d2f078cc5",
+  "rows": 2,
+  "rules": {}
+ },
+ "powercat_revShell_sysmon_1_3.evtx": {
+  "flagged": 0,
+  "md5": "c331a01474a4a4587471981a739452d3",
+  "rows": 9,
+  "rules": {}
+ },
+ "ppl_bypass_ppldump_knowdll_hijack_sysmon_security.evtx": {
+  "flagged": 0,
+  "md5": "9bb7d22e432d2cefd497459a3f31148b",
+  "rows": 20,
+  "rules": {}
+ },
+ "privesc_KrbRelayUp_windows_4624.evtx": {
+  "flagged": 0,
+  "md5": "bb069ea6f207a0a2f36c372ca83273cb",
+  "rows": 1,
+  "rules": {}
+ },
+ "privesc_registry_symlink_CVE-2020-1377.evtx": {
+  "flagged": 0,
+  "md5": "1004f9a1ce3e46618126477fa7cc8763",
+  "rows": 30,
+  "rules": {}
+ },
+ "privesc_roguepotato_sysmon_17_18.evtx": {
+  "flagged": 0,
+  "md5": "2efd5ddb1df8710ab7706332b687e435",
+  "rows": 6,
+  "rules": {}
+ },
+ "privesc_rotten_potato_from_webshell_metasploit_sysmon_1_8_3.evtx": {
+  "flagged": 0,
+  "md5": "9da3daaa6ff4421d91153df022e036cb",
+  "rows": 13,
+  "rules": {}
+ },
+ "privesc_seimpersonate_tosys_spoolsv_sysmon_17_18.evtx": {
+  "flagged": 0,
+  "md5": "95a409e82c2f873ecaa765404d4a1036",
+  "rows": 7,
+  "rules": {}
+ },
+ "privesc_spoolfool_mahdihtm_sysmon_1_11_7_13.evtx": {
+  "flagged": 0,
+  "md5": "1ac9d1ae05d8fe81984b3467dc462bd8",
+  "rows": 4,
+  "rules": {}
+ },
+ "privesc_spoolsv_spl_file_write_sysmon11.evtx": {
+  "flagged": 0,
+  "md5": "add8f317d598059e057e0ab9ea36ffd0",
+  "rows": 37,
+  "rules": {}
+ },
+ "privesc_sysmon_cve_20201030_spooler.evtx": {
+  "flagged": 0,
+  "md5": "7446c77a19495a3194ebc23a37825b4b",
+  "rows": 8,
+  "rules": {}
+ },
+ "privesc_unquoted_svc_sysmon_1_11.evtx": {
+  "flagged": 0,
+  "md5": "0ae09d6c275cef76f678359807fa6bf9",
+  "rows": 87,
+  "rules": {}
+ },
+ "privexchange_dirkjan.evtx": {
+  "flagged": 0,
+  "md5": "0ee83bb0cb042b1d33634ad130ae3d94",
+  "rows": 8,
+  "rules": {}
+ },
+ "process_suspend_sysmon_10_ga_800.evtx": {
+  "flagged": 0,
+  "md5": "e5463f86c7b05f88c842e36ce5187c54",
+  "rows": 1,
+  "rules": {}
+ },
+ "rdpcorets_148_mst120_bluekeep_rpdscan_full.evtx": {
+  "flagged": 0,
+  "md5": "29d1b88c44768aa119bd62337fa66e99",
+  "rows": 733,
+  "rules": {}
+ },
+ "remote_file_copy_system_proc_file_write_sysmon_11.evtx": {
+  "flagged": 0,
+  "md5": "b8a578bd2eb8af8458d7e3104eb0f4c0",
+  "rows": 2,
+  "rules": {}
+ },
+ "remote_pwd_reset_rpc_mimikatz_postzerologon_target_DC.evtx": {
+  "flagged": 0,
+  "md5": "983c504efae48afc7feedf157388a683",
+  "rows": 7,
+  "rules": {}
+ },
+ "remote_sam_registry_access_via_backup_operator_priv.evtx": {
+  "flagged": 0,
+  "md5": "235ee2ed17f4885eb97012a04a0fbe60",
+  "rows": 31,
+  "rules": {}
+ },
+ "remote_task_update_4624_4702_same_logonid.evtx": {
+  "flagged": 0,
+  "md5": "80bdff42afc0f82f044926335f5cf385",
+  "rows": 8,
+  "rules": {}
+ },
+ "revshell_cmd_svchost_sysmon_1.evtx": {
+  "flagged": 0,
+  "md5": "69e620f80808b6a5eb82962b8f65161e",
+  "rows": 4,
+  "rules": {}
+ },
  "rhttpproxy.log": {
   "flagged": 0,
   "md5": "c74a6720f91ef649dfb76ad0310c9b82",
   "rows": 0,
+  "rules": {}
+ },
+ "rogue_msi_url_1040_1042.evtx": {
+  "flagged": 0,
+  "md5": "92c2e38e2ccb6f94120c44db2f6e61b9",
+  "rows": 351,
+  "rules": {}
+ },
+ "rundll32_cmd_schtask.evtx": {
+  "flagged": 0,
+  "md5": "46642abfda17eda9a0dc8f8f51678b59",
+  "rows": 50,
+  "rules": {}
+ },
+ "rundll32_hollowing_wermgr_masquerading.evtx": {
+  "flagged": 0,
+  "md5": "67edcbd48b2b0f191af10861c2eb1770",
+  "rows": 4,
+  "rules": {}
+ },
+ "samaccount_spoofing_CVE-2021-42287_CVE-2021-42278_DC_securitylogs.evtx": {
+  "flagged": 0,
+  "md5": "c04aa1ab9f64a7cda1b77f943bc2213b",
+  "rows": 18,
   "rules": {}
  },
  "sdrsinjector.log": {
@@ -448,10 +1774,64 @@
   "rows": 0,
   "rules": {}
  },
+ "security_4624_4673_token_manip.evtx": {
+  "flagged": 0,
+  "md5": "36987d8cfa7b1cecee6ce96c9eaf926c",
+  "rows": 14,
+  "rules": {}
+ },
+ "settings.json": {
+  "flagged": 0,
+  "md5": "d1f53e1fefa022323e86ecc20f36a3bd",
+  "rows": 0,
+  "rules": {}
+ },
+ "sharprdp_sysmon_7_mstscax.dll.evtx": {
+  "flagged": 0,
+  "md5": "ea14c4456de692df337cd203ddfdb7d8",
+  "rows": 4,
+  "rules": {}
+ },
  "shell.log": {
   "flagged": 0,
   "md5": "f8785a8225859703fb3239af8de20d36",
   "rows": 185,
+  "rules": {}
+ },
+ "sideloading_injection_persistence_run_key.evtx": {
+  "flagged": 0,
+  "md5": "f377a1724433fd3da2f4792429618640",
+  "rows": 7,
+  "rules": {}
+ },
+ "sideloading_uacbypass_rundll32_injection_c2.evtx": {
+  "flagged": 0,
+  "md5": "dfce60bcda5f8dcd8fe4d28801a15f5b",
+  "rows": 18,
+  "rules": {}
+ },
+ "sideloading_wwlib_sysmon_7_1_11.evtx": {
+  "flagged": 0,
+  "md5": "17fe1827d9741168f45857c03719b531",
+  "rows": 7,
+  "rules": {}
+ },
+ "smb_bi_auth_conn_spoolsample.evtx": {
+  "flagged": 0,
+  "md5": "29feb797504d810af0ec6eac5297f487",
+  "rows": 2,
+  "rules": {}
+ },
+ "smbmap_upload_exec_sysmon.evtx": {
+  "flagged": 0,
+  "md5": "8bd5b7b99da00c25bc9fade23721245f",
+  "rows": 27,
+  "rules": {}
+ },
+ "spoolsample_5145.evtx": {
+  "flagged": 0,
+  "md5": "10555d6e38c35ee9b1828c55bb3c433d",
+  "rows": 1,
   "rules": {}
  },
  "src10-8-2-37.csv": {
@@ -477,6 +1857,18 @@
   "rows": 0,
   "rules": {}
  },
+ "susp_explorer_exec.evtx": {
+  "flagged": 0,
+  "md5": "e4f22a1a3288bf45c7766c2f64725196",
+  "rows": 3,
+  "rules": {}
+ },
+ "susp_explorer_exec_root_cmdline__rimpq__CyberRaiju.evtx": {
+  "flagged": 0,
+  "md5": "68e3de47042227777c983ed8f36d597b",
+  "rows": 10,
+  "rules": {}
+ },
  "sysboot.log": {
   "flagged": 0,
   "md5": "7aa6e194676cc3dc5475e9a115d7291c",
@@ -487,6 +1879,288 @@
   "flagged": 0,
   "md5": "27fca3ffb04fa1a1bb71c14d58854705",
   "rows": 0,
+  "rules": {}
+ },
+ "sysmon17_18_kekeo_tsssp_default_np.evtx": {
+  "flagged": 0,
+  "md5": "25f2c10d8800155a3aa410b5883764a9",
+  "rows": 3,
+  "rules": {}
+ },
+ "sysmon_10_11_lsass_memdump.evtx": {
+  "flagged": 0,
+  "md5": "85f213a960a5b9443474336665305234",
+  "rows": 4,
+  "rules": {}
+ },
+ "sysmon_10_11_outlfank_dumpert_and_andrewspecial_memdump.evtx": {
+  "flagged": 0,
+  "md5": "eb0d195506b400c6f07822a8ccc76109",
+  "rows": 15,
+  "rules": {}
+ },
+ "sysmon_10_1_memdump_comsvcs_minidump.evtx": {
+  "flagged": 0,
+  "md5": "8c7242bc60a0fdbfaffb9b2188416c15",
+  "rows": 6,
+  "rules": {}
+ },
+ "sysmon_10_1_ppid_spoofing.evtx": {
+  "flagged": 0,
+  "md5": "ff0ab1fbca2f927803f239f30e521162",
+  "rows": 5,
+  "rules": {}
+ },
+ "sysmon_10_lsass_mimikatz_sekurlsa_logonpasswords.evtx": {
+  "flagged": 0,
+  "md5": "8b86373364e09b77b69ab1e4de05f359",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon_11_1_15_WScriptBypassUAC.evtx": {
+  "flagged": 0,
+  "md5": "ab1597a3276cb5516662c031c132e499",
+  "rows": 15,
+  "rules": {}
+ },
+ "sysmon_11_1_7_uacbypass_cliconfg.evtx": {
+  "flagged": 0,
+  "md5": "70ec5bc426007e973364309cd90fd597",
+  "rows": 8,
+  "rules": {}
+ },
+ "sysmon_11_1_lolbas_downldr_desktopimgdownldr.evtx": {
+  "flagged": 0,
+  "md5": "abb667e32c0656ddeb701750c232ae51",
+  "rows": 3,
+  "rules": {}
+ },
+ "sysmon_11_7_1_uacbypass_windirectory_mocking.evtx": {
+  "flagged": 0,
+  "md5": "6ab3a4301976c7a4f10f8ccdcdc431de",
+  "rows": 10,
+  "rules": {}
+ },
+ "sysmon_13_1_12_11_perfmonUACBypass.evtx": {
+  "flagged": 0,
+  "md5": "529e9fdbfd7973adb3569061ed4bcf63",
+  "rows": 5,
+  "rules": {}
+ },
+ "sysmon_13_1_compmgmtlauncherUACBypass.evtx": {
+  "flagged": 0,
+  "md5": "3317d89269d48c851550b02932ce4f7f",
+  "rows": 4,
+  "rules": {}
+ },
+ "sysmon_13_1_meterpreter_getsystem_NamedPipeImpersonation.evtx": {
+  "flagged": 0,
+  "md5": "dcd47568b35d3cb247af2509369815b5",
+  "rows": 4,
+  "rules": {}
+ },
+ "sysmon_13_1_persistence_via_winlogon_shell.evtx": {
+  "flagged": 0,
+  "md5": "b60c0f5d4736fadf212ee152f8232849",
+  "rows": 25,
+  "rules": {}
+ },
+ "sysmon_13_keylogger_directx.evtx": {
+  "flagged": 0,
+  "md5": "e05ace79bab67f15f90e4d0c31bcf706",
+  "rows": 6,
+  "rules": {}
+ },
+ "sysmon_13_rdp_settings_tampering.evtx": {
+  "flagged": 0,
+  "md5": "2d1b3629157dcb3ca06055725ab94f2f",
+  "rows": 20,
+  "rules": {}
+ },
+ "sysmon_1_11_exec_as_system_via_schedtask.evtx": {
+  "flagged": 0,
+  "md5": "6ddef5654c7afd2575c64f736a2250f6",
+  "rows": 6,
+  "rules": {}
+ },
+ "sysmon_1_11_rundll32_cpl_ostap.evtx": {
+  "flagged": 0,
+  "md5": "1e5c367fca8926dfc3245a4865f06ebd",
+  "rows": 5,
+  "rules": {}
+ },
+ "sysmon_1_13_11_cmstp_ini_uacbypass.evtx": {
+  "flagged": 0,
+  "md5": "653430ce2c2374de7cf6e8fbf997102f",
+  "rows": 5,
+  "rules": {}
+ },
+ "sysmon_1_13_UACBypass_AppPath_Control.evtx": {
+  "flagged": 0,
+  "md5": "9910b1eaad2096f90fe84efe7f312a8a",
+  "rows": 3,
+  "rules": {}
+ },
+ "sysmon_1_7_11_mcx2prov_uacbypass.evtx": {
+  "flagged": 0,
+  "md5": "41e1e4f0a1fe3457783f18ebbfa25554",
+  "rows": 9,
+  "rules": {}
+ },
+ "sysmon_1_7_11_migwiz.evtx": {
+  "flagged": 0,
+  "md5": "fbc1f37731f132583b74ae2594b88530",
+  "rows": 7,
+  "rules": {}
+ },
+ "sysmon_1_7_11_sysprep_uacbypass.evtx": {
+  "flagged": 0,
+  "md5": "5067fcc29c15f3160140c490d33aebf6",
+  "rows": 7,
+  "rules": {}
+ },
+ "sysmon_1_7_elevate_uacbypass_sysprep.evtx": {
+  "flagged": 0,
+  "md5": "f1ce1f2e1314ec3c475045ca4d7f4ce1",
+  "rows": 15,
+  "rules": {}
+ },
+ "sysmon_1_exec_via_sql_xpcmdshell.evtx": {
+  "flagged": 0,
+  "md5": "3670210b0288dbe68e4a7c2b71feaf04",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon_1_persist_bitsjob_SetNotifyCmdLine.evtx": {
+  "flagged": 0,
+  "md5": "4865e034babe833d7f935e830afa23ef",
+  "rows": 6,
+  "rules": {}
+ },
+ "sysmon_1_smss_child_proc_bootexecute_setupexecute.evtx": {
+  "flagged": 0,
+  "md5": "92f298b29f860beb974ea895b5d922f7",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon_20_21_1_CommandLineEventConsumer.evtx": {
+  "flagged": 0,
+  "md5": "abb1fb619dec81f33242fb1f4778b9d7",
+  "rows": 17,
+  "rules": {}
+ },
+ "sysmon_2_11_evasion_timestomp_MACE.evtx": {
+  "flagged": 0,
+  "md5": "df0533b4bd17824cf6402b57f2299a95",
+  "rows": 2,
+  "rules": {}
+ },
+ "sysmon_2x10_lsass_with_different_pid_RtlCreateProcessReflection.evtx": {
+  "flagged": 0,
+  "md5": "d6e2ce7c5a25fded9b20154fb44012ef",
+  "rows": 3,
+  "rules": {}
+ },
+ "sysmon_3_10_Invoke-Mimikatz_hosted_Github.evtx": {
+  "flagged": 0,
+  "md5": "16c7b3f29a674627498dba833b5c991a",
+  "rows": 2,
+  "rules": {}
+ },
+ "sysmon_exec_from_vss_persistence.evtx": {
+  "flagged": 0,
+  "md5": "398f888017b19aa0031c97a0331d406a",
+  "rows": 17,
+  "rules": {}
+ },
+ "sysmon_local_account_creation_and_added_admingroup_12_13.evtx": {
+  "flagged": 0,
+  "md5": "c2efeb9a23e0ad46e3fd75b3a9265899",
+  "rows": 17,
+  "rules": {}
+ },
+ "sysmon_lolbas_rundll32_zipfldr_routethecall_shell.evtx": {
+  "flagged": 0,
+  "md5": "7e1828942603d9702c779ace95ac8131",
+  "rows": 2,
+  "rules": {}
+ },
+ "sysmon_lolbin_bohops_vshadow_exec.evtx": {
+  "flagged": 0,
+  "md5": "6ade83c5299d09a778a58eb20d0a113b",
+  "rows": 6,
+  "rules": {}
+ },
+ "sysmon_mshta_sharpshooter_stageless_meterpreter.evtx": {
+  "flagged": 0,
+  "md5": "9fb970ca582b2b86d6ddf12f552ff324",
+  "rows": 3,
+  "rules": {}
+ },
+ "sysmon_privesc_from_admin_to_system_handle_inheritance.evtx": {
+  "flagged": 0,
+  "md5": "d13d5284b9adfc5ee168d8dfd5e188a4",
+  "rows": 3,
+  "rules": {}
+ },
+ "sysmon_privesc_psexec_dwell.evtx": {
+  "flagged": 0,
+  "md5": "eff671396db10b3c6c3bcfd8511c2492",
+  "rows": 12,
+  "rules": {}
+ },
+ "sysmon_rdrleakdiag_lsass_dump.evtx": {
+  "flagged": 0,
+  "md5": "8def5b510fcfee96e88806def748e463",
+  "rows": 4,
+  "rules": {}
+ },
+ "sysmon_uacbypass_CDSSync_schtask_hijack_byeintegrity5.evtx": {
+  "flagged": 0,
+  "md5": "4b0a623923793b2ca47cc83840cde285",
+  "rows": 8,
+  "rules": {}
+ },
+ "sysmon_vbs_sharpshooter_stageless_meterpreter.evtx": {
+  "flagged": 0,
+  "md5": "d7ab0eb827eec753fac21b97f408ba9f",
+  "rows": 5,
+  "rules": {}
+ },
+ "sysmon_zipexec.evtx": {
+  "flagged": 0,
+  "md5": "808934aed8ed6bbf4005647888853008",
+  "rows": 8,
+  "rules": {}
+ },
+ "temp_scheduled_task_4698_4699.evtx": {
+  "flagged": 0,
+  "md5": "0cd7b2093c852ca7259d0b87455c06be",
+  "rows": 2,
+  "rules": {}
+ },
+ "this-pc-Application.evtx": {
+  "flagged": 0,
+  "md5": "1964a00929529c54295e8635d9b540e8",
+  "rows": 46749,
+  "rules": {}
+ },
+ "this-pc-System.evtx": {
+  "flagged": 0,
+  "md5": "65c9c1eb9dc5c01efd958c9adbfc1162",
+  "rows": 43413,
+  "rules": {}
+ },
+ "tunna_iis_rdp_smb_tunneling_sysmon_3.evtx": {
+  "flagged": 0,
+  "md5": "49dcbc002201cd39f36bf91e53c766cc",
+  "rows": 12,
+  "rules": {}
+ },
+ "tutto_malseclogon.evtx": {
+  "flagged": 0,
+  "md5": "7e5e98f2099a2ae401e8981794fcff1e",
+  "rows": 15,
   "rules": {}
  },
  "usb.log": {
@@ -543,6 +2217,18 @@
   "rows": 0,
   "rules": {}
  },
+ "web_attack_and_isp_webshell_localhost_access_log.txt": {
+  "flagged": 0,
+  "md5": "f5bc5743fe8f5d89fa17be3186cdb0d6",
+  "rows": 0,
+  "rules": {}
+ },
+ "win10_4703_SeDebugPrivilege_enabled.evtx": {
+  "flagged": 0,
+  "md5": "cc83c5b25dbf9b9bd5d517bf0f235fbb",
+  "rows": 1,
+  "rules": {}
+ },
  "windows-security-xml-spray.log": {
   "flagged": 50,
   "md5": "589ecf58da9c91d05d9aca1150e8dd6d",
@@ -562,6 +2248,24 @@
   "flagged": 0,
   "md5": "3098cd8aa5a06241106f8ed274af946e",
   "rows": 40,
+  "rules": {}
+ },
+ "windows_bits_4_59_60_lolbas_desktopimgdownldr.evtx": {
+  "flagged": 0,
+  "md5": "45c9c51ca0414acb757022eb5a8baeb0",
+  "rows": 5,
+  "rules": {}
+ },
+ "wmi_remote_registry_sysmon.evtx": {
+  "flagged": 0,
+  "md5": "6e216a1800612cab94d65a22cb8e1bec",
+  "rows": 13,
+  "rules": {}
+ },
+ "wmighost_sysmon_20_21_1.evtx": {
+  "flagged": 0,
+  "md5": "22c6be2ab11c6850528e570b79495f65",
+  "rows": 4,
   "rules": {}
  }
 }

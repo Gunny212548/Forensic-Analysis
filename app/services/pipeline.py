@@ -10,9 +10,12 @@ roughly 300 rows/sec here (20k rows took 65s), while its CSV reader ingests
 the same data in well under a second. Peak memory stays flat either way.
 """
 
+import contextlib
 import csv
+import gzip
 import logging
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -402,11 +405,11 @@ def _coverage(con, start: int, written: int, mapping: dict) -> int:
     return loaded
 
 
-def _file_notes(mapping: dict, encoding: str, read_as: str | None, found: dict) -> None:
+def _file_notes(mapping: dict, encoding: str | None, read_as: str | None, found: dict) -> None:
     """What the case page should say about how the file itself was read, and
-    what it was identified as (identify.py)."""
+    what it was identified as (identify.py). A binary file has no encoding."""
     mapping["logsource"] = found
-    if encoding != "utf-8-sig":
+    if encoding and encoding != "utf-8-sig":
         mapping["encoding"] = encoding
     if read_as:
         mapping["read_as"] = read_as
@@ -433,6 +436,12 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
         # Windows event XML (W1): timeline rows and the native win_events rows.
         mapping = _ingest_winevents(con, path, start, report)
         _file_notes(mapping, parsers.detect_encoding(path), None, found)
+        return _coverage(con, start, mapping["windows"]["rows"], mapping), False, mapping
+    if found.get("profile") == winevent.EVTX_PROFILE_ID:
+        # .evtx (W2): the same rows, from records the evtx library renders.
+        with _plain_copy(path) as plain:
+            mapping = _ingest_winevents(con, plain, start, report, evtx=True)
+        _file_notes(mapping, None, None, found)
         return _coverage(con, start, mapping["windows"]["rows"], mapping), False, mapping
     encoding = parsers.detect_encoding(path)
     if found.get("profile") == checkpoint_le.PROFILE_ID:
@@ -505,29 +514,64 @@ _WIN_STAGE_COLUMNS = {
 }
 
 
-def _ingest_winevents(con, path: Path, start: int, report=_noop) -> dict:
-    """Windows event XML into raw_events (the timeline row) and win_events (the
-    event as Windows wrote it) - winevent.py. Streamed one event at a time
-    through two staging CSVs and bulk-loaded (gotcha #1). Returns the mapping."""
+@contextlib.contextmanager
+def _plain_copy(path: Path):
+    """The file itself, or a .gz decompressed into staging: an .evtx is read by
+    chunk offset, which a gzip stream cannot seek to cheaply. The upload already
+    held the decompressed size to the limit and the disk check (FR-2.2)."""
+    if not str(path).lower().endswith(".gz"):
+        yield path
+        return
+    fd, name = tempfile.mkstemp(suffix=".evtx", dir=str(_stage_dir()))
+    os.close(fd)
+    tmp = Path(name)
+    try:
+        with gzip.open(path, "rb") as src, open(tmp, "wb") as dst:
+            shutil.copyfileobj(src, dst, 1024 * 1024)
+        yield tmp
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _ingest_winevents(con, path: Path, start: int, report=_noop, evtx: bool = False) -> dict:
+    """Windows event XML, or an .evtx's records rendered as event XML, into
+    raw_events (the timeline row) and win_events (the event as Windows wrote
+    it) - winevent.py. Streamed one event at a time through two staging CSVs
+    and bulk-loaded (gotcha #1). Returns the mapping."""
     stage = []
     for _ in range(2):
         fd, name = tempfile.mkstemp(suffix=".csv", dir=str(_stage_dir()))
         os.close(fd)
         stage.append(Path(name))
-    rows = damaged = 0
+    rows = events = damaged = bad_chunks = 0
+    errors: list[str] = []
     channels: Counter = Counter()
     types: Counter = Counter()
+    progress = lambda f: report(0.9 * f)  # noqa: E731
+    texts = (winevent.iter_evtx(path, progress, errors, scratch=_stage_dir()) if evtx
+             else winevent.iter_event_texts(path, progress=progress))
     try:
         with open(stage[0], "w", encoding="utf-8", newline="") as f_raw, \
                 open(stage[1], "w", encoding="utf-8", newline="") as f_win:
             w_raw, w_win = csv.writer(f_raw), csv.writer(f_win)
-            for text in winevent.iter_event_texts(path, progress=lambda f: report(0.9 * f)):
+            for text in texts:
                 row_id = start + rows
-                ev = winevent.parse_event(text)
+                if isinstance(text, winevent.Damage):
+                    # What the chunk headers name and the reader did not return.
+                    damaged += text.records
+                    bad_chunks += not text.records
+                    w_raw.writerow(_stage_row(row_id, winevent.damaged_row(text.text, prefix="")))
+                    rows += 1
+                    continue
+                if isinstance(text, winevent.EvtxRecord):
+                    text, ev = text.xml, winevent.parse_event(text.xml, text.fixes, text.empty_in_array)
+                else:
+                    ev = winevent.parse_event(text)
                 if ev is None:
                     damaged += 1
                     w_raw.writerow(_stage_row(row_id, winevent.damaged_row(text)))
                 else:
+                    events += 1
                     channels[ev["channel"] or "-"] += 1
                     timeline = winevent.timeline_row(ev)
                     types[timeline["action"] or f"untyped {ev['provider']} {ev['event_id']}"] += 1
@@ -548,19 +592,28 @@ def _ingest_winevents(con, path: Path, start: int, report=_noop) -> dict:
     finally:
         for p in stage:
             p.unlink(missing_ok=True)
+    notes = ["Every item of every event is kept under its own name in win_events - the "
+             "names SigmaHQ rules use.",
+             "Which Sysmon items fill the timeline columns is observed in the events' own "
+             "Data names; the Sysmon page lists the events, not their fields."]
+    if evtx:
+        notes.append("Records are rendered by the evtx library and counted against each chunk's "
+                     "header: what a chunk names and was not returned is listed as unreadable.")
+    windows = {"rows": rows, "events": events, "unreadable": damaged,
+               "channels": dict(channels.most_common()), "types": dict(types.most_common())}
+    if evtx:
+        windows.update(unreadable_chunks=bad_chunks, reader_errors=errors)
     return {
-        "method": "documented", "profile": winevent.PROFILE_ID, "name": winevent.NAME,
-        "docs": [{"title": t, "url": u} for t, u in winevent.DOCS],
-        "notes": ["Every item of every event is kept under its own name in win_events - the "
-                  "names SigmaHQ rules use.",
-                  "Which Sysmon items fill the timeline columns is observed in the events' own "
-                  "Data names; the Sysmon page lists the events, not their fields."],
+        "method": "documented",
+        "profile": winevent.EVTX_PROFILE_ID if evtx else winevent.PROFILE_ID,
+        "name": winevent.EVTX_NAME if evtx else winevent.NAME,
+        "docs": [{"title": t, "url": u} for t, u in (winevent.EVTX_DOCS if evtx else winevent.DOCS)],
+        "notes": notes,
         "fields": {f: {"columns": [c], "source": "documented"} for f, c in (
             ("ts", "System/TimeCreated/@SystemTime"), ("username", "TargetUserName / SubjectUserName / User"),
             ("srcip", "IpAddress / SourceIp"), ("dstip", "DestinationIp"), ("dstport", "DestinationPort"))},
         "heuristic_fields": [], "missing_fields": [],
-        "windows": {"rows": rows, "events": rows - damaged, "unreadable": damaged,
-                    "channels": dict(channels.most_common()), "types": dict(types.most_common())},
+        "windows": windows,
     }
 
 

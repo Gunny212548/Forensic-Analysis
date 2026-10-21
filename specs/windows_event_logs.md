@@ -1,6 +1,6 @@
 # Windows event logs - Security, Sysmon and every format they arrive in
 
-Status: **W1 built 2026-10-21** (gotcha #60; W2-W5 to come). **Approved 2026-10-21** - Q40 `win_events` + MAP, Q41 4771 / 4776 typed but not counted,
+Status: **W1 and W2 (.evtx) built 2026-10-21** (gotcha #60; W3-W5 to come). **Approved 2026-10-21** - Q40 `win_events` + MAP, Q41 4771 / 4776 typed but not counted,
 Q42 `evtx` (pyevtx-rs) for W2, Q43 GPL samples and exports from this machine kept outside the repo. The user: "ทำ Windows Security
 กับ Sysmon reader ต่อ"; formats: "ต้องรับทุกรูปแบบที่เป็น Windows Log"; tested on **lab samples**
 until a customer file exists. No Jira story yet (IAI-92 only *identifies* these files).
@@ -85,6 +85,18 @@ letter on the Sysmon sample and a Security XML sample; UTC -> GMT+7; `win_events
 every item; layer A types; a 4625 burst in a synthetic file fires R2000; a broken record counted
 not dropped; `.gz` / `.zip`. Parity unchanged on the corpus. `check_identify` moves the two
 samples from `no_reader` to `supported`.
+
+## W2 - .evtx (built)
+
+The `evtx` library (Q42) renders each record; `parse_event()` and the two tables are W1's. Two
+things the library does not do, both measured and handled (gotcha #60): it drops damaged records
+without an error - every record is counted against its chunk header and the shortfall kept as a
+row - and it renders GUID / FILETIME / SYSTEMTIME values, null items and control characters
+differently from Windows - the value types are read from the record's Binary XML (libyal) and
+put in Windows' form. Checked: 278 EVTX-ATTACK-SAMPLES files and this PC's System export, every
+event identical to `Get-WinEvent .ToXml()` of the same file; a cut file and an overwritten
+chunk; `.gz` and `.zip`. The UI now states events per channel and anything unreadable
+(`Mapping.jsx`, for event XML too).
 
 ## Questions
 

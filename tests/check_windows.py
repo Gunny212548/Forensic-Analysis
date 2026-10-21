@@ -1,12 +1,12 @@
-"""Windows event logs, W1: the core and event XML (app/services/winevent.py,
-specs/windows_event_logs.md).
+"""Windows event logs, W1 + W2: the core, event XML and .evtx
+(app/services/winevent.py, specs/windows_event_logs.md).
 
-    python tests/check_windows.py <scratch dir> [--repo DIR]
+    python tests/check_windows.py <scratch dir> [--repo DIR] [--evtx D:/logtest/windows]
 
 Throwaway store, the real pipeline, no server. Checks:
 
 - identification: event XML is supported with the Sigma logsource of its
-  channel; Splunk's text rendering and an .evtx stay no_reader (W3, W2);
+  channel; Splunk's text rendering stays no_reader (W3); an .evtx is read (W2);
 - the committed Splunk attack_data captures read to the letter: the Sysmon
   sample and PurpleSharp's NTLM spray (Security XML) - counts per event ID,
   event types, every item kept in win_events under its own name, UTC -> GMT+7;
@@ -17,14 +17,35 @@ Throwaway store, the real pipeline, no server. Checks:
   event counted and kept as text - never dropped;
 - the same counts through .gz and inside a .zip.
 
-stdlib + the app's own modules.
+With --evtx, on the lab folder kept outside the repo (Q43): it holds a clone of
+EVTX-ATTACK-SAMPLES (GPL-3.0) and this machine's System log exported twice -
+`wevtutil epl System this-pc-System.evtx`, then Windows' own rendering of that
+file as UTF-8 event XML (PowerShell; `wevtutil qe /f:xml` writes through the
+console code page and loses what it cannot show):
+
+    $w = [IO.StreamWriter]::new("this-pc-System.toxml.xml", $false, [Text.UTF8Encoding]::new($false))
+    Get-WinEvent -Path this-pc-System.evtx -Oldest | ForEach-Object { $w.WriteLine($_.ToXml()) }
+    $w.Close()
+
+
+- all 278 samples identified by their channel, every record each chunk header
+  names returned and parsed;
+- the .evtx read through the pipeline equals Windows' XML of it, event by event
+  and item by item (FILETIME to the microsecond - the library's precision);
+- a cut file and an overwritten chunk: the missing records counted from the
+  chunk headers and kept as a row, never dropped;
+- a Sysmon sample through .gz and inside a .zip.
+
+stdlib + the app's own modules (+ the `evtx` wheel for .evtx).
 """
 
 import argparse
 import gzip
 import os
+import re
 import shutil
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -50,10 +71,125 @@ def check(ok: bool, what: str) -> None:
         FAILED.append(what)
 
 
+
+def check_evtx(lab: Path, run, win, query) -> None:
+    """W2 on the lab folder (Q43 - kept outside the repo): EVTX-ATTACK-SAMPLES
+    (GPL-3.0) and this machine's System log exported twice, as .evtx (`wevtutil
+    epl`) and as Windows' own event XML of that file (`Get-WinEvent ... .ToXml()`)."""
+    from app.services import identify, winevent
+
+    print(".evtx - every EVTX-ATTACK-SAMPLES file")
+    samples = sorted((lab / "EVTX-ATTACK-SAMPLES").rglob("*.evtx"))
+    wrong, damaged, records, compared, unlike = [], [], 0, 0, []
+
+    def key(e):
+        return (e["record_id"] or "", e["provider"] or "", e["event_id"] or 0, e["channel"] or "",
+                e["computer"] or "", e["user_sid"] or "", e["time_created"] or "", sorted(e["data"].items()))
+    for f in samples:
+        r = identify.identify(f, "log")
+        chunks, bad = winevent.evtx_chunks(f)
+        named = sum(last - first + 1 for _, first, last, _ in chunks)
+        events = [winevent.parse_event(t.xml, t.fixes, t.empty_in_array) for t in winevent.iter_evtx(f)
+                  if isinstance(t, winevent.EvtxRecord)]
+        records += len(events)
+        if bad or len(events) != named or any(e is None for e in events):
+            damaged.append(f.name)
+        channels = {e["channel"] for e in events if e and e["channel"]}
+        want = (winevent.CHANNELS.get(next(iter(channels))) if len(channels) == 1 else None) or \
+            {"sigma": {"product": "windows"}}
+        if (r["status"], r.get("read_as"), r["sigma"]) != ("supported", "evtx", want["sigma"]):
+            wrong.append((f.name, r["status"], r["sigma"]))
+        # Windows' own rendering of the same file (toxml/<path>.xml, made like the System one).
+        ref = lab / "toxml" / (str(f.relative_to(lab / "EVTX-ATTACK-SAMPLES")) + ".xml")
+        if ref.is_file():
+            theirs = [winevent.parse_event(t) for t in winevent.iter_event_texts(ref)]
+            compared += len(theirs)
+            if sorted(map(key, filter(None, events))) != sorted(map(key, filter(None, theirs))):
+                unlike.append(f.name)
+    check(len(samples) == 278 and not wrong,
+          f"{len(samples)} files identified as .evtx with their channel's Sigma service {wrong[:3]}")
+    check(not damaged and records == 37364,
+          f"{records} records, each chunk's header count returned and parsed {damaged[:3]}")
+    check(compared == records and not unlike,
+          f"{compared} of them exactly as Windows renders them (Get-WinEvent .ToXml()) {unlike[:3]}")
+
+    print(".evtx vs Windows' own rendering of the same file")
+    sys_evtx, sys_xml = lab / "this-pc-System.evtx", lab / "this-pc-System.toxml.xml"
+    t0 = time.monotonic()
+    me = run(sys_evtx, "log", "evtx")
+    took = time.monotonic() - t0
+    w = win(me)
+    check(me["status"] == "ready" and w.get("events") == 43413 and w.get("unreadable") == 0,
+          f"System export: 43,413 events, none unreadable ({me['status']}, {w.get('events')}, "
+          f"{w.get('unreadable')}) - {took:.1f} s, {43413 / took:,.0f} events/s through the whole pipeline")
+    mx = run(sys_xml)
+    sql = ("SELECT record_id, provider, event_id, channel, computer, user_sid, time_created, data "
+           "FROM win_events ORDER BY record_id::BIGINT")
+    a, b = query(me["case_id"], sql), query(mx["case_id"], sql)
+
+    diff = [x[0] for x, y in zip(a, b) if x != y]
+    check(len(a) == len(b) == 43413 and not diff,
+          f"every event and item exactly as Windows renders it - GUID values braced, FILETIME to "
+          f"100 ns, empty values empty, a string holding a GUID left as written ({diff[:3]})")
+    port = query(me["case_id"], "SELECT data['PortName'] FROM win_events WHERE data['PortName'] "
+                 "SIMILAR TO '[0-9A-F-]{36}' LIMIT 1")
+    check(bool(port), f"Hyper-V's PortName, a string, keeps its bare upper-case GUID ({port[:1]})")
+
+    print(".evtx damaged - counted from the chunk headers, never dropped")
+    whole = sys_evtx.read_bytes()
+    scratch = Path(os.environ["DATA_DIR"]).parent
+    cut_file = scratch / "cut.evtx"
+    cut_file.write_bytes(whole[:len(whole) // 2 + 12345])
+    corrupt = bytearray(whole)
+    at = winevent.EVTX_HEADER + 3 * winevent.EVTX_CHUNK + 9000
+    corrupt[at:at + 400] = b"\xff" * 400
+    corrupt_file = scratch / "corrupt.evtx"
+    corrupt_file.write_bytes(bytes(corrupt))
+    for f, events, lost, why in ((cut_file, 21491, 165, "the file ends inside chunk 160"),
+                                 (corrupt_file, 43275, 138, "chunk 3 overwritten")):
+        m = run(f, "log", "evtx")
+        w = win(m)
+        rows = [r[0] for r in query(m["case_id"], "SELECT raw FROM raw_events WHERE raw LIKE '[unreadable EVTX%'")]
+        check(m["status"] == "ready" and (w.get("events"), w.get("unreadable")) == (events, lost) and len(rows) == 1,
+              f"{why}: {events} events + {lost} unreadable, kept as a row ({w.get('events')}, "
+              f"{w.get('unreadable')}: {rows[:1]})")
+    # The reader stops at a slot with no chunk signature; every good chunk after it is still read.
+    first_bad = scratch / "first-chunk-gone.evtx"
+    first_bad.write_bytes(whole[:winevent.EVTX_HEADER] + b"\x5a" * winevent.EVTX_CHUNK
+                          + whole[winevent.EVTX_HEADER + winevent.EVTX_CHUNK:])
+    m = run(first_bad, "log", "evtx")
+    w = win(m)
+    check(m["status"] == "ready" and (w.get("events"), w.get("unreadable_chunks")) == (43413 - 125, 1)
+          and m["mapping"]["logsource"]["sigma"].get("service") == "system",
+          f"chunk 0 overwritten: the other 43,288 events read, one damaged chunk named "
+          f"({w.get('events')}, {w.get('unreadable_chunks')})")
+
+    print(".evtx compressed")
+    sysmon = lab / "EVTX-ATTACK-SAMPLES" / "Execution" / "sysmon_1_11_rundll32_cpl_ostap.evtx"
+    m = run(sysmon, "log", "evtx")
+    base = sorted(query(m["case_id"], "SELECT event_id, count(*) FROM win_events GROUP BY 1"))
+    gz = scratch / "sysmon.evtx.gz"
+    with gzip.open(gz, "wb") as fh:
+        fh.write(sysmon.read_bytes())
+    mg = run(gz, "log", "evtx.gz")
+    zp = scratch / "sysmon.zip"
+    with zipfile.ZipFile(zp, "w") as z:
+        z.write(sysmon, "Microsoft-Windows-Sysmon%4Operational.evtx")
+    mz = run(zp, "zip", "zip")
+    check(base and all(sorted(query(x["case_id"], "SELECT event_id, count(*) FROM win_events GROUP BY 1")) == base
+                       for x in (mg, mz)),
+          f"the same Sysmon file through .gz and inside a .zip ({base})")
+    p1 = query(m["case_id"], "SELECT e.action, w.data['ProcessGuid'] FROM raw_events e JOIN win_events w "
+               "USING (row_id) WHERE w.event_id = 1 ORDER BY row_id LIMIT 1")
+    check(p1 and p1[0][0] == "process_created" and re.match(r"^\{[0-9a-f-]{36}\}$", p1[0][1] or ""),
+          f"Sysmon 1 typed, ProcessGuid as Windows renders it ({p1[:1]})")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("scratch")
     ap.add_argument("--repo", default=str(REPO))
+    ap.add_argument("--evtx", help="lab .evtx folder kept outside the repo (W2, see the docstring)")
     args = ap.parse_args()
     scratch = Path(args.scratch)
     shutil.rmtree(scratch, ignore_errors=True)
@@ -70,11 +206,11 @@ def main() -> int:
               f"{name}: supported, windows/{service} ({r['status']} {r['sigma']})")
     r = identify.identify(SAMPLES / "windows-security.log", "log")
     check(r["status"] == "no_reader", f"Splunk's text rendering stays no_reader until W3 ({r['status']})")
-    evtx = scratch / "fake.evtx"
-    evtx.write_bytes(b"ElfFile\x00" + b"\x00" * 4088)
-    r = identify.identify(evtx, "log")
-    check((r["status"], r["name"]) == ("no_reader", "Windows event log (.evtx)"),
-          f"an .evtx by its signature: no_reader until W2 ({r['status']})")
+    empty = scratch / "empty.evtx"
+    empty.write_bytes(b"ElfFile\x00" + b"\x00" * 4088)
+    r = identify.identify(empty, "log")
+    check((r["status"], r["name"], r.get("read_as")) == ("supported", "Windows event log (.evtx)", "evtx"),
+          f"an .evtx by its signature, even one with no records: supported (W2) ({r['status']})")
 
     co = storage.create_company("Windows lab")
 
@@ -170,6 +306,13 @@ def main() -> int:
     mz = run(zp, "zip", "zip")
     check(sorted(query(mz["case_id"], "SELECT event_id, count(*) FROM win_events GROUP BY 1")) == base
           and win(mz).get("unreadable") == 1, "the same file inside a .zip")
+
+    me = run(empty)
+    check(me["status"] == "ready" and win(me).get("events") == 0 and win(me).get("unreadable") == 0,
+          f".evtx with no records: ready, 0 events ({me['status']}, {win(me)})")
+
+    if args.evtx:
+        check_evtx(Path(args.evtx), run, win, query)
 
     print()
     print(f"{len(FAILED)} FAILED" if FAILED else "WINDOWS OK")

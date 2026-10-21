@@ -89,6 +89,42 @@ function JsonNote({ stats, label }) {
   )
 }
 
+/** How a Windows event log was read (pipeline._ingest_winevents): events
+ *  per channel, and - stated, never left out - what could not be read: an
+ *  event XML record that does not parse, or .evtx records a chunk header
+ *  names that the reader did not return (gotcha #60). */
+function WindowsNote({ win, label }) {
+  if (!win) return null
+  const n = (v) => (v ?? 0).toLocaleString()
+  const channels = Object.entries(win.channels || {})
+    .map(([c, k]) => `${c === '-' ? 'no channel' : c} ${n(k)}`)
+    .join(' · ')
+  const bad = win.unreadable || 0
+  const chunks = win.unreadable_chunks || 0
+  const errors = win.reader_errors || []
+  return (
+    <div className={`map-note${bad || chunks || errors.length ? ' map-warn' : ''}`}>
+      {label}
+      {n(win.events)} Windows events read{channels ? ` - ${channels}` : ''}.
+      {bad > 0 && (
+        <>
+          {' '}
+          <strong>{n(bad)} {bad === 1 ? 'record' : 'records'} could not be read</strong> - each damaged part is
+          kept in the case as a text row that says where it is.
+        </>
+      )}
+      {chunks > 0 && (
+        <>
+          {' '}
+          <strong>{n(chunks)} damaged {chunks === 1 ? 'chunk' : 'chunks'}</strong> with no readable header - how
+          many records {chunks === 1 ? 'it' : 'they'} held cannot be known.
+        </>
+      )}
+      {errors.length > 0 && <div className="map-sub">Reader messages: {errors.join(' · ')}</div>}
+    </div>
+  )
+}
+
 /** What of the file was actually read (pipeline._coverage, IAI-31): rows in
  *  the case, rows the bulk load refused, timestamps that did not parse, and
  *  per mapped field how many rows carry a value - the "0 findings: schema
@@ -164,6 +200,7 @@ function One({ mapping, name }) {
         </div>
       )}
       {mapping.json && <JsonNote stats={mapping.json} label={label} />}
+      <WindowsNote win={mapping.windows} label={label} />
       <SyslogNote syslog={mapping.syslog} docs={mapping.syslog_docs} label={label} />
       <CoverageNote cov={mapping.coverage} label={label} />
     </>

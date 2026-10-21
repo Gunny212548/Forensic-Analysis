@@ -28,7 +28,47 @@
   `param<n>`.
 - Identification: event XML by the `Event` element in Microsoft's namespace (`.xml`, `.log`,
   `.txt`, in a zip too - `.xml` / `.evtx` are now zip member extensions); the Sigma service from
-  the channel when the head has one channel, else `product: windows`. `.evtx` is recognised by
-  `ElfFile\0` and stays `no_reader` until W2; Splunk's classic text stays `no_reader` until W3.
+  the channel when the head has one channel, else `product: windows`. Splunk's classic text stays
+  `no_reader` until W3.
 - Baseline: `windows-sysmon.log` 0 -> 40 rows (it was kept unread before W1);
   `windows-security-xml-spray.log` (attack_data, Apache-2.0) 232 rows, 50 flagged.
+
+## W2 - .evtx (2026-10-21)
+
+Read with the `evtx` library (pyevtx-rs 0.13.1, MIT, Q42), which renders each record as event
+XML into the same `parse_event()`. Identified by `ElfFile\0`, the channel from the records of the
+first four chunks (`read_as: evtx`, profile `windows-evtx`). `.evtx.gz` is decompressed into
+staging first - records are found by chunk offset. Lab: `D:/logtest/windows` (outside the repo,
+Q43); `tests/check_windows.py --evtx` documents how its references were made.
+
+- **The library drops damage silently.** Overwriting 400 bytes of one chunk lost 138 of its 158
+  records, cutting the file lost the last chunk's 165 - no error object, no exception. So every
+  record is counted against the chunk headers (libyal: first / last record identifier at 24 /
+  32): what a header names and the reader did not return becomes one row per chunk
+  (`[unreadable EVTX records] chunk N at byte X: k of records a-b not readable`) and
+  `windows.unreadable`; a non-empty 64 KB slot with no `ElfChnk\0`, or whose header names more
+  records than a chunk can hold, is `unreadable_chunks`. On 278 EVTX-ATTACK-SAMPLES files and two
+  exports from this PC the count is exact (0 missing).
+- **...and gives up at a slot with no chunk signature** ("Failed to parse chunk header"): a
+  garbage first chunk lost all 43k events of the file. A file with such a slot is read from a
+  staging copy of the file header and the slots that start with `ElfChnk\0` (never written beside
+  the evidence); identification reads its head the same way and calls any `ElfFile\0` file
+  supported, saying when its first chunks could not be read.
+- **The library does not render values the way Windows does** - measured item by item against
+  `Get-WinEvent .ToXml()` of the same files: a GUID bare and upper case (Windows `{lower}`, 38k
+  Sysmon `ProcessGuid`s), FILETIME / SYSTEMTIME to 6 fraction digits (Windows 7), a null or empty
+  value as the indent of its closing tag, a null *unnamed* item as an extra `<Data>` (Windows
+  leaves it out), XML-illegal control characters kept (Windows writes `_`). A GUID cannot be told
+  from a string that holds one by its text - Hyper-V's `PortName` is a bare upper-case GUID
+  *string* - so the value types are read from the record's own Binary XML (`evtx_typed_values`:
+  template instance, descriptors, nested 0x21 fragments) and only GUID / FILETIME / SYSTEMTIME
+  values are rewritten. Result: 37,364 + 43,413 events identical to Windows' rendering in every
+  System value and every item.
+- **Do not use `wevtutil qe /f:xml >` as the reference**: it writes through the console code
+  page (`®` -> `?`, U+200E -> `?`) and looks like a reader bug. `Get-WinEvent ... .ToXml()`
+  written as UTF-8 is the reference.
+- Speed: the library itself ~700k records/s (multi-threaded); the whole pipeline ~17k events/s
+  on the 43k-event System export (2.5 s with rules and profiles). Not measured on a GB file.
+- Not seen in any sample, so not handled: arrays of GUID / FILETIME (0x8f / 0x91); ANSI strings
+  are decoded with the library's default windows-1252 (a Thai-locale ANSI string would need
+  windows-874).

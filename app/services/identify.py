@@ -98,20 +98,35 @@ def _windows(path: Path) -> dict | None:
             magic = fh.read(8)
     except OSError:
         return None
-    if magic == b"ElfFile\x00":
-        return _result(NO_READER, {"sigma": {"product": "windows"}}, "Windows event log (.evtx)",
-                       "file signature ElfFile (EVTX); the .evtx reader is story W2")
+    if magic == winevent.EVTX_MAGIC:
+        # The signature decides; a damaged file is still read, and what of it
+        # could not be is counted (winevent.iter_evtx).
+        try:
+            records, found = winevent.evtx_head_channels(path)
+            seen = f"channels of the {records} records in its first chunks - {_seen(Counter(found))}"
+        except Exception as exc:  # noqa: BLE001 - the reader's own error types
+            found, seen = [], f"its first chunks could not be read ({str(exc)[:200]})"
+        return {**_result(SUPPORTED, _channel_source(Counter(found)), winevent.EVTX_NAME,
+                          f"file signature ElfFile (EVTX); {seen}", winevent.EVTX_PROFILE_ID),
+                "read_as": "evtx"}
     head = _head_text(path)
     if not winevent.is_event_xml(head):
         return None
-    channels = Counter(winevent.channels_in(head))
-    top = channels.most_common(1)[0][0] if channels else None
-    source = (winevent.CHANNELS.get(top) if len(channels) == 1 else None) or {"sigma": {"product": "windows"}}
-    seen = ", ".join(f"{c}: {n}" for c, n in channels.most_common()) or "no channel named"
-    return {**_result(SUPPORTED, source, winevent.NAME,
+    channels = Counter(c.strip() for c in winevent.channels_in(head) if c.strip())
+    return {**_result(SUPPORTED, _channel_source(channels), winevent.NAME,
                       f"Windows event XML (Microsoft Event schema); channels in the first "
-                      f"{SAMPLE_BYTES // 1024} KB - {seen}", winevent.PROFILE_ID),
+                      f"{SAMPLE_BYTES // 1024} KB - {_seen(channels)}", winevent.PROFILE_ID),
             "read_as": "winxml"}
+
+
+def _channel_source(channels: Counter) -> dict:
+    """One channel names the Sigma service; several, or none, are product windows."""
+    top = channels.most_common(1)[0][0] if channels else None
+    return (winevent.CHANNELS.get(top) if len(channels) == 1 else None) or {"sigma": {"product": "windows"}}
+
+
+def _seen(channels: Counter) -> str:
+    return ", ".join(f"{c}: {n}" for c, n in channels.most_common()) or "no channel named"
 
 
 def _table(path: Path) -> dict | None:

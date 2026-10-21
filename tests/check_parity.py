@@ -30,7 +30,8 @@ import urllib.request
 from pathlib import Path
 
 BASELINE = Path(__file__).with_name("baseline.json")
-LOG_SUFFIXES = {".csv", ".log", ".json", ".txt", ".jsonl", ".ndjson"}
+# .evtx since W2 (gotcha #60): the lab folder D:/logtest/windows is in the baseline.
+LOG_SUFFIXES = {".csv", ".log", ".json", ".txt", ".jsonl", ".ndjson", ".evtx"}
 # A gzipped JSON log counts too (gen_usecase's nested .jsonl.gz, IAI-35).
 # Other .gz files stay out: the corpus's are ESXi binary traces (boot.gz,
 # vsantraces), and taking them in would change what the baseline covers.
