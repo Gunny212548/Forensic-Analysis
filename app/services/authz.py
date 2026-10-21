@@ -12,6 +12,9 @@ REVIEW = "finding:review"
 LIFECYCLE = "finding:lifecycle"
 VERIFY = "evidence:verify"
 MERGE = "case:merge"
+REPROCESS = "case:reprocess"
+QUESTION = "investigation:question"
+PROVENANCE = "evidence:provenance"
 
 
 class Forbidden(Exception):

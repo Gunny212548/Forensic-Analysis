@@ -374,6 +374,24 @@ def project_path(company_id: str, project_id: str) -> Path:
     return customer_dir(company_id) / "projects" / f"{project_id}.json"
 
 
+def project_log_path(company_id: str, project_id: str) -> Path:
+    """The project's own hash-chained log - its question's history
+    (investigation.py)."""
+    return project_path(company_id, project_id).with_suffix(".log.jsonl")
+
+
+def save_project(project: dict) -> None:
+    """Write-then-rename, as save_manifest: a project is now rewritten after
+    it is created (its question), while pages read it."""
+    path = project_path(project["company_id"], project["project_id"])
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(json.dumps(project, indent=2, default=str), encoding="utf-8")
+        _replace_retry(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def create_project(company_id: str, name: str, created_by: str) -> dict:
     if load_company(company_id) is None:
         raise UnownedCase("a project needs an existing customer")

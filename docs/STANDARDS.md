@@ -63,7 +63,7 @@ sentence relied on: **`docs/standards/SOURCES.md`**. ISO documents marked
 
 | Step | Standard | Done when | Today |
 |---|---|---|---|
-| 1 Ingest | SP 800-86 Collection; ISO/IEC 27037 (not read); RFC 3227; FIPS 180-4; CSF RS.AN-07; each log source's format documentation, RFC 5424 / 3164; ISO 8601 | case `ready`, acquisition digest verified | ✅ rows 1-3 |
+| 1 Ingest | SP 800-86 Collection, §3.1.2 (tool log); ISO/IEC 27037 (not read); RFC 3227 §2 (UTC vs local), §3.1 (reproducible), §3.2 (clock drift), §4.1; ACPO P3, 5.5 (tasking), 5.10.3 (provenance); SP 800-92 fn 24 (out-of-sync sources); FIPS 180-4; CSF RS.AN-07; each log source's format documentation, RFC 5424 / 3164; ISO 8601 | case `ready`, acquisition digest verified; question, provenance, duplicates and assumed zones listed as warnings, never blocks | ✅ rows 1-3; story 3 (gotcha #58): question, provenance, declared time, re-process, method record |
 | 2 Triage | SP 800-86 Examination; CSF DE.AE-02, DE.AE-08, RS.MA-02, RS.MA-03; Sigma `level`; Admiralty Code; ATT&CK | no finding in scope left Unreviewed (scope: D2) | ⚠️ review in two places (finding page, Reports tab) |
 | 3 Investigate | SP 800-86 Analysis; ISO/IEC 27042 (not read); CSF RS.AN-03, RS.AN-06, RS.AN-08, DE.AE-03; ATT&CK, ODNI CTF | every high/critical finding has an assignee and is past Open | ⚠️ graph per case only; timeline is the AI's (IAI-60, IAI-61) |
 | 4 Respond | SP 800-61r3: CSF RS.MI-01, RS.MI-02, RS.MA | every workflow finding Resolved | ✅ row 14 |

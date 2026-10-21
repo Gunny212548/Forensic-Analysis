@@ -188,6 +188,42 @@ export async function getCustody(caseId) {
 }
 
 /** Re-hashes the preserved file server-side and records the check. */
+/** The Ingest step's own facts (story 3): question, provenance per evidence
+ *  item, time settings applied, duplicates, reproducibility record, warnings. */
+export async function getIngest(caseId) {
+  return jsonOrThrow(await fetch(`/api/cases/${encodeURIComponent(caseId)}/ingest`), 'Could not load the ingest record')
+}
+
+async function putJson(url, body, fallback) {
+  const resp = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return jsonOrThrow(resp, fallback)
+}
+
+/** The question of the investigation the case belongs to (its project's, or
+ *  its own without one). Only the fields sent change. */
+export async function putQuestion(caseId, body) {
+  return putJson(`/api/cases/${encodeURIComponent(caseId)}/question`, body, 'Could not save the question')
+}
+
+/** One evidence item's provenance; `item` names a zip member. */
+export async function putProvenance(caseId, item, body) {
+  const q = item ? `?item=${encodeURIComponent(item)}` : ''
+  return putJson(`/api/cases/${encodeURIComponent(caseId)}/provenance${q}`, body, 'Could not save the provenance')
+}
+
+export async function reprocessCase(caseId, reason) {
+  const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}/reprocess`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  return jsonOrThrow(resp, 'Could not re-process the case')
+}
+
 export async function verifyEvidence(caseId) {
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/verify`, { method: 'POST' }),

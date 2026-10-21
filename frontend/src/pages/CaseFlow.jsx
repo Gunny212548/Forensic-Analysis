@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getAnalysis, getCase, getFindings, getFlow, getGraph, runAnalysis } from '../api.js'
+import { getAnalysis, getCase, getFindings, getFlow, getGraph, getIngest, runAnalysis } from '../api.js'
 import { LEVEL_EN, fmtNum, fmtTime, statusOf } from '../format.js'
 import { Empty, SeverityPill } from '../components/common.jsx'
 import StepBar, { stepHref } from '../components/StepBar.jsx'
@@ -8,6 +8,8 @@ import ReviewPanel from '../components/ReviewPanel.jsx'
 import AttackGraph from '../components/AttackGraph.jsx'
 import MappingNote from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
+import Question from '../components/Question.jsx'
+import Provenance, { Method } from '../components/Provenance.jsx'
 import Veris from '../components/Veris.jsx'
 import {
   AnalysisMeta,
@@ -267,6 +269,56 @@ export default function CaseFlow({ caseId, stepId }) {
   )
 }
 
+/** Story 3: the investigation's question, the warnings, each evidence item's
+ *  provenance and the reproducibility record, around the custody block
+ *  (children). Reloaded when the case's status changes, so a re-process that
+ *  finishes shows its new record. */
+function IngestRecord({ caseId, status, reload, children }) {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+  // Bumped on every save - and the status is in the key too - so the custody
+  // block (children) remounts and shows the new custody lines.
+  const [version, setVersion] = useState(0)
+  const load = useCallback(async () => {
+    try {
+      setData(await getIngest(caseId))
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    }
+  }, [caseId])
+  useEffect(() => {
+    load()
+  }, [load, status])
+
+  const saved = useCallback(() => {
+    load()
+    reload()
+    setVersion((v) => v + 1)
+  }, [load, reload])
+
+  if (error) return <Empty>{error}</Empty>
+  if (!data) return <Empty>Loading...</Empty>
+  return (
+    <>
+      {data.warnings.length > 0 && (
+        <div className="map-note map-warn">
+          {data.warnings.map((w) => (
+            <div key={w}>{w}</div>
+          ))}
+        </div>
+      )}
+      <div className="section-label">Question</div>
+      <Question caseId={caseId} investigation={data.investigation} onSaved={saved} />
+      <div key={`${version}-${status}`}>{children}</div>
+      <div className="section-label">Provenance</div>
+      <Provenance caseId={caseId} ingest={data} onSaved={saved} onReprocessed={saved} />
+      <div className="section-label">Method of the last run</div>
+      <Method method={data.method} />
+    </>
+  )
+}
+
 function StepBody({ step, caseId, manifest, ready, ai, reload }) {
   const cite = (key) => {
     window.location.hash = `#/finding/${caseId}/${encodeURIComponent(key)}`
@@ -288,8 +340,10 @@ function StepBody({ step, caseId, manifest, ready, ai, reload }) {
           )}
           {manifest.status === 'failed' && <Empty>Processing failed: {manifest.error || 'unknown cause'}</Empty>}
           {ready && <MappingNote manifest={manifest} />}
-          <div className="section-label">Evidence and chain of custody</div>
-          <Evidence caseId={caseId} />
+          <IngestRecord caseId={caseId} status={manifest.status} reload={reload}>
+            <div className="section-label">Evidence and chain of custody</div>
+            <Evidence caseId={caseId} />
+          </IngestRecord>
           {ready && (
             <>
               <div className="section-label">Events, in file order</div>

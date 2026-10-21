@@ -108,6 +108,10 @@ GET  /api/cases/{id}/review-log              full decision history
 GET  /api/cases/{id}/custody                 evidence digest + chain of custody,
                                              hash chain checked on read
 POST /api/cases/{id}/verify                  re-hash the raw file now, log it
+GET  /api/cases/{id}/ingest                  question, provenance, method, warnings
+PUT  /api/cases/{id}/question | provenance   the investigation's question; one
+                                             item's provenance (gotcha #58)
+POST /api/cases/{id}/reprocess               run the pipeline again from raw/
 POST /api/cases/{id}/lifecycle               one status change / assignment on a
                                              tracked finding (lifecycle.py)
 GET  /api/cases/{id}/stix                    STIX 2.1 bundle download; ready only
@@ -375,6 +379,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #41 Login accounts live in `AUTH_DIR`, apart from customer data; docker-compose deliberately does not set it.
 - #47 Sign-in throttled per account (not per address), audit-logged, and bound to the password hash.
 - #48 Work is queued, durable and bounded (`jobs.py`); manifests are written atomically. **One process only.**
+- #58 Ingest: question on the project (hash-chained log), provenance per evidence item (custody lines), declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
 **AI narrative** (`analysis.py`, `llm.py`, `grounding.py`, `veris.py`)
 - #5 Groq's output-token limits and the measured sweeps (events 15, max_tokens 950); schema key order is the priority list. Groq only - not the local model.

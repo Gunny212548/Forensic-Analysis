@@ -28,5 +28,7 @@ services:
       # tests/ is not in the image (.dockerignore); mounted so every check runs
       # here as it would in a container: docker exec -w /app forensic-dev-... python tests/...
       - ./tests:/app/tests
+      # check_case_flow.py reads docs/standards/SOURCES.md.
+      - ./docs:/app/docs:ro
       - forensic-data:/data
       - forensic-auth:/auth

@@ -7,7 +7,8 @@ router to get a findings list. Services read this module; routers and the
 MCP server call it.
 """
 
-from . import confidence, custody, db, finding_ids, lifecycle, related, review, storage, veris
+from . import (confidence, custody, db, finding_ids, investigation, lifecycle, provenance, related, review,
+               storage, veris)
 
 
 def integrity_refused(manifest: dict) -> bool:
@@ -37,6 +38,48 @@ def custody_view(case_id: str, manifest: dict) -> dict:
         "chain_problem": problem,
         "entries": custody.entries(case_id),
     }
+
+
+def ingest_view(case_id: str, manifest: dict) -> dict:
+    """The Ingest step's own facts (story 3): question, provenance per evidence
+    item with the time settings its last run applied, duplicates, the
+    reproducibility record of the last run, and the warnings."""
+    applied = {a["item"]: a for a in manifest.get("time_applied") or []}
+    method = next((e.get("method") for e in reversed(custody.entries(case_id))
+                   if e.get("action") == "processed" and e.get("method")), None)
+    return {
+        "case_id": case_id,
+        "status": manifest.get("status"),
+        "investigation": investigation.get(manifest),
+        "items": [{"item": item,
+                   "provenance": (manifest.get("provenance") or {}).get(item) or {},
+                   "time_applied": applied.get(item)}
+                  for item in provenance.items(manifest)],
+        "fields": list(provenance.FIELDS),
+        "reprocess_needed": provenance.reprocess_needed(manifest),
+        "duplicate_of": manifest.get("duplicate_of") or [],
+        "method": method,
+        "warnings": ingest_warnings(manifest),
+    }
+
+
+def ingest_warnings(manifest: dict) -> list[str]:
+    """What the Ingest step lists under itself. Warnings, never blocks (D8, D9)."""
+    out = []
+    if not investigation.answered(manifest):
+        out.append("No question recorded for this investigation - required before the report is approved")
+    if provenance.reprocess_needed(manifest):
+        out.append("A declared time zone or clock offset has not been applied yet - re-process to apply it")
+    for d in manifest.get("duplicate_of") or []:
+        out.append(f"The same file (SHA-256) was already received as {d['case_id']} "
+                   f"({d.get('original_filename') or 'unnamed'})")
+    for a in manifest.get("time_applied") or []:
+        if a.get("rows_without_offset") and not a.get("zone"):
+            out.append(f"{a['item']}: {a['rows_without_offset']:,} events state no time zone - "
+                       "GMT+7 was assumed; record the source's zone in its provenance if known")
+    for item, gaps in provenance.missing(manifest).items():
+        out.append(f"{item}: provenance not recorded - {', '.join(g.replace('_', ' ') for g in gaps)}")
+    return out
 
 
 def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list[dict]:

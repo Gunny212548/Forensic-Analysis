@@ -764,3 +764,11 @@
     .sidebar-user { border-top: none; padding: 8px 0 0; align-items: center; }
     .sidebar-user .link-button { margin: 0 0 0 auto; }
   }
+
+  /* The Ingest step's question and provenance (story 3, Question.jsx / Provenance.jsx). */
+  .ing-form { max-width: 820px; }
+  .ing-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .ing-question { font-size: 14px; color: var(--text); white-space: pre-wrap; }
+  .ing-items { display: grid; gap: 10px; }
+  .ing-item { padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 4px; background: var(--panel); }
+  .ing-item-head { font-weight: 600; margin-bottom: 4px; }

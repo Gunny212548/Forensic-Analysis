@@ -17,6 +17,9 @@ const ACTION_EN = {
   integrity_failed: 'INTEGRITY CHECK FAILED',
   processed: 'Processed',
   relocated: "Moved into the customer's own store",
+  provenance: 'Provenance recorded',
+  question: 'Question recorded',
+  reprocess_requested: 'Re-process requested',
 }
 
 function detail(e) {
@@ -30,6 +33,14 @@ function detail(e) {
   if (e.action === 'integrity_failed') return `expected ${e.expected}`
   if (e.action === 'relocated') return `${e.from} → ${e.to}, digest unchanged`
   if (e.action === 'processed') return `${(e.rows ?? 0).toLocaleString()} rows, ${(e.flagged ?? 0).toLocaleString()} flagged`
+  // Story 3: each change with its old and new value.
+  if (e.action === 'provenance' || e.action === 'question') {
+    const changes = Object.entries(e.changes || {})
+      .map(([k, [from, to]]) => `${k.replace(/_/g, ' ')}: ${JSON.stringify(from ?? '')} → ${JSON.stringify(to ?? '')}`)
+      .join('; ')
+    return e.item ? `${e.item} - ${changes}` : changes
+  }
+  if (e.action === 'reprocess_requested') return e.reason || ''
   return e.purpose || e.note || ''
 }
 

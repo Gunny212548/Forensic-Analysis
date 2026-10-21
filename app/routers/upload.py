@@ -176,14 +176,23 @@ async def upload_log(
     # before anything reads it (RFC 3227 chain of custody).
     actor = request.state.user["email"]
     sha256 = digest.hexdigest()
+    # The same bytes received before, for this customer only (D11, gotcha #40):
+    # accepted as its own evidence item - receiving it twice is a custody fact.
+    duplicate_of = [{"case_id": m["case_id"], "original_filename": m.get("original_filename"),
+                     "project_name": m.get("project_name")}
+                    for m in storage.list_manifests(company["company_id"])
+                    if m["case_id"] != case_id and (m.get("evidence") or {}).get("sha256") == sha256]
     custody.record(
         case_id, "acquired", actor,
         sha256=sha256, bytes=size, original_filename=manifest["original_filename"],
         compression=compression, client_address=request.client.host if request.client else None,
         stored_as=dest.name,
+        **({"duplicate_of": [d["case_id"] for d in duplicate_of]} if duplicate_of else {}),
     )
     fields = {"size_bytes": size, "uncompressed_bytes": uncompressed,
               "compression": compression, "evidence": custody.evidence(sha256, size, actor), **extra}
+    if duplicate_of:
+        fields["duplicate_of"] = duplicate_of
     storage.update_case(case_id, **fields)
     manifest.update(fields)
 

@@ -40,8 +40,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import config
-from .services import (auth, case_flow, custody, db, hashchain, profiles, review, rule_meta,
-                       storage, veris)
+from .services import (auth, case_flow, case_views, custody, db, hashchain, investigation, profiles,
+                       review, rule_meta, storage, veris)
 from .services.rules import RULE_LABELS
 from .services.severity import LEVELS, WEIGHT
 
@@ -190,6 +190,13 @@ def tool_get_case(args: dict) -> dict:
         "members": [{k: x.get(k) for k in ("name", "rows", "row_id_first", "row_id_last", "mapping")}
                     for x in (m.get("members") or [])] or None,
         "custody": _custody_status(m["case_id"], m),
+        # Story 3: the question the investigation answers, where each file came
+        # from, the time settings applied, a duplicate upload, the warnings.
+        "investigation": investigation.get(m),
+        "provenance": m.get("provenance") or None,
+        "time_applied": m.get("time_applied"),
+        "duplicate_of": m.get("duplicate_of"),
+        "ingest_warnings": case_views.ingest_warnings(m),
     }
 
 

@@ -7,7 +7,8 @@ from fastapi.responses import JSONResponse
 
 from .. import config
 from ..services import (analysis, analysis_jobs, attack_layer, auth, case_flow, case_views, custody,
-                        db, authz, lifecycle, merge, profiles, review, stix_export, storage, veris)
+                        db, authz, investigation, jobs, lifecycle, merge, profiles, provenance, review,
+                        stix_export, storage, veris)
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -174,6 +175,74 @@ async def verify_evidence(case_id: str, request: Request):
                        purpose="on request",
                        **({} if ok else {"note": "no acquisition digest was recorded for this file"}))
     return {"match": ok, "sha256": actual, **case_views.custody_view(case_id, manifest)}
+
+
+@router.get("/{case_id}/ingest")
+async def get_ingest(case_id: str):
+    """What the Ingest step shows beyond custody (story 3): the investigation's
+    question, each evidence item's provenance and the time settings its last
+    run applied, a duplicate upload, and the reproducibility record."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    return case_views.ingest_view(case_id, manifest)
+
+
+@router.put("/{case_id}/question")
+async def put_question(case_id: str, request: Request, body: dict = Body(...)):
+    """The question of the investigation this case belongs to - its project's,
+    or its own when it has no project (investigation.py). Only the fields sent
+    change; each change is a hash-chained line."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    _authorize(request, authz.QUESTION, manifest.get("company_id"))
+    try:
+        return investigation.save(case_id, body, request.state.user["email"])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.put("/{case_id}/provenance")
+async def put_provenance(case_id: str, request: Request, body: dict = Body(...),
+                         item: str | None = Query(None, max_length=512)):
+    """One evidence item's provenance (provenance.py); `item` names a zip
+    member. A changed zone or clock offset applies on the next re-process,
+    which the response says is needed - nothing re-processes on its own."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    _authorize(request, authz.PROVENANCE, manifest.get("company_id"))
+    try:
+        return provenance.save(case_id, item, body, request.state.user["email"])
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.post("/{case_id}/reprocess")
+async def reprocess(case_id: str, request: Request, body: dict = Body(default={})):
+    """Run the pipeline again over the preserved original (ACPO principle 3).
+    Review decisions survive: they are keyed by finding, not stored in the
+    case DuckDB (gotcha #19)."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    _authorize(request, authz.REPROCESS, manifest.get("company_id"))
+    if manifest.get("status") in ("queued", "processing"):
+        raise HTTPException(409, "The case is already queued or processing")
+    raw = _raw_file(case_id)
+    if raw is None:
+        raise HTTPException(409, "The preserved original file is missing")
+    reason = str(body.get("reason") or "").strip()[:500] or "analyst request"
+    custody.record(case_id, "reprocess_requested", request.state.user["email"], reason=reason)
+    storage.update_status(case_id, "queued")
+    try:
+        jobs.submit(case_id, raw, manifest["file_kind"])
+    except jobs.JobActive as exc:
+        raise HTTPException(409, str(exc))
+    return storage.load_manifest(case_id)
 
 
 @router.post("/merge")

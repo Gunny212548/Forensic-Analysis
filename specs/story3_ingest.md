@@ -84,10 +84,13 @@ timeline's "not counted twice" half of D11 belongs to story 4 (the timeline acro
 
 ### API
 
+As built (one question route instead of two: it writes to the case's investigation, project
+or case, so the UI never has to know which):
+
 | Route | What |
 |---|---|
-| `GET / PUT /api/companies/{cid}/projects/{pj}/question` | question, window, leads; PUT appends to the project log |
-| `PUT /api/cases/{id}/question` | the same for a case with no project (409 if it has one) |
+| `GET /api/cases/{id}/ingest` | everything the Ingest step shows: question, items with provenance and time applied, duplicates, method, warnings |
+| `PUT /api/cases/{id}/question` | question, window, leads of the case's investigation - its project's, or its own |
 | `PUT /api/cases/{id}/provenance` (`member=` for a zip) | provenance fields; response says whether a re-process is needed |
 | `POST /api/cases/{id}/reprocess` | as above |
 | `GET /api/cases/{id}/flow` | Ingest step gains `warnings: [...]` |

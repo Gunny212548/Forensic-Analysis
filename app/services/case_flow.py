@@ -26,6 +26,9 @@ STEPS = [
     {"id": "ingest", "title": "Ingest", "standards": [
         {"source": "NIST SP 800-86", "ref": "Collection phase, 3.1"},
         {"source": "RFC 3227", "ref": "4.1 chain of custody"},
+        {"source": "RFC 3227", "ref": "2, 3.2 time zone and clock drift"},
+        {"source": "ACPO Good Practice Guide", "ref": "principle 3, 5.5 tasking, 5.10.3 provenance"},
+        {"source": "NIST SP 800-92", "ref": "fn 24 out-of-sync sources"},
         {"source": "Sigma rules specification", "ref": "logsource taxonomy appendix 2.1.0"},
         {"source": "NIST CSWP 29", "ref": "CSF 2.0 RS.AN-07"},
         {"source": "FIPS 180-4", "ref": "SHA-256"},
@@ -70,7 +73,8 @@ def _plural(n: int, word: str) -> str:
 
 
 def build(case_id: str, manifest: dict) -> dict:
-    steps = {s["id"]: {**s, "state": NOT_STARTED, "remaining": None, "total": None, "reason": ""}
+    steps = {s["id"]: {**s, "state": NOT_STARTED, "remaining": None, "total": None, "reason": "",
+                       "warnings": []}
              for s in STEPS}
     _ingest(case_id, manifest, steps["ingest"])
 
@@ -131,6 +135,9 @@ def _ingest(case_id: str, manifest: dict, step: dict) -> None:
     else:
         pct = (manifest.get("progress") or {}).get("pct")
         step.update(state=ACTIVE, reason=f"Processing ({pct}%)" if pct is not None else f"Status: {status}")
+    # Question, provenance, declared time, duplicates (story 3): listed under
+    # the step, never a block (D8, D9).
+    step["warnings"] = case_views.ingest_warnings(manifest)
 
 
 def _attack_events(findings: list[dict], unreviewed: list[dict], step: dict) -> None:

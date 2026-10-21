@@ -449,7 +449,10 @@ def _listed(con, ips: set[str]) -> dict[str, str]:
 # "2026-06-04T10:21:33+07:00" and "2026-06-04 10:21:33Z" do; Palo Alto's
 # "04/06/2026 10:21:33" does not, and guessing wrong by an hour reorders the
 # timeline (FR-1.6).
-_TZ_MARKER = re.compile(r"(?:Z|UTC|GMT|[+-]\d{2}:?\d{2})\s*$", re.I)
+# A source time that states its zone. Also run in SQL (pipeline, declared time
+# zones - provenance.py), so "states an offset" means the same in both places.
+TZ_MARKER_PATTERN = r"(?:Z|UTC|GMT|[+-]\d{2}:?\d{2})\s*$"
+_TZ_MARKER = re.compile(TZ_MARKER_PATTERN, re.I)
 # An RFC 3164 timestamp ("Aug 12 05:03:31"): the source gave no year, so the
 # one stored was inferred from the upload time (decode.infer_year, IAI-34).
 _NO_YEAR = re.compile(r"^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}$")
@@ -619,6 +622,7 @@ def collapsed_findings(case_id: str) -> list[dict]:
     cols = ["rid", "srcip", "username", "lvl", "descr", "mitre", "cnt",
             "ts_parsed", "ts_min", "ts_max", "ts_raw_first", "sample_row_id",
             "raw", "entity_rules", "entity_families"]
+    declared = _declared_spans(case_id)
     out = []
     for r in rows:
         row = dict(zip(cols, r))
@@ -645,8 +649,25 @@ def collapsed_findings(case_id: str) -> list[dict]:
         row["credibility_reasons"] = why
         row["confidence"] = confidence.label(grade)
         row["flags"] = _flags(row)
+        if "timezone-unconfirmed" in row["flags"] and any(
+                first is None or first <= row["sample_row_id"] <= last for first, last in declared):
+            # The source never stated a zone, but the analyst declared one and
+            # the last run applied it (provenance.py) - no longer an assumption.
+            row["flags"] = ["timezone-declared" if f == "timezone-unconfirmed" else f for f in row["flags"]]
         out.append(row)
     return out
+
+
+def _declared_spans(case_id: str) -> list[tuple[int | None, int | None]]:
+    """Row ranges whose declared source zone the last run applied; (None, None)
+    for a whole single-file case."""
+    manifest = storage.load_manifest(case_id) or {}
+    zoned = {a["item"] for a in manifest.get("time_applied") or [] if a.get("zone")}
+    members = manifest.get("members") or []
+    if not members:
+        return [(None, None)] if zoned else []
+    return [(m["row_id_first"], m["row_id_last"]) for m in members
+            if m.get("name") in zoned and m.get("row_id_first") is not None]
 
 
 def top_distinct_findings(case_id: str, limit: int) -> list[dict]:

@@ -23,7 +23,7 @@ from pathlib import Path
 
 from .. import config
 from . import (archive, custody, db, decode, finding_ids, identify, intel, logsources, parsers,
-               profiles, rules, severity, storage)
+               profiles, provenance, repro, rules, severity, storage)
 
 log = logging.getLogger(__name__)
 
@@ -522,6 +522,41 @@ def _ingest_zip(con, case_id: str, path: Path, report=_noop) -> tuple[bool, list
     return truncated, done, skipped
 
 
+def _apply_declared_time(con, manifest: dict, extra: dict) -> list[dict]:
+    """Apply each evidence item's declared zone and clock offset to `ts`
+    (provenance.py, D10) and count its rows with and without a stated offset.
+    A declared zone moves only the rows whose source text states no offset -
+    the ones gotcha #21 took to be GMT+7; a clock offset moves every row. One
+    UPDATE per item over its row range; `raw_events` is rebuilt from `raw/` on
+    every run, so a cleared setting gives back the first run's times."""
+    members = extra.get("members")
+    spans = ([(m["name"], m["row_id_first"], m["row_id_last"]) for m in members]
+             if members else [(manifest.get("original_filename") or "", None, None)])
+    applied = []
+    for item, first, last in spans:
+        if members and first is None:  # a member that produced no rows
+            continue
+        where, params = ("row_id BETWEEN ? AND ?", [first, last]) if members else ("TRUE", [])
+        no_offset = f"NOT coalesce(regexp_matches(ts_raw, '{db.TZ_MARKER_PATTERN}', 'i'), false)"
+        with_offset, without_offset = con.execute(
+            f"SELECT count(*) FILTER (WHERE NOT {no_offset}), count(*) FILTER (WHERE {no_offset}) "
+            f"FROM raw_events WHERE {where} AND ts IS NOT NULL", params).fetchone()
+        zone, clock = provenance.declared_time(manifest, item)
+        shifted = 0
+        if zone is not None or clock:
+            zone_shift = provenance.shift(zone, clock).total_seconds()
+            clock_shift = provenance.shift(None, clock).total_seconds()
+            con.execute(
+                f"UPDATE raw_events SET ts = ts + to_seconds(CASE WHEN {no_offset} THEN ? ELSE ? END) "
+                f"WHERE {where} AND ts IS NOT NULL", [zone_shift, clock_shift, *params])
+            shifted = without_offset if not clock else with_offset + without_offset
+        p = (manifest.get("provenance") or {}).get(item) or {}
+        applied.append({"item": item, "zone": p.get("source_timezone"),
+                        "clock_offset_seconds": clock, "rows_with_offset": with_offset,
+                        "rows_without_offset": without_offset, "rows_shifted": shifted})
+    return applied
+
+
 class IntegrityError(Exception):
     """The preserved file no longer matches its acquisition digest."""
 
@@ -567,6 +602,11 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             # (logsources.py).
             extra = {"mapping": mapping}
 
+        # Declared source time zones and clock offsets (provenance.py, D10),
+        # before anything reads a time: rules, windows and profiles all see the
+        # corrected `ts`. `ts_raw` keeps the source text as written.
+        time_applied = _apply_declared_time(con, storage.load_manifest(case_id) or {}, extra)
+
         # Threat-intel indicators are loaded now that the traffic is known,
         # so only the ones this case can match are stored (see intel.fill).
         progress.set("intel", INGEST_END, force=True)
@@ -605,10 +645,13 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             escalations=escalated,
             error=None,
             progress={"stage": "done", "pct": 100, "estimated": False},
+            time_applied=time_applied,
             **extra,
         )
+        # The reproducibility record (repro.py): what produced these findings.
+        mappings = [m.get("mapping") or {} for m in extra.get("members") or []] or [extra.get("mapping") or {}]
         custody.record(case_id, "processed", "system", rows=total_rows, flagged=flagged,
-                       rules=matched)
+                       rules=matched, method=repro.record(mappings, time_applied))
         log.info("case %s ready: %s rows, %s flagged", case_id, total_rows, flagged)
 
     except Exception as exc:  # noqa: BLE001 - surface any ingest failure to the UI
