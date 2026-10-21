@@ -28,7 +28,9 @@ CHUNK = 1024 * 1024
 # Extensions a log member may have. Anything else in a zip (a PDF with the
 # ticket, a screenshot, a nested zip) is skipped and listed, not decoded as
 # garbage lines.
-_LOG_EXTS = {".csv", ".json", ".jsonl", ".ndjson", ".log", ".txt", ""}
+# .xml and .evtx: Windows event logs (winevent.py) - read, or identified and
+# kept, like any other log.
+_LOG_EXTS = {".csv", ".json", ".jsonl", ".ndjson", ".log", ".txt", ".xml", ".evtx", ""}
 
 
 def detect(filename: str) -> tuple[str, str | None]:

@@ -23,7 +23,7 @@ from pathlib import Path
 
 from .. import config
 from . import (archive, checkpoint_le, custody, db, decode, finding_ids, identify, intel, logsources,
-               parsers, profiles, provenance, repro, rules, severity, storage)
+               parsers, profiles, provenance, repro, rules, severity, storage, winevent)
 
 log = logging.getLogger(__name__)
 
@@ -429,6 +429,11 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
         return 0, False, {"method": found["status"], "profile": None, "name": found["name"],
                           "fields": {}, "heuristic_fields": [], "docs": [], "notes": [],
                           "logsource": found}
+    if found.get("profile") == winevent.PROFILE_ID:
+        # Windows event XML (W1): timeline rows and the native win_events rows.
+        mapping = _ingest_winevents(con, path, start, report)
+        _file_notes(mapping, parsers.detect_encoding(path), None, found)
+        return _coverage(con, start, mapping["windows"]["rows"], mapping), False, mapping
     encoding = parsers.detect_encoding(path)
     if found.get("profile") == checkpoint_le.PROFILE_ID:
         # Check Point Log Exporter records inside an EventLog Analyzer export
@@ -491,6 +496,72 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
     finally:
         decode.REFERENCE_TIME.reset(year_ref)
         stage_path.unlink(missing_ok=True)
+
+
+_WIN_STAGE_COLUMNS = {
+    "row_id": "BIGINT", "channel": "VARCHAR", "provider": "VARCHAR", "event_id": "INTEGER",
+    "record_id": "VARCHAR", "computer": "VARCHAR", "user_sid": "VARCHAR", "time_created": "VARCHAR",
+    "data": "VARCHAR",
+}
+
+
+def _ingest_winevents(con, path: Path, start: int, report=_noop) -> dict:
+    """Windows event XML into raw_events (the timeline row) and win_events (the
+    event as Windows wrote it) - winevent.py. Streamed one event at a time
+    through two staging CSVs and bulk-loaded (gotcha #1). Returns the mapping."""
+    stage = []
+    for _ in range(2):
+        fd, name = tempfile.mkstemp(suffix=".csv", dir=str(_stage_dir()))
+        os.close(fd)
+        stage.append(Path(name))
+    rows = damaged = 0
+    channels: Counter = Counter()
+    types: Counter = Counter()
+    try:
+        with open(stage[0], "w", encoding="utf-8", newline="") as f_raw, \
+                open(stage[1], "w", encoding="utf-8", newline="") as f_win:
+            w_raw, w_win = csv.writer(f_raw), csv.writer(f_win)
+            for text in winevent.iter_event_texts(path, progress=lambda f: report(0.9 * f)):
+                row_id = start + rows
+                ev = winevent.parse_event(text)
+                if ev is None:
+                    damaged += 1
+                    w_raw.writerow(_stage_row(row_id, winevent.damaged_row(text)))
+                else:
+                    channels[ev["channel"] or "-"] += 1
+                    timeline = winevent.timeline_row(ev)
+                    types[timeline["action"] or f"untyped {ev['provider']} {ev['event_id']}"] += 1
+                    w_raw.writerow(_stage_row(row_id, timeline))
+                    w_win.writerow(winevent.native_row(row_id, ev))
+                rows += 1
+        report(0.9)
+        for table, path_, cols in (("raw_events", stage[0], _STAGE_COLUMNS),
+                                   ("win_events", stage[1], _WIN_STAGE_COLUMNS)):
+            spec = ", ".join(f"'{n}': '{t}'" for n, t in cols.items())
+            select = ("*" if table == "raw_events" else
+                      "* REPLACE (CAST(data AS JSON)::MAP(VARCHAR, VARCHAR) AS data)")
+            con.execute(f"""
+                INSERT INTO {table}
+                SELECT {select} FROM read_csv(?, columns={{{spec}}}, header=false, nullstr='',
+                                            quote='"', escape='"', auto_detect=false)
+            """, [str(path_)])
+    finally:
+        for p in stage:
+            p.unlink(missing_ok=True)
+    return {
+        "method": "documented", "profile": winevent.PROFILE_ID, "name": winevent.NAME,
+        "docs": [{"title": t, "url": u} for t, u in winevent.DOCS],
+        "notes": ["Every item of every event is kept under its own name in win_events - the "
+                  "names SigmaHQ rules use.",
+                  "Which Sysmon items fill the timeline columns is observed in the events' own "
+                  "Data names; the Sysmon page lists the events, not their fields."],
+        "fields": {f: {"columns": [c], "source": "documented"} for f, c in (
+            ("ts", "System/TimeCreated/@SystemTime"), ("username", "TargetUserName / SubjectUserName / User"),
+            ("srcip", "IpAddress / SourceIp"), ("dstip", "DestinationIp"), ("dstport", "DestinationPort"))},
+        "heuristic_fields": [], "missing_fields": [],
+        "windows": {"rows": rows, "events": rows - damaged, "unreadable": damaged,
+                    "channels": dict(channels.most_common()), "types": dict(types.most_common())},
+    }
 
 
 _MEMBER_SUFFIX = {"csv": ".csv", "json": ".json", "log": ".log"}

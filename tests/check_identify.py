@@ -37,8 +37,11 @@ CASES = [
     ("Cisco FTD eStreamer JSON", S / "attack-data/ftd_connection_events.log", "log", "no_reader", FIREWALL, "cisco_ftd"),
     ("Windows Security (Splunk text)", S / "attack-data/windows-security.log", "log", "no_reader",
      {"product": "windows", "service": "security"}, None),
-    ("Windows Sysmon event XML", S / "attack-data/windows-sysmon.log", "log", "no_reader",
+    # Read since W1 (winevent.py, specs/windows_event_logs.md).
+    ("Windows Sysmon event XML", S / "attack-data/windows-sysmon.log", "log", "supported",
      {"product": "windows", "service": "sysmon"}, None),
+    ("Windows Security event XML", S / "attack-data/windows-security-xml-spray.log", "log", "supported",
+     {"product": "windows", "service": "security"}, None),
     ("CrowdStrike Falcon FDR", S / "attack-data/crowdstrike_falcon.log", "log", "no_reader", {}, "crowdstrike_falcon"),
     ("Entra ID Azure Monitor JSON", S / "entra-azure-monitor/azure_ad_distributed_spray.jsonl", "json", "supported",
      {"product": "azure", "service": "signinlogs"}, None),

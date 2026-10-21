@@ -22,6 +22,7 @@ from .. import config
 from . import intel
 from . import confidence
 from . import storage
+from . import winevent
 from .rule_meta import RULE_META
 from .rules import DENY_VERDICTS, RULE_LABELS, RULE_LEVEL
 from .severity import PATTERNS, level_of
@@ -66,6 +67,21 @@ CREATE TABLE IF NOT EXISTS escalations (
   row_id  BIGINT,
   rid     VARCHAR,
   pattern VARCHAR
+);
+
+-- A Windows event as Windows wrote it (winevent.py): its System values and
+-- every EventData / UserData item under its own name - the names SigmaHQ
+-- rules match on (ADR-006 decision 2). Joined to raw_events by row_id.
+CREATE TABLE IF NOT EXISTS win_events (
+  row_id       BIGINT,
+  channel      VARCHAR,
+  provider     VARCHAR,
+  event_id     INTEGER,
+  record_id    VARCHAR,
+  computer     VARCHAR,
+  user_sid     VARCHAR,
+  time_created VARCHAR,
+  data         MAP(VARCHAR, VARCHAR)
 );
 """
 
@@ -293,7 +309,14 @@ EVENT_TYPES = {
     # A later Check Point Log Exporter record of a connection already logged
     # (same loguid) - not a second connection (checkpoint_le.py, IAI-85).
     "log_update": "Log update (same connection)",
+    # Windows Security and Sysmon events (winevent.py), named from each
+    # event's Microsoft page and the Sysmon page's event headings.
+    **winevent.TYPE_NAMES,
 }
+
+# A Windows event with no type of ours: its raw text starts "<id> <provider>:"
+# (winevent.timeline_row), and the table names it so instead of leaving it blank.
+_WIN_UNTYPED = re.compile(r"^(\d{1,5}) ([\w.-]+): ")
 
 _EVENT_COLS = ["row_id", "ts", "ts_raw", "srcip", "dstip", "dstport", "username", "hostname",
                "action", "verdict", "app", "risk", "raw"]
@@ -410,6 +433,8 @@ def _events(con, cond: str, params: list, order: str, limit: int, offset: int) -
     for row in out:
         row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings
         row["event"] = EVENT_TYPES.get(row["action"], row["action"])
+        if row["event"] is None and row["hostname"] and (w := _WIN_UNTYPED.match(row["raw"] or "")):
+            row["event"] = f"Windows event {w.group(1)} ({w.group(2)})"
         ctx = []
         if row["srcip"] in profile_line:
             ctx.append(profile_line[row["srcip"]])

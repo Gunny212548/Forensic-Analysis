@@ -55,6 +55,20 @@ read in full except where the row says otherwise. Downloaded with `curl --ssl-no
 | Check Point R81 CLI Reference, `cp_log_export` | R81 | web: sc1.checkpoint.com/.../MDSG/cp_log_export.htm | `format` default `syslog`; `time-in-milli`; example action filter values incl. Prevent |
 | ManageEngine EventLog Analyzer user guide, *Report export and customization* | web | web: manageengine.com/products/eventlog/help/.../report-export-and-customization.html | Report export formats; **no layout for the search-result CSV** - the wrapper is observed, not documented |
 
+### Windows event logs (read 2026-10-21, `specs/windows_event_logs.md`)
+
+All read on the web (no saved copy); quotes are in the spec and `winevent.py`.
+
+| Document | Version | Where | What was checked |
+|---|---|---|---|
+| Microsoft, Windows Event schema: `SystemPropertiesType`, `EventDataType` | learn.microsoft.com | /windows/win32/wes/eventschema-* | Children of System (Provider, EventID, TimeCreated/@SystemTime, EventRecordID, Channel, Computer, Security/@UserID); EventData's `Data` items |
+| Microsoft, Security auditing events 4624, 4625, 4648, 4672, 4688, 4697, 4698, 4720, 4740, 4768, 4769, 4771, 4776, 1102 | learn.microsoft.com (archived Windows 10 pages) | /previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-<id> | Each event's meaning and its EventData names; 4624's LogonType table; 4625's status codes; 1102's UserData |
+| Microsoft Sysinternals, Sysmon | learn.microsoft.com | /sysinternals/downloads/sysmon | Event IDs 1-29 and 255 with their headings; "Event timestamps are in UTC standard time" |
+| libyal, Windows XML Event Log (EVTX) format | GitHub libyal/libevtx documentation | asciidoc | `ElfFile\0` file signature, `ElfChnk\0` chunks of 65,536 bytes, records of Binary XML (for W2) |
+| Elastic, Winlogbeat exported fields (winlog) | elastic.co | /guide/en/beats/winlogbeat/current/exported-fields-winlog.html | `winlog.event_data`, `event_id`, `channel`, `computer_name`, `provider_name`; unnamed items `param1`, `param2`... |
+
+Not obtained: Splunk Add-on for Windows docs (HTTP 403) - its classic text layout is observed only.
+
 ### The sentences the design rests on
 
 - **SP 800-86** - "The process for performing digital forensics comprises the following basic

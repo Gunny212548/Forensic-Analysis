@@ -29,7 +29,8 @@ describes the code before that direction.
 
 Formats exercised against real data so far: VMware ESXi `auth.log`,
 Palo Alto CSV exports, Check Point SmartLog CSV exports, Check Point Log Exporter
-records in a ManageEngine EventLog Analyzer export (gotcha #59), Entra ID sign-in
+records in a ManageEngine EventLog Analyzer export (gotcha #59), Windows Security and
+Sysmon event XML (lab captures, gotcha #60), Entra ID sign-in
 CSV exports and their Azure Monitor JSON export (gotcha #39). Every file is
 identified before it is read (gotcha #53, IAI-92 - on its branch): a documented
 format is read through its profile, anything else is kept as evidence and not
@@ -343,6 +344,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+- #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules; .evtx / Splunk text still no_reader (W2/W3).
 - #59 Check Point Log Exporter records inside a ManageEngine EventLog Analyzer search export (`checkpoint_le.py`): record documented, wrapper observed; fields via `regexp_extract_all`; update logs sharing a `loguid` are `log_update` rows with no verdict; epoch `time` states its zone.
 - #53 Every file is identified before it is read, in Sigma logsource terms (`identify.py`); no column is guessed; a format without a reader, or none, is kept as evidence and not analysed. A file's name proves nothing - JSON-lines arrive as `.log`, exports start with a blank line.
 

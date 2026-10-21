@@ -25,12 +25,13 @@ so identifying a 10 GB file costs the same as a small one.
 """
 
 import csv
+import gzip
 import re
 from collections import Counter
 from itertools import islice
 from pathlib import Path
 
-from . import checkpoint_le, decode, logsources, parsers
+from . import checkpoint_le, decode, logsources, parsers, winevent
 
 SAMPLE_LINES = 2000
 SAMPLE_BYTES = 256 * 1024
@@ -46,11 +47,6 @@ _LINE_MARKERS = [
     (re.compile(r"%FTD-[0-7]-\d{6}:"), {"sigma": {"category": "firewall"}, "custom": "cisco_ftd"},
      "Cisco Secure Firewall Threat Defense syslog",
      "message header %FTD-<severity>-<id>: (Cisco Secure Firewall Threat Defense Syslog Messages)"),
-    (re.compile(r"<Channel>Microsoft-Windows-Sysmon/Operational</Channel>"),
-     {"sigma": {"product": "windows", "service": "sysmon"}}, "Windows Sysmon event log (event XML)",
-     "event XML with the Microsoft-Windows-Sysmon/Operational channel"),
-    (re.compile(r"<Channel>Security</Channel>"), {"sigma": {"product": "windows", "service": "security"}},
-     "Windows Security event log (event XML)", "event XML with the Security channel"),
     (re.compile(r"^LogName=Security\s*$", re.M), {"sigma": {"product": "windows", "service": "security"}},
      "Windows Security event log (Splunk WinEventLog text)",
      "LogName=Security record header - Splunk's rendering, not a Windows export format"),
@@ -74,6 +70,12 @@ def _result(status: str, source: dict | None, name: str | None, evidence: str,
 def identify(path: Path, kind: str) -> dict:
     """`kind` is the file kind the upload decided (csv / json / log)."""
     if kind == "log":
+        # Windows event logs first (winevent.py): an .evtx by its file
+        # signature (libyal's EVTX format document: "ElfFile\0"), event XML by
+        # the Event element in Microsoft's event namespace.
+        windows = _windows(path)
+        if windows:
+            return windows
         # The name says nothing reliable: a PAN-OS table saved as .txt
         # (IAI-30), JSON-lines exported as .log (CrowdStrike, eStreamer).
         table = _table(path)
@@ -87,6 +89,29 @@ def identify(path: Path, kind: str) -> dict:
     if kind == "json":
         return _json(path)
     return _result(UNRECOGNISED, None, None, f"file kind '{kind}' is not read")
+
+
+def _windows(path: Path) -> dict | None:
+    try:
+        opener = gzip.open if str(path).lower().endswith(".gz") else open
+        with opener(path, "rb") as fh:
+            magic = fh.read(8)
+    except OSError:
+        return None
+    if magic == b"ElfFile\x00":
+        return _result(NO_READER, {"sigma": {"product": "windows"}}, "Windows event log (.evtx)",
+                       "file signature ElfFile (EVTX); the .evtx reader is story W2")
+    head = _head_text(path)
+    if not winevent.is_event_xml(head):
+        return None
+    channels = Counter(winevent.channels_in(head))
+    top = channels.most_common(1)[0][0] if channels else None
+    source = (winevent.CHANNELS.get(top) if len(channels) == 1 else None) or {"sigma": {"product": "windows"}}
+    seen = ", ".join(f"{c}: {n}" for c, n in channels.most_common()) or "no channel named"
+    return {**_result(SUPPORTED, source, winevent.NAME,
+                      f"Windows event XML (Microsoft Event schema); channels in the first "
+                      f"{SAMPLE_BYTES // 1024} KB - {seen}", winevent.PROFILE_ID),
+            "read_as": "winxml"}
 
 
 def _table(path: Path) -> dict | None:
