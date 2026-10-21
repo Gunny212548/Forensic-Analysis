@@ -72,3 +72,36 @@ Q43); `tests/check_windows.py --evtx` documents how its references were made.
 - Not seen in any sample, so not handled: arrays of GUID / FILETIME (0x8f / 0x91); ANSI strings
   are decoded with the library's default windows-1252 (a Thai-locale ANSI string would need
   windows-874).
+
+## W3 - Splunk's classic WinEventLog text (2026-10-21)
+
+A time line (`MM/DD/YYYY hh:mm:ss AM`), `LogName=` ... header lines, then `Message=` and the
+**rendered** message - the layout is observed (Splunk's docs refuse automated access). Identified
+by a time line followed by `LogName=` in the first 50 lines (`read_as: winsplunk`).
+
+- **The message names no item.** `Account For Which Logon Failed: / Account Name: X` is
+  `TargetUserName`. Windows' own message templates say so: `ProviderMetadata.Events` gives per
+  event ID and version the message with `%n` and the template's item names in order.
+  `tools/export_win_templates.ps1` exports Security-Auditing (502) and Eventlog (44, for
+  1100 / 1102) into `app/data/windows/` - committed (Q45), the Linux container cannot read them.
+- **Matched line by line, not one regex**: a lazy-group regex over a 28-insertion message
+  backtracks badly when a version does not fit. A literal line must read the same, a `%n` line
+  gives its values, other lines continue the previous value (4672 PrivilegeList, 4662 Properties,
+  blank lines inside 5145's Accesses). Newest version first.
+- **The same version differs between Windows builds**: 5156 version 1 on Windows 11 has
+  `InterfaceIndex` / `FilterOrigin` that an older build's version 1 lacks. A leftover
+  `Label:<tab>` line therefore rejects a template instead of being swallowed as a continuation,
+  and a message no template fits is kept whole as `Message` and counted
+  (`windows.unmatched_messages`) - never mislabelled. Of 1,553 lab events with EventData, only
+  5156 v1 had other names or order than this PC's template.
+- **Values are as rendered (Q46)**: a SID as its account (`ATTACKRANGE\Administrator`), a `%%`
+  parameter as its text. Hex is the exception that can be undone losslessly: the message writes
+  `0xC000006D`, the event stores `0xc000006d`, and the template's `outType` says which items are
+  hex - those are lower-cased. Control characters become `_`, as in Windows' XML.
+- **Time has no zone (Q44)**: taken as written, GMT+7 by #21, flagged unconfirmed.
+- Measured: attack_data account_lockout (9,245 events, 46 IDs) and both committed captures -
+  every message named; Windows-rendered messages of the lab's 1,577 Security events read back:
+  18,002 items equal to the XML, 1,597 SIDs / `%%` as rendered, 0 other. ~32k records/s.
+- Seen in passing, not changed here: on the lockout capture R2006 flags the DC's own machine
+  account `WIN-DC-259$` (177 rows, 4 sources) - Windows 4624s include computer accounts, which
+  the multi-source rule was not written for.

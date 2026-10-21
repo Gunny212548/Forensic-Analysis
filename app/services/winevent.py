@@ -40,6 +40,7 @@ events but not their fields.
 """
 
 import bisect
+import functools
 import gzip
 import io
 import json
@@ -95,6 +96,21 @@ EVTX_DOCS = (
      "https://github.com/omerbenamram/pyevtx-rs"),
     *DOCS,
 )
+
+# Splunk's classic WinEventLog text (W3) - observed: Splunk's docs refuse
+# automated access. A record is a time line, `LogName=` and the other header
+# lines, then `Message=` and the rendered message.
+_SPLUNK_TIME = re.compile(r"^\d{2}/\d{2}/\d{4} \d{1,2}:\d{2}:\d{2} [AP]M\s*$")
+SPLUNK_PROFILE_ID = "windows-splunk-text"
+SPLUNK_NAME = "Windows event log (Splunk WinEventLog text)"
+SPLUNK_DOCS = (
+    ("Microsoft - ProviderMetadata.Events: each event's message template and data item names "
+     "(exported to app/data/windows by tools/export_win_templates.ps1)",
+     "https://learn.microsoft.com/en-us/dotnet/api/"
+     "system.diagnostics.eventing.reader.providermetadata.events"),
+    *DOCS,
+)
+_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "data" / "windows"
 
 # Channel -> Sigma logsource (taxonomy v2.1.0). Any other channel is
 # product windows with the channel named.
@@ -359,9 +375,17 @@ def _first(data: dict, names: tuple[str, ...]) -> str | None:
 
 
 def _when(text: str | None) -> datetime | None:
-    """SystemTime (UTC, `...Z`, up to 100 ns) -> naive GMT+7."""
+    """SystemTime (UTC, `...Z`, up to 100 ns) -> naive GMT+7. Splunk's
+    `MM/DD/YYYY hh:mm:ss AM` states no zone: taken as written - GMT+7 by
+    gotcha #21, flagged timezone-unconfirmed (Q44)."""
     if not text:
         return None
+    m = _SPLUNK_TIME.match(text)
+    if m:
+        try:
+            return datetime.strptime(text.strip(), "%m/%d/%Y %I:%M:%S %p")
+        except ValueError:
+            return None
     t = text.strip().replace("Z", "+00:00")
     m = re.match(r"^(.*\.\d{6})\d+(\+.*)$", t)  # fromisoformat takes 6 fraction digits
     if m:
@@ -683,3 +707,204 @@ def iter_evtx(path: Path, progress=None, errors: list | None = None,
                      "its chunk header is damaged - how many records it held cannot be known", 0)
     if progress:
         progress(1.0)
+
+
+# --- Splunk classic WinEventLog text (W3) ----------------------------------
+
+@dataclass
+class SplunkRecord:
+    """One record's text: the time line through the end of its message."""
+    text: str
+
+
+def is_splunk_text(head: str) -> bool:
+    """A Splunk time line followed by `LogName=` within the first 50 lines (a
+    few lines before it - a search's preamble - are kept as a row when read)."""
+    lines = head.lstrip("﻿").splitlines()[:51]
+    return any(_SPLUNK_TIME.match(a) and b.startswith("LogName=") for a, b in zip(lines, lines[1:]))
+
+
+def splunk_channels(head: str) -> list[str]:
+    return [c.strip() for c in re.findall(r"^LogName=(.*)$", head, re.M) if c.strip()]
+
+
+def iter_splunk_records(path: Path, progress=None) -> Iterator[SplunkRecord | Damage]:
+    """Each record of a Splunk WinEventLog text file, in order. A record
+    starts at a time line followed by `LogName=`, so a message line that
+    happens to hold a date does not cut it. Text before the first record is
+    kept as a Damage row, never dropped."""
+    report = parsers._reporter(path, progress)
+    current: list[str] = []
+    pending: str | None = None  # a time line, until the next line says whether it starts a record
+
+    def flush():
+        if not current:
+            return None
+        text = "\n".join(current).rstrip("\n")
+        current.clear()
+        if text.strip():
+            return SplunkRecord(text) if _SPLUNK_TIME.match(text.split("\n", 1)[0]) else \
+                Damage("[not a Splunk WinEventLog record] " + text, 1)
+        return None
+
+    with parsers.open_text(path) as fh:
+        for n, raw in enumerate(fh, 1):
+            line = raw.rstrip("\r\n")
+            if pending is not None:
+                if line.startswith("LogName="):
+                    done = flush()
+                    if done:
+                        yield done
+                current.append(pending)
+                pending = None
+            if _SPLUNK_TIME.match(line):
+                pending = line
+                continue
+            current.append(line)
+            if report and n % 2000 == 0:
+                report(fh)
+    if pending is not None:
+        current.append(pending)
+    done = flush()
+    if done:
+        yield done
+
+
+@functools.cache
+def _providers() -> dict[str, dict]:
+    """Display name -> {"name", "events": {id: [templates, newest version first]}}
+    from the exported provider metadata (Q45)."""
+    out = {}
+    for path in sorted(_TEMPLATE_DIR.glob("*.json")):
+        meta = json.loads(path.read_text(encoding="utf-8"))
+        events: dict[int, list] = {}
+        for e in meta["events"]:
+            events.setdefault(e["id"], []).append(e)
+        for versions in events.values():
+            versions.sort(key=lambda e: -e["version"])
+        out[meta["display"]] = {"name": meta["provider"], "events": events}
+    return out
+
+
+_INSERT = re.compile(r"%(\d+)(?:![^!]*!)?")
+
+
+@functools.cache
+def _line_pattern(template_line: str) -> tuple[re.Pattern, tuple[int, ...]]:
+    """One template line as a pattern over a rendered line: its words as
+    written, any run of whitespace as any whitespace, each %n a value (the last
+    one runs to the end of the line)."""
+    parts = _INSERT.split(template_line)
+    numbers = tuple(int(p) for p in parts[1::2])
+    out = []
+    for i, part in enumerate(parts):
+        if i % 2:
+            out.append("(.*)" if i == len(parts) - 2 else "(.*?)")
+        else:
+            out.append("".join(r"\s*" if t.isspace() else re.escape(t)
+                               for t in re.split(r"(\s+)", part) if t))
+    return re.compile(r"\s*" + "".join(out) + ("" if numbers else r"\s*") + "$"), numbers
+
+
+# A "Label:<tab>" line at the margin or one tab in: a field of the message, never
+# a value continuing. One left over means the template is another build's - the
+# same version of 5156 has two more fields on Windows 11 than on older builds.
+_LABELLED = re.compile(r"^\t?[A-Za-z][^\t:]*:\t")
+_HEX = re.compile(r"^0x[0-9A-F]+$")
+
+
+def _match_template(message: list[str], template: str, names: list[str],
+                    hex_names: tuple[str, ...] = ()) -> dict[str, str] | None:
+    """Align the rendered message with one template, line by line: a line
+    without an insertion must read the same; a line with one gives its values;
+    lines that fit no template line are the previous value continuing (4672's
+    PrivilegeList) - unless they are a field's own line. None when they do not
+    align."""
+    tlines = template.split("\n")
+    values: dict[str, str] = {}
+    j = 0
+    last = None  # the name of the value a continuation line belongs to
+
+    def fits(t: str, line: str) -> bool:
+        return bool(_line_pattern(t)[0].match(line)) if t.strip() else not line.strip()
+    for t in tlines:
+        while True:
+            if j >= len(message):
+                return None
+            if fits(t, message[j]):
+                break
+            # A continuation of the previous value (blank lines too: 4662's
+            # Properties); with no value open, the template does not fit.
+            if last is None or _LABELLED.match(message[j]):
+                return None
+            values[last] += "\n" + message[j]
+            j += 1
+        pattern, numbers = _line_pattern(t)
+        if numbers:
+            m = pattern.match(message[j])
+            for n, v in zip(numbers, m.groups()):
+                if 0 < n <= len(names):
+                    values[names[n - 1]] = v
+            last = names[numbers[-1] - 1] if 0 < numbers[-1] <= len(names) else None
+        elif t.strip():
+            last = None  # a label line closes the value; a blank one may not (4662)
+        j += 1
+    # The last value may continue up to the blank line before the explanation.
+    while j < len(message) and message[j].strip():
+        if not last or _LABELLED.match(message[j]):
+            return None
+        values[last] += "\n" + message[j]
+        j += 1
+    # Blank lines a multi-line value ran over before the next label are layout;
+    # a hex value is written as the event stores it.
+    return {k: re.sub(r"(\n[ \t]*)+$", "", v) if "\n" in v
+            else v.lower() if k in hex_names and _HEX.match(v) else v
+            for k, v in values.items()}
+
+
+def parse_splunk(text: str) -> dict | None:
+    """One Splunk WinEventLog record as parse_event's dict, or None when it
+    has no EventCode. Items named from the provider's message templates
+    (newest version first); a message no template fits is kept whole as
+    `Message` and the dict says so (`template_matched`)."""
+    lines = text.split("\n")
+    header: dict[str, str] = {}
+    message: list[str] = []
+    for i, line in enumerate(lines[1:], 1):
+        if line.startswith("Message="):
+            message = [line[len("Message="):]] + lines[i + 1:]
+            break
+        key, sep, value = line.partition("=")
+        if sep:
+            header[key.strip()] = value.strip()
+    try:
+        event_id = int(header.get("EventCode", ""))
+    except ValueError:
+        return None
+    while message and not message[-1].strip():
+        message.pop()
+    display = header.get("SourceName")
+    provider = _providers().get(display or "")
+    data, matched = None, False
+    if provider:
+        for template in provider["events"].get(event_id, []):
+            data = _match_template(message, template["message"], template["names"],
+                                   tuple(template.get("hex", ())))
+            if data is not None:
+                matched = True
+                break
+    if data is None:
+        data = {"Message": "\n".join(message)}
+    # A character XML cannot hold, as Windows' event XML writes it (see .evtx).
+    data = {k: _ILLEGAL.sub("_", v) for k, v in data.items()}
+    return {
+        "provider": provider["name"] if provider else display,
+        "event_id": event_id,
+        "time_created": lines[0].strip(),
+        "record_id": header.get("RecordNumber"),
+        "channel": header.get("LogName"),
+        "computer": header.get("ComputerName"),
+        "user_sid": None,
+        "data": data,
+        "template_matched": matched,
+    }

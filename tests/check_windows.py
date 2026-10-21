@@ -1,12 +1,12 @@
-"""Windows event logs, W1 + W2: the core, event XML and .evtx
+"""Windows event logs, W1-W3: the core, event XML, .evtx and Splunk's WinEventLog text
 (app/services/winevent.py, specs/windows_event_logs.md).
 
     python tests/check_windows.py <scratch dir> [--repo DIR] [--evtx D:/logtest/windows]
 
 Throwaway store, the real pipeline, no server. Checks:
 
-- identification: event XML is supported with the Sigma logsource of its
-  channel; Splunk's text rendering stays no_reader (W3); an .evtx is read (W2);
+- identification: event XML and Splunk text are supported with the Sigma logsource of their
+  channel; an .evtx is read (W2);
 - the committed Splunk attack_data captures read to the letter: the Sysmon
   sample and PurpleSharp's NTLM spray (Security XML) - counts per event ID,
   event types, every item kept in win_events under its own name, UTC -> GMT+7;
@@ -15,7 +15,10 @@ Throwaway store, the real pipeline, no server. Checks:
 - a synthetic file: an XML declaration and an <Events> wrapper, an event that
   spans lines, a 1102 with UserData, unnamed Data items (param<n>), a damaged
   event counted and kept as text - never dropped;
-- the same counts through .gz and inside a .zip.
+- the same counts through .gz and inside a .zip;
+- Splunk's classic text (W3): attack_data's PurpleSharp spray capture named item by item
+  from Windows' message templates (R2000 / R2009 as for XML), hex values in the stored
+  form, multi-line values whole, damage and unmatched messages kept, .gz / .zip.
 
 With --evtx, on the lab folder kept outside the repo (Q43): it holds a clone of
 EVTX-ATTACK-SAMPLES (GPL-3.0) and this machine's System log exported twice -
@@ -27,14 +30,18 @@ console code page and loses what it cannot show):
     Get-WinEvent -Path this-pc-System.evtx -Oldest | ForEach-Object { $w.WriteLine($_.ToXml()) }
     $w.Close()
 
+(and the same for every sample, as toxml/<sample path>.xml):
 
 - all 278 samples identified by their channel, every record each chunk header
-  names returned and parsed;
+  names returned and parsed, and equal to Windows' XML of it;
 - the .evtx read through the pipeline equals Windows' XML of it, event by event
-  and item by item (FILETIME to the microsecond - the library's precision);
+  and item by item (GUIDs, FILETIME / SYSTEMTIME to 100 ns, from the record's types);
 - a cut file and an overwritten chunk: the missing records counted from the
   chunk headers and kept as a row, never dropped;
-- a Sysmon sample through .gz and inside a .zip.
+- a Sysmon sample through .gz and inside a .zip;
+- W3: attack_data account_lockout (splunk-text/), and the lab's Security events rendered by
+  Windows in Splunk's layout (tests/make_splunk_text.ps1) read back equal to their XML, but
+  for SIDs and %% parameters, which the message shows rendered (Q46).
 
 stdlib + the app's own modules (+ the `evtx` wheel for .evtx).
 """
@@ -185,6 +192,124 @@ def check_evtx(lab: Path, run, win, query) -> None:
           f"Sysmon 1 typed, ProcessGuid as Windows renders it ({p1[:1]})")
 
 
+SPLUNK_SYNTHETIC = """junk before the first record
+04/20/2021 09:11:18 PM
+LogName=Security
+SourceName=Microsoft Windows security auditing.
+EventCode=4625
+ComputerName=dc01.example.test
+RecordNumber=7
+Message=This is not the message Windows writes for 4625.
+04/20/2021 09:11:19 PM
+LogName=Security
+SourceName=Microsoft Windows security auditing.
+EventCode=not-a-number
+Message=An account failed to log on.
+"""
+
+
+def check_splunk(lab: Path | None, scratch: Path, run, win, query) -> None:
+    """W3: Splunk's classic WinEventLog text, items named from Windows' message
+    templates (app/data/windows, tools/export_win_templates.ps1)."""
+    from app.services import identify, winevent
+
+    print("Splunk WinEventLog text - PurpleSharp spray (attack_data)")
+    spray = SAMPLES / "windows-security-text-spray.log"
+    r = identify.identify(spray, "log")
+    check((r["status"], r["sigma"], r.get("read_as")) == ("supported", {"product": "windows", "service": "security"},
+                                                          "winsplunk"),
+          f"identified as Splunk text, windows/security ({r['status']} {r['sigma']})")
+    m = run(spray)
+    w = win(m)
+    check(m["status"] == "ready" and (w.get("events"), w.get("unreadable"), w.get("unmatched_messages")) == (162, 0, 0),
+          f"162 events, every message named from its template ({w.get('events')}, {w.get('unmatched_messages')})")
+    check(m.get("rules_matched") == {"R2000": 20, "R2009": 20},
+          f"the spray fires R2000 and R2009 as the XML capture does ({m.get('rules_matched')})")
+    row = query(m["case_id"], "SELECT e.ts, e.ts_raw, e.srcip, e.username, e.app, w.data FROM raw_events e "
+                "JOIN win_events w USING (row_id) WHERE w.event_id = 4625 ORDER BY row_id LIMIT 1")[0]
+    d = row[5]
+    check(str(row[0]) == "2021-04-20 21:11:18" and row[1] == "04/20/2021 09:11:18 PM",
+          f"time as written, no zone - GMT+7 by gotcha #21, unconfirmed (Q44) ({row[0]} from {row[1]})")
+    check((row[2], row[3], row[4]) == ("10.0.1.15", "KERRI_RIVERS", "Network (3)")
+          and (d["IpAddress"], d["TargetUserName"], d["LogonType"], d["WorkstationName"])
+          == ("10.0.1.15", "KERRI_RIVERS", "3", "WIN-HOST-816"),
+          "4625's values under their Data names (Account For Which Logon Failed / Account Name -> TargetUserName)")
+    check((d["Status"], d["SubStatus"], d["LogonProcessName"]) == ("0xc000006d", "0xc000006a", "NtLmSsp "),
+          f"hex values as the event stores them, a trailing space kept ({d['Status']}, {d['LogonProcessName']!r})")
+    priv = query(m["case_id"], "SELECT data['PrivilegeList'] FROM win_events WHERE event_id = 4672 LIMIT 1")[0][0]
+    check(priv.startswith("SeSecurityPrivilege\n") and priv.rstrip().endswith("Privilege"),
+          "4672's PrivilegeList is whole across its lines")
+    m4688 = run(SAMPLES / "windows-security.log")
+    cmd = query(m4688["case_id"], "SELECT count(*) FROM win_events WHERE data['CommandLine'] ILIKE '%comsvcs.dll%MiniDump%'")[0][0]
+    check(cmd == 4, f"4688's Process Command Line is CommandLine - a Sigma-style query finds the lsass dump ({cmd})")
+
+    print("Splunk text - damage and messages no template fits")
+    syn = scratch / "splunk-synthetic.log"
+    syn.write_text(SPLUNK_SYNTHETIC, encoding="utf-8")
+    m = run(syn)
+    w = win(m)
+    raw = [e["raw"] for e in __import__("app.services.db", fromlist=["db"]).list_raw(m["case_id"], 10, 0)]
+    check((w.get("rows"), w.get("events"), w.get("unreadable"), w.get("unmatched_messages")) == (3, 1, 2, 1)
+          and any(x.startswith("[not a Splunk WinEventLog record] junk") for x in raw)
+          and any(x.startswith("[unreadable Splunk WinEventLog record]") for x in raw),
+          f"text before the first record and a record with no EventCode kept as rows; a message no "
+          f"template fits counted ({w})")
+    msg = query(m["case_id"], "SELECT data FROM win_events")[0][0]
+    check(list(msg) == ["Message"], f"...and kept whole as Message, nothing guessed ({list(msg)})")
+
+    gz = scratch / "spray.log.gz"
+    with gzip.open(gz, "wb") as fh:
+        fh.write(spray.read_bytes())
+    zp = scratch / "spray-text.zip"
+    with zipfile.ZipFile(zp, "w") as z:
+        z.write(spray, "WinEventLog-Security.txt")
+    base = sorted(query(run(spray)["case_id"], "SELECT event_id, count(*) FROM win_events GROUP BY 1"))
+    check(all(sorted(query(x["case_id"], "SELECT event_id, count(*) FROM win_events GROUP BY 1")) == base
+              for x in (run(gz, "log", "log.gz"), run(zp, "zip", "zip"))),
+          "the same through .gz and inside a .zip")
+
+    if lab is None:
+        return
+    print("Splunk text - lab (outside the repo)")
+    lockout = lab / "splunk-text" / "account_lockout-windows-security.log"
+    m = run(lockout)
+    w = win(m)
+    ids = query(m["case_id"], "SELECT count(DISTINCT event_id) FROM win_events")[0][0]
+    check(m["status"] == "ready" and (w.get("events"), w.get("unmatched_messages"), ids) == (9245, 0, 46),
+          f"attack_data account_lockout: 9,245 events of 46 event IDs, every message named "
+          f"({w.get('events')}, {w.get('unmatched_messages')}, {ids} IDs)")
+    check(m.get("rules_matched", {}).get("R2000") == 24 and m.get("rules_matched", {}).get("R2008") == 3,
+          f"the account brute-forced, then signed in to (R2000, R2008) ({m.get('rules_matched')})")
+
+    # Windows' own rendering of the lab's Security events (tests/make_splunk_text.ps1),
+    # read back and compared item by item with the same events' XML.
+    same = rendered = other = 0
+    bad = []
+    for f in sorted((lab / "splunk-text" / "from-evtx").rglob("*.log")):
+        rel = str(f.relative_to(lab / "splunk-text" / "from-evtx"))[:-4]
+        xml = {e["record_id"]: e for e in map(winevent.parse_event,
+                                              winevent.iter_event_texts(lab / "toxml" / (rel + ".xml"))) if e}
+        for rec in winevent.iter_splunk_records(f):
+            s = winevent.parse_splunk(rec.text)
+            if s["event_id"] == 5156:  # rendered here with this build's template - see the script
+                continue
+            if not s["template_matched"]:
+                bad.append((rel, s["event_id"], "unmatched"))
+                continue
+            x = xml[s["record_id"]]["data"]
+            for k, v in s["data"].items():
+                if x.get(k) == v:
+                    same += 1
+                elif (x.get(k) or "").startswith("S-1-") or "%%" in (x.get(k) or ""):
+                    rendered += 1  # a SID shown as its account, a %% parameter as its text (Q46)
+                else:
+                    other += 1
+                    bad.append((rel, s["event_id"], k, v[:40], (x.get(k) or "")[:40]))
+    check(not bad and same > 18000,
+          f"Windows-rendered messages read back: {same} items equal to the XML, {rendered} SIDs / %% "
+          f"parameters as rendered, {other} other {bad[:3]}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("scratch")
@@ -204,8 +329,6 @@ def main() -> int:
         check((r["status"], r["sigma"], r.get("read_as")) == ("supported", {"product": "windows", "service": service},
                                                               "winxml"),
               f"{name}: supported, windows/{service} ({r['status']} {r['sigma']})")
-    r = identify.identify(SAMPLES / "windows-security.log", "log")
-    check(r["status"] == "no_reader", f"Splunk's text rendering stays no_reader until W3 ({r['status']})")
     empty = scratch / "empty.evtx"
     empty.write_bytes(b"ElfFile\x00" + b"\x00" * 4088)
     r = identify.identify(empty, "log")
@@ -313,6 +436,7 @@ def main() -> int:
 
     if args.evtx:
         check_evtx(Path(args.evtx), run, win, query)
+    check_splunk(Path(args.evtx) if args.evtx else None, scratch, run, win, query)
 
     print()
     print(f"{len(FAILED)} FAILED" if FAILED else "WINDOWS OK")

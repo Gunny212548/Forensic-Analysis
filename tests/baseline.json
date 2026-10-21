@@ -5,9 +5,21 @@
   "rows": 3,
   "rules": {}
  },
+ "4624_LT3_AnonymousLogon_Localhost_-_JuicyPotato.evtx.log": {
+  "flagged": 0,
+  "md5": "fd6e97b99f71a084751e76fdc489834c",
+  "rows": 3,
+  "rules": {}
+ },
  "4765_sidhistory_add_t1178.evtx": {
   "flagged": 0,
   "md5": "5f2d9a7383b9173a2cae6ae29a0f0dbd",
+  "rows": 3,
+  "rules": {}
+ },
+ "4765_sidhistory_add_t1178.evtx.log": {
+  "flagged": 0,
+  "md5": "e3d683c6a50723440dced94b3d1c69af",
   "rows": 3,
   "rules": {}
  },
@@ -17,9 +29,21 @@
   "rows": 1,
   "rules": {}
  },
+ "4794_DSRM_password_change_t1098.evtx.log": {
+  "flagged": 0,
+  "md5": "89327f9a48ad53aea1560fd1c82cdce8",
+  "rows": 1,
+  "rules": {}
+ },
  "4799_remote_local_groups_enumeration.evtx": {
   "flagged": 0,
   "md5": "7054a6d8aa9ecd4b03c723b84a58a3ef",
+  "rows": 5,
+  "rules": {}
+ },
+ "4799_remote_local_groups_enumeration.evtx.log": {
+  "flagged": 0,
+  "md5": "f6293f717e94a77945d1d1b63c03d2b5",
   "rows": 5,
   "rules": {}
  },
@@ -29,15 +53,33 @@
   "rows": 55,
   "rules": {}
  },
+ "ACL_ForcePwd_SPNAdd_User_Computer_Accounts.evtx.log": {
+  "flagged": 0,
+  "md5": "2625120b80ed98a4f8139188ef8885f4",
+  "rows": 55,
+  "rules": {}
+ },
  "CA_4624_4625_LogonType2_LogonProc_chrome.evtx": {
   "flagged": 0,
   "md5": "6fed95d86ae1ae216bccf6ca45207121",
   "rows": 4,
   "rules": {}
  },
+ "CA_4624_4625_LogonType2_LogonProc_chrome.evtx.log": {
+  "flagged": 0,
+  "md5": "14aa568c3efed2e41d23409f46be96a7",
+  "rows": 4,
+  "rules": {}
+ },
  "CA_DCSync_4662.evtx": {
   "flagged": 0,
   "md5": "becffbf52ebce7b4532557a95f343b00",
+  "rows": 3,
+  "rules": {}
+ },
+ "CA_DCSync_4662.evtx.log": {
+  "flagged": 0,
+  "md5": "8337f384ebf4d396d1392ddaaa2d1074",
   "rows": 3,
   "rules": {}
  },
@@ -59,9 +101,21 @@
   "rows": 5,
   "rules": {}
  },
+ "CA_chrome_firefox_opera_4663.evtx.log": {
+  "flagged": 0,
+  "md5": "e0c31497e637a26b738c439584b70403",
+  "rows": 5,
+  "rules": {}
+ },
  "CA_hashdump_4663_4656_lsass_access.evtx": {
   "flagged": 0,
   "md5": "f7c6ca9355c92c87eb0377de38882e82",
+  "rows": 2,
+  "rules": {}
+ },
+ "CA_hashdump_4663_4656_lsass_access.evtx.log": {
+  "flagged": 0,
+  "md5": "380b117c1c0c142c5d79a2251fe0d7bf",
   "rows": 2,
   "rules": {}
  },
@@ -80,6 +134,12 @@
  "CA_protectedstorage_5145_rpc_masterkey.evtx": {
   "flagged": 0,
   "md5": "d78b6f501ea45d9e576f54b023b9beef",
+  "rows": 1,
+  "rules": {}
+ },
+ "CA_protectedstorage_5145_rpc_masterkey.evtx.log": {
+  "flagged": 0,
+  "md5": "9a6b300259020617cb9dd407d2ef47fa",
   "rows": 1,
   "rules": {}
  },
@@ -107,6 +167,12 @@
   "rows": 28,
   "rules": {}
  },
+ "DACL_DCSync_Right_Powerview__Add-DomainObjectAcl.evtx.log": {
+  "flagged": 0,
+  "md5": "cad29534bcabce0eee62f6e0464dfd6d",
+  "rows": 28,
+  "rules": {}
+ },
  "DE_104_system_log_cleared.evtx": {
   "flagged": 0,
   "md5": "3c3e61b2c463ec22962f718055c26456",
@@ -116,6 +182,12 @@
  "DE_1102_security_log_cleared.evtx": {
   "flagged": 0,
   "md5": "0868ba6f10c24411f5536e05d50aaa1a",
+  "rows": 112,
+  "rules": {}
+ },
+ "DE_1102_security_log_cleared.evtx.log": {
+  "flagged": 0,
+  "md5": "a98b7699c129faf969b003abcb9a8fe7",
   "rows": 112,
   "rules": {}
  },
@@ -137,9 +209,21 @@
   "rows": 2,
   "rules": {}
  },
+ "DE_Fake_ComputerAccount_4720.evtx.log": {
+  "flagged": 0,
+  "md5": "953e9c0c8cbb773c780fbadafcf14969",
+  "rows": 2,
+  "rules": {}
+ },
  "DE_KernelDebug_and_TestSigning_ON_Security_4826.evtx": {
   "flagged": 0,
   "md5": "4ceb2ee5f35d0c8043c1195218418e2e",
+  "rows": 6,
+  "rules": {}
+ },
+ "DE_KernelDebug_and_TestSigning_ON_Security_4826.evtx.log": {
+  "flagged": 0,
+  "md5": "dce6daed909a52ba860c86d3c757ba1d",
   "rows": 6,
   "rules": {}
  },
@@ -161,9 +245,21 @@
   "rows": 101,
   "rules": {}
  },
+ "DE_RDP_Tunnel_5156.evtx.log": {
+  "flagged": 0,
+  "md5": "34b7c21e77464d1cf4792ce6b9fb9e46",
+  "rows": 101,
+  "rules": {}
+ },
  "DE_RDP_Tunneling_4624.evtx": {
   "flagged": 0,
   "md5": "569be8374bf3c347ff942205d0434cf4",
+  "rows": 18,
+  "rules": {}
+ },
+ "DE_RDP_Tunneling_4624.evtx.log": {
+  "flagged": 0,
+  "md5": "f5a46445d903e8c4f1250c0397d59cbf",
   "rows": 18,
   "rules": {}
  },
@@ -200,6 +296,12 @@
  "DE_suspicious_remote_eventlog_svc_access_5145.evtx": {
   "flagged": 0,
   "md5": "11c7a1059f417886a3343279d8b9c39b",
+  "rows": 8,
+  "rules": {}
+ },
+ "DE_suspicious_remote_eventlog_svc_access_5145.evtx.log": {
+  "flagged": 0,
+  "md5": "cf3d654104b5f6c856b64b214f4380b5",
   "rows": 8,
   "rules": {}
  },
@@ -275,9 +377,21 @@
   "rows": 14,
   "rules": {}
  },
+ "ImpersonateUser-via_local_Pass_The_Hash_Sysmon_and_Security.evtx.log": {
+  "flagged": 0,
+  "md5": "cd99e6caa8926aa8696c84aa6866f61a",
+  "rows": 2,
+  "rules": {}
+ },
  "Invoke_TokenDuplication_UAC_Bypass4624.evtx": {
   "flagged": 0,
   "md5": "0688d52a80c672a1b9707087a895a0cf",
+  "rows": 1,
+  "rules": {}
+ },
+ "Invoke_TokenDuplication_UAC_Bypass4624.evtx.log": {
+  "flagged": 0,
+  "md5": "f1045efc32768dc6083283029e18b516",
   "rows": 1,
   "rules": {}
  },
@@ -302,9 +416,21 @@
   "rows": 6,
   "rules": {}
  },
+ "LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx.log": {
+  "flagged": 0,
+  "md5": "5682f9b998a810f409bc91da37dcc342",
+  "rows": 6,
+  "rules": {}
+ },
  "LM_5145_Remote_FileCopy.evtx": {
   "flagged": 0,
   "md5": "3cd9b43d1b44ea6742b562d780793d41",
+  "rows": 869,
+  "rules": {}
+ },
+ "LM_5145_Remote_FileCopy.evtx.log": {
+  "flagged": 0,
+  "md5": "1099dde9d5139e1e6015f43a7e714098",
   "rows": 869,
   "rules": {}
  },
@@ -338,9 +464,21 @@
   "rows": 30,
   "rules": {}
  },
+ "LM_REMCOM_5145_TargetHost.evtx.log": {
+  "flagged": 0,
+  "md5": "797d4cc5a305538521ca1f072bbf3d7f",
+  "rows": 30,
+  "rules": {}
+ },
  "LM_Remote_Service01_5145_svcctl.evtx": {
   "flagged": 0,
   "md5": "a3f5dd974a403a9987a5fe95bc54b8d5",
+  "rows": 1,
+  "rules": {}
+ },
+ "LM_Remote_Service01_5145_svcctl.evtx.log": {
+  "flagged": 0,
+  "md5": "e4b8e818564b39a4d762fce35017e5cf",
   "rows": 1,
   "rules": {}
  },
@@ -356,15 +494,33 @@
   "rows": 34,
   "rules": {}
  },
+ "LM_ScheduledTask_ATSVC_target_host.evtx.log": {
+  "flagged": 0,
+  "md5": "9f5c31533a6a88c8cf980dd17af3f07e",
+  "rows": 34,
+  "rules": {}
+ },
  "LM_WMIC_4648_rpcss.evtx": {
   "flagged": 0,
   "md5": "ed3e19e3218e9c034ec22f0c5d783c31",
   "rows": 5,
   "rules": {}
  },
+ "LM_WMIC_4648_rpcss.evtx.log": {
+  "flagged": 0,
+  "md5": "415651abb1aaf91e95842d70ec4d69f6",
+  "rows": 5,
+  "rules": {}
+ },
  "LM_WMI_4624_4688_TargetHost.evtx": {
   "flagged": 0,
   "md5": "8553f8eda7d812e96a63056928592f69",
+  "rows": 8,
+  "rules": {}
+ },
+ "LM_WMI_4624_4688_TargetHost.evtx.log": {
+  "flagged": 0,
+  "md5": "691294f6351011a8247b0bb85f852769",
   "rows": 8,
   "rules": {}
  },
@@ -395,6 +551,12 @@
  "LM_renamed_psexecsvc_5145.evtx": {
   "flagged": 0,
   "md5": "4f8478211c8b985a70dff88dd6c3364e",
+  "rows": 22,
+  "rules": {}
+ },
+ "LM_renamed_psexecsvc_5145.evtx.log": {
+  "flagged": 0,
+  "md5": "27c0715f6d7150c6f1e693e1213cd69d",
   "rows": 22,
   "rules": {}
  },
@@ -509,9 +671,21 @@
   "rows": 11,
   "rules": {}
  },
+ "NTLM2SelfRelay-med0x2e-security_4624_4688.evtx.log": {
+  "flagged": 0,
+  "md5": "9774322e4ded1fdaadfda63bc8a995f1",
+  "rows": 11,
+  "rules": {}
+ },
  "Network_Service_Guest_added_to_admins_4732.evtx": {
   "flagged": 0,
   "md5": "42a2d5817a5f56fa3a363422615bd6a5",
+  "rows": 2,
+  "rules": {}
+ },
+ "Network_Service_Guest_added_to_admins_4732.evtx.log": {
+  "flagged": 0,
+  "md5": "b16dbc97056d9d7b4c3814e5382cd126",
   "rows": 2,
   "rules": {}
  },
@@ -563,9 +737,21 @@
   "rows": 1,
   "rules": {}
  },
+ "PrivEsc_NetSvc_SessionToken_Retrival_via_localSMB_Auth_5145.evtx.log": {
+  "flagged": 0,
+  "md5": "37c2e44ce26ae56b0461aeac284428bf",
+  "rows": 1,
+  "rules": {}
+ },
  "PrivEsc_SeImpersonatePriv_enabled_back_for_upnp_localsvc_4698.evtx": {
   "flagged": 0,
   "md5": "6a6d8b66daaee7afade6c039a88a7ab8",
+  "rows": 2,
+  "rules": {}
+ },
+ "PrivEsc_SeImpersonatePriv_enabled_back_for_upnp_localsvc_4698.evtx.log": {
+  "flagged": 0,
+  "md5": "79570aea0ebcff35744a4947ba7cd821",
   "rows": 2,
   "rules": {}
  },
@@ -584,6 +770,12 @@
  "Runas_4624_4648_Webshell_CreateProcessAsUserA.evtx": {
   "flagged": 0,
   "md5": "eb322c299e5a34d200f66c8981656b44",
+  "rows": 3,
+  "rules": {}
+ },
+ "Runas_4624_4648_Webshell_CreateProcessAsUserA.evtx.log": {
+  "flagged": 0,
+  "md5": "5a7548c5861291561e6cc2446b360c4e",
   "rows": 3,
   "rules": {}
  },
@@ -806,6 +998,12 @@
   "rows": 2,
   "rules": {}
  },
+ "Win_4985_T1186_Process_Doppelganging.evtx.log": {
+  "flagged": 0,
+  "md5": "75668b356b72af39cb7156f8db2a7bb3",
+  "rows": 2,
+  "rules": {}
+ },
  "Zerologon_CVE-2020-1472_DFIR_System_NetLogon_Error_EventID_5805.evtx": {
   "flagged": 0,
   "md5": "d7aea8552eeb2d4b1c17fd0ea363953d",
@@ -818,11 +1016,27 @@
   "rows": 9,
   "rules": {}
  },
+ "Zerologon_VoidSec_CVE-2020-1472_4626_LT3_Anonym_follwedby_4742_DC_Anony_DC.evtx.log": {
+  "flagged": 0,
+  "md5": "bca93051e27214ce5e2a693eefd75f51",
+  "rows": 9,
+  "rules": {}
+ },
  "_root_nohup_tmpesxi_encryptor_qpby.txt": {
   "flagged": 0,
   "md5": "2c308ed9b4c18f2d42bf50ca36befa27",
   "rows": 0,
   "rules": {}
+ },
+ "account_lockout-windows-security.log": {
+  "flagged": 204,
+  "md5": "9fcc620bf2baef8a8538c0292e38b71d",
+  "rows": 9245,
+  "rules": {
+   "R2000": 24,
+   "R2006": 177,
+   "R2008": 3
+  }
  },
  "ad_ssh.csv": {
   "flagged": 0,
@@ -951,6 +1165,12 @@
   "rows": 63,
   "rules": {}
  },
+ "dicovery_4661_net_group_domain_admins_target.evtx.log": {
+  "flagged": 0,
+  "md5": "c51d3292ff4b88f8ca1e4457bd224742",
+  "rows": 63,
+  "rules": {}
+ },
  "discovery_UEFI_Settings_rweverything_sysmon_6.evtx": {
   "flagged": 0,
   "md5": "357574786f5c6f4f2364bc0a39a920fc",
@@ -960,6 +1180,12 @@
  "discovery_bloodhound.evtx": {
   "flagged": 0,
   "md5": "5d7fcba0cbb0a1d688f1fd791b73386e",
+  "rows": 10,
+  "rules": {}
+ },
+ "discovery_bloodhound.evtx.log": {
+  "flagged": 0,
+  "md5": "0b6bb95da7d5dbf84f55dd58e4eb6f51",
   "rows": 10,
   "rules": {}
  },
@@ -975,6 +1201,12 @@
   "rows": 3,
   "rules": {}
  },
+ "discovery_local_user_or_group_windows_security_4799_4798.evtx.log": {
+  "flagged": 0,
+  "md5": "e5466298748d1e5e7aed09178e8ac235",
+  "rows": 3,
+  "rules": {}
+ },
  "discovery_meterpreter_ps_cmd_process_listing_sysmon_10.evtx": {
   "flagged": 0,
   "md5": "247b44a2533ffcde754588e6c2f4cea5",
@@ -984,6 +1216,12 @@
  "discovery_psloggedon.evtx": {
   "flagged": 0,
   "md5": "2a2ac935f72a78fca0b8d4dcd39e4a0e",
+  "rows": 4,
+  "rules": {}
+ },
+ "discovery_psloggedon.evtx.log": {
+  "flagged": 0,
+  "md5": "a6eb663620e5bf815e92d90a181cc6ad",
   "rows": 4,
   "rules": {}
  },
@@ -1237,6 +1475,12 @@
   "rows": 12,
   "rules": {}
  },
+ "kerberos_pwd_spray_4771.evtx.log": {
+  "flagged": 0,
+  "md5": "bf052f5dd14d454f107fb197b8927faa",
+  "rows": 12,
+  "rules": {}
+ },
  "lacp.log": {
   "flagged": 0,
   "md5": "30b4501b520d681d2117d647bfea8786",
@@ -1484,6 +1728,12 @@
   "rows": 11,
   "rules": {}
  },
+ "maldoc_mshta_via_shellbrowserwind_rundll32.evtx.log": {
+  "flagged": 0,
+  "md5": "faf22973b6da6b9a80bbf1af6daf1293",
+  "rows": 6,
+  "rules": {}
+ },
  "meterpreter_migrate_to_explorer_sysmon_8.evtx": {
   "flagged": 0,
   "md5": "0ea6204c3fc88ba31776497d5a58e989",
@@ -1493,6 +1743,12 @@
  "net_share_drive_5142.evtx": {
   "flagged": 0,
   "md5": "a51d35dd5e9c87de78b74145b7a9a857",
+  "rows": 2,
+  "rules": {}
+ },
+ "net_share_drive_5142.evtx.log": {
+  "flagged": 0,
+  "md5": "0879acbc3d282881dac9cba2c15eab8a",
   "rows": 2,
   "rules": {}
  },
@@ -1606,6 +1862,12 @@
   "rows": 10,
   "rules": {}
  },
+ "persistence_security_dcshadow_4742.evtx.log": {
+  "flagged": 0,
+  "md5": "a3f4395c9a15aa9920775d0e5a9ddd23",
+  "rows": 10,
+  "rules": {}
+ },
  "persistence_startup_UserShellStartup_Folder_Changed_sysmon_13.evtx": {
   "flagged": 0,
   "md5": "34f362d064b94cd56428a75424cd9790",
@@ -1636,9 +1898,21 @@
   "rows": 20,
   "rules": {}
  },
+ "ppl_bypass_ppldump_knowdll_hijack_sysmon_security.evtx.log": {
+  "flagged": 0,
+  "md5": "dbe4eeee8d81f3bafaec4081f257a9cd",
+  "rows": 2,
+  "rules": {}
+ },
  "privesc_KrbRelayUp_windows_4624.evtx": {
   "flagged": 0,
   "md5": "bb069ea6f207a0a2f36c372ca83273cb",
+  "rows": 1,
+  "rules": {}
+ },
+ "privesc_KrbRelayUp_windows_4624.evtx.log": {
+  "flagged": 0,
+  "md5": "e74dcfceb584883745f51203d92d4fc4",
   "rows": 1,
   "rules": {}
  },
@@ -1696,6 +1970,12 @@
   "rows": 8,
   "rules": {}
  },
+ "privexchange_dirkjan.evtx.log": {
+  "flagged": 0,
+  "md5": "f99789a527065df3b39641ff377945c9",
+  "rows": 8,
+  "rules": {}
+ },
  "process_suspend_sysmon_10_ga_800.evtx": {
   "flagged": 0,
   "md5": "e5463f86c7b05f88c842e36ce5187c54",
@@ -1720,15 +2000,33 @@
   "rows": 7,
   "rules": {}
  },
+ "remote_pwd_reset_rpc_mimikatz_postzerologon_target_DC.evtx.log": {
+  "flagged": 0,
+  "md5": "3cfcfb2da707b149c16a7839f2de0369",
+  "rows": 7,
+  "rules": {}
+ },
  "remote_sam_registry_access_via_backup_operator_priv.evtx": {
   "flagged": 0,
   "md5": "235ee2ed17f4885eb97012a04a0fbe60",
   "rows": 31,
   "rules": {}
  },
+ "remote_sam_registry_access_via_backup_operator_priv.evtx.log": {
+  "flagged": 0,
+  "md5": "6d8914bffc82f988a5ac4a2c89d09e2d",
+  "rows": 31,
+  "rules": {}
+ },
  "remote_task_update_4624_4702_same_logonid.evtx": {
   "flagged": 0,
   "md5": "80bdff42afc0f82f044926335f5cf385",
+  "rows": 8,
+  "rules": {}
+ },
+ "remote_task_update_4624_4702_same_logonid.evtx.log": {
+  "flagged": 0,
+  "md5": "72a7f1e5507e5b120beabc645249b5c7",
   "rows": 8,
   "rules": {}
  },
@@ -1768,6 +2066,12 @@
   "rows": 18,
   "rules": {}
  },
+ "samaccount_spoofing_CVE-2021-42287_CVE-2021-42278_DC_securitylogs.evtx.log": {
+  "flagged": 0,
+  "md5": "0592a28a64dbd1f8319fcc93a0e0d16e",
+  "rows": 18,
+  "rules": {}
+ },
  "sdrsinjector.log": {
   "flagged": 0,
   "md5": "543ab1e5364d966fbc96d798591d75f7",
@@ -1777,6 +2081,12 @@
  "security_4624_4673_token_manip.evtx": {
   "flagged": 0,
   "md5": "36987d8cfa7b1cecee6ce96c9eaf926c",
+  "rows": 14,
+  "rules": {}
+ },
+ "security_4624_4673_token_manip.evtx.log": {
+  "flagged": 0,
+  "md5": "e27b841144736835b7663eced855b6e5",
   "rows": 14,
   "rules": {}
  },
@@ -1831,6 +2141,12 @@
  "spoolsample_5145.evtx": {
   "flagged": 0,
   "md5": "10555d6e38c35ee9b1828c55bb3c433d",
+  "rows": 1,
+  "rules": {}
+ },
+ "spoolsample_5145.evtx.log": {
+  "flagged": 0,
+  "md5": "28d9db4483b3125174f6edb58c90e0f8",
   "rows": 1,
   "rules": {}
  },
@@ -2139,6 +2455,12 @@
   "rows": 2,
   "rules": {}
  },
+ "temp_scheduled_task_4698_4699.evtx.log": {
+  "flagged": 0,
+  "md5": "c12934389993b0903b0f2d7f8957ed43",
+  "rows": 2,
+  "rules": {}
+ },
  "this-pc-Application.evtx": {
   "flagged": 0,
   "md5": "1964a00929529c54295e8635d9b540e8",
@@ -2161,6 +2483,12 @@
   "flagged": 0,
   "md5": "7e5e98f2099a2ae401e8981794fcff1e",
   "rows": 15,
+  "rules": {}
+ },
+ "tutto_malseclogon.evtx.log": {
+  "flagged": 0,
+  "md5": "c3e74d8ea92fa23497866263dd02789b",
+  "rows": 9,
   "rules": {}
  },
  "usb.log": {
@@ -2229,6 +2557,21 @@
   "rows": 1,
   "rules": {}
  },
+ "win10_4703_SeDebugPrivilege_enabled.evtx.log": {
+  "flagged": 0,
+  "md5": "67eb6edc5f0aa80134bc87ea0b9f2c6b",
+  "rows": 1,
+  "rules": {}
+ },
+ "windows-security-text-spray.log": {
+  "flagged": 20,
+  "md5": "d7d28e325fc6108166e5d36ac486d7e1",
+  "rows": 162,
+  "rules": {
+   "R2000": 20,
+   "R2009": 20
+  }
+ },
  "windows-security-xml-spray.log": {
   "flagged": 50,
   "md5": "589ecf58da9c91d05d9aca1150e8dd6d",
@@ -2241,7 +2584,7 @@
  "windows-security.log": {
   "flagged": 0,
   "md5": "222a710ea671c23629b1201b9015d91c",
-  "rows": 0,
+  "rows": 4,
   "rules": {}
  },
  "windows-sysmon.log": {

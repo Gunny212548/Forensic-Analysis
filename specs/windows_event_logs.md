@@ -1,6 +1,6 @@
 # Windows event logs - Security, Sysmon and every format they arrive in
 
-Status: **W1 and W2 (.evtx) built 2026-10-21** (gotcha #60; W3-W5 to come). **Approved 2026-10-21** - Q40 `win_events` + MAP, Q41 4771 / 4776 typed but not counted,
+Status: **W1, W2 (.evtx) and W3 (Splunk text) built 2026-10-21** (gotcha #60; W4-W5 to come). **Approved 2026-10-21** - Q40 `win_events` + MAP, Q41 4771 / 4776 typed but not counted,
 Q42 `evtx` (pyevtx-rs) for W2, Q43 GPL samples and exports from this machine kept outside the repo. The user: "ทำ Windows Security
 กับ Sysmon reader ต่อ"; formats: "ต้องรับทุกรูปแบบที่เป็น Windows Log"; tested on **lab samples**
 until a customer file exists. No Jira story yet (IAI-92 only *identifies* these files).
@@ -97,6 +97,54 @@ put in Windows' form. Checked: 278 EVTX-ATTACK-SAMPLES files and this PC's Syste
 event identical to `Get-WinEvent .ToXml()` of the same file; a cut file and an overwritten
 chunk; `.gz` and `.zip`. The UI now states events per channel and anything unreadable
 (`Mapping.jsx`, for event XML too).
+
+## W3 - Splunk classic text (`WinEventLog`) - approved 2026-10-21 (Q44-Q47 as proposed), built
+
+What it is (observed - Splunk's docs refuse automated access): a record starts with a time line
+`MM/DD/YYYY hh:mm:ss AM|PM`, then `LogName=`, `SourceName=`, `EventCode=`, `EventType=`, `Type=`,
+`ComputerName=`, `TaskCategory=`, `OpCode=`, `RecordNumber=`, `Keywords=` lines, then `Message=`
+and the **rendered** message, which runs to the next record. The items are not named in it: the
+message says `Account For Which Logon Failed: / Account Name: KERRI_RIVERS`, not `TargetUserName`.
+
+**Item names from Windows' own message templates.** Every provider publishes, per event ID and
+version, its message with `%n` insertions and the template naming each data item in order
+(`ProviderMetadata.Events`; read on this PC: Microsoft-Windows-Security-Auditing, 502 events).
+4625's message has `Account Name:\t\t%6` under `Account For Which Logon Failed:`, and its
+template's 6th item is `TargetUserName` - so a rendered message is matched against the event's
+templates (every version - 4624 has 4) and each value gets its Data name. Nothing guessed: an
+event whose message matches no template keeps its whole message as one item `Message` and is
+said so.
+
+- Identification: the time line + `LogName=` record header (any channel; today only
+  `LogName=Security` is recognised, as no_reader).
+- System values: `EventCode` -> event_id, `ComputerName` -> computer, `RecordNumber` ->
+  record_id, `LogName` -> channel; `SourceName` is the provider's display name ("Microsoft
+  Windows security auditing.") and is turned into its name by the same provider metadata.
+- **Time (Q44):** the time line has no zone. Proposed: as gotcha #21 - taken as GMT+7 and
+  flagged `timezone-unconfirmed`; the analyst declares the source's zone at Ingest (story 3)
+  and re-processes.
+- **Templates in the repo (Q45):** exported once from this PC (Windows 11) by a small tool into
+  `app/data/windows/` as JSON - Microsoft's message text and item names. Proposed: commit it
+  (the same text is on Microsoft's event pages); the container (Linux) cannot read it from
+  Windows at run time.
+- **Values as rendered (Q46, to know rather than decide):** Splunk's text carries what the
+  message shows - a SID as an account name (`ATTACKRANGE\Administrator`), `%%1842` as `Yes`.
+  `win_events` gets the right names with those values, and the case page says so; a SigmaHQ
+  rule matching a raw SID would not match this container.
+- Not in W3: Sysmon (its provider metadata is not on this PC) and other providers - message
+  kept whole as above.
+- **Samples (Q47):** commit attack_data `T1110.003/purplesharp_remote_spray/windows-security.log`
+  (Apache-2.0, 211 KB: 4625 x20, 4624, 4776, 4672, 4688...); keep
+  `T1078.002/account_lockout` (10 MB, 46 event IDs incl. 4740 / 4768 / 4769) in
+  `D:/logtest/windows/splunk-text/`. Fidelity check: the Security events of the lab .evtx files
+  rendered by Windows (`Get-WinEvent .Message`) written in this layout, read back, and their items
+  compared with the same events' XML.
+
+As built (gotcha #60): Eventlog's templates too (1100 / 1102 are its events, in the Security
+log); hex items lower-cased as the event stores them (the template's `outType` says which);
+a leftover `Label:` line rejects a template - the same version differs between builds (5156
+v1); matched line by line, not by one regex. All 9,245 lockout events and both committed
+captures named; Windows-rendered lab messages read back equal to their XML but for SIDs / `%%`.
 
 ## Questions
 

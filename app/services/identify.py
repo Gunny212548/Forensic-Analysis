@@ -47,9 +47,6 @@ _LINE_MARKERS = [
     (re.compile(r"%FTD-[0-7]-\d{6}:"), {"sigma": {"category": "firewall"}, "custom": "cisco_ftd"},
      "Cisco Secure Firewall Threat Defense syslog",
      "message header %FTD-<severity>-<id>: (Cisco Secure Firewall Threat Defense Syslog Messages)"),
-    (re.compile(r"^LogName=Security\s*$", re.M), {"sigma": {"product": "windows", "service": "security"}},
-     "Windows Security event log (Splunk WinEventLog text)",
-     "LogName=Security record header - Splunk's rendering, not a Windows export format"),
 ]
 
 
@@ -110,6 +107,15 @@ def _windows(path: Path) -> dict | None:
                           f"file signature ElfFile (EVTX); {seen}", winevent.EVTX_PROFILE_ID),
                 "read_as": "evtx"}
     head = _head_text(path)
+    if winevent.is_splunk_text(head):
+        # Splunk's classic WinEventLog text (W3): items named from Windows' own
+        # message templates; the layout itself is observed, not documented.
+        channels = Counter(winevent.splunk_channels(head))
+        return {**_result(SUPPORTED, _channel_source(channels), winevent.SPLUNK_NAME,
+                          f"Splunk WinEventLog record header (time line, LogName=...; observed - "
+                          f"Splunk's documentation refuses automated access); channels in the first "
+                          f"{SAMPLE_BYTES // 1024} KB - {_seen(channels)}", winevent.SPLUNK_PROFILE_ID),
+                "read_as": "winsplunk"}
     if not winevent.is_event_xml(head):
         return None
     channels = Counter(c.strip() for c in winevent.channels_in(head) if c.strip())

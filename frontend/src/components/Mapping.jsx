@@ -92,7 +92,8 @@ function JsonNote({ stats, label }) {
 /** How a Windows event log was read (pipeline._ingest_winevents): events
  *  per channel, and - stated, never left out - what could not be read: an
  *  event XML record that does not parse, or .evtx records a chunk header
- *  names that the reader did not return (gotcha #60). */
+ *  names that the reader did not return - and, for Splunk's text, messages
+ *  no Windows message template fits (gotcha #60). */
 function WindowsNote({ win, label }) {
   if (!win) return null
   const n = (v) => (v ?? 0).toLocaleString()
@@ -118,6 +119,16 @@ function WindowsNote({ win, label }) {
           {' '}
           <strong>{n(chunks)} damaged {chunks === 1 ? 'chunk' : 'chunks'}</strong> with no readable header - how
           many records {chunks === 1 ? 'it' : 'they'} held cannot be known.
+        </>
+      )}
+      {win.unmatched_messages > 0 && (
+        <>
+          {' '}
+          <strong>
+            {n(win.unmatched_messages)} {win.unmatched_messages === 1 ? 'message fits' : 'messages fit'} no
+            Windows message template
+          </strong>{' '}
+          - kept whole as one item, Message; their values are not named.
         </>
       )}
       {errors.length > 0 && <div className="map-sub">Reader messages: {errors.join(' · ')}</div>}

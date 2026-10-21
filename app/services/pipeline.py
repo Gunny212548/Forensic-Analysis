@@ -432,15 +432,17 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
         return 0, False, {"method": found["status"], "profile": None, "name": found["name"],
                           "fields": {}, "heuristic_fields": [], "docs": [], "notes": [],
                           "logsource": found}
-    if found.get("profile") == winevent.PROFILE_ID:
-        # Windows event XML (W1): timeline rows and the native win_events rows.
-        mapping = _ingest_winevents(con, path, start, report)
+    if found.get("profile") in (winevent.PROFILE_ID, winevent.SPLUNK_PROFILE_ID):
+        # Windows event XML (W1) or Splunk's WinEventLog text (W3): timeline
+        # rows and the native win_events rows.
+        container = "xml" if found["profile"] == winevent.PROFILE_ID else "splunk"
+        mapping = _ingest_winevents(con, path, start, report, container)
         _file_notes(mapping, parsers.detect_encoding(path), None, found)
         return _coverage(con, start, mapping["windows"]["rows"], mapping), False, mapping
     if found.get("profile") == winevent.EVTX_PROFILE_ID:
         # .evtx (W2): the same rows, from records the evtx library renders.
         with _plain_copy(path) as plain:
-            mapping = _ingest_winevents(con, plain, start, report, evtx=True)
+            mapping = _ingest_winevents(con, plain, start, report, "evtx")
         _file_notes(mapping, None, None, found)
         return _coverage(con, start, mapping["windows"]["rows"], mapping), False, mapping
     encoding = parsers.detect_encoding(path)
@@ -533,22 +535,26 @@ def _plain_copy(path: Path):
         tmp.unlink(missing_ok=True)
 
 
-def _ingest_winevents(con, path: Path, start: int, report=_noop, evtx: bool = False) -> dict:
-    """Windows event XML, or an .evtx's records rendered as event XML, into
-    raw_events (the timeline row) and win_events (the event as Windows wrote
-    it) - winevent.py. Streamed one event at a time through two staging CSVs
-    and bulk-loaded (gotcha #1). Returns the mapping."""
+def _ingest_winevents(con, path: Path, start: int, report=_noop, container: str = "xml") -> dict:
+    """Windows events into raw_events (the timeline row) and win_events (the
+    event as Windows wrote it) - winevent.py. `container`: "xml" (event XML),
+    "evtx" (records rendered as event XML) or "splunk" (Splunk's WinEventLog
+    text, items named from Windows' message templates). Streamed one event at
+    a time through two staging CSVs and bulk-loaded (gotcha #1). Returns the
+    mapping."""
+    evtx, splunk = container == "evtx", container == "splunk"
     stage = []
     for _ in range(2):
         fd, name = tempfile.mkstemp(suffix=".csv", dir=str(_stage_dir()))
         os.close(fd)
         stage.append(Path(name))
-    rows = events = damaged = bad_chunks = 0
+    rows = events = damaged = bad_chunks = unmatched = 0
     errors: list[str] = []
     channels: Counter = Counter()
     types: Counter = Counter()
     progress = lambda f: report(0.9 * f)  # noqa: E731
     texts = (winevent.iter_evtx(path, progress, errors, scratch=_stage_dir()) if evtx
+             else winevent.iter_splunk_records(path, progress=progress) if splunk
              else winevent.iter_event_texts(path, progress=progress))
     try:
         with open(stage[0], "w", encoding="utf-8", newline="") as f_raw, \
@@ -563,15 +569,20 @@ def _ingest_winevents(con, path: Path, start: int, report=_noop, evtx: bool = Fa
                     w_raw.writerow(_stage_row(row_id, winevent.damaged_row(text.text, prefix="")))
                     rows += 1
                     continue
+                prefix = "[unreadable event XML] "
                 if isinstance(text, winevent.EvtxRecord):
                     text, ev = text.xml, winevent.parse_event(text.xml, text.fixes, text.empty_in_array)
+                elif isinstance(text, winevent.SplunkRecord):
+                    text, ev = text.text, winevent.parse_splunk(text.text)
+                    prefix = "[unreadable Splunk WinEventLog record] "
                 else:
                     ev = winevent.parse_event(text)
                 if ev is None:
                     damaged += 1
-                    w_raw.writerow(_stage_row(row_id, winevent.damaged_row(text)))
+                    w_raw.writerow(_stage_row(row_id, winevent.damaged_row(text, prefix)))
                 else:
                     events += 1
+                    unmatched += splunk and not ev["template_matched"]
                     channels[ev["channel"] or "-"] += 1
                     timeline = winevent.timeline_row(ev)
                     types[timeline["action"] or f"untyped {ev['provider']} {ev['event_id']}"] += 1
@@ -599,18 +610,32 @@ def _ingest_winevents(con, path: Path, start: int, report=_noop, evtx: bool = Fa
     if evtx:
         notes.append("Records are rendered by the evtx library and counted against each chunk's "
                      "header: what a chunk names and was not returned is listed as unreadable.")
+    if splunk:
+        notes += ["Splunk's text carries only the rendered message: each value is named by matching "
+                  "it against the event's message template that Windows publishes (Security-Auditing, "
+                  "Eventlog). The values are as rendered - an account name where Windows stored a SID, "
+                  "the text of a %% parameter (\"Yes\" for %%1842) - so a rule that matches a raw SID "
+                  "or %% code does not match here (Q46).",
+                  "The time line states no zone: it is taken as GMT+7 and flagged unconfirmed - "
+                  "declare the source's zone at Ingest and re-process (Q44)."]
     windows = {"rows": rows, "events": events, "unreadable": damaged,
                "channels": dict(channels.most_common()), "types": dict(types.most_common())}
     if evtx:
         windows.update(unreadable_chunks=bad_chunks, reader_errors=errors)
+    if splunk:
+        windows["unmatched_messages"] = unmatched
+    profile, name, docs = {"evtx": (winevent.EVTX_PROFILE_ID, winevent.EVTX_NAME, winevent.EVTX_DOCS),
+                           "splunk": (winevent.SPLUNK_PROFILE_ID, winevent.SPLUNK_NAME, winevent.SPLUNK_DOCS),
+                           }.get(container, (winevent.PROFILE_ID, winevent.NAME, winevent.DOCS))
     return {
         "method": "documented",
-        "profile": winevent.EVTX_PROFILE_ID if evtx else winevent.PROFILE_ID,
-        "name": winevent.EVTX_NAME if evtx else winevent.NAME,
-        "docs": [{"title": t, "url": u} for t, u in (winevent.EVTX_DOCS if evtx else winevent.DOCS)],
+        "profile": profile,
+        "name": name,
+        "docs": [{"title": t, "url": u} for t, u in docs],
         "notes": notes,
         "fields": {f: {"columns": [c], "source": "documented"} for f, c in (
-            ("ts", "System/TimeCreated/@SystemTime"), ("username", "TargetUserName / SubjectUserName / User"),
+            ("ts", "Splunk's time line" if splunk else "System/TimeCreated/@SystemTime"),
+            ("username", "TargetUserName / SubjectUserName / User"),
             ("srcip", "IpAddress / SourceIp"), ("dstip", "DestinationIp"), ("dstport", "DestinationPort"))},
         "heuristic_fields": [], "missing_fields": [],
         "windows": windows,
