@@ -178,8 +178,9 @@ def _wrapped(obj) -> tuple[str | None, list | None]:
 
 
 class _JsonStats:
-    def __init__(self, stats: dict):
+    def __init__(self, stats: dict, flat: bool = True):
         self.s = stats
+        self.shape = flatten if flat else (lambda x: x)
         stats.update(layout=None, records=0, unparseable=0, unparseable_at=[],
                      broken_at_byte=None, wrapper=None)
 
@@ -195,10 +196,10 @@ class _JsonStats:
             self.s["wrapper"] = key
             for x in inner:
                 self.s["records"] += 1
-                yield flatten(x)
+                yield self.shape(x)
         elif isinstance(obj, dict):
             self.s["records"] += 1
-            yield flatten(obj)
+            yield self.shape(obj)
         else:
             # Valid JSON, but not a record (a bare string or number).
             self.bad(where)
@@ -218,11 +219,13 @@ def _lines(head: str, fh) -> Iterator[str]:
         yield buf
 
 
-def iter_json(path: Path, progress=None, stats: dict | None = None) -> Iterator[dict]:
+def iter_json(path: Path, progress=None, stats: dict | None = None,
+              flat: bool = True) -> Iterator[dict]:
     """JSON-lines, a top-level array or a top-level object - see above.
     `stats` (a dict, filled in place) says which layout was read and how many
-    records could not be."""
-    st = _JsonStats(stats if stats is not None else {})
+    records could not be. `flat=False` gives each record as decoded, nested
+    and with its empty values (Windows events, winevent.py)."""
+    st = _JsonStats(stats if stats is not None else {}, flat)
     report = _reporter(path, progress)
     with open_text(path) as fh:
         head = fh.read(JSON_CHUNK)

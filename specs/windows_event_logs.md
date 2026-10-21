@@ -1,6 +1,6 @@
 # Windows event logs - Security, Sysmon and every format they arrive in
 
-Status: **W1, W2 (.evtx) and W3 (Splunk text) built 2026-10-21** (gotcha #60; W4-W5 to come). **Approved 2026-10-21** - Q40 `win_events` + MAP, Q41 4771 / 4776 typed but not counted,
+Status: **W1, W2 (.evtx), W3 (Splunk text) and W4 (Winlogbeat / NXLog JSON) built 2026-10-21** (gotcha #60; W4b PowerShell JSON and W5 to come). **Approved 2026-10-21** - Q40 `win_events` + MAP, Q41 4771 / 4776 typed but not counted,
 Q42 `evtx` (pyevtx-rs) for W2, Q43 GPL samples and exports from this machine kept outside the repo. The user: "ทำ Windows Security
 กับ Sysmon reader ต่อ"; formats: "ต้องรับทุกรูปแบบที่เป็น Windows Log"; tested on **lab samples**
 until a customer file exists. No Jira story yet (IAI-92 only *identifies* these files).
@@ -145,6 +145,44 @@ log); hex items lower-cased as the event stores them (the template's `outType` s
 a leftover `Label:` line rejects a template - the same version differs between builds (5156
 v1); matched line by line, not by one regex. All 9,245 lockout events and both committed
 captures named; Windows-rendered lab messages read back equal to their XML but for SIDs / `%%`.
+
+## W4 design - JSON - approved 2026-10-21 (Q48-Q51 as proposed: Winlogbeat + NXLog; PowerShell later as W4b)
+
+Three JSON shapes of the same event are in circulation; each is identified by its own keys
+(after `parsers.iter_rows` flattens a record to dotted keys - gotcha #39), all read into W1's
+`parse_event` dict:
+
+| shape | documented by | keys that identify it | event items | time |
+|---|---|---|---|---|
+| **Winlogbeat / Elastic Agent** (and an Elasticsearch export, `_source.` stripped) | Elastic, Winlogbeat exported fields (read) | `winlog.event_id`, `winlog.channel` / `winlog.provider_name` | `winlog.event_data.*`, `winlog.user_data.*` - under their own names | `@timestamp` - the event's TimeCreated, UTC |
+| **NXLog `im_msvistalog`** (`to_json`; the OTRF / Mordor datasets) | NXLog Agent reference, im_msvistalog "Fields" (read 2026-10-21) | `EventID`, `SourceName`, `Channel`, `Hostname`, `EventTime` | every key that is not one of NXLog's documented fields (nor Logstash's `@timestamp`, `@version`, `tags`, `host`, `port`); the `EventData` XML string instead when the record carries it | `EventTime` (TimeCreated; older NXLog writes it without a zone) |
+| PowerShell `Get-WinEvent \| ConvertTo-Json` | Microsoft, `EventLogRecord` | `Id`, `ProviderName`, `Properties`, `RecordId` | `Properties` is a list of values with **no names**: positional, named only through the message templates of W3 (Security, Eventlog); typed values (logon ids as decimal, status codes as negative integers, PS 5.1 dates as `/Date(ms)/`) | `TimeCreated` |
+
+- **Q48 - scope.** Proposed: Winlogbeat and NXLog in W4; PowerShell JSON later as its own story
+  (W4b) - its items have no names, and converting its typed values back needs the templates'
+  types, for two providers only.
+- **Q49 - NXLog time without a zone** (`2020-08-07 10:32:22` in OTRF, the agent's local time).
+  Proposed: as Q44 / gotcha #21 - GMT+7, flagged unconfirmed, the zone declared at Ingest. Not
+  Logstash's `@timestamp`, which is when the record was received (3 s later in OTRF), not when the
+  event happened.
+- **Q50 - NXLog's own fields vs the event's items.** Proposed: NXLog's documented field list
+  (plus its core fields `EventReceivedTime`, `SourceModuleName`, `SourceModuleType` and
+  Logstash's) is set aside; every other key is an item under its own name. An item that happens
+  to share a name with an NXLog field would be lost to the items - stated on the case page; the
+  `EventData` XML, when present, is exact.
+- **Q51 - samples.** OTRF Security-Datasets is MIT: commit one trimmed dataset (Sysmon +
+  Security, a few hundred records) and keep whole ones in `D:/logtest/windows/nxlog/`. Elastic's
+  Winlogbeat test files (105 `.evtx` with the JSON Winlogbeat wrote from each - `x-pack`, Elastic
+  License 2.0) stay outside the repo in `D:/logtest/windows/winlogbeat/`; they let the check
+  compare, event by event, Winlogbeat's JSON with our own `.evtx` reading of the same file. The
+  committed Winlogbeat sample is synthetic, written from Elastic's field list.
+
+As built (gotcha #60): an item Windows' template names stays an item even when NXLog has a
+field of that name (4778 `AccountName`); keys no template names are kept and counted; channel
+names compared case-insensitively; OTRF's later flat records (no shipper field) are no_reader.
+Measured: Winlogbeat's JSON of 97 test `.evtx` = our reading but for what Winlogbeat itself
+changes (empty items out, `%%` rendered, GUID case, trimming); 42,362 OTRF NXLog events with no
+NXLog field taken for an item.
 
 ## Questions
 

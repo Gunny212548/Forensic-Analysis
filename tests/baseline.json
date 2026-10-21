@@ -1,4 +1,124 @@
 {
+ "1100.evtx": {
+  "flagged": 0,
+  "md5": "dc2b1c4e90247f619985fc5877e4ac80",
+  "rows": 1,
+  "rules": {}
+ },
+ "1100.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "9ccadbded8caf025f114b9c190bbe483",
+  "rows": 1,
+  "rules": {}
+ },
+ "1102.evtx": {
+  "flagged": 0,
+  "md5": "fbe091fe5a7f7eed7da7c55a2ace181d",
+  "rows": 1,
+  "rules": {}
+ },
+ "1102.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "b53cf5e04ee395b6637f6dd6386b08ed",
+  "rows": 1,
+  "rules": {}
+ },
+ "1104.evtx": {
+  "flagged": 0,
+  "md5": "caa01b63f4bf96666eb1f86108613a62",
+  "rows": 1,
+  "rules": {}
+ },
+ "1104.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "ed99e8348d0f99a00d6ec68dae3842c5",
+  "rows": 1,
+  "rules": {}
+ },
+ "1105.evtx": {
+  "flagged": 0,
+  "md5": "147ea5bd1a5c132cb8903a33e0d16766",
+  "rows": 1,
+  "rules": {}
+ },
+ "1105.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "93fdccaa66a7f1547b96c4c73fd92d71",
+  "rows": 1,
+  "rules": {}
+ },
+ "400.evtx": {
+  "flagged": 0,
+  "md5": "10db68ee0873a2bd590f771189328c40",
+  "rows": 4,
+  "rules": {}
+ },
+ "400.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "64b86d816be4535c2cef814cf83ed2f4",
+  "rows": 4,
+  "rules": {}
+ },
+ "403.evtx": {
+  "flagged": 0,
+  "md5": "8dc38460ff61ed5af70c4198c92c3575",
+  "rows": 4,
+  "rules": {}
+ },
+ "403.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "341667108bdd3bf1bb3ced6e8cf1adf8",
+  "rows": 4,
+  "rules": {}
+ },
+ "4103.evtx": {
+  "flagged": 0,
+  "md5": "a3aee995bac2fbd1b26bada9f0983466",
+  "rows": 2,
+  "rules": {}
+ },
+ "4103.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "e3481c3eaa53755392952be374c771d7",
+  "rows": 2,
+  "rules": {}
+ },
+ "4104.evtx": {
+  "flagged": 0,
+  "md5": "a155150d6fa3567e4526f92583b9019f",
+  "rows": 2,
+  "rules": {}
+ },
+ "4104.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "9a77d9303646d2982c0a625c6b4f571f",
+  "rows": 2,
+  "rules": {}
+ },
+ "4105.evtx": {
+  "flagged": 0,
+  "md5": "2dc6dc2afbb4dcd0fea5cd2b05e2480c",
+  "rows": 1,
+  "rules": {}
+ },
+ "4105.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "b8db6719d43fdd39096da229aa0c50e1",
+  "rows": 1,
+  "rules": {}
+ },
+ "4106.evtx": {
+  "flagged": 0,
+  "md5": "a4c04c26517bbe5474cb0da2b8f2eb50",
+  "rows": 1,
+  "rules": {}
+ },
+ "4106.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "30511046bb22fcc380aa282eba0f9e02",
+  "rows": 1,
+  "rules": {}
+ },
  "4624_LT3_AnonymousLogon_Localhost_-_JuicyPotato.evtx": {
   "flagged": 0,
   "md5": "004aea2c5b8f66304094429c6504f016",
@@ -9,6 +129,342 @@
   "flagged": 0,
   "md5": "fd6e97b99f71a084751e76fdc489834c",
   "rows": 3,
+  "rules": {}
+ },
+ "4670_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "6bb63b396c32312340a87125d09c2a89",
+  "rows": 1,
+  "rules": {}
+ },
+ "4670_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "7e381f62ab4c1b71dd094aab9eb2acbe",
+  "rows": 1,
+  "rules": {}
+ },
+ "4706_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "a5762570224547cb3b7993b8298cc8d1",
+  "rows": 1,
+  "rules": {}
+ },
+ "4706_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "260cd46b61616eceb407c105422ea380",
+  "rows": 1,
+  "rules": {}
+ },
+ "4707_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "82972959eec280672f6c000c6a251d7f",
+  "rows": 1,
+  "rules": {}
+ },
+ "4707_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3b14e30349baf52f910b9b1a35f944fb",
+  "rows": 1,
+  "rules": {}
+ },
+ "4713_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "ccd2966a5be1158a76a8891914a811f3",
+  "rows": 1,
+  "rules": {}
+ },
+ "4713_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "1ba54f0f0f40d2a5af05feea0040346f",
+  "rows": 1,
+  "rules": {}
+ },
+ "4716_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "d120cbaaef1116a843784f974008a24b",
+  "rows": 1,
+  "rules": {}
+ },
+ "4716_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "ce9b40c77a716d3f6fe72266f766684b",
+  "rows": 1,
+  "rules": {}
+ },
+ "4717_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "106a9019988363240a15627a1c8d60cd",
+  "rows": 1,
+  "rules": {}
+ },
+ "4717_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3465a01298748b6b346ee7aedeb02473",
+  "rows": 1,
+  "rules": {}
+ },
+ "4718_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "4866df8b20781a5588e4c4e515a10e5d",
+  "rows": 1,
+  "rules": {}
+ },
+ "4718_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "693ada84013380a0f722774f2c477ebc",
+  "rows": 1,
+  "rules": {}
+ },
+ "4719.evtx": {
+  "flagged": 0,
+  "md5": "7cd3684943ba5ff78df82fcfded36bda",
+  "rows": 1,
+  "rules": {}
+ },
+ "4719.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "f9e6deb9a333cdfd2c381cd28cc06dd6",
+  "rows": 1,
+  "rules": {}
+ },
+ "4719_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "5074b88ac14ea72083c46314997d42e8",
+  "rows": 1,
+  "rules": {}
+ },
+ "4719_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "231f2f92cf59df353fb5d2a7a84107b7",
+  "rows": 1,
+  "rules": {}
+ },
+ "4739_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "8d3177690f13791a30d7120880a28008",
+  "rows": 1,
+  "rules": {}
+ },
+ "4739_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "c53f374bc52dad9468fe06b1539a553f",
+  "rows": 1,
+  "rules": {}
+ },
+ "4741.evtx": {
+  "flagged": 0,
+  "md5": "44293c10be59078a048845efc3e9d934",
+  "rows": 1,
+  "rules": {}
+ },
+ "4741.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "4d5f405c9fb088b2f3f05f5627ddf10f",
+  "rows": 1,
+  "rules": {}
+ },
+ "4742.evtx": {
+  "flagged": 0,
+  "md5": "be58593eda925d9e68b309df106d8174",
+  "rows": 1,
+  "rules": {}
+ },
+ "4742.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "34cfbd4ba424b04e9dd3e4922099cec6",
+  "rows": 1,
+  "rules": {}
+ },
+ "4743.evtx": {
+  "flagged": 0,
+  "md5": "1cda723fd865027244c2e5cb9b99a08c",
+  "rows": 1,
+  "rules": {}
+ },
+ "4743.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "e18564432558ef6aed00da3db4b1c197",
+  "rows": 1,
+  "rules": {}
+ },
+ "4744.evtx": {
+  "flagged": 0,
+  "md5": "0809746e8be42757f38657e6023fa318",
+  "rows": 1,
+  "rules": {}
+ },
+ "4744.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "d1e806f117047bac758c7b07b85569ae",
+  "rows": 1,
+  "rules": {}
+ },
+ "4745.evtx": {
+  "flagged": 0,
+  "md5": "e3f9fbe683452a878f895cc2c74d5e65",
+  "rows": 1,
+  "rules": {}
+ },
+ "4745.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3e1362116d9a970c8de06bbb77eb8838",
+  "rows": 1,
+  "rules": {}
+ },
+ "4746.evtx": {
+  "flagged": 0,
+  "md5": "9cac6698892951a6a5b7ff16e577a93f",
+  "rows": 1,
+  "rules": {}
+ },
+ "4746.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "f2288adb139761de726acb43c5a7a42d",
+  "rows": 1,
+  "rules": {}
+ },
+ "4747.evtx": {
+  "flagged": 0,
+  "md5": "d613463de077d788e306255aa0c66062",
+  "rows": 1,
+  "rules": {}
+ },
+ "4747.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "0a35e6d6271360c86aa4fc9e9b15e05d",
+  "rows": 1,
+  "rules": {}
+ },
+ "4748.evtx": {
+  "flagged": 0,
+  "md5": "51f874b0f5e2cea326909d4a0d3ab477",
+  "rows": 1,
+  "rules": {}
+ },
+ "4748.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "5ade3a0f79b41163ec60f3c1e99b25e8",
+  "rows": 1,
+  "rules": {}
+ },
+ "4749.evtx": {
+  "flagged": 0,
+  "md5": "4afc2f149a66ab87906dfe8e0a73ea60",
+  "rows": 1,
+  "rules": {}
+ },
+ "4749.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "500ad9776be68d47205e985de52a8051",
+  "rows": 1,
+  "rules": {}
+ },
+ "4750.evtx": {
+  "flagged": 0,
+  "md5": "062522f43fd1a8ce90846c83bf6cf9dc",
+  "rows": 1,
+  "rules": {}
+ },
+ "4750.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "c53b5f72ad197324916ed0eb67bc9012",
+  "rows": 1,
+  "rules": {}
+ },
+ "4751.evtx": {
+  "flagged": 0,
+  "md5": "5c50938569a72dbfe0fb67f2b427a4ec",
+  "rows": 1,
+  "rules": {}
+ },
+ "4751.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3d907bcf7551823fedf255fcb8a3653f",
+  "rows": 1,
+  "rules": {}
+ },
+ "4752.evtx": {
+  "flagged": 0,
+  "md5": "62664ba2ac1e069b7294ff21d5a76e9b",
+  "rows": 1,
+  "rules": {}
+ },
+ "4752.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "6ceb9bbef2b26669e53eacf80f6cb3d7",
+  "rows": 1,
+  "rules": {}
+ },
+ "4753.evtx": {
+  "flagged": 0,
+  "md5": "8cd13fa31fba29167eb2ec9d18bf0278",
+  "rows": 1,
+  "rules": {}
+ },
+ "4753.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "da7f09411d1097f69a9bc9f258bcfa0a",
+  "rows": 1,
+  "rules": {}
+ },
+ "4759.evtx": {
+  "flagged": 0,
+  "md5": "8b3c7af0bcf90640e9c2c4300f641b6c",
+  "rows": 1,
+  "rules": {}
+ },
+ "4759.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "bb3df41fe8449fbf14d6f3639d81674f",
+  "rows": 1,
+  "rules": {}
+ },
+ "4760.evtx": {
+  "flagged": 0,
+  "md5": "08fc85c70d3569ff807f962ba8ca14c3",
+  "rows": 1,
+  "rules": {}
+ },
+ "4760.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "d7f6f85b63f4f268b24f1299eff4de15",
+  "rows": 1,
+  "rules": {}
+ },
+ "4761.evtx": {
+  "flagged": 0,
+  "md5": "eace02b4e4b2f0d1daeb738a75d44605",
+  "rows": 1,
+  "rules": {}
+ },
+ "4761.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "8185d14974bec189e5ed77be0bc15d23",
+  "rows": 1,
+  "rules": {}
+ },
+ "4762.evtx": {
+  "flagged": 0,
+  "md5": "b5be5cdc7c6188f77e13d42a1fc59c40",
+  "rows": 1,
+  "rules": {}
+ },
+ "4762.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "4ce4efc89e70bcb169309d153fbc236d",
+  "rows": 1,
+  "rules": {}
+ },
+ "4763.evtx": {
+  "flagged": 0,
+  "md5": "e2bbf7a654eefdac7252c84420fa5d52",
+  "rows": 1,
+  "rules": {}
+ },
+ "4763.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "6ebb824eaedb55d7f4d394323d0cf827",
+  "rows": 1,
   "rules": {}
  },
  "4765_sidhistory_add_t1178.evtx": {
@@ -23,6 +479,18 @@
   "rows": 3,
   "rules": {}
  },
+ "4778.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "4257c0ba62e5352ec0af9e97ccc85fb1",
+  "rows": 5,
+  "rules": {}
+ },
+ "4779.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "503531c19bb6ce899657dde6ca560371",
+  "rows": 5,
+  "rules": {}
+ },
  "4794_DSRM_password_change_t1098.evtx": {
   "flagged": 0,
   "md5": "79662986ae3842d2159dd33882065fb9",
@@ -35,6 +503,12 @@
   "rows": 1,
   "rules": {}
  },
+ "4797.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3cd7566fa54477a46ea0883250a02588",
+  "rows": 5,
+  "rules": {}
+ },
  "4799_remote_local_groups_enumeration.evtx": {
   "flagged": 0,
   "md5": "7054a6d8aa9ecd4b03c723b84a58a3ef",
@@ -45,6 +519,138 @@
   "flagged": 0,
   "md5": "f6293f717e94a77945d1d1b63c03d2b5",
   "rows": 5,
+  "rules": {}
+ },
+ "4817_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "2f9280473caca94ef41e29567bf6d05b",
+  "rows": 1,
+  "rules": {}
+ },
+ "4817_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "fddea06583c2c4a0f5027417aa663895",
+  "rows": 1,
+  "rules": {}
+ },
+ "4902_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "51af8831c413c9862c74b3e2a13a320d",
+  "rows": 1,
+  "rules": {}
+ },
+ "4902_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "dc6bf255804a741f73062b7edca2e2fa",
+  "rows": 1,
+  "rules": {}
+ },
+ "4904_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "04848993b52a54665d0960f685145ed3",
+  "rows": 1,
+  "rules": {}
+ },
+ "4904_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "a2a0c2335f577128ba18dd9a6964a72a",
+  "rows": 1,
+  "rules": {}
+ },
+ "4905_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "2b77866c08f0bae047160eb35d515d7f",
+  "rows": 1,
+  "rules": {}
+ },
+ "4905_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "ef308eb2fa859e8edaceea9b4b00afb4",
+  "rows": 1,
+  "rules": {}
+ },
+ "4906_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "f4c66e2c1b66315d50e351a031e781a2",
+  "rows": 1,
+  "rules": {}
+ },
+ "4906_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "0805c080648c410aaca723937257e485",
+  "rows": 1,
+  "rules": {}
+ },
+ "4907_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "1c1b275eeb7f5099c3a5623712a05a68",
+  "rows": 1,
+  "rules": {}
+ },
+ "4907_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "c9d3600d6c067cbb12533848ff61dd9c",
+  "rows": 1,
+  "rules": {}
+ },
+ "4908_WindowsSrv2016.evtx": {
+  "flagged": 0,
+  "md5": "ce3fd9f957b4ac171765d772b1b63a33",
+  "rows": 1,
+  "rules": {}
+ },
+ "4908_WindowsSrv2016.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "6140bbb111dec386401951929c6caf3d",
+  "rows": 1,
+  "rules": {}
+ },
+ "5379.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "69d47ce5c7136751775a32eec5e999e7",
+  "rows": 5,
+  "rules": {}
+ },
+ "5380.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "eb12189d777de6b134e2f884977f54e2",
+  "rows": 5,
+  "rules": {}
+ },
+ "5381.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3de74199696b2761f06380678919d97e",
+  "rows": 5,
+  "rules": {}
+ },
+ "5382.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "448d94289e732d535769be07e75b0c50",
+  "rows": 5,
+  "rules": {}
+ },
+ "600.evtx": {
+  "flagged": 0,
+  "md5": "09fa1e4c2f8dca878f196b69d9398b8b",
+  "rows": 3,
+  "rules": {}
+ },
+ "600.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "0bf5af1cf0b76d6d2ba5d9044cf2d216",
+  "rows": 3,
+  "rules": {}
+ },
+ "800.evtx": {
+  "flagged": 0,
+  "md5": "3ce648f0d181f517facedb7a8a22fbf3",
+  "rows": 4,
+  "rules": {}
+ },
+ "800.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "4f98d05fc842b1e5a75456a4d3c1091b",
+  "rows": 4,
   "rules": {}
  },
  "ACL_ForcePwd_SPNAdd_User_Computer_Accounts.evtx": {
@@ -1099,6 +1705,12 @@
   "rows": 0,
   "rules": {}
  },
+ "covenant_copy_smb_CreateRequest_2020-09-22145302.json": {
+  "flagged": 0,
+  "md5": "be95574f40157db575675c26c9a09a48",
+  "rows": 506,
+  "rules": {}
+ },
  "crowdstrike_falcon.log": {
   "flagged": 0,
   "md5": "08685555b091658d2af7a4bb16902dff",
@@ -1255,6 +1867,18 @@
   "flagged": 0,
   "md5": "12c363684706c2e217ddfce2dcc586b3",
   "rows": 11969,
+  "rules": {}
+ },
+ "empire_mimikatz_logonpasswords_2020-08-07103224.json": {
+  "flagged": 0,
+  "md5": "8d3591ae086c1c299e0c8957627c9104",
+  "rows": 6026,
+  "rules": {}
+ },
+ "empire_psexec_dcerpc_tcp_svcctl_2020-09-20121608.json": {
+  "flagged": 0,
+  "md5": "56a802730a23ede6e21025efd48a6463",
+  "rows": 4348,
   "rules": {}
  },
  "eop_appcontainer_il_broker_filewrite.evtx": {
@@ -1982,6 +2606,30 @@
   "rows": 1,
   "rules": {}
  },
+ "psh_lsass_memory_dump_comsvcs_2020-10-18T19500924.json": {
+  "flagged": 0,
+  "md5": "db0ed267005bf8fc4d5ba0b8bd75e439",
+  "rows": 0,
+  "rules": {}
+ },
+ "purplesharp_ad_playbook_I_2020-10-22042947.json": {
+  "flagged": 0,
+  "md5": "5005611b6aa8094ad9b0ce0a3482d742",
+  "rows": 25993,
+  "rules": {}
+ },
+ "rdp_interactive_taskmanager_lsass_dump.json": {
+  "flagged": 0,
+  "md5": "18644d2ff70a4f8b327c92db146881bf",
+  "rows": 283,
+  "rules": {}
+ },
+ "rdp_interactive_taskmanager_lsass_dump_2020-09-22043748.json": {
+  "flagged": 0,
+  "md5": "62949d41a081d4b66898d4c39e9f2f91",
+  "rows": 5489,
+  "rules": {}
+ },
  "rdpcorets_148_mst120_bluekeep_rpdscan_full.evtx": {
   "flagged": 0,
   "md5": "29d1b88c44768aa119bd62337fa66e99",
@@ -2072,10 +2720,604 @@
   "rows": 18,
   "rules": {}
  },
+ "schtask_create_2020-12-1907003032.json": {
+  "flagged": 0,
+  "md5": "86ef75024b42866a577c2c20a7653c79",
+  "rows": 0,
+  "rules": {}
+ },
  "sdrsinjector.log": {
   "flagged": 0,
   "md5": "543ab1e5364d966fbc96d798591d75f7",
   "rows": 0,
+  "rules": {}
+ },
+ "security-windows2012_4673.evtx": {
+  "flagged": 0,
+  "md5": "022c31881a3a78768b2ad3391a02dd08",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4673.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "e3b4e8737d69285b09f6e78a87a2c26f",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4674.evtx": {
+  "flagged": 0,
+  "md5": "72c9ffa6be32f5f6e92ebf43431ffc12",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4674.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "a559c071df077ed65a3e616b767c53dd",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4697.evtx": {
+  "flagged": 0,
+  "md5": "c6971c46162d3b2b8f2acea09ac59d60",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4697.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "c8be46e57dfc95fa271a0335d5b15c7e",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4698.evtx": {
+  "flagged": 0,
+  "md5": "4355b27c23986c97d739921bb64ed050",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4698.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "d4a426a4a068dfeb493722e3fdccb651",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4699.evtx": {
+  "flagged": 0,
+  "md5": "ca1ba669fb6e89c1c10482bbbd95d9cb",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4699.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "e454ac0c0fda377d544a06740634708c",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4700.evtx": {
+  "flagged": 0,
+  "md5": "767a4cbc5b882e7bacc8c87d38a7e041",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4700.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "9716629e98873245cdbd0719509876a9",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4701.evtx": {
+  "flagged": 0,
+  "md5": "392939323a1b5ba75364100f71581de0",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4701.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "ae49092ab9326021c294955df17bdaee",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4702.evtx": {
+  "flagged": 0,
+  "md5": "e4a385cd335145942845116ec444f4c6",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4702.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "7eddd4679e6159980717d0c896cd6952",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4768.evtx": {
+  "flagged": 0,
+  "md5": "e2634e596b4fdeb88fad93a62bea5d77",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4768.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "08caf70230e75a3ad50629140a58fc4c",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4769.evtx": {
+  "flagged": 0,
+  "md5": "eec9c010a529b41be60ac5294e21c187",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4769.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "85a6f221f51e5e22eed6022577e53287",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4770.evtx": {
+  "flagged": 0,
+  "md5": "76b049ce0ce3732e7b33128321c2f061",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4770.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "e62bbdec543fab5dd4501ad703965937",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4771.evtx": {
+  "flagged": 0,
+  "md5": "f380cc381a141b496a8e0946800146d8",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4771.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "e209e436eeb260ffe9de568543841355",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4776.evtx": {
+  "flagged": 0,
+  "md5": "2c8134725762a8d7c98e14669573d00b",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4776.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "79ca2236630bfd40ecba99d9c753cd68",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4778.evtx": {
+  "flagged": 0,
+  "md5": "3420689d60280086779d939db06b3739",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4778.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "fc76ee02c063a4b5bd6d9c0e8d8ef486",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4779.evtx": {
+  "flagged": 0,
+  "md5": "510096e2de8d8b93328c4d866e4976fe",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012_4779.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "8b7f2892753dacc097eb9af0d43c895a",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2012r2-logon.evtx": {
+  "flagged": 0,
+  "md5": "ef84f18ed90a4bb41c3d22e81a441d26",
+  "rows": 18,
+  "rules": {}
+ },
+ "security-windows2012r2-logon.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3aee97dd5c922754c4fba8d14707fad0",
+  "rows": 18,
+  "rules": {}
+ },
+ "security-windows2016-4672.evtx": {
+  "flagged": 0,
+  "md5": "316e7c4ca9a0721b8a62b8f5b7bfa579",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016-4672.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "ee46b3bb402e740a5bec11cecfd0cbd3",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016-logoff.evtx": {
+  "flagged": 0,
+  "md5": "401602b9fcc5f95aae4fc837c9740a01",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016-logoff.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "2a73dd25c213f626b62c0f70efdcf8a6",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4720_Account_Created.evtx": {
+  "flagged": 0,
+  "md5": "7cfa6598141861b5707c580cbd07b8fe",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4720_Account_Created.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "6371af78c01c932addd48fa6c111b9d5",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4722_Account_Enabled.evtx": {
+  "flagged": 0,
+  "md5": "c350a787ddee26418686a41ddc550ca2",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4722_Account_Enabled.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3d743b2c46e3e45e61de72a6558179de",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4723_Password_Change.evtx": {
+  "flagged": 0,
+  "md5": "0b66b18f7ff71edd6f87eb8ce42da4da",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4723_Password_Change.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "2e39aa667bb2639cb610062952c56f9f",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4724_Password_Reset.evtx": {
+  "flagged": 0,
+  "md5": "28c2fee299c3e60b40f599910ea23713",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4724_Password_Reset.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "36ef4252e2deb3b987014120e0a8dabf",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4725_Account_Disabled.evtx": {
+  "flagged": 0,
+  "md5": "b27a16e755fcaab3e311382c218c05d7",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4725_Account_Disabled.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "7298bfc9a1e35c85a73326ab69a001e1",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4726_Account_Deleted.evtx": {
+  "flagged": 0,
+  "md5": "7dff87706a4a1a24e61c0fdc071beb4b",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4726_Account_Deleted.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "0c3335f62886016df60b4ffca3178981",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4727.evtx": {
+  "flagged": 0,
+  "md5": "70b5d54c2b352a545dc2b4e572924faa",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4727.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "d353b39ab17046fbf9ae0ee3ce772d2b",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4728.evtx": {
+  "flagged": 0,
+  "md5": "52cda0d17c46541e033ffed4272d13eb",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4728.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "4a325d85df4a64c2be04e62fdccbc977",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4729.evtx": {
+  "flagged": 0,
+  "md5": "e72ddb15cf2703ac7e8be166859a0956",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4729.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "da95e4e2125d7c9bdcb75028f0522cef",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4730.evtx": {
+  "flagged": 0,
+  "md5": "cdd2237b2c7946024faf5d65b081e7b1",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4730.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "87c0f1334a7297b6f7f4b49aceb2a71a",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4731.evtx": {
+  "flagged": 0,
+  "md5": "f7374d774010484534f73735381a2987",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4731.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "1e60ad22400be1b917669df23c508448",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4732.evtx": {
+  "flagged": 0,
+  "md5": "9b5d3e10e5bf37eb157b7de9a3a23f0c",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4732.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3cabedc5954993edf63afaa93b27e9f8",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4733.evtx": {
+  "flagged": 0,
+  "md5": "ba3db88c14064d72fb7cfeb82d82682d",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4733.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "fd825f23e77757bde1b284b150f59356",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4734.evtx": {
+  "flagged": 0,
+  "md5": "50cbfd96d168017525ecda8718e16f0e",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4734.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "4f128b5ffe7d64f689b6a72860dc68de",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4735.evtx": {
+  "flagged": 0,
+  "md5": "66363e7cbbb7c5156d9ba4c32aab23c0",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4735.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "0d5e1af68a1a45df85426309b7226714",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4737.evtx": {
+  "flagged": 0,
+  "md5": "c244f995703e3462d1bf8991bb5e4b20",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4737.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "edf88e1f84bdc069dc885e9c41e3baae",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4738_Account_Changed.evtx": {
+  "flagged": 0,
+  "md5": "874e62c4de7f2902a0a3ef2095fbcfdd",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4738_Account_Changed.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "8b72650ade56e1174846ce5ff12899bb",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4740_Account_Locked_Out.evtx": {
+  "flagged": 0,
+  "md5": "4ffb7874f0f429d759e599e02871b159",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4740_Account_Locked_Out.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "2644663677e99a879f90457f549d5ad4",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4754.evtx": {
+  "flagged": 0,
+  "md5": "5f009245509e090006d1d9646d88515f",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4754.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "2d6d1dde4795bc3bad34897cf54421ac",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4755.evtx": {
+  "flagged": 0,
+  "md5": "729a23cd17f83581585853c0242a9cb4",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4755.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "b64fa96dcd551a8d470b60ca4a7c6165",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4756.evtx": {
+  "flagged": 0,
+  "md5": "dc658ecb49546adf9b6edc6f7d4c7d52",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4756.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "7a04aeaa5536fbada278ab67879cdc02",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4757.evtx": {
+  "flagged": 0,
+  "md5": "173dbc0fdb0989c70f265b0d37de589b",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4757.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "dbb10af79fa1de6f2e60bda2b7492366",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4758.evtx": {
+  "flagged": 0,
+  "md5": "fd08485116eafeb26d9f6a2f9366c598",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4758.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "93e2d1e8b17af857cd983c0b0e6f16ea",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4764.evtx": {
+  "flagged": 0,
+  "md5": "eac62459a1d454478cdfdd467b67098b",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4764.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3f923bdf5690c71bf2f00e71f36ceee2",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4767_Account_Unlocked.evtx": {
+  "flagged": 0,
+  "md5": "b9315866a9f5f5d943534ba9826db6ec",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4767_Account_Unlocked.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "127e65037b9152fc82d0dad5dadc5eec",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4781_Account_Renamed.evtx": {
+  "flagged": 0,
+  "md5": "54bc8a5c7ebbcaf529d63152bbc06d4a",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4781_Account_Renamed.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "4ec78e142d3237e0c0efc0229b001ddf",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4798.evtx": {
+  "flagged": 0,
+  "md5": "210d5278c65b3d209acc3340c49338a0",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4798.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "09c6af1daa6658931bf22c0279be1d9c",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4799.evtx": {
+  "flagged": 0,
+  "md5": "565af73153666dc5fe392a9c44dec646",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4799.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "03c314aa237e579097e2293dd5fce31a",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2016_4964.evtx": {
+  "flagged": 0,
+  "md5": "05d3597b1dc764f782979ce0adc0ecf1",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2016_4964.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "eac0779d00aa4c3e0dec14dc8e63e738",
+  "rows": 2,
+  "rules": {}
+ },
+ "security-windows2019_4688_Process_Created.evtx": {
+  "flagged": 0,
+  "md5": "4337ecc9290cb911a515ef4b2353fd6a",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2019_4688_Process_Created.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "14851c750e85937b59451a008f9576e3",
+  "rows": 1,
+  "rules": {}
+ },
+ "security-windows2019_4689_Process_Exited.evtx": {
+  "flagged": 0,
+  "md5": "4e493048c4c5ff818e07ad77dbdd83c6",
+  "rows": 3,
+  "rules": {}
+ },
+ "security-windows2019_4689_Process_Exited.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "0e926e450b7a5926deb8448602c5e2b7",
+  "rows": 3,
   "rules": {}
  },
  "security_4624_4673_token_manip.evtx": {
@@ -2195,6 +3437,120 @@
   "flagged": 0,
   "md5": "27fca3ffb04fa1a1bb71c14d58854705",
   "rows": 0,
+  "rules": {}
+ },
+ "sysmon-10.2-dns.evtx": {
+  "flagged": 0,
+  "md5": "ed5932548178a755ff414b469f158685",
+  "rows": 156,
+  "rules": {}
+ },
+ "sysmon-10.2-dns.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "3b0a95b2d53b54f3042b2bec067bdf57",
+  "rows": 156,
+  "rules": {}
+ },
+ "sysmon-11-filedelete.evtx": {
+  "flagged": 0,
+  "md5": "6d1d0c8bf22fb87eae868be81042c820",
+  "rows": 3,
+  "rules": {}
+ },
+ "sysmon-11-filedelete.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "9783663c4fc770e32ede173b290d9d19",
+  "rows": 3,
+  "rules": {}
+ },
+ "sysmon-11-filedeletedetected.evtx": {
+  "flagged": 0,
+  "md5": "025ab8d719fb07dd21af14c1e737a233",
+  "rows": 2,
+  "rules": {}
+ },
+ "sysmon-11-filedeletedetected.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "bf83c5310146e4396900de90fca044d9",
+  "rows": 2,
+  "rules": {}
+ },
+ "sysmon-11-registry.evtx": {
+  "flagged": 0,
+  "md5": "0ef72206e4c947d3ce954140fc85365f",
+  "rows": 5,
+  "rules": {}
+ },
+ "sysmon-11-registry.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "1619a0ff5083dde61f29707d92601deb",
+  "rows": 5,
+  "rules": {}
+ },
+ "sysmon-12-loadimage.evtx": {
+  "flagged": 0,
+  "md5": "edf73cde3cb7114b0eff9b2024e15c5c",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon-12-loadimage.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "983f4ef5917002d8d75a58a623b502da",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon-12-processcreate.evtx": {
+  "flagged": 0,
+  "md5": "eebe098a39c18d8cffb872b860cde17b",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon-12-processcreate.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "d2904ac6222910ad9e392390f33020c5",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon-13-clipboardchange.evtx": {
+  "flagged": 0,
+  "md5": "c2e55d1be8b17f08549609b5a818a331",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon-13-clipboardchange.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "aee3e800cb48b28973bc2200b9cbd71b",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon-13-processtampering.evtx": {
+  "flagged": 0,
+  "md5": "2c4e04c21df002f81028aca9c2e80156",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon-13-processtampering.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "c3d3b7796946781b47f884a2e427dac5",
+  "rows": 1,
+  "rules": {}
+ },
+ "sysmon-9.01.evtx": {
+  "flagged": 0,
+  "md5": "295c16e7b8e0c078142a6ab234d2ec03",
+  "rows": 32,
+  "rules": {}
+ },
+ "sysmon-9.01.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "eaa0a50a2c587f89fb863ff87163e1cb",
+  "rows": 32,
+  "rules": {}
+ },
+ "sysmon-no-evtx.evtx.golden.json": {
+  "flagged": 0,
+  "md5": "8a65547674abacf8631e8b148443340e",
+  "rows": 1,
   "rules": {}
  },
  "sysmon17_18_kekeo_tsssp_default_np.evtx": {

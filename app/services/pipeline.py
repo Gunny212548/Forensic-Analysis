@@ -13,6 +13,7 @@ the same data in well under a second. Peak memory stays flat either way.
 import contextlib
 import csv
 import gzip
+import json
 import logging
 import os
 import shutil
@@ -432,11 +433,10 @@ def _ingest_file(con, case_id: str, path: Path, kind: str, start: int,
         return 0, False, {"method": found["status"], "profile": None, "name": found["name"],
                           "fields": {}, "heuristic_fields": [], "docs": [], "notes": [],
                           "logsource": found}
-    if found.get("profile") in (winevent.PROFILE_ID, winevent.SPLUNK_PROFILE_ID):
-        # Windows event XML (W1) or Splunk's WinEventLog text (W3): timeline
-        # rows and the native win_events rows.
-        container = "xml" if found["profile"] == winevent.PROFILE_ID else "splunk"
-        mapping = _ingest_winevents(con, path, start, report, container)
+    if found.get("profile") in _WIN_CONTAINERS:
+        # Windows event XML (W1), Splunk's WinEventLog text (W3) or Winlogbeat /
+        # NXLog JSON (W4): timeline rows and the native win_events rows.
+        mapping = _ingest_winevents(con, path, start, report, _WIN_CONTAINERS[found["profile"]])
         _file_notes(mapping, parsers.detect_encoding(path), None, found)
         return _coverage(con, start, mapping["windows"]["rows"], mapping), False, mapping
     if found.get("profile") == winevent.EVTX_PROFILE_ID:
@@ -535,14 +535,20 @@ def _plain_copy(path: Path):
         tmp.unlink(missing_ok=True)
 
 
+_WIN_CONTAINERS = {winevent.PROFILE_ID: "xml", winevent.SPLUNK_PROFILE_ID: "splunk",
+                   winevent.WINLOGBEAT_PROFILE_ID: "winlogbeat", winevent.NXLOG_PROFILE_ID: "nxlog"}
+
+
 def _ingest_winevents(con, path: Path, start: int, report=_noop, container: str = "xml") -> dict:
     """Windows events into raw_events (the timeline row) and win_events (the
     event as Windows wrote it) - winevent.py. `container`: "xml" (event XML),
-    "evtx" (records rendered as event XML) or "splunk" (Splunk's WinEventLog
-    text, items named from Windows' message templates). Streamed one event at
-    a time through two staging CSVs and bulk-loaded (gotcha #1). Returns the
-    mapping."""
+    "evtx" (records rendered as event XML), "splunk" (Splunk's WinEventLog
+    text, items named from Windows' message templates), "winlogbeat" or
+    "nxlog" (JSON records). Streamed one event at a time through two staging
+    CSVs and bulk-loaded (gotcha #1). Returns the mapping."""
     evtx, splunk = container == "evtx", container == "splunk"
+    as_json = container in ("winlogbeat", "nxlog")
+    json_stats: dict = {}
     stage = []
     for _ in range(2):
         fd, name = tempfile.mkstemp(suffix=".csv", dir=str(_stage_dir()))
@@ -552,9 +558,11 @@ def _ingest_winevents(con, path: Path, start: int, report=_noop, container: str 
     errors: list[str] = []
     channels: Counter = Counter()
     types: Counter = Counter()
+    outside: Counter = Counter()  # NXLog keys the event's Windows template does not name
     progress = lambda f: report(0.9 * f)  # noqa: E731
     texts = (winevent.iter_evtx(path, progress, errors, scratch=_stage_dir()) if evtx
              else winevent.iter_splunk_records(path, progress=progress) if splunk
+             else winevent.iter_json_records(path, progress, json_stats) if as_json
              else winevent.iter_event_texts(path, progress=progress))
     try:
         with open(stage[0], "w", encoding="utf-8", newline="") as f_raw, \
@@ -575,6 +583,12 @@ def _ingest_winevents(con, path: Path, start: int, report=_noop, container: str 
                 elif isinstance(text, winevent.SplunkRecord):
                     text, ev = text.text, winevent.parse_splunk(text.text)
                     prefix = "[unreadable Splunk WinEventLog record] "
+                elif isinstance(text, dict):
+                    # A JSON record that is not a Windows event of this file's shape
+                    # (or did not parse - `_raw`) is kept as its text.
+                    ev = winevent.parse_json_event(text)
+                    text = text.get("_raw") or json.dumps(text, ensure_ascii=False)
+                    prefix = "[not a readable Windows event record] "
                 else:
                     ev = winevent.parse_event(text)
                 if ev is None:
@@ -583,6 +597,7 @@ def _ingest_winevents(con, path: Path, start: int, report=_noop, container: str 
                 else:
                     events += 1
                     unmatched += splunk and not ev["template_matched"]
+                    outside.update(ev.get("outside_template") or ())
                     channels[ev["channel"] or "-"] += 1
                     timeline = winevent.timeline_row(ev)
                     types[timeline["action"] or f"untyped {ev['provider']} {ev['event_id']}"] += 1
@@ -624,8 +639,20 @@ def _ingest_winevents(con, path: Path, start: int, report=_noop, container: str 
         windows.update(unreadable_chunks=bad_chunks, reader_errors=errors)
     if splunk:
         windows["unmatched_messages"] = unmatched
+    if container == "nxlog":
+        windows["keys_outside_template"] = dict(outside.most_common(10))
+    if container == "nxlog":
+        notes += ["NXLog writes its own fields beside the event's items: the fields its reference "
+                  "documents (and Logstash's) are set aside, every other key is an item under its "
+                  "own name (Q50) - an item named like one of NXLog's fields would be among them; "
+                  "the EventData XML is used instead when a record carries it.",
+                  "EventTime states no zone in older NXLog output: it is taken as GMT+7 and flagged "
+                  "unconfirmed - declare the source's zone at Ingest and re-process (Q49)."]
     profile, name, docs = {"evtx": (winevent.EVTX_PROFILE_ID, winevent.EVTX_NAME, winevent.EVTX_DOCS),
                            "splunk": (winevent.SPLUNK_PROFILE_ID, winevent.SPLUNK_NAME, winevent.SPLUNK_DOCS),
+                           "winlogbeat": (winevent.WINLOGBEAT_PROFILE_ID, winevent.WINLOGBEAT_NAME,
+                                          winevent.WINLOGBEAT_DOCS),
+                           "nxlog": (winevent.NXLOG_PROFILE_ID, winevent.NXLOG_NAME, winevent.NXLOG_DOCS),
                            }.get(container, (winevent.PROFILE_ID, winevent.NAME, winevent.DOCS))
     return {
         "method": "documented",
@@ -634,11 +661,16 @@ def _ingest_winevents(con, path: Path, start: int, report=_noop, container: str 
         "docs": [{"title": t, "url": u} for t, u in docs],
         "notes": notes,
         "fields": {f: {"columns": [c], "source": "documented"} for f, c in (
-            ("ts", "Splunk's time line" if splunk else "System/TimeCreated/@SystemTime"),
+            ("ts", {"splunk": "Splunk's time line", "winlogbeat": "@timestamp",
+                    "nxlog": "EventTime"}.get(container, "System/TimeCreated/@SystemTime")),
             ("username", "TargetUserName / SubjectUserName / User"),
             ("srcip", "IpAddress / SourceIp"), ("dstip", "DestinationIp"), ("dstport", "DestinationPort"))},
         "heuristic_fields": [], "missing_fields": [],
         "windows": windows,
+        # How the JSON was laid out, and what could not be read as a record (IAI-35).
+        **({"json": {k: json_stats.get(k) for k in ("layout", "records", "wrapper", "unparseable",
+                                                    "unparseable_at", "broken_at_byte")}}
+           if as_json else {}),
     }
 
 

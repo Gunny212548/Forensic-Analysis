@@ -1,4 +1,4 @@
-"""Windows event logs, W1-W3: the core, event XML, .evtx and Splunk's WinEventLog text
+"""Windows event logs, W1-W4: the core, event XML, .evtx, Splunk's WinEventLog text and JSON
 (app/services/winevent.py, specs/windows_event_logs.md).
 
     python tests/check_windows.py <scratch dir> [--repo DIR] [--evtx D:/logtest/windows]
@@ -19,6 +19,9 @@ Throwaway store, the real pipeline, no server. Checks:
 - Splunk's classic text (W3): attack_data's PurpleSharp spray capture named item by item
   from Windows' message templates (R2000 / R2009 as for XML), hex values in the stored
   form, multi-line values whole, damage and unmatched messages kept, .gz / .zip.
+- JSON (W4): synthetic Winlogbeat records (event_data, user_data, an Elasticsearch `_source`,
+  a broken line) and OTRF's NXLog records (tests/samples/otrf, MIT): identification, items under
+  their own names and none of NXLog's fields among them, channel case, EventTime as written.
 
 With --evtx, on the lab folder kept outside the repo (Q43): it holds a clone of
 EVTX-ATTACK-SAMPLES (GPL-3.0) and this machine's System log exported twice -
@@ -42,6 +45,9 @@ console code page and loses what it cannot show):
 - W3: attack_data account_lockout (splunk-text/), and the lab's Security events rendered by
   Windows in Splunk's layout (tests/make_splunk_text.ps1) read back equal to their XML, but
   for SIDs and %% parameters, which the message shows rendered (Q46).
+- W4: winlogbeat/ (Elastic's test .evtx with the JSON Winlogbeat wrote from each, Elastic License
+  2.0 - from github.com/elastic/beats x-pack/winlogbeat/module/*/test/testdata/collection) read
+  both ways and compared; nxlog/ (whole OTRF datasets) - no NXLog field taken for an item.
 
 stdlib + the app's own modules (+ the `evtx` wheel for .evtx).
 """
@@ -206,6 +212,124 @@ SourceName=Microsoft Windows security auditing.
 EventCode=not-a-number
 Message=An account failed to log on.
 """
+
+
+def _winlogbeat(n: int, event_id: int, data: dict, when: str, **extra) -> dict:
+    """A record in Winlogbeat's shape (Elastic's winlog fields) - synthetic."""
+    return {"@timestamp": when, "event": {"code": str(event_id)}, "host": {"name": "dc01"},
+            "winlog": {"channel": "Security", "computer_name": "dc01.example.test", "event_id": str(event_id),
+                       "provider_name": "Microsoft-Windows-Security-Auditing", "record_id": n,
+                       "event_data": data, **extra}}
+
+
+def check_json(lab: Path | None, scratch: Path, run, win, query) -> None:
+    """W4: Windows events as Winlogbeat / Elastic JSON and NXLog JSON."""
+    import json
+    from app.services import identify, winevent
+
+    print("JSON - Winlogbeat (synthetic, Elastic's winlog fields)")
+    recs = [_winlogbeat(i, 4625, {"TargetUserName": "alice", "IpAddress": "203.0.113.7", "LogonType": "3",
+                                  "Status": "0xc000006d", "SubStatus": "0xc000006a"},
+                        f"2026-03-01T01:00:{i:02d}.1234567Z") for i in range(12)]
+    recs.append(_winlogbeat(12, 1102, {}, "2026-03-01T01:01:00Z",
+                            user_data={"xml_name": "LogFileCleared", "SubjectUserName": "mallory",
+                                       "SubjectUserSid": "S-1-5-21-1"}))
+    recs[-1]["winlog"].pop("event_data")
+    recs[-1]["winlog"]["provider_name"] = "Microsoft-Windows-Eventlog"
+    lines = [json.dumps(r) for r in recs]
+    # An Elasticsearch export wraps a document in _source; one line is not JSON at all.
+    lines.append(json.dumps({"_index": "winlogbeat-8", "_source": _winlogbeat(
+        13, 4624, {"TargetUserName": "alice", "IpAddress": "203.0.113.7", "LogonType": "10"},
+        "2026-03-01T01:02:00Z")}))
+    lines.append("{not json")
+    wlb = scratch / "winlogbeat.ndjson"
+    wlb.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    r = identify.identify(wlb, "json")
+    check((r["status"], r["profile"], r["sigma"]) == ("supported", winevent.WINLOGBEAT_PROFILE_ID,
+                                                       {"product": "windows", "service": "security"}),
+          f"identified as Winlogbeat JSON, windows/security ({r['status']} {r['profile']})")
+    m = run(wlb, "json", "json")
+    w = win(m)
+    check(m["status"] == "ready" and (w.get("events"), w.get("unreadable")) == (14, 1)
+          and m["mapping"]["json"]["unparseable"] == 1,
+          f"14 events, the broken line kept as a row and counted ({w.get('events')}, {w.get('unreadable')})")
+    check(m.get("rules_matched") == {"R2000": 12, "R2008": 1},
+          f"12 failures then a sign-in from one address: R2000, R2008 ({m.get('rules_matched')})")
+    row = query(m["case_id"], "SELECT e.ts, e.srcip, w.data['Status'] FROM raw_events e JOIN win_events w "
+                "USING (row_id) WHERE w.event_id = 4625 ORDER BY row_id LIMIT 1")[0]
+    check(str(row[0]) == "2026-03-01 08:00:00.123456" and row[1:] == ("203.0.113.7", "0xc000006d"),
+          f"@timestamp UTC -> GMT+7, event_data under its own names ({row})")
+    cleared = query(m["case_id"], "SELECT data FROM win_events WHERE event_id = 1102")[0][0]
+    check(cleared == {"SubjectUserName": "mallory", "SubjectUserSid": "S-1-5-21-1"},
+          f"1102's user_data items, not Winlogbeat's xml_name ({cleared})")
+    check(query(m["case_id"], "SELECT count(*) FROM win_events WHERE event_id = 4624 AND data['LogonType'] = '10'")[0][0] == 1,
+          "an Elasticsearch export's _source document is read")
+
+    print("JSON - NXLog im_msvistalog (OTRF, MIT)")
+    otrf = REPO / "tests" / "samples" / "otrf" / "rdp_interactive_taskmanager_lsass_dump.json"
+    r = identify.identify(otrf, "json")
+    check((r["status"], r["profile"]) == ("supported", winevent.NXLOG_PROFILE_ID),
+          f"identified as NXLog JSON ({r['status']} {r['profile']})")
+    m = run(otrf, "json", "json")
+    w = win(m)
+    check(m["status"] == "ready" and (w.get("events"), w.get("unreadable")) == (283, 0)
+          and w.get("channels", {}).get("Security") == 164 and "security" not in w.get("channels", {}),
+          f"283 events; `security` and `Security` are one channel ({w.get('events')}, {w.get('channels')})")
+    row = query(m["case_id"], "SELECT e.ts, e.ts_raw, e.srcip, e.username, e.app, w.data FROM raw_events e "
+                "JOIN win_events w USING (row_id) WHERE w.event_id = 4624 ORDER BY row_id LIMIT 1")[0]
+    check(str(row[0]) == "2020-09-22 04:37:54" and row[1] == "2020-09-22 04:37:54",
+          f"EventTime as written, no zone - GMT+7 by gotcha #21, unconfirmed (Q49) ({row[0]})")
+    names = set(row[5])
+    check(row[2:5] == ("::1", "MORDORDC$", "Network (3)") and "TargetUserSid" in names
+          and not names & {"EventTime", "Hostname", "SourceModuleType", "Severity", "@timestamp", "host", "Task"},
+          f"4624's items under their own names, none of NXLog's or Logstash's fields among them ({row[2:5]})")
+    check(w.get("keys_outside_template") == {"ProcessId": 10},
+          f"keys no Windows template names are kept and counted ({w.get('keys_outside_template')})")
+
+    if lab is None:
+        return
+    print("JSON - lab (outside the repo)")
+    # Winlogbeat's own JSON of Elastic's test .evtx files vs our reading of the same files.
+    same = explained = 0
+    bad = []
+    for g in sorted((lab / "winlogbeat").rglob("*.evtx.golden.json")):
+        evtx = g.with_name(g.name[:-len(".golden.json")])
+        if not evtx.is_file():
+            continue
+        ours = {}
+        for t in winevent.iter_evtx(evtx):
+            if isinstance(t, winevent.EvtxRecord):
+                e = winevent.parse_event(t.xml, t.fixes, t.empty_in_array)
+                ours[(e["record_id"], e["provider"])] = e
+        for rec in winevent.iter_json_records(g):
+            j = winevent.parse_json_event(rec)
+            o = ours.get((j["record_id"], j["provider"]))
+            if o is None or (o["event_id"], o["channel"], o["computer"]) != (j["event_id"], j["channel"], j["computer"]) \
+                    or winevent._when(o["time_created"]) != winevent._when(j["time_created"]):
+                bad.append((g.name, j["record_id"], "event"))
+                continue
+            for k in set(o["data"]) | set(j["data"]):
+                a, b = o["data"].get(k), j["data"].get(k)
+                if a == b:
+                    same += 1
+                elif (b is None and not (a or "").strip()) or ("%%" in (a or "") and "%%" not in (b or "")) \
+                        or (a or "").lower() == (b or "").lower() or " ".join((a or "").split()) == " ".join((b or "").split()):
+                    explained += 1  # Winlogbeat leaves out empty items, renders %%, upper-cases GUIDs, trims
+                else:
+                    bad.append((g.name, k, (a or "")[:30], (b or "")[:30]))
+    check(not bad and same > 2500,
+          f"Winlogbeat's JSON of Elastic's 97 test .evtx = our reading of them: {same} items equal, {explained} "
+          f"as Winlogbeat writes them (empty left out, %% rendered, GUID case, trimmed) {bad[:3]}")
+    stray = set()
+    events = 0
+    for f in sorted((lab / "nxlog").glob("*.json")):
+        for rec in winevent.iter_json_records(f):
+            if winevent.json_shape(rec) == "nxlog":
+                events += 1
+                stray |= set(winevent.parse_json_event(rec).get("outside_template") or ())
+    check(events > 40000 and stray <= {"ProcessId"},
+          f"{events:,} NXLog events of 5 OTRF datasets: no NXLog field taken for an item (outside the "
+          f"templates only {sorted(stray)})")
 
 
 def check_splunk(lab: Path | None, scratch: Path, run, win, query) -> None:
@@ -437,6 +561,7 @@ def main() -> int:
     if args.evtx:
         check_evtx(Path(args.evtx), run, win, query)
     check_splunk(Path(args.evtx) if args.evtx else None, scratch, run, win, query)
+    check_json(Path(args.evtx) if args.evtx else None, scratch, run, win, query)
 
     print()
     print(f"{len(FAILED)} FAILED" if FAILED else "WINDOWS OK")

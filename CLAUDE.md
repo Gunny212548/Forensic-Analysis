@@ -30,7 +30,7 @@ describes the code before that direction.
 Formats exercised against real data so far: VMware ESXi `auth.log`,
 Palo Alto CSV exports, Check Point SmartLog CSV exports, Check Point Log Exporter
 records in a ManageEngine EventLog Analyzer export (gotcha #59), Windows Security and
-Sysmon event XML, .evtx and Splunk WinEventLog text (lab captures, gotcha #60), Entra ID sign-in
+Sysmon event XML, .evtx, Splunk WinEventLog text and Winlogbeat / NXLog JSON (lab captures, gotcha #60), Entra ID sign-in
 CSV exports and their Azure Monitor JSON export (gotcha #39). Every file is
 identified before it is read (gotcha #53, IAI-92 - on its branch): a documented
 format is read through its profile, anything else is kept as evidence and not
@@ -344,7 +344,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
-- #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; W3 Splunk WinEventLog text: items named from Windows' own message templates (`app/data/windows`, `tools/export_win_templates.ps1`), values as rendered.
+- #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; W3 Splunk WinEventLog text: items named from Windows' own message templates (`app/data/windows`, `tools/export_win_templates.ps1`), values as rendered. W4 Winlogbeat / NXLog JSON (`json_shape`): Winlogbeat writes rendered values and leaves out empty items; NXLog's own fields set aside by its documented list, but a template-named item always kept.
 - #59 Check Point Log Exporter records inside a ManageEngine EventLog Analyzer search export (`checkpoint_le.py`): record documented, wrapper observed; fields via `regexp_extract_all`; update logs sharing a `loguid` are `log_update` rows with no verdict; epoch `time` states its zone.
 - #53 Every file is identified before it is read, in Sigma logsource terms (`identify.py`); no column is guessed; a format without a reader, or none, is kept as evidence and not analysed. A file's name proves nothing - JSON-lines arrive as `.log`, exports start with a blank line.
 
@@ -760,6 +760,9 @@ came in with them. W3 added `splunk-text/` (attack_data's account_lockout, 9,245
 R2006 177 / R2008 3, and 54 files of the lab's Security events rendered in Splunk's layout by
 `tests/make_splunk_text.ps1`) and, in `tests/samples`, `windows-security.log` 0 -> 4 rows plus
 `windows-security-text-spray.log` (162 rows, R2000 20 / R2009 20).
+W4 added `winlogbeat/` (Elastic's 105 test `.evtx` and the 113 JSON files Winlogbeat wrote from
+them) and `nxlog/` (7 OTRF datasets, 2 of them flat JSON kept as no_reader) - 225 entries, 0
+flagged - and `tests/samples/otrf/` (283 NXLog records, 0 flagged).
 
 **Real-world benchmark.** A Check Point export was analysed alongside the
 human SOC report written from the same data ("Firewall Port Scanning &

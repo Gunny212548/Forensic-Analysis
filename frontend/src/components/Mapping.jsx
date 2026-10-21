@@ -131,6 +131,15 @@ function WindowsNote({ win, label }) {
           - kept whole as one item, Message; their values are not named.
         </>
       )}
+      {Object.keys(win.keys_outside_template || {}).length > 0 && (
+        <div className="map-sub">
+          Keys the event&apos;s Windows template does not name, kept as items (added by the shipper or
+          its pipeline, or another Windows build&apos;s version):{' '}
+          {Object.entries(win.keys_outside_template)
+            .map(([k, c]) => `${k} ×${n(c)}`)
+            .join(' · ')}
+        </div>
+      )}
       {errors.length > 0 && <div className="map-sub">Reader messages: {errors.join(' · ')}</div>}
     </div>
   )

@@ -105,3 +105,33 @@ by a time line followed by `LogName=` in the first 50 lines (`read_as: winsplunk
 - Seen in passing, not changed here: on the lockout capture R2006 flags the DC's own machine
   account `WIN-DC-259$` (177 rows, 4 sources) - Windows 4624s include computer accounts, which
   the multi-source rule was not written for.
+
+## W4 - JSON: Winlogbeat / Elastic and NXLog (2026-10-21)
+
+Q48: Winlogbeat and NXLog; PowerShell's `ConvertTo-Json` is W4b (its `Properties` carry no
+names). `parsers.iter_json(..., flat=False)` gives each record as decoded - the dotted
+flattening drops empty values, which are items here. Identified by the first records' shape
+(`winevent.json_shape`), before any other JSON profile.
+
+- **Winlogbeat** (`winlog.event_id`, `winlog.channel`): items are `winlog.event_data.*` and
+  `winlog.user_data.*` (less Winlogbeat's `xml_name`); an Elasticsearch export's `_source` is
+  unwrapped; time is `@timestamp` (TimeCreated, UTC). **Winlogbeat does not write what the
+  event holds**, measured on Elastic's 97 test `.evtx` files and the JSON Winlogbeat wrote from
+  each (lab, Elastic License): it leaves out empty items (258), renders `%%` parameters as text
+  (71), writes GUIDs upper case (213) and trims values (12); 2,632 items equal; nothing else.
+  The reader keeps Winlogbeat's values as written (Q46's rule).
+- **NXLog** (`SourceModuleType: im_msvistalog`): its own fields and the event's items share the
+  top level. Set aside: NXLog's documented fields (reference v5.11 and current), its core fields,
+  `ExecutionThreadID` / `EventData` (its own sample), `Task` (observed in OTRF), Logstash's
+  `@timestamp` `@version` `tags` `host` `port`. **But an item Windows' template names stays an
+  item** - 4778's `AccountName` is also an NXLog field name and was lost before that rule. Keys
+  no template names are kept and counted (`keys_outside_template`: OTRF's pipeline adds
+  `ProcessId`). NXLog leaves out empty items too. The `EventData` XML is used when a record has it.
+- **Channel names are case-insensitive**: OTRF's NXLog records hold both `security` and
+  `Security` (`winevent.channel_name`).
+- **A time with no zone is now kept as written everywhere** (`_when`): it used to be taken as
+  UTC, harmless while only SystemTime (`...Z`) reached it; NXLog's `2020-09-22 04:37:54` is the
+  agent's local time (Q49 / #21).
+- OTRF's later datasets (from 2020-10) are flat JSON with no shipper field (`TimeCreated`, no
+  `SourceModuleType`): recognised and kept as no_reader, not guessed at.
+- Speed: ~16k events/s through the whole pipeline (OTRF purplesharp, 25,993 events, 1.6 s).

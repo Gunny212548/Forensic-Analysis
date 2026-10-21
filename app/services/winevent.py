@@ -112,6 +112,40 @@ SPLUNK_DOCS = (
 )
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "data" / "windows"
 
+# JSON (W4): the shapes two shippers write. Winlogbeat / Elastic Agent nest the
+# event under `winlog` (Elastic's exported fields); NXLog's im_msvistalog puts
+# its own fields and the event's items side by side at the top (NXLog Agent
+# reference, "Fields").
+WINLOGBEAT_PROFILE_ID = "windows-winlogbeat-json"
+WINLOGBEAT_NAME = "Windows event log (Winlogbeat / Elastic JSON)"
+WINLOGBEAT_DOCS = (
+    ("Elastic - Winlogbeat exported fields: winlog",
+     "https://www.elastic.co/guide/en/beats/winlogbeat/current/exported-fields-winlog.html"),
+    *DOCS,
+)
+NXLOG_PROFILE_ID = "windows-nxlog-json"
+NXLOG_NAME = "Windows event log (NXLog im_msvistalog JSON)"
+NXLOG_DOCS = (
+    ("NXLog Agent reference - im_msvistalog fields",
+     "https://docs.nxlog.co/agent/current/im/msvistalog.html"),
+    *DOCS,
+)
+# NXLog's own fields (its reference, v5.11 and current), its core fields and two in its
+# own output sample (ExecutionThreadID, EventData); `Task` is observed in the OTRF
+# datasets' NXLog records, not listed. What is left of a record is the event's items.
+_NXLOG_FIELDS = frozenset({
+    "raw_event", "AccountName", "AccountType", "ActivityID", "Category", "Channel", "Domain",
+    "ERROR_EVT_UNRESOLVED", "EventID", "EventTime", "EventType", "EventXML", "ExecutionProcessID",
+    "Hostname", "Keywords", "Level", "LevelValue", "Message", "Opcode", "OpcodeValue",
+    "ProviderGuid", "RecordNumber", "RelatedActivityID", "Severity", "SeverityValue", "SourceName",
+    "TaskValue", "ThreadID", "UserID", "Version",
+    "EventReceivedTime", "SourceModuleName", "SourceModuleType",
+    "ExecutionThreadID", "EventData", "Task",
+})
+# What Logstash adds when it forwards a record (its event fields; host / port from its
+# tcp input, as in the OTRF datasets).
+_LOGSTASH_FIELDS = frozenset({"@timestamp", "@version", "tags", "host", "port"})
+
 # Channel -> Sigma logsource (taxonomy v2.1.0). Any other channel is
 # product windows with the channel named.
 CHANNELS = {
@@ -120,6 +154,14 @@ CHANNELS = {
     "System": {"sigma": {"product": "windows", "service": "system"}},
     "Application": {"sigma": {"product": "windows", "service": "application"}},
 }
+_CHANNEL_NAMES = {c.lower(): c for c in CHANNELS}
+
+
+def channel_name(name: str) -> str:
+    """A channel as Windows names it: channel names are not case-sensitive, and
+    some shippers lower-case them (OTRF's NXLog records hold both `security` and
+    `Security`)."""
+    return _CHANNEL_NAMES.get(name.strip().lower(), name.strip())
 
 SECURITY = "Microsoft-Windows-Security-Auditing"
 SYSMON = "Microsoft-Windows-Sysmon"
@@ -375,9 +417,10 @@ def _first(data: dict, names: tuple[str, ...]) -> str | None:
 
 
 def _when(text: str | None) -> datetime | None:
-    """SystemTime (UTC, `...Z`, up to 100 ns) -> naive GMT+7. Splunk's
-    `MM/DD/YYYY hh:mm:ss AM` states no zone: taken as written - GMT+7 by
-    gotcha #21, flagged timezone-unconfirmed (Q44)."""
+    """SystemTime (UTC, `...Z`, up to 100 ns), or any ISO time with an
+    offset -> naive GMT+7. A time that states no zone (Splunk's `MM/DD/YYYY
+    hh:mm:ss AM`, NXLog's `2020-08-07 10:32:22`) is taken as written - GMT+7
+    by gotcha #21, flagged timezone-unconfirmed (Q44, Q49)."""
     if not text:
         return None
     m = _SPLUNK_TIME.match(text)
@@ -395,7 +438,7 @@ def _when(text: str | None) -> datetime | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        return dt  # no zone stated (NXLog's EventTime): as written, gotcha #21 (Q49)
     return dt.astimezone(_GMT7).replace(tzinfo=None)
 
 
@@ -908,3 +951,116 @@ def parse_splunk(text: str) -> dict | None:
         "data": data,
         "template_matched": matched,
     }
+
+
+# --- JSON: Winlogbeat / Elastic and NXLog (W4) -------------------------------
+
+def _unwrap(rec: dict) -> dict:
+    """An Elasticsearch export wraps each document in `_source`."""
+    return rec["_source"] if isinstance(rec.get("_source"), dict) else rec
+
+
+def json_shape(rec: dict) -> str | None:
+    """"winlogbeat", "nxlog", "flat" (OTRF's later records: Windows' names at
+    the top, no shipper named - observed, not read) or None."""
+    if not isinstance(rec, dict) or "_raw" in rec:
+        return None
+    rec = _unwrap(rec)
+    w = rec.get("winlog")
+    if isinstance(w, dict) and "event_id" in w and ("channel" in w or "provider_name" in w):
+        return "winlogbeat"
+    if rec.get("SourceModuleType") == "im_msvistalog":
+        return "nxlog"
+    if {"EventID", "Channel", "Hostname", "SourceName", "TimeCreated"} <= set(rec):
+        return "flat"
+    return None
+
+
+def _text(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (dict, list)):
+        return json.dumps(v, ensure_ascii=False)
+    return str(v)
+
+
+def _int(v) -> int | None:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _template_names(provider: str | None, event_id: int | None, version: int | None) -> set[str] | None:
+    """The item names of one event version in the exported templates, or None
+    when the provider, event or version is not among them."""
+    for meta in _providers().values():
+        if meta["name"] == provider:
+            for t in meta["events"].get(event_id, []):
+                if t["version"] == version:
+                    return set(t["names"])
+    return None
+
+
+def _nxlog_event_data(xml: str) -> dict[str, str] | None:
+    """NXLog's `EventData` field, when it carries one: the items as Windows wrote them."""
+    try:
+        root = ElementTree.fromstring(_ILLEGAL.sub("_", xml))
+    except ElementTree.ParseError:
+        return None
+    data = {}
+    for i, d in enumerate((el for el in root.iter() if _local(el.tag) == "Data"), 1):
+        data[d.get("Name") or f"param{i}"] = d.text or ""
+    return data
+
+
+def parse_json_event(rec: dict) -> dict | None:
+    """One Winlogbeat or NXLog record as parse_event's dict, or None when it
+    is neither (or carries no event ID)."""
+    shape = json_shape(rec)
+    if shape not in ("winlogbeat", "nxlog"):
+        return None
+    rec = _unwrap(rec)
+    if shape == "winlogbeat":
+        w = rec["winlog"]
+        data = {k: _text(v) for k, v in (w.get("event_data") or {}).items()}
+        for k, v in (w.get("user_data") or {}).items():
+            if isinstance(v, dict):  # an element inside UserData's own element
+                data.update({kk: _text(vv) for kk, vv in v.items()})
+            elif k != "xml_name":  # Winlogbeat's name for UserData's element, not an item
+                data[k] = _text(v)
+        ev = {"provider": w.get("provider_name"), "event_id": _int(w.get("event_id")),
+              "time_created": rec.get("@timestamp"), "record_id": _text(w.get("record_id")) or None,
+              "channel": w.get("channel"), "computer": w.get("computer_name"),
+              "user_sid": (w.get("user") or {}).get("identifier") if isinstance(w.get("user"), dict) else None}
+    else:
+        data, outside = None, []
+        if isinstance(rec.get("EventData"), str):
+            data = _nxlog_event_data(rec["EventData"])
+        if data is None:
+            # An item Windows' template names stays an item even when NXLog has a
+            # field of that name (4778's AccountName); a key the template does not
+            # name is kept too, and counted (OTRF's pipeline adds ProcessId).
+            named = _template_names(rec.get("SourceName"), _int(rec.get("EventID")), _int(rec.get("Version")))
+            data = {k: _text(v) for k, v in rec.items()
+                    if (k not in _NXLOG_FIELDS and k not in _LOGSTASH_FIELDS) or (named and k in named)}
+            if named is not None:
+                outside = sorted(k for k in data if k not in named)
+        ev = {"provider": rec.get("SourceName"), "event_id": _int(rec.get("EventID")),
+              "time_created": _text(rec.get("EventTime")) or None,
+              "record_id": _text(rec.get("RecordNumber")) or None,
+              "channel": rec.get("Channel"), "computer": rec.get("Hostname"),
+              "user_sid": rec.get("UserID"), "outside_template": outside}
+    if ev["event_id"] is None:
+        return None
+    if ev["channel"]:
+        ev["channel"] = channel_name(ev["channel"])
+    ev["data"] = {k: _ILLEGAL.sub("_", v) for k, v in data.items()}
+    return ev
+
+
+def iter_json_records(path: Path, progress=None, stats: dict | None = None) -> Iterator[dict]:
+    """Each JSON record of the file as decoded - nested, empty values kept."""
+    return parsers.iter_json(path, progress, stats, flat=False)

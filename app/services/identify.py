@@ -127,7 +127,11 @@ def _windows(path: Path) -> dict | None:
 
 def _channel_source(channels: Counter) -> dict:
     """One channel names the Sigma service; several, or none, are product windows."""
-    top = channels.most_common(1)[0][0] if channels else None
+    merged: Counter = Counter()
+    for c, n in channels.items():
+        merged[winevent.channel_name(c)] += n  # `security` and `Security` are one channel
+    top = merged.most_common(1)[0][0] if merged else None
+    channels = merged
     return (winevent.CHANNELS.get(top) if len(channels) == 1 else None) or {"sigma": {"product": "windows"}}
 
 
@@ -161,7 +165,40 @@ def _table(path: Path) -> dict | None:
                    "header matches the documented columns", profile.id)
 
 
+def _windows_json(path: Path) -> dict | None:
+    """Windows events shipped as JSON (W4), by the shape of the first records:
+    Winlogbeat / Elastic Agent (`winlog.*`), NXLog im_msvistalog
+    (`SourceModuleType`), or OTRF's later flat records, which name no shipper -
+    recognised and kept, not read."""
+    head = list(islice(winevent.iter_json_records(path), JSON_RECORDS))
+    shapes = Counter(winevent.json_shape(r) for r in head)
+    shape = shapes.most_common(1)[0][0] if shapes else None
+    if shape is None:
+        return None
+    records = [winevent._unwrap(r) for r in head if winevent.json_shape(r) == shape]
+    if shape == "flat":
+        return _result(NO_READER, {"sigma": {"product": "windows"}},
+                       "Windows events, flat JSON (no shipper named)",
+                       "records carry EventID, Channel, Hostname, SourceName and TimeCreated at the top "
+                       "level, with no field that names the tool that wrote them - observed in the "
+                       "OTRF Security-Datasets; not read until its producer is known")
+    if shape == "winlogbeat":
+        channels = Counter(r["winlog"].get("channel") for r in records if r["winlog"].get("channel"))
+        name, profile, basis = winevent.WINLOGBEAT_NAME, winevent.WINLOGBEAT_PROFILE_ID, \
+            "records carry winlog.event_id and winlog.channel / provider_name (Elastic's winlog fields)"
+    else:
+        channels = Counter(r.get("Channel") for r in records if r.get("Channel"))
+        name, profile, basis = winevent.NXLOG_NAME, winevent.NXLOG_PROFILE_ID, \
+            "records carry SourceModuleType im_msvistalog (NXLog's im_msvistalog fields)"
+    return {**_result(SUPPORTED, _channel_source(channels), name,
+                      f"{basis}; channels in the first {len(head)} records - {_seen(channels)}", profile),
+            "read_as": "json"}
+
+
 def _json(path: Path) -> dict:
+    windows = _windows_json(path)
+    if windows:
+        return windows
     head = [r for r in islice(parsers.iter_rows(path, "json"), JSON_RECORDS) if "_raw" not in r]
     if not head:
         return _result(UNRECOGNISED, None, None, "no JSON record could be read")
