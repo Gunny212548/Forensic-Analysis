@@ -1,0 +1,32 @@
+# Development: the same image and settings as docker-compose.yml, with the
+# source mounted and uvicorn reloading on every save - an edit to app/ is live
+# in a second or two, no rebuild. Its own project name, port and volumes, so
+# code being worked on never touches the store on 8091:
+#
+#   docker compose -p forensic-dev -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+# Open it at http://127.0.0.1:8092, not localhost: browsers do not scope
+# cookies by port, so localhost:8092 and localhost:8091 would sign each other
+# out (CLAUDE.md, "Two instances on one machine"). Rebuild (--build) only after
+# requirements.txt or the Dockerfile changes; the UI is served by `npm run dev`
+# with FA_API=http://127.0.0.1:8092.
+services:
+  forensic-analyzer:
+    hostname: forensic-dev
+    restart: "no"
+    ports: !override
+      - "127.0.0.1:8092:8000"
+    # Polling: file events from a Windows bind mount do not reach the
+    # container, so watchfiles would never see a save.
+    environment:
+      - WATCHFILES_FORCE_POLLING=true
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--reload", "--reload-dir", "/app/app"]
+    volumes:
+      - ./app:/app/app
+      - ./tools:/app/tools
+      # tests/ is not in the image (.dockerignore); mounted so every check runs
+      # here as it would in a container: docker exec -w /app forensic-dev-... python tests/...
+      - ./tests:/app/tests
+      - forensic-data:/data
+      - forensic-auth:/auth

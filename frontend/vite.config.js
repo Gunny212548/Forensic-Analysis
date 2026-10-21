@@ -29,9 +29,10 @@ export default defineConfig({
   },
   server: {
     // `npm run dev` proxies the API to the container so the UI can be worked
-    // on with hot reload against real cases.
+    // on with hot reload against real cases. FA_API points it elsewhere, e.g.
+    // the dev container of docker-compose.dev.yml: FA_API=http://127.0.0.1:8092
     proxy: {
-      '/api': 'http://localhost:8091',
+      '/api': process.env.FA_API || 'http://localhost:8091',
     },
   },
 })

@@ -636,6 +636,14 @@ docker exec -i forensic-analyzer-forensic-analyzer-1 \
 cd frontend && npm ci && npm run build   # UI only, straight into ../static
 cd frontend && npm run dev               # hot reload, /api proxied to 8091
 
+# dev container: app/ tools/ tests/ mounted, uvicorn --reload (~1 s after a save),
+# its own store and port - never the 8091 data. Open 127.0.0.1:8092, not localhost.
+# --build only after requirements.txt / Dockerfile change. Needs its own account.
+docker compose -p forensic-dev -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+docker exec -it forensic-dev-forensic-analyzer-1 python tools/create_user.py add you@example.com --name "..."
+docker exec -w /app forensic-dev-forensic-analyzer-1 python tests/check_mcp.py /tmp/mcp --repo /app
+cd frontend && FA_API=http://127.0.0.1:8092 npm run dev   # UI hot reload against it
+
 # every /api call needs a session cookie now
 curl -s -c /tmp/fa.jar -H 'Content-Type: application/json' \
     -d '{"email":"you@example.com","password":"..."}' http://localhost:8091/api/auth/login
