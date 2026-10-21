@@ -66,7 +66,8 @@ async def list_profiles(
         raise HTTPException(409, str(exc))
 
 
-@router.get("/{case_id}/profiles/{kind}/{value}")
+# :path, so an account name with a "/" in it still reaches the route.
+@router.get("/{case_id}/profiles/{kind}/{value:path}")
 async def get_profile(case_id: str, kind: str, value: str):
     """One source address's or account's behaviour profile - layer C facts,
     not a verdict."""
