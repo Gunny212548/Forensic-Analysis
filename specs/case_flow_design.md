@@ -507,6 +507,61 @@ analysis repeat).
 Still open from revision 2: Q5 (attack path from confirmed events only - written that way
 above) and Q6 (AI suggestions on request).
 
+## Revision 7 (2026-10-21, draft) - practitioner methods added to steps 2, 4, 5 and 6
+
+The user asked how human analysts do this (2026-10-21). `docs/standards/practitioner-methods.md`
+read five published methods (Carrier & Spafford 2004, the Diamond Model 2013, Casey 2002,
+Heuer ACH, Gudjonsson's super timeline). They are methods, not standards: each addition below
+cites one beside the standard the step already cites. Nothing is built; each line needs the
+user's approval as revision 6 did.
+
+- **Step 2 Timeline - temporal proximity.** From any event, "what happened within N minutes
+  of this", across every evidence item, in time order (Gudjonsson §4.3: look "for other
+  objects in the timeline that are in temporal proximity to the known event"). N is the
+  analyst's choice per view, never a threshold of ours. The pivot of revision 6 (every event
+  sharing a value) stays; the two combine - same address, ±N minutes. MCP has both since
+  `search_events` (`since` / `until`); the UI has neither.
+- **Step 2 Timeline - rare values.** Per field (event type, account, destination port, ...),
+  the values rarest in this evidence, rarest first (Gudjonsson §4.4, "least frequency of
+  occurrence"; SP 800-92 §5.2.2 "newness"). A fact of layer C, never a finding. Behaviour
+  profiles today rank only the *most* active.
+- **Step 3 Attack events - unknown is shown.** Each confirmed event shows actor (account),
+  source, target, action, result and direction, and an empty one says "unknown" instead of
+  being left out (Diamond §4: "any empty features are now identified knowledge gaps").
+  Result as Success / Failure / Unknown (Diamond §4.5.3).
+- **Step 4 Attack timeline - hypotheses as a matrix.** Revision 6 already records hypotheses
+  with supporting and contradicting events. Added: shown as Heuer's matrix (hypotheses
+  across, confirmed events down, each cell consistent / inconsistent / not applicable);
+  events consistent with every hypothesis are marked "not diagnostic"; the hypotheses are
+  ordered by evidence *against*, fewest first, not by evidence for (Heuer ch. 8 steps 3-5).
+  The analyst decides; the matrix is the audit trail (Heuer p. 105).
+- **Step 5 Attack path - edges actual or hypothesised.** Each edge carries the Diamond
+  activity-thread label: Actual (cites confirmed events) or Hypothesised (cites the
+  analyst's written assumption), with a confidence and what the step provides the next
+  (Diamond §8, p. 35). **This conflicts with revision 6 step 5** ("a node or edge with no
+  confirmed event cannot be drawn") - see Q30.
+- **Step 6 Report - certainty of the data, and rejected hypotheses.** Each statement's
+  evidence carries a Casey level, computed where it can be: one unprotected log = C2,
+  independent evidence items agreeing = C4, contradicted = C0, an address behind a known
+  proxy or NAT = C1 (Casey §2.3, Table 1). It grades the data, not the conclusion. The
+  report lists every hypothesis considered and why the rejected ones were rejected (Heuer
+  step 7). Beside, not instead of, the findings' Admiralty grade (gotcha #30) - see Q31.
+
+### Questions (revision 7)
+
+- **Q30 - hypothesised edges on the attack path.** Revision 6 draws only what confirmed events
+  show. The Diamond Model draws hypothesised arcs dashed, with the assumption written on them,
+  so a gap is visible where it is. Proposed: allow them, dashed, never in the Attack Flow
+  export as fact, and only from a note the analyst wrote - the system and the AI never add
+  one. Or keep revision 6 and show gaps only on the attack timeline (step 4).
+- **Q31 - Casey levels beside Admiralty.** Admiralty grades a finding (source reliability +
+  credibility); Casey grades the data under a statement (corroboration across independent
+  items). Proposed: Casey on the report's evidence lines only, Admiralty unchanged. Or one of
+  the two.
+- **Q32 - where it lands.** Proposed: temporal proximity and rare values in story 3 (data
+  timeline, IAI-60); unknown features with story 5 (confirmed events); the matrix with step 4;
+  edge labels in story 7 (`specs/story7_attack_path_mcp.md`); Casey with the report story.
+
 ## Open questions
 
 - **Q1** A rejection for `better_technique` says the ATT&CK mapping is wrong, not that the
