@@ -165,6 +165,14 @@ def build(product: str, prefix: str, service: str = "dstport", unit: str = "port
         # of the generic rule matching the same behaviour (R2002 / R2004 / R2007
         # are R2, R3003-R3005 R3).
         "FAMILY": {s1: "R2", s2: "R2", s3: "R2", m1: "R2", i1: "R3", i2: "R3", i3: "R3"},
+        # The generic rule each one matches the same behaviour as (escalation
+        # patterns and VERIS count behaviours, not ids)...
+        "EQUIVALENT": {s1: "R2002", s2: "R2002", s3: "R2004", m1: "R2007", i1: "R3003",
+                       i2: "R3004", i3: "R3005"},
+        # ...and the generic rules that stop running on this product's rows
+        # (story 4, D13). R2003 is R2002's count over service names - both scans
+        # are SCAN-1 / SCAN-2 now. R3001 stays: no data-transfer rule yet.
+        "SUPERSEDES": ("R2002", "R2003", "R2004", "R2007", "R3003", "R3004", "R3005"),
     }
 
 

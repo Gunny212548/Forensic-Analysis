@@ -41,6 +41,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from .confidence import _member_of
+from . import rules
 from .lifecycle import RESOLVED, tracked
 
 SCHEMA_VERSION = "1.4.0"  # what verisc.json declares as its schema_version default
@@ -106,7 +107,9 @@ def build(case_id: str, manifest: dict, findings: list[dict]) -> dict | None:
     cloud = set()
     exfil = False
     for f in tf:
-        cat, variety, side = ACTION.get(f["rid"], ("hacking", "Unknown", "src"))
+        # A product rule is classified as the generic rule of the same behaviour.
+        rid = rules.RULE_EQUIVALENT.get(f["rid"], f["rid"])
+        cat, variety, side = ACTION.get(rid, ("hacking", "Unknown", "src"))
         actor_ip = f.get("srcip") if side == "src" else _dest(f)
         victim = (f.get("username") or _dest(f)) if side == "src" else f.get("srcip")
         if actor_ip:

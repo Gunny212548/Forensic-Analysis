@@ -511,6 +511,23 @@ def family_sql(rid: str) -> str:
     return f"CASE {rid} {whens} ELSE substr({rid}, 1, 2) END" if whens else f"substr({rid}, 1, 2)"
 
 
+# Story 4 (D13): a generic rule no longer runs on the rows of a product whose
+# own rules match the same behaviour - generic rule id -> those products. It
+# still runs on every other row (FortiGate, ESXi, sshd, Entra, Windows), which
+# have no rule set of their own yet. Filled from the product modules below.
+RULE_SUPERSEDED: dict[str, set[str]] = {}
+
+# A product rule -> the generic rule matching the same behaviour, for whatever
+# counts behaviours rather than rule ids (escalation patterns, VERIS actions).
+RULE_EQUIVALENT: dict[str, str] = {}
+
+
+def generic_sql(rid: str) -> str:
+    """SQL for the generic rule id that the rule id expression `rid` stands for."""
+    whens = " ".join(f"WHEN '{r}' THEN '{g}'" for r, g in sorted(RULE_EQUIVALENT.items()))
+    return f"CASE {rid} {whens} ELSE {rid} END" if whens else rid
+
+
 # A rule that draws a line (lines.py, D16): run before its SQL, it returns the
 # SQL's named parameters ($above, $minimum) and the line's record, which the
 # case keeps (apply_rules' `lines`).
@@ -518,14 +535,16 @@ RULE_PREPARE: dict = {}
 
 
 def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
-                rule_product=None, lines: dict | None = None) -> dict[str, int]:
+                rule_product=None, lines: dict | None = None,
+                rule_superseded=None) -> dict[str, int]:
     """Runs every rule against the case's raw_events, filling findings.
     Returns {rule_id: rows_matched} so the pipeline can log/report it.
     `on_rule(done, total)` is called after each rule, for progress (FR-2.5).
     `lines`, when given, receives each line-drawing rule's record.
-    `rules` / `rule_product` replace RULES / RULE_PRODUCT (tests)."""
+    `rules` / `rule_product` / `rule_superseded` replace the module's (tests)."""
     rules = RULES if rules is None else rules
     rule_product = RULE_PRODUCT if rule_product is None else rule_product
+    rule_superseded = RULE_SUPERSEDED if rule_superseded is None else rule_superseded
     present = _products_present(con)
     matched: dict[str, int] = {}
     for i, (rid, sql) in enumerate(rules, 1):
@@ -538,6 +557,12 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
             # The value is one of products.PRODUCTS' ids (checked), never input.
             con.execute("CREATE OR REPLACE TEMP VIEW product_events AS "
                         f"SELECT * FROM raw_events WHERE product = '{_product_id(product)}'")
+        elif present & rule_superseded.get(rid, set()):
+            # A generic rule on every row but the superseding products' (story 4).
+            out = ", ".join(f"'{_product_id(p)}'" for p in sorted(rule_superseded[rid]))
+            con.execute("CREATE OR REPLACE TEMP VIEW generic_events AS SELECT * FROM raw_events "
+                        f"WHERE product IS NULL OR product NOT IN ({out})")
+            sql = sql.replace("raw_events", "generic_events")
         params = None
         if rid in RULE_PREPARE:
             params, record = RULE_PREPARE[rid](con)
@@ -595,5 +620,8 @@ for _mod in (rules_paloalto, rules_checkpoint):
         RULE_PRODUCT[_rid] = _mod.PRODUCT
     RULE_PREPARE.update(_mod.PREPARE)
     RULE_FAMILY.update(_mod.FAMILY)
+    RULE_EQUIVALENT.update(_mod.EQUIVALENT)
+    for _generic in _mod.SUPERSEDES:
+        RULE_SUPERSEDED.setdefault(_generic, set()).add(_mod.PRODUCT)
     RULE_LEVEL.update(_mod.LEVEL)
     RULE_LABELS.update(_mod.LABELS)

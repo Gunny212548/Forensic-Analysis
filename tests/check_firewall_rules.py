@@ -76,6 +76,9 @@ def build(con, benign: int):
         ev("203.0.113.51", "10.9.3.2", None, "drop", 12100 + k, product="checkpoint", app=name)
     for h in range(6):
         ev("203.0.113.52", f"10.9.4.{h}", 443, "detect", 12200 + h, product="checkpoint")
+    # FortiGate has no rule set yet: its scan is still the generic R2002's (story 4).
+    for p in range(10):
+        ev("203.0.113.60", "10.9.5.1", 3000 + p, "deny", 13000 + p, product="fortigate")
     con.executemany("INSERT INTO raw_events (row_id, ts, srcip, dstip, dstport, verdict, category, "
                     "product, app) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
 
@@ -128,6 +131,20 @@ def main() -> int:
           f"Check Point vertical scans, by port and by service name ({findings(con, 'CP-SCAN-1')})")
     check(not findings(con, "CP-SCAN-2") and rec["CP-SCAN-2"]["sources"]["scanner"] == 0,
           "six Detect verdicts are no scan: neither refusals nor accepts")
+    check(findings(con, "R2002") == {"203.0.113.60"},
+          f"the generic port scan runs only where no product rule replaces it ({findings(con, 'R2002')})")
+    from app.services import products
+    cells = {c["area"]: c for c in products.matrix(["paloalto", "fortigate"], rules.RULE_PRODUCT,
+                                                   rules.RULE_SUPERSEDED)[0]["areas"]}
+    check(cells["scanning-policy"]["rules"] == ["PAN-SCAN-1", "PAN-SCAN-2", "PAN-SCAN-3"]
+          and not cells["scanning-policy"]["generic"],
+          f"Palo Alto's scanning area lists its own rules only ({cells['scanning-policy']['rules']})")
+    forti = {c["area"]: c for c in products.matrix(["fortigate"], rules.RULE_PRODUCT,
+                                                   rules.RULE_SUPERSEDED)[0]["areas"]}
+    check(forti["scanning-policy"]["rules"] == ["R2002", "R2003", "R2004"],
+          "FortiGate's still lists the generic rules")
+    check(con.execute(f"SELECT {rules.generic_sql(repr('PAN-MAL-1'))}").fetchone()[0] == "R2007",
+          "PAN-MAL-1 counts as R2007's behaviour (escalation, VERIS)")
     tags = dict(con.execute("SELECT DISTINCT rid, mitre FROM findings WHERE rid IN ('PAN-SCAN-1', 'PAN-SCAN-2')").fetchall())
     check(tags == {"PAN-SCAN-1": ["T1595"], "PAN-SCAN-2": ["T1595.001"]},
           f"an outside source is reconnaissance, not discovery ({tags})")

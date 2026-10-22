@@ -886,7 +886,7 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             progress={"stage": "done", "pct": 100, "estimated": False},
             time_applied=time_applied,
             products=present,
-            detection=products.matrix(present, rules.RULE_PRODUCT),
+            detection=products.matrix(present, rules.RULE_PRODUCT, rules.RULE_SUPERSEDED),
             periods=periods,
             lines=rule_lines,
             **extra,

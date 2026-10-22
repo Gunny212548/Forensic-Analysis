@@ -31,3 +31,8 @@ PREPARE = _SHARED["PREPARE"]
 LEVEL = _SHARED["LEVEL"]
 LABELS = _SHARED["LABELS"]
 FAMILY = _SHARED["FAMILY"]
+EQUIVALENT = _SHARED["EQUIVALENT"]
+# R3002 (a malware-like category) keeps running on Check Point rows: there is no
+# Check Point category rule to replace it (the category column is not read for
+# Check Point yet, so it cannot fire there either).
+SUPERSEDES = _SHARED["SUPERSEDES"]

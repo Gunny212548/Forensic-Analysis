@@ -97,13 +97,16 @@ _AUTH_RULES = "('R2000', 'R2005', 'R2006', 'R2008', 'R2009')"
 
 def _escalations() -> list[tuple[str, str]]:
     # Imported here, not at the top: rules imports this module for WEIGHT.
-    from .rules import DENY_VERDICTS
+    from .rules import DENY_VERDICTS, generic_sql
 
     # Rows that make a host's compromise likely, counted only where the
     # firewall let them through - a beacon or malware download that was
-    # refused every time never crossed the intrusion boundary.
+    # refused every time never crossed the intrusion boundary. A product rule
+    # counts as the generic rule it matches the same behaviour as (PAN-MAL-1 is
+    # R2007's beaconing), so one behaviour is one, whichever rule flagged it.
+    behaviour = generic_sql("f.rid")
     post_intrusion = (
-        "f.rid IN ('R2007', 'R3003', 'R3002', 'R3001') "
+        f"{behaviour} IN ('R2007', 'R3003', 'R3002', 'R3001') "
         f"AND (r.verdict IS NULL OR r.verdict NOT IN {DENY_VERDICTS})"
     )
     return [
@@ -136,7 +139,7 @@ def _escalations() -> list[tuple[str, str]]:
             ) hit ON r.srcip = hit.srcip AND r.username = hit.username
             WHERE f.rid IN {_AUTH_RULES}
         """),
-        # Two *different* rules, not two rows: one beaconing pair produces
+        # Two *different* behaviours, not two rows: one beaconing pair produces
         # hundreds of R2007 rows and is still a single behaviour.
         ("compromised-host", f"""
             INSERT INTO escalations
@@ -149,7 +152,7 @@ def _escalations() -> list[tuple[str, str]]:
                 JOIN raw_events r USING (row_id)
                 WHERE {post_intrusion} AND r.srcip IS NOT NULL
                 GROUP BY r.srcip
-                HAVING count(DISTINCT f.rid) >= 2
+                HAVING count(DISTINCT {behaviour}) >= 2
             ) h ON r.srcip = h.srcip
             WHERE {post_intrusion}
         """),

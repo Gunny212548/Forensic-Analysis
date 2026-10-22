@@ -61,9 +61,13 @@ ones and the 3 ordinary high-risk-app sessions):
 
 | rule | meaning | count |
 |---|---|---|
-| R2002 | port scan (>=10 distinct dst ports) | 15 |
-| R3001 | large outbound transfer | 2 |
-| R3002 | malware-flagged category | 1 |
+| PAN-SCAN-1 | vertical scan: 15 distinct ports refused within an hour (was R2002) | 15 |
+| R3001 | large outbound transfer (no Palo Alto data-transfer rule yet) | 2 |
+| PAN-MAL-2 | PAN-DB category `malware` (was R3002) | 1 |
+
+Since story 4 of `specs/per_product_rules.md` (2026-10-22) the generic R2002 / R3002 do not
+run on Palo Alto rows: the Palo Alto rules (`rules_paloalto.py`, gotcha #62) match the same
+behaviours there. PAN-SCAN-2 (TRW) decides nothing here - the attacker reached one host only.
 
 R2001 (refused repeatedly) and R3000 (high-risk app allowed) are layer C facts
 on the event since 2026-10-20 - the events table shows "source refused 15 times in this evidence item"
@@ -73,7 +77,7 @@ A row can match several rules, so per-rule counts sum to more than the
 flagged-row count. `flagged_count` is DISTINCT rows.
 
 The firewall CSV carries PAN-OS's documented `Category` (URL category) column
-since IAI-92, so R3002's malware match reads it rather than a guessed column.
+since IAI-92, so PAN-MAL-2's category match reads it rather than a guessed column.
 
 The two JSON twins (IAI-35) carry the same 26 firewall rows:
 

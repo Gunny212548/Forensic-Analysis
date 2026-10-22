@@ -212,6 +212,11 @@ docs. Cases processed before keep their R-ids until re-processed.
    expired certificate), not threats - no rule reads Detect as one. CP-DATA-1 waits with
    PAN-DATA-1.
 4. Retire R2000-R3005 and re-base everything that reads an R-id; baseline re-taken and explained.
+   **Built 2026-10-22, per product** (gotcha #63): the generic rules a product's rules replace stop
+   running on that product's rows and keep running elsewhere - FortiGate, ESXi, sshd, Entra and
+   Windows have no rule set yet, and deleting the R-rules would have left them with none. R3001
+   and the sign-in rules stay everywhere. Escalations and VERIS count behaviours
+   (`RULE_EQUIVALENT`). Baseline 648 -> 668, every move a rename or a new product-rule finding.
 5. Windows · 6. Linux · 7. FortiGate · 8. Cisco (reader first).
 
 ## Questions

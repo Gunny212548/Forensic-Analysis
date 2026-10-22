@@ -62,19 +62,24 @@ def of_profile(profile: str | None) -> str | None:
     return _OF_PROFILE.get(profile or "")
 
 
-def matrix(present: list[str], rule_product: dict[str, str]) -> list[dict]:
+def matrix(present: list[str], rule_product: dict[str, str],
+           superseded: dict[str, set[str]] | None = None) -> list[dict]:
     """Per product present in the case, what each of the six areas runs.
 
     `rule_product` is rules.RULE_PRODUCT (rule id -> product). A rule that
-    declares no product is generic and runs on every row - the R-rules until
-    they are retired (story 4) - so it counts for every product."""
+    declares no product is generic and runs on every row except those of the
+    products whose own rules supersede it (`superseded`, rules.RULE_SUPERSEDED,
+    story 4) - so it counts for every other product."""
+    superseded = superseded or {}
     out = []
     for pid in present:
         prod = PRODUCTS.get(pid, {"name": pid, "type": None})
         cells = []
         for area in areas.AREAS:
             reason = NOT_APPLICABLE.get((pid, area["id"]))
-            rids = [r for r in area["rids"] if rule_product.get(r) in (None, pid)]
+            rids = [r for r in area["rids"]
+                    if rule_product.get(r) == pid
+                    or (r not in rule_product and pid not in superseded.get(r, ()))]
             if reason:
                 cells.append({"area": area["id"], "name": area["name"], "status": "n/a",
                               "reason": reason, "rules": []})

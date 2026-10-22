@@ -231,7 +231,7 @@ def main() -> int:
 
         print("related findings on the planted attack (IAI-43)")
         by_rid = {x["rid"]: x for x in fw}
-        scan = by_rid.get("R2002")
+        scan = by_rid.get("PAN-SCAN-1")  # R2002 on Palo Alto rows since story 4
         check(scan is not None and scan["related_count"] > 0, "the port scan is chained to what 10.10.1.5 did next")
         if scan:
             rel_src = {x["srcip"] for x in scan["related"]}

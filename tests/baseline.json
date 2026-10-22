@@ -1016,6 +1016,12 @@
   "rows": 938,
   "rules": {}
  },
+ "LICENSE-elastic-integrations.txt": {
+  "flagged": 0,
+  "md5": "a509bc948f8741b22c3832224021e251",
+  "rows": 0,
+  "rules": {}
+ },
  "LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx": {
   "flagged": 0,
   "md5": "28d3173f655430d2f28ed36193d1629d",
@@ -1385,15 +1391,28 @@
   "rows": 3,
   "rules": {}
  },
- "Search_Report-2026_10_21-10_23_21_869.csv": {
-  "flagged": 11,
-  "md5": "8c4de33719e47bb8379c84e3d41536ac",
-  "rows": 20000,
-  "rules": {
-   "R3001": 2,
-   "R3004": 9
+ "Search_Report-2026_10_21-10_23_21_869.csv": [
+  {
+   "flagged": 53,
+   "md5": "dc301d76bad6e32f5a5a89a4c30ed672",
+   "rows": 20000,
+   "rules": {
+    "CP-INTEL-2": 9,
+    "CP-SCAN-1": 12,
+    "CP-SCAN-2": 30,
+    "R3001": 2
+   }
+  },
+  {
+   "flagged": 11,
+   "md5": "8c4de33719e47bb8379c84e3d41536ac",
+   "rows": 20000,
+   "rules": {
+    "R3001": 2,
+    "R3004": 9
+   }
   }
- },
+ ],
  "Sysmon13_MachineAccount_Password_Hash_Changed_via_LsarSetSecret.evtx": {
   "flagged": 0,
   "md5": "74342cb695d47c5df598fafb9b40207f",
@@ -2220,7 +2239,7 @@
   "md5": "e12f53cfdfeabcee0e68f6bbd17d31aa",
   "rows": 20530,
   "rules": {
-   "R3004": 318
+   "PAN-INTEL-2": 318
   }
  },
  "log_23_.csv": {
@@ -2228,7 +2247,7 @@
   "md5": "c82c5160d0090404f2bf6468744944d9",
   "rows": 20531,
   "rules": {
-   "R3004": 319
+   "PAN-INTEL-2": 319
   }
  },
  "log_24_.csv": {
@@ -2236,7 +2255,7 @@
   "md5": "c82c5160d0090404f2bf6468744944d9",
   "rows": 20531,
   "rules": {
-   "R3004": 319
+   "PAN-INTEL-2": 319
   }
  },
  "log_25_.csv": {
@@ -2244,8 +2263,8 @@
   "md5": "e1af82c59a4860617421aaad052f01c3",
   "rows": 1941,
   "rules": {
-   "R3001": 1,
-   "R3004": 92
+   "PAN-INTEL-2": 92,
+   "R3001": 1
   }
  },
  "log_26_.csv": {
@@ -2253,8 +2272,8 @@
   "md5": "e1af82c59a4860617421aaad052f01c3",
   "rows": 1941,
   "rules": {
-   "R3001": 1,
-   "R3004": 92
+   "PAN-INTEL-2": 92,
+   "R3001": 1
   }
  },
  "log_27_.csv": {
@@ -2262,8 +2281,8 @@
   "md5": "9fce9f35e55bd14bb300d728f3c10659",
   "rows": 1178,
   "rules": {
-   "R3001": 1,
-   "R3004": 73
+   "PAN-INTEL-2": 73,
+   "R3001": 1
   }
  },
  "log_28_.csv": {
@@ -2341,10 +2360,13 @@
   "rules": {}
  },
  "log_9_.csv": {
-  "flagged": 0,
+  "flagged": 18,
   "md5": "7c47a4a677e7d74683564e6478a0a7de",
   "rows": 97,
-  "rules": {}
+  "rules": {
+   "PAN-SCAN-1": 12,
+   "PAN-SCAN-3": 6
+  }
  },
  "maldoc_mshta_via_shellbrowserwind_rundll32.evtx": {
   "flagged": 0,
@@ -2395,6 +2417,12 @@
  "nightfall-firewall-nested.jsonl.gz": [
   {
    "flagged": 0,
+   "md5": "fcf5828a60a6e8de74537f5089fc735e",
+   "rows": 0,
+   "rules": {}
+  },
+  {
+   "flagged": 0,
    "md5": "47b1f96169998f7aa0e60bc538032ae1",
    "rows": 0,
    "rules": {}
@@ -2411,9 +2439,9 @@
   "md5": "1576144a3f04ddd89990a7242c376438",
   "rows": 26,
   "rules": {
-   "R2002": 15,
-   "R3001": 2,
-   "R3002": 1
+   "PAN-MAL-2": 1,
+   "PAN-SCAN-1": 15,
+   "R3001": 2
   }
  },
  "nightfall-firewall.json": {
@@ -2421,9 +2449,9 @@
   "md5": "56e8d58d9035f0582ffd4611e167c631",
   "rows": 26,
   "rules": {
-   "R2002": 15,
-   "R3001": 2,
-   "R3002": 1
+   "PAN-MAL-2": 1,
+   "PAN-SCAN-1": 15,
+   "R3001": 2
   }
  },
  "panache_sysmon_vs_EDRTestingScript.evtx": {
@@ -3405,7 +3433,7 @@
   "md5": "386d3134becb5c4923bc8a4b576459fe",
   "rows": 25579,
   "rules": {
-   "R2007": 1167,
+   "PAN-MAL-1": 1167,
    "R3001": 8
   }
  },
@@ -3815,6 +3843,120 @@
   "flagged": 0,
   "md5": "c12934389993b0903b0f2d7f8957ed43",
   "rows": 2,
+  "rules": {}
+ },
+ "test-panw-panos-audit-sample.log": {
+  "flagged": 0,
+  "md5": "88980fa156a6e5ea8ab43349a57e47d6",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-authentication-sample.log": {
+  "flagged": 0,
+  "md5": "d2e0c9a6089d489ee4c051ae5356970f",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-config-sample.log": {
+  "flagged": 0,
+  "md5": "ca88b56a6d5519e5592908c2d8a28153",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-correlated-events-sample.log": {
+  "flagged": 0,
+  "md5": "73a409d96533fcfe7088515de0863c7d",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-decryption-sample.log": {
+  "flagged": 0,
+  "md5": "5e23278655e1287c7fe824c644a099be",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-globalprotect-sample.log": {
+  "flagged": 0,
+  "md5": "60cf2dd07d02cfc2c3d472c957ceee46",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-gtp-sample.log": {
+  "flagged": 0,
+  "md5": "56787fe4297de68452f79cda530c37a6",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-hipmatch-sample.log": {
+  "flagged": 0,
+  "md5": "29e879ab3b90c06c6ae8e2813481f483",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-inc-other-sample.log": {
+  "flagged": 0,
+  "md5": "a97d40f04fed62a013fd5d3bda0bbdd4",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-inc-threat-sample.log": {
+  "flagged": 0,
+  "md5": "d82d7dce6dec94de1d6ce9bd5ea4052b",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-inc-traffic-sample.log": {
+  "flagged": 0,
+  "md5": "33996109b64311485f7c47aa1551e413",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-ip-tag-sample.log": {
+  "flagged": 0,
+  "md5": "862a1e7dd5bfbc77e0442ecf345c1710",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-sctp-sample.log": {
+  "flagged": 0,
+  "md5": "979ffe4b287a751cf9400f52fece4b1c",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-system-sample.log": {
+  "flagged": 0,
+  "md5": "e432ab8747ba651751e14df23ff819b0",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-threat-sample.log": {
+  "flagged": 0,
+  "md5": "585e1122f5bdc0cc1b0cc9f6fb68a68d",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-time-sample.log": {
+  "flagged": 0,
+  "md5": "27bd7bb18ebc752b3c1a9f2a455e0f75",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-traffic-sample.log": {
+  "flagged": 0,
+  "md5": "27576047b41990c814d983f9014bfa64",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-tunnel-inspection-sample.log": {
+  "flagged": 0,
+  "md5": "c5c6ed70282a9567f29734f807499623",
+  "rows": 0,
+  "rules": {}
+ },
+ "test-panw-panos-userid-sample.log": {
+  "flagged": 0,
+  "md5": "98dad2a5a5b7681d40c73f13bd34525a",
+  "rows": 0,
   "rules": {}
  },
  "this-pc-Application.evtx": {
