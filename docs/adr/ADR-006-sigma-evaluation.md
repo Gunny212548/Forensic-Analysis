@@ -118,7 +118,9 @@ tenant without Intune.
   Analytics values (`Single-factor authentication` -> `singleFactorAuthentication`) where
   Microsoft documents both, or leave such rules "not applicable" for the CSV.
   Recommended: map only what a Microsoft page shows side by side; otherwise not
-  applicable.
+  applicable. **Decided 2026-10-22 (the user): as recommended** - each mapped pair cites
+  the Microsoft page that shows both forms (`docs/standards/SOURCES.md`); the
+  `SigninLogs` reference is read before the map is written.
 - **Q10 (open since revision 4) - thresholds.** The spec's example values give 0 on the
   spray sample. Spec values as defaults, adjustable per case and shown on the finding?
 - **Q13 - noisy rules.** `Sign-ins from Non-Compliant Devices` flags 91 of 91 sign-ins.

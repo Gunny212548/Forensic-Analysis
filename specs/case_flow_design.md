@@ -325,7 +325,8 @@ still needed for who / where / what (revision 3), no longer a detection prerequi
 dropped; (f) baseline: in-house counts unchanged, Sigma findings measured separately.
 
 Still open: Q12 (portal CSV value vocabulary) and Q13 (rules that match every row), both
-in ADR-006.
+in ADR-006. Q12 decided 2026-10-22: map only pairs a Microsoft page documents side by side,
+otherwise "not applicable" for the CSV.
 
 ## Revision 6 (2026-10-20, draft) - what each step of the forensic flow does
 
