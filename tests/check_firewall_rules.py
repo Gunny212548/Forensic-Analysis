@@ -157,8 +157,8 @@ def main() -> int:
           f"Check Point vertical scans, by port and by service name ({findings(con, 'CP-SCAN-1')})")
     mal = dict(con.execute("SELECT r.srcip, f.mitre FROM findings f JOIN raw_events r USING (row_id) "
                            "WHERE f.rid = 'CP-MAL-2'").fetchall())
-    check(mal == {"10.0.88.8": ["T1071"], "198.51.100.67": []},
-          f"Threat Prevention verdicts: Anti-Bot (T1071) and IPS, not URL Filtering's Detect ({mal})")
+    check(mal == {"10.0.88.8": ["T1071"], "198.51.100.67": ["T1190"]},
+          f"Threat Prevention verdicts: Anti-Bot (T1071), IPS from outside (T1190), not URL Filtering's Detect ({mal})")
     lvl = dict(con.execute("SELECT r.verdict, f.lvl FROM findings f JOIN raw_events r USING (row_id) "
                            "WHERE f.rid = 'CP-MAL-2'").fetchall())
     from app.services.severity import WEIGHT

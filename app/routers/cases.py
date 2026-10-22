@@ -9,6 +9,7 @@ from .. import config
 from ..services import (analysis, analysis_jobs, attack_layer, auth, case_delete, case_flow, case_views, custody,
                         db, authz, investigation, jobs, lifecycle, merge, profiles, provenance, review,
                         stix_export, storage, triage, veris)
+from ..services import rule_meta
 from ..services.rules import RULE_ID_PATTERN
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -365,6 +366,8 @@ async def get_case_findings(case_id: str):
         # Unreviewed when a final report is produced.
         "ready_for_report": counts.get(review.UNREVIEWED, 0) == 0 and bool(findings),
         "reason_codes": review.REASON_CODES,
+        # The Attack timeline's stages: ATT&CK's Enterprise tactics, in its order.
+        "tactic_order": [{"id": t, "ta": ta, "name": n} for t, ta, n in rule_meta.TACTIC_ORDER],
         # Whether the decision history behind these statuses is untampered.
         "review_chain": review.verify(case_id),
     }

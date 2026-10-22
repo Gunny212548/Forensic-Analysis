@@ -796,3 +796,17 @@ button.danger-outline { color: var(--danger); border-color: var(--danger-border)
 .ai-fact { display: inline-block; margin-left: 2px; padding: 0 4px; border-radius: 4px; background: #E3E6EB;
   font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: help; }
 .ai-warn { color: var(--danger); }
+
+/* Attack timeline stages (CaseFlow.jsx AttackTimeline): chevrons, one per ATT&CK tactic reached. */
+.tl-stages { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+.tl-stage { position: relative; min-width: 150px; padding: 10px 26px 10px 22px; border: 0; border-radius: 0;
+  background: #3A3F47; color: #fff; text-align: left; display: grid; gap: 2px; cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%); }
+.tl-stage:first-child { clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%); padding-left: 14px; }
+.tl-stage:hover { background: #2B2F35; }
+.tl-stage-on { background: var(--danger); }
+.tl-stage-on:hover { background: var(--danger); }
+.tl-stage-unmapped { background: #8A9099; }
+.tl-stage-name { font-weight: 600; font-size: 13px; }
+.tl-stage-sub { font-size: 11px; opacity: .85; }
+.tl-note { font-size: 12px; margin-bottom: 8px; }

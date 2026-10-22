@@ -8,7 +8,7 @@ MCP server call it.
 """
 
 from . import (confidence, custody, db, finding_ids, investigation, lifecycle, provenance, related, review,
-               storage, triage, veris)
+               rule_meta, storage, triage, veris)
 
 
 def integrity_refused(manifest: dict) -> bool:
@@ -135,6 +135,8 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
             f["lifecycle"] = {"tracked": False}
         # The AI's advice on this suggestion (triage.py), if it was reviewed.
         f["ai_review"] = ai_items.get(f["key"])
+        # Its ATT&CK tactics, in ATT&CK's order - the Attack timeline's stages.
+        f["tactics"] = rule_meta.tactics_of(f.get("mitre"))
     return findings
 
 

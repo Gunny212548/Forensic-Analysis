@@ -53,7 +53,38 @@ TACTICS = {
     "t1071": ["command_and_control"],
     "t1041": ["exfiltration"],
     "t1105": ["command_and_control"],
+    "t1190": ["initial_access"],
 }
+
+# The Enterprise tactics in the order ATT&CK lists them (attack.mitre.org/tactics/enterprise,
+# content v20.0, read 2026-10-22): the stages of the Attack timeline. v20 has 15 - Defense Evasion
+# became Stealth (TA0005) and Defense Impairment (TA0112); TACTICS above still says
+# defense_evasion for T1078, which is shown at TA0005's place.
+TACTIC_ORDER: list[tuple[str, str, str]] = [
+    ("reconnaissance", "TA0043", "Reconnaissance"),
+    ("resource_development", "TA0042", "Resource Development"),
+    ("initial_access", "TA0001", "Initial Access"),
+    ("execution", "TA0002", "Execution"),
+    ("persistence", "TA0003", "Persistence"),
+    ("privilege_escalation", "TA0004", "Privilege Escalation"),
+    ("defense_evasion", "TA0005", "Stealth (Defense Evasion)"),
+    ("defense_impairment", "TA0112", "Defense Impairment"),
+    ("credential_access", "TA0006", "Credential Access"),
+    ("discovery", "TA0007", "Discovery"),
+    ("lateral_movement", "TA0008", "Lateral Movement"),
+    ("collection", "TA0009", "Collection"),
+    ("command_and_control", "TA0011", "Command and Control"),
+    ("exfiltration", "TA0010", "Exfiltration"),
+    ("impact", "TA0040", "Impact"),
+]
+_TACTIC_RANK = {t: i for i, (t, _, _) in enumerate(TACTIC_ORDER)}
+
+
+def tactics_of(techniques: list[str] | None) -> list[str]:
+    """The ATT&CK tactics of a finding's techniques, in ATT&CK's order."""
+    found = {t for tech in techniques or [] for t in TACTICS.get(tech.lower().split(".")[0], [])}
+    return sorted(found, key=lambda t: _TACTIC_RANK.get(t, len(TACTIC_ORDER)))
+
 
 AUTH_SOURCES = ["openssh-sshd", "entra-signin"]
 FIREWALL_SOURCES = ["paloalto-traffic", "checkpoint-smartconsole", "fortigate-traffic"]
@@ -666,15 +697,16 @@ RULE_META["CP-MAL-2"] = {
     "id": "c8f26b0c-c3df-42c0-8ddc-bc63bd0f37cb",
     "title": "Check Point: Threat Prevention verdict",
     "status": "experimental",
-    "techniques": ["T1071"],
+    "techniques": ["T1071", "T1190"],
     "category": "firewall", "log_sources": ["checkpoint-log-exporter"],
     "falsepositives": ["A protection matching benign traffic (ThreatCloud confidence below High)"],
     "ads": {
         "goal": "Report what Check Point's own Threat Prevention blades decided: IPS, Anti-Bot, "
                 "Anti-Virus or Threat Emulation prevented or detected a connection (behaviour M5).",
         "strategy": "Log Exporter record whose product (Blade) is one of those four and whose action is "
-                    "Prevent or Detect (sk144192). Anti-Bot verdicts are T1071 (C&C, DET0444); the others "
-                    "carry no technique until T1190 / T1105 are read.",
+                    "Prevent or Detect (sk144192). Anti-Bot verdicts are T1071 (C&C, DET0444); IPS verdicts on "
+                    "traffic from outside are T1190 (Initial Access, DET0080); Anti-Virus / Threat Emulation "
+                    "carry no technique until T1105 is read.",
         "technical_context": "The blade, protection name, malware action and ThreatCloud severity are read "
                              "from the record kept in raw - no canonical column holds them. A Detect of the "
                              "URL Filtering / HTTPS inspection blade (certificate notes) is not a threat blade "

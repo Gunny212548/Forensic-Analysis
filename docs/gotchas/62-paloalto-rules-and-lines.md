@@ -83,3 +83,7 @@ seen only as connection volume), I2's VPN sign-ins / RDP / most SMB spread (allo
 fan-out), I4's C2 on 443/995/2222 (too few, too irregular), half of I2's exfiltration (no
 data-transfer rule). False positives by design: the Zabbix heartbeat as beaconing (8,876 rows),
 OneDrive uploads over R3001's 50 MB (14).
+
+**IPS verdicts from outside are T1190** (same day): ATT&CK T1190 (Initial Access) and DET0080
+read; a CP-MAL-2 IPS record whose source is not internal is tagged T1190, so the Attack timeline's
+Initial Access stage holds the Log4Shell / CVE-2024-24919 attempts instead of "not mapped".

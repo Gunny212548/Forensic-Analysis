@@ -30,6 +30,7 @@ A Prevent is a refusal, so its level is capped at medium like any refused row
 """
 
 from . import rules_firewall
+from .rules import NON_PUBLIC_IPV4_RE
 
 PRODUCT = "checkpoint"
 _SHARED = rules_firewall.build(PRODUCT, "CP", service="coalesce(dstport, app)", unit="services")
@@ -47,8 +48,10 @@ def _field(name: str) -> str:
 RULES: list[tuple[str, str]] = _SHARED["RULES"] + [
     # M5 the firewall's own verdict: a Threat Prevention blade prevented or
     # detected (let pass) the connection. Anti-Bot's C&C verdicts are T1071
-    # (DET0444); IPS / Anti-Virus / Threat Emulation carry no technique until
-    # their ATT&CK pages (T1190, T1105) are read.
+    # (DET0444); an IPS verdict on traffic from outside is an exploit attempt
+    # against an internet-facing host, T1190 (Initial Access; DET0080 AN0220
+    # names JNDI / deserialization payload indicators); Anti-Virus / Threat
+    # Emulation carry no technique until T1105 is read.
     ("CP-MAL-2", f"""
         INSERT INTO findings
         SELECT row_id, 'CP-MAL-2', NULL,
@@ -56,7 +59,10 @@ RULES: list[tuple[str, str]] = _SHARED["RULES"] + [
                coalesce({_field('protection_name')}, {_field('malware_action')}, 'protection') ||
                ' (' || coalesce(srcip, '?') || ' -> ' || coalesce(dstip, '?') ||
                coalesce(', severity ' || {_field('severity')}, '') || ')',
-               CASE WHEN {_field('product')} = 'Anti-Bot' THEN ['T1071'] ELSE []::VARCHAR[] END
+               CASE WHEN {_field('product')} = 'Anti-Bot' THEN ['T1071']
+                    WHEN {_field('product')} = 'IPS'
+                         AND NOT regexp_matches(coalesce(srcip, ''), '{NON_PUBLIC_IPV4_RE}') THEN ['T1190']
+                    ELSE []::VARCHAR[] END
         FROM product_events
         WHERE verdict IN ('prevent', 'detect')
           AND {_field('product')} IN {THREAT_BLADES}
