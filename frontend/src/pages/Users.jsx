@@ -9,7 +9,7 @@ import { ROLE_NAMES, useAccess } from '../permissions.js'
  *  themself) and written to the hash-chained account log shown below
  *  (NIST SP 800-53 AC-2(7), AC-6(9)). */
 const ROLE_DOES = {
-  admin: 'manages accounts; reads everything; takes no case action',
+  admin: 'everything a manager may do, and manages accounts',
   manager: 'all case work; creates customers and projects; assigns; the only role that resolves or reopens',
   analyst: 'uploads, reviews, works the findings assigned to them; no new customers, no closing',
 }

@@ -56,6 +56,9 @@ keys" (API keys were cut - every datum comes from an upload).
 
 ## Questions
 
+- **Q56 superseded 2026-10-22 by the user**: "Admin สามารถทำได้ทุกอย่างที่ Role อื่นทำได้" - Admin
+  may do everything the other roles may, plus accounts. The separation Q56 had chosen (AC-6(2):
+  the account administrator does no case work) is given up on purpose.
 - **Q56 - Admin and case data.** (A) Admin manages accounts only and sees no customer data
   (AC-5 / AC-6(2): whoever administers accounts also investigating needs a second, Manager
   account); (B) Admin manages accounts and may **read** everything, but takes no case action -

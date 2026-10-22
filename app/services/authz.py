@@ -10,9 +10,10 @@ and AC-6 (least privilege):
 - **manager** does all of that, and decides: creates customers and projects,
   sets the investigation's question, merges cases, assigns anyone, and is
   the only role that closes (resolves) or reopens a finding (Q57).
-- **admin** manages accounts and may read everything, but takes no case action
-  (Q56): whoever administers accounts and also investigates uses a second,
-  manager account (AC-6(2)).
+- **admin** may do everything the other roles may, and manages accounts
+  (the user, 2026-10-22 - replacing Q56's "accounts and read only", which had
+  followed AC-6(2)'s separation of the account administrator from case work;
+  the user chose one all-powerful role instead).
 
 Deny by default: an account with any other role may do nothing, not even read.
 Every customer is open to every role for now (Q58); `company_id` is passed so
@@ -46,7 +47,7 @@ _CASE_WORK = {READ, UPLOAD, PROVENANCE, VERIFY, REPROCESS, ANALYZE, REVIEW, LIFE
 PERMISSIONS = {
     ANALYST: frozenset(_CASE_WORK),
     MANAGER: frozenset(_CASE_WORK | {CUSTOMERS, QUESTION, MERGE, ASSIGN, WORK, CLOSE, REOPEN}),
-    ADMIN: frozenset({READ, ACCOUNTS}),
+    ADMIN: frozenset(_CASE_WORK | {CUSTOMERS, QUESTION, MERGE, ASSIGN, WORK, CLOSE, REOPEN, ACCOUNTS}),
 }
 # What a role that lacks an action is told it needs - the page shows it beside
 # the disabled control.
@@ -83,7 +84,7 @@ def require_lifecycle(user: dict | None, action: str, current: dict | None, body
     may take an unassigned finding for themself and investigate / contain the
     findings assigned to them; resolving and reopening are a manager's (Q57)."""
     require(user, LIFECYCLE, company_id)
-    if role(user) == MANAGER:
+    if role(user) in (MANAGER, ADMIN):
         return
     me = (user or {}).get("email")
     assignee = (current or {}).get("assignee")

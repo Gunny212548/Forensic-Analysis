@@ -41,19 +41,19 @@ def check(name: str, ok: bool) -> None:
 print("the matrix (specs/IAI-14_rbac.md)")
 A, M, N = authz.ADMIN, authz.MANAGER, authz.ANALYST
 TABLE = {
-    authz.READ: {A, M, N}, authz.UPLOAD: {M, N}, authz.CUSTOMERS: {M}, authz.QUESTION: {M},
-    authz.PROVENANCE: {M, N}, authz.VERIFY: {M, N}, authz.REPROCESS: {M, N}, authz.MERGE: {M},
-    authz.ANALYZE: {M, N}, authz.REVIEW: {M, N}, authz.ASSIGN: {M}, authz.WORK: {M},
-    authz.CLOSE: {M}, authz.REOPEN: {M}, authz.ACCOUNTS: {A}, authz.LIFECYCLE: {M, N},
+    authz.READ: {A, M, N}, authz.UPLOAD: {A, M, N}, authz.CUSTOMERS: {A, M}, authz.QUESTION: {A, M},
+    authz.PROVENANCE: {A, M, N}, authz.VERIFY: {A, M, N}, authz.REPROCESS: {A, M, N},
+    authz.MERGE: {A, M}, authz.ANALYZE: {A, M, N}, authz.REVIEW: {A, M, N}, authz.ASSIGN: {A, M},
+    authz.WORK: {A, M}, authz.CLOSE: {A, M}, authz.REOPEN: {A, M}, authz.ACCOUNTS: {A},
+    authz.LIFECYCLE: {A, M, N},
 }
 wrong = [(action, role) for action, roles in TABLE.items() for role in authz.ROLES
          if authz.can({"role": role}, action) != (role in roles)]
 check(f"every action x role as the table says {wrong}", not wrong)
 check("deny by default: an unknown role, or none, may do nothing",
       not any(authz.can({"role": r}, a) for r in ("viewer", "", None, "Admin") for a in TABLE))
-check("admin reads but takes no case action (Q56)",
-      authz.can({"role": A}, authz.READ) and not any(
-          authz.can({"role": A}, a) for a in (authz.UPLOAD, authz.REVIEW, authz.CLOSE, authz.CUSTOMERS)))
+check("admin may do everything any other role may (the user, 2026-10-22)",
+      all(set(authz.PERMISSIONS[r]) <= set(authz.PERMISSIONS[A]) for r in authz.ROLES))
 try:
     authz.require({"email": "a@x", "role": N}, authz.CLOSE)
     check("a refusal names who and what is needed", False)
@@ -89,9 +89,9 @@ mgr = {"email": "mgr@x", "role": M}
 check("a manager may assign, work, resolve and reopen any",
       all(allowed(mgr, a, {"assignee": "bob@x"}, {"assignee": "bob@x"})
           for a in ("assign", "investigate", "contain", "resolve", "reopen")))
-check("an admin may make no lifecycle change",
-      not any(allowed({"email": "adm@x", "role": A}, a, None, {"assignee": "adm@x"})
-              for a in ("assign", "investigate", "resolve")))
+check("an admin may make any lifecycle change, as a manager",
+      all(allowed({"email": "adm@x", "role": A}, a, {"assignee": "bob@x"}, {"assignee": "bob@x"})
+          for a in ("assign", "investigate", "contain", "resolve", "reopen")))
 
 print("over HTTP")
 PW = "correct horse battery"
@@ -121,9 +121,9 @@ check("/me carries the role and its permissions",
 check("every role reads; an account with no role reads nothing but who it is",
       all(c.get("/api/cases").status_code == 200 for c in (admin, manager, analyst))
       and norole.get("/api/cases").status_code == 403 and norole.get("/api/auth/me").status_code == 200)
-check("a new customer: manager 200, analyst and admin 403",
+check("a new customer: admin and manager 200, analyst 403",
       [c.post("/api/companies", json={"name": "New Co"}).status_code for c in (analyst, admin, manager)]
-      == [403, 403, 200])
+      == [403, 200, 200])
 
 
 def upload(c: TestClient, **form) -> int:
@@ -131,7 +131,9 @@ def upload(c: TestClient, **form) -> int:
                   files={"file": ("t.log", io.BytesIO(b"Oct 1 00:00:00 h sshd[1]: x\n"), "text/plain")}).status_code
 
 
-check("upload: admin refused before the body is read", upload(admin, company_id=co["company_id"]) == 403)
+check("upload: an account with no role refused before the body is read",
+      upload(norole, company_id=co["company_id"]) == 403)
+check("upload: an admin may", upload(admin, company_id=co["company_id"]) == 200)
 check("upload: an analyst into an existing customer", upload(analyst, company_id=co["company_id"]) == 200)
 check("upload: an analyst may not create a customer or a project on the way",
       upload(analyst, company_name="Brand new") == 403

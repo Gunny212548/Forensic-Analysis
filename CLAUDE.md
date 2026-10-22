@@ -196,7 +196,8 @@ anything. The page and its bundle stay public; they hold no data.
   ends their sessions at once**; what logout cannot do is revoke a copy of
   the cookie taken before it expires - but a password reset does end them (gotcha #47).
   Failed sign-ins are throttled and every sign-in event is audit-logged (gotcha #47).
-- **Roles since IAI-14 (2026-10-22, `specs/IAI-14_rbac.md`):** admin (accounts + read only),
+- **Roles since IAI-14 (2026-10-22, `specs/IAI-14_rbac.md`):** admin (everything the others may, plus
+  accounts - Q56's "accounts + read only" superseded by the user the same day),
   manager (case work + customers, merge, assign, close / reopen), analyst (case work). One table,
   `authz.PERMISSIONS`; deny by default; a route asks `authz.require`, the UI reads the same table
   through `/api/auth/me` (`frontend/src/permissions.js`) but the server is the gate. Accounts are
