@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAnalysis, getCase, getFindings, getFlow, getGraph, getIngest, runAnalysis } from '../api.js'
+import { useAccess } from '../permissions.js'
 import { LEVEL_EN, fmtNum, fmtTime, statusOf } from '../format.js'
 import { Empty, SeverityPill } from '../components/common.jsx'
 import StepBar, { stepHref } from '../components/StepBar.jsx'
@@ -469,6 +470,7 @@ function GraphAndRisk({ caseId }) {
 
 function AnalyseStep({ ai, cite }) {
   const { analysis, job, jobFailed, stalled, analyzing, analyzeError, analyze } = ai
+  const { can, why } = useAccess() // an analyst's or a manager's (IAI-14)
   return (
     <>
       <div className="meta-line" style={{ marginTop: 0 }}>
@@ -482,7 +484,12 @@ function AnalyseStep({ ai, cite }) {
       {!analyzing && jobFailed && <Empty style={{ paddingTop: 14 }}>Analysis failed: {jobFailed}</Empty>}
       {!analyzing && analyzeError && <Empty style={{ paddingTop: 14 }}>{analyzeError}</Empty>}
       <div className="lc-actions">
-        <button className="secondary" disabled={analyzing || !!job} onClick={() => analyze(!!analysis)}>
+        <button
+          className="secondary"
+          disabled={analyzing || !!job || !can('case:analyze')}
+          title={why('case:analyze')}
+          onClick={() => analyze(!!analysis)}
+        >
           {job ? 'Analysing...' : analysis ? 'Re-analyse' : 'Analyse with AI'}
         </button>
       </div>

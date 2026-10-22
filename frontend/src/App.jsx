@@ -10,7 +10,9 @@ import Cases from './pages/Cases.jsx'
 import FindingDetail from './pages/FindingDetail.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import Login from './pages/Login.jsx'
+import Users from './pages/Users.jsx'
 import Sidebar, { NAV_GROUPS } from './components/Sidebar.jsx'
+import { UserContext } from './permissions.js'
 
 const MENU = NAV_GROUPS.flatMap((g) => g.items)
 // The case page's older addresses, kept so links pasted into tickets still open.
@@ -169,6 +171,7 @@ export default function App() {
   if (page === 'login') return null
 
   return (
+    <UserContext.Provider value={user}>
     <div className="app">
       <Sidebar
         active={page === 'case' ? 'cases' : page === 'finding' ? 'findings' : page}
@@ -196,8 +199,10 @@ export default function App() {
         {page === 'finding' && splitResult(param).findingKey && (
           <FindingDetail {...splitResult(param)} key={param} />
         )}
+        {page === 'settings' && <Users />}
         {placeholder && <Placeholder title={placeholder.label} />}
       </main>
     </div>
+    </UserContext.Provider>
   )
 }

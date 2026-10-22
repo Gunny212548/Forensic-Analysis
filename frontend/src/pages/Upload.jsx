@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { checkUpload, listCases, listCompanies, listProjects, uploadFile } from '../api.js'
+import { useAccess } from '../permissions.js'
 import { fmtBytes, fmtTime } from '../format.js'
 import { SeverityPill, StatusBadge } from '../components/common.jsx'
 
@@ -54,6 +55,11 @@ function myRecent(cases, email) {
  *  drop area (FR-2.2) and the supported formats (FR-2.6). */
 export default function Upload({ user }) {
   const fileRef = useRef(null)
+  // Uploading is an analyst's or a manager's; a new customer or project a
+  // manager's (IAI-14). The server refuses the same.
+  const { can, why } = useAccess()
+  const mayUpload = can('case:upload')
+  const mayCreate = can('customer:manage')
   const [file, setFile] = useState(null)
   const [dragging, setDragging] = useState(false)
   const [companies, setCompanies] = useState([])
@@ -212,6 +218,7 @@ export default function Upload({ user }) {
         </a>
       </div>
 
+      {!mayUpload && <div className="status-line err">{why('case:upload')} to upload evidence.</div>}
       <form className="upload-form" onSubmit={onSubmit}>
         <div>
           <label htmlFor="company-select">Customer</label>
@@ -233,7 +240,9 @@ export default function Upload({ user }) {
                   {c.name}
                 </option>
               ))}
-              <option value="__new__">+ Add new customer...</option>
+              <option value="__new__" disabled={!mayCreate}>
+                + Add new customer...{mayCreate ? '' : ' (Manager)'}
+              </option>
             </select>
             <span className="field-hint">required — every case belongs to exactly one customer</span>
           </div>
@@ -264,7 +273,9 @@ export default function Upload({ user }) {
                   {p.name}
                 </option>
               ))}
-              <option value="__new__">+ Add new project...</option>
+              <option value="__new__" disabled={!mayCreate}>
+                + Add new project...{mayCreate ? '' : ' (Manager)'}
+              </option>
             </select>
             <span className="field-hint">optional — one investigation of this customer</span>
           </div>
@@ -308,7 +319,8 @@ export default function Upload({ user }) {
                 <div className="drop-title">{file.name}</div>
                 <div className="drop-sub">{fmtBytes(file.size)}</div>
                 <div className="drop-actions">
-                  <button type="submit" disabled={busy || !hasCustomer || tooBig}>
+                  <button type="submit" disabled={busy || !hasCustomer || tooBig || !mayUpload}
+                          title={why('case:upload')}>
                     {busy ? 'Uploading...' : 'Upload'}
                   </button>
                   <button type="button" className="secondary" disabled={busy} onClick={clearFile}>

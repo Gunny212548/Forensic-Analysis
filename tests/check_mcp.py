@@ -49,7 +49,7 @@ def setup(repo: Path, usecase_dir: Path, scratch: Path) -> tuple[dict, str, Path
             z.write(uc / name, name)
     env = {**os.environ, "DATA_DIR": str(store), "PYTHONPATH": str(repo)}
     subprocess.run([sys.executable, str(repo / "tools" / "create_user.py"), "add", EMAIL,
-                    "--name", "MCP check", "--role", "analyst", "--password-stdin"],
+                    "--name", "MCP check", "--role", "manager", "--password-stdin"],
                    input=PASSWORD + "\n", text=True, env=env, capture_output=True, check=True)
     code = (
         "import sys; sys.path.insert(0, sys.argv[1])\n"

@@ -21,6 +21,13 @@ def _authorize(request: Request, action: str, company_id: str | None = None) -> 
         raise HTTPException(403, str(exc))
 
 
+def _case_workers() -> list[dict]:
+    """The accounts a finding can be assigned to: those who work cases (an
+    admin takes no case action - IAI-14, Q56)."""
+    return [u for u in sorted(auth.load_users().values(), key=lambda u: u["email"])
+            if authz.can(u, authz.REVIEW) and not u.get("disabled")]
+
+
 @router.get("")
 async def list_cases(company_id: str | None = None):
     if company_id is not None and storage.load_company(company_id) is None:
@@ -333,8 +340,8 @@ async def get_case_findings(case_id: str):
         "review_summary": counts,
         "lifecycle_summary": lifecycle.summary(findings, case_views.created_at(case_id, manifest)),
         "classifications": lifecycle.CLASSIFICATIONS,
-        "assignees": [{"email": u["email"], "name": u.get("name") or u["email"]}
-                      for u in sorted(auth.load_users().values(), key=lambda u: u["email"])],
+        "assignees": [{"email": u["email"], "name": u.get("name") or u["email"], "role": u.get("role")}
+                      for u in _case_workers()],
         # FR-5.6: the export gate reads exactly this - nothing may be left
         # Unreviewed when a final report is produced.
         "ready_for_report": counts.get(review.UNREVIEWED, 0) == 0 and bool(findings),
@@ -383,11 +390,18 @@ async def change_lifecycle(case_id: str, request: Request, body: dict = Body(...
         raise HTTPException(404, "Finding not found in this case")
     if not lifecycle.tracked(finding):
         raise HTTPException(400, "This finding is below the workflow threshold (high) and has no lifecycle")
+    current = lifecycle.state(case_id).get(key)
+    action = body.get("action") or ""
+    # Which change this role may make on this finding (an analyst: their own, IAI-14).
+    try:
+        authz.require_lifecycle(request.state.user, action, current, body, manifest.get("company_id"))
+    except authz.Forbidden as exc:
+        raise HTTPException(403, str(exc))
     review_status = (review.current(case_id).get(key) or {}).get("status", review.UNREVIEWED)
     try:
         entry = lifecycle.apply(
-            case_id, finding, lifecycle.state(case_id).get(key), body.get("action") or "",
-            request.state.user["email"], body, review_status, set(auth.load_users()),
+            case_id, finding, current, action,
+            request.state.user["email"], body, review_status, {u["email"] for u in _case_workers()},
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -470,7 +484,7 @@ async def get_case_analysis(case_id: str):
 
 
 @router.post("/{case_id}/analyze")
-async def analyze_case(case_id: str, background_tasks: BackgroundTasks, force: bool = False):
+async def analyze_case(case_id: str, request: Request, background_tasks: BackgroundTasks, force: bool = False):
     """Write the narrative for this case.
 
     Small cases (evidence that fits one model call) are answered inline, 200,
@@ -483,6 +497,7 @@ async def analyze_case(case_id: str, background_tasks: BackgroundTasks, force: b
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
+    _authorize(request, authz.ANALYZE, manifest.get("company_id"))
     if manifest.get("status") != "ready":
         raise HTTPException(409, f"Case is not ready yet (status: {manifest.get('status')})")
 

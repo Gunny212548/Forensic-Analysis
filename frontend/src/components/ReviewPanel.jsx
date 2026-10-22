@@ -4,6 +4,7 @@ import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
 import FindingEvents from './FindingEvents.jsx'
 import RuleCard from './RuleCard.jsx'
+import { useAccess } from '../permissions.js'
 
 // Unreviewed first, whatever its confidence: a high-confidence finding
 // nobody has looked at must never sit above a reviewed one (NFR-9).
@@ -17,6 +18,9 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [rejecting, setRejecting] = useState(null) // finding key awaiting a reason
+  // Reviewing is an analyst's or a manager's (IAI-14); an admin reads only.
+  const { can, why } = useAccess()
+  const mayReview = can('finding:review')
   const [reasonCode, setReasonCode] = useState('')
   const [reasonNote, setReasonNote] = useState('')
   const [busyKey, setBusyKey] = useState('')
@@ -341,33 +345,38 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
                 </div>
               </form>
             ) : (
-              <div className="rv-actions">
+              <div className="rv-actions" title={why('finding:review')}>
                 <button
                   className="rv-btn rv-accept"
-                  disabled={busy}
+                  disabled={busy || !mayReview}
                   onClick={() => submit(f.key, 'accept')}
                 >
                   Accept
                 </button>
                 <button
                   className="rv-btn rv-modify"
-                  disabled={busy}
+                  disabled={busy || !mayReview}
                   onClick={() => submit(f.key, 'modify')}
                 >
                   Modified
                 </button>
-                <button className="rv-btn rv-reject" disabled={busy} onClick={() => setRejecting(f.key)}>
+                <button
+                  className="rv-btn rv-reject"
+                  disabled={busy || !mayReview}
+                  onClick={() => setRejecting(f.key)}
+                >
                   Reject
                 </button>
                 {st !== 'Unreviewed' && (
                   <button
                     className="rv-btn rv-undo"
-                    disabled={busy}
+                    disabled={busy || !mayReview}
                     onClick={() => submit(f.key, 'unreview')}
                   >
                     Undo
                   </button>
                 )}
+                {!mayReview && <span className="cell-sub">{why('finding:review')}</span>}
               </div>
             )}
           </div>

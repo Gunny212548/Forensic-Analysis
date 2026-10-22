@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { postLifecycle } from '../api.js'
 import { fmtTime } from '../format.js'
+import { useAccess } from '../permissions.js'
 
 /** A tracked finding's status workflow (app/services/lifecycle.py, aligned
  *  with NIST SP 800-61r3 / CSF 2.0). Only the next legal step is offered,
@@ -33,6 +34,14 @@ export default function Lifecycle({ caseId, finding, assignees, classifications,
 
   const status = lc.status
   const names = Object.fromEntries((assignees || []).map((a) => [a.email, a.name]))
+  // What this role may do here (authz.require_lifecycle decides): a manager
+  // anything; an analyst takes an unassigned finding and works their own;
+  // only a manager resolves or reopens (IAI-14, Q57).
+  const { user, can, why } = useAccess()
+  const me = user?.email
+  const own = (to) => can('finding:lifecycle') && to === me && (!lc.assignee || lc.assignee === me)
+  const mayAssign = can('finding:assign') || own(assignee)
+  const mayWork = can('finding:work') || own(lc.assignee || assignee)
 
   return (
     <div className={`lc lc-${status.toLowerCase()}`}>
@@ -64,30 +73,46 @@ export default function Lifecycle({ caseId, finding, assignees, classifications,
             ))}
           </select>
           {assignee && assignee !== lc.assignee && status !== 'Open' && (
-            <button className="rv-btn" disabled={busy} onClick={() => send('assign', { assignee })}>
+            <button
+              className="rv-btn"
+              disabled={busy || !mayAssign}
+              title={mayAssign ? '' : why('finding:assign')}
+              onClick={() => send('assign', { assignee })}
+            >
               Reassign
             </button>
           )}
           {status === 'Open' && (
             <button
               className="rv-btn"
-              disabled={busy || !assignee}
-              title={assignee ? '' : 'Choose an assignee first'}
+              disabled={busy || !assignee || !mayWork}
+              title={!assignee ? 'Choose an assignee first' : mayWork ? '' : why('finding:work')}
               onClick={() => send('investigate', { assignee })}
             >
               Start investigating
             </button>
           )}
           {status === 'Investigating' && (
-            <button className="rv-btn" disabled={busy} onClick={() => setForm(form === 'contain' ? '' : 'contain')}>
+            <button
+              className="rv-btn"
+              disabled={busy || !mayWork}
+              title={mayWork ? '' : why('finding:work')}
+              onClick={() => setForm(form === 'contain' ? '' : 'contain')}
+            >
               Mark contained
             </button>
           )}
           {(status === 'Investigating' || status === 'Contained') && (
             <button
               className="rv-btn"
-              disabled={busy || !reviewed}
-              title={reviewed ? '' : 'Review the finding (accept, modify or reject) first'}
+              disabled={busy || !reviewed || !can('finding:close')}
+              title={
+                !can('finding:close')
+                  ? why('finding:close')
+                  : reviewed
+                    ? ''
+                    : 'Review the finding (accept, modify or reject) first'
+              }
               onClick={() => setForm(form === 'resolve' ? '' : 'resolve')}
             >
               Resolve
@@ -97,9 +122,21 @@ export default function Lifecycle({ caseId, finding, assignees, classifications,
       )}
       {status === 'Resolved' && (
         <div className="lc-actions">
-          <button className="rv-btn" disabled={busy} onClick={() => setForm(form === 'reopen' ? '' : 'reopen')}>
+          <button
+            className="rv-btn"
+            disabled={busy || !can('finding:reopen')}
+            title={why('finding:reopen')}
+            onClick={() => setForm(form === 'reopen' ? '' : 'reopen')}
+          >
             Reopen
           </button>
+        </div>
+      )}
+      {!can('finding:close') && status !== 'Resolved' && (
+        <div className="cell-sub">
+          {can('finding:lifecycle')
+            ? 'You work the findings assigned to you; a Manager resolves them.'
+            : why('finding:lifecycle')}
         </div>
       )}
 

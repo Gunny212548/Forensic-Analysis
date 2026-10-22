@@ -8,23 +8,25 @@ customer logs. Run it inside the container so it writes the same AUTH_DIR
         python tools/create_user.py add someone@example.com --name "Somchai" --role analyst
     docker exec forensic-analyzer-forensic-analyzer-1 python tools/create_user.py list
     docker exec forensic-analyzer-forensic-analyzer-1 python tools/create_user.py remove someone@example.com
+    docker exec forensic-analyzer-forensic-analyzer-1 python tools/create_user.py role someone@example.com manager
 
 `add` on an existing email updates its name/role and resets its password.
 The password is prompted for; pass --password-stdin to pipe it in instead.
 Removing an account ends its sessions at once (see app/services/auth.py).
+Roles: admin, manager, analyst (app/services/authz.py, IAI-14). Every change
+goes through auth.py like the Users page does - checked the same way (the last
+administrator stays one) and written to the hash-chained account audit log,
+with the actor `cli:<operating-system user>`.
 """
 
 import argparse
 import getpass
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.services import auth  # noqa: E402
-
-MIN_PASSWORD = 10
+from app.services import auth, authz  # noqa: E402
 
 
 def main() -> int:
@@ -33,11 +35,14 @@ def main() -> int:
     add = sub.add_parser("add", help="create an account, or update one and reset its password")
     add.add_argument("email")
     add.add_argument("--name", default="")
-    add.add_argument("--role", default=auth.DEFAULT_ROLE)
+    add.add_argument("--role", default=auth.DEFAULT_ROLE, choices=authz.ROLES)
     add.add_argument("--password-stdin", action="store_true")
     sub.add_parser("list")
     rm = sub.add_parser("remove")
     rm.add_argument("email")
+    ro = sub.add_parser("role", help="change an account's role, keeping its password")
+    ro.add_argument("email")
+    ro.add_argument("role", choices=authz.ROLES)
     args = ap.parse_args()
 
     users = auth.load_users()
@@ -49,12 +54,22 @@ def main() -> int:
         return 0
 
     email = auth.normalize_email(args.email)
+    actor = f"cli:{getpass.getuser()}"
     if args.cmd == "remove":
-        if users.pop(email, None) is None:
-            print(f"no account {email}", file=sys.stderr)
+        try:
+            auth.remove_account(actor, email)
+        except (LookupError, auth.AccountError) as exc:
+            print(exc, file=sys.stderr)
             return 1
-        auth.save_users(users)
         print(f"removed {email}")
+        return 0
+    if args.cmd == "role":
+        try:
+            auth.update_account(actor, email, role=args.role)
+        except (LookupError, auth.AccountError) as exc:
+            print(exc, file=sys.stderr)
+            return 1
+        print(f"{email} is now {args.role}")
         return 0
 
     if "@" not in email:
@@ -67,19 +82,16 @@ def main() -> int:
         if getpass.getpass("again: ") != password:
             print("passwords differ", file=sys.stderr)
             return 1
-    if len(password) < MIN_PASSWORD:
-        print(f"password must be at least {MIN_PASSWORD} characters", file=sys.stderr)
+    existing = email in users
+    try:
+        if existing:
+            auth.update_account(actor, email, name=args.name or None, role=args.role)
+            auth.reset_password(actor, email, password)
+        else:
+            auth.create_account(actor, email, args.name or email, args.role, password)
+    except auth.AccountError as exc:
+        print(exc, file=sys.stderr)
         return 1
-
-    existing = users.get(email, {})
-    users[email] = {
-        "email": email,
-        "name": args.name or existing.get("name") or email,
-        "role": args.role,
-        "password": auth.hash_password(password),
-        "created": existing.get("created") or datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    }
-    auth.save_users(users)
     print(f"{'updated' if existing else 'created'} {email} ({args.role})")
     return 0
 

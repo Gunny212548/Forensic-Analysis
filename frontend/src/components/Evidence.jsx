@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getCustody, verifyEvidence } from '../api.js'
 import { fmtBytes, fmtTime } from '../format.js'
 import { Empty } from './common.jsx'
+import { useAccess } from '../permissions.js'
 
 /** Evidence integrity + chain of custody (app/services/custody.py).
  *  The digest is what makes every finding on this case citable: it shows the
@@ -48,6 +49,7 @@ export default function Evidence({ caseId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const { can, why } = useAccess()
   // undefined = not checked this visit; true / false / null = the server's
   // answer (null: no acquisition digest exists to compare with).
   const [lastCheck, setLastCheck] = useState(undefined)
@@ -113,7 +115,12 @@ export default function Evidence({ caseId }) {
       )}
 
       <div className="ev-actions">
-        <button className="secondary" onClick={verify} disabled={busy}>
+        <button
+          className="secondary"
+          onClick={verify}
+          disabled={busy || !can('evidence:verify')}
+          title={why('evidence:verify')}
+        >
           {busy ? 'Hashing the preserved file...' : 'Verify integrity now'}
         </button>
         {lastCheck === true && <span className="ev-ok">Matches the recorded digest.</span>}

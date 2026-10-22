@@ -6,9 +6,17 @@ import zlib
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from .. import config
-from ..services import archive, custody, jobs, storage
+from ..services import archive, authz, custody, jobs, storage
 
 router = APIRouter(prefix="/api", tags=["upload"])
+
+
+def _authorize(user: dict, action: str) -> None:
+    """Ask the authz seam (services/authz.py); a refusal is a 403."""
+    try:
+        authz.require(user, action)
+    except authz.Forbidden as exc:
+        raise HTTPException(403, str(exc))
 
 CHUNK = 1024 * 1024  # 1MB
 
@@ -61,6 +69,8 @@ async def upload_log(
     project_id: str = Form(""),
     project_name: str = Form(""),
 ):
+    user = request.state.user
+    _authorize(user, authz.UPLOAD)
     filename = file.filename or "upload"
     # FR-2.3: "fw.csv.gz" is a gzip'd CSV, a .zip is a bundle of logs.
     kind, compression = archive.detect(filename)
@@ -75,7 +85,10 @@ async def upload_log(
     elif company_name.strip():
         # Inline "add new company" from the upload form - idempotent by
         # name so re-submitting doesn't fork a duplicate company.
-        company = storage.find_company_by_name(company_name) or storage.create_company(company_name.strip())
+        company = storage.find_company_by_name(company_name)
+        if company is None:
+            _authorize(user, authz.CUSTOMERS)  # a new customer is a manager's (IAI-14)
+            company = storage.create_company(company_name.strip())
     else:
         raise HTTPException(400, "A customer is required - every case belongs to exactly one customer")
 
@@ -88,9 +101,10 @@ async def upload_log(
             raise HTTPException(409, "Project not found for this customer")
     elif project_name.strip():
         # Inline "add new project", idempotent by name like the customer.
-        project = (storage.find_project_by_name(company["company_id"], project_name)
-                   or storage.create_project(company["company_id"], project_name,
-                                             request.state.user["email"]))
+        project = storage.find_project_by_name(company["company_id"], project_name)
+        if project is None:
+            _authorize(user, authz.CUSTOMERS)  # so is a new project
+            project = storage.create_project(company["company_id"], project_name, user["email"])
 
     manifest = storage.create_case(
         original_filename=filename,

@@ -12,8 +12,9 @@ from .routers import findings as findings_router
 from .routers import overview as overview_router
 from .routers import rules as rules_router
 from .routers import upload as upload_router
+from .routers import users as users_router
 from . import config
-from .services import auth, jobs, storage
+from .services import auth, authz, jobs, storage
 
 app = FastAPI(title="Forensic Analyzer")
 
@@ -26,12 +27,15 @@ app.include_router(findings_router.router)
 app.include_router(companies_router.router)
 app.include_router(overview_router.router)
 app.include_router(rules_router.router)
+app.include_router(users_router.router)
 
 
 # Everything under /api needs a signed-in user except what the login page
 # itself calls. The page and its bundle stay public - they hold no data, and
 # the login form is part of them.
 PUBLIC_API = {"/api/health", "/api/auth/login", "/api/auth/config"}
+# What a signed-in account may call whatever its role: who it is, and signing out.
+SELF_API = {"/api/auth/me", "/api/auth/logout"}
 
 
 @app.middleware("http")
@@ -42,7 +46,18 @@ async def require_login(request: Request, call_next):
         if user is None:
             return JSONResponse({"detail": "Sign-in required"}, status_code=401)
         request.state.user = user
+        # An account whose role may not read sees nothing but who it is (IAI-14:
+        # deny by default, NIST SP 800-53 AC-6).
+        if not authz.can(user, authz.READ) and path not in SELF_API:
+            return JSONResponse({"detail": "Your account has no role that may use this tool - "
+                                           "ask an administrator"}, status_code=403)
         if request.method == "POST" and path == "/api/upload":
+            # Refused before the body is read: Starlette spools the whole upload
+            # before the handler runs (gotcha #25), so a role that may not upload
+            # must not cost 10 GB of disk first.
+            if not authz.can(user, authz.UPLOAD):
+                return JSONResponse({"detail": f"{user['email']} may not upload - it needs "
+                                               f"{' or '.join(authz.NEEDS[authz.UPLOAD])}"}, status_code=403)
             refused = _refuse_oversized_upload(request)
             if refused:
                 return refused

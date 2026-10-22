@@ -40,7 +40,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import config
-from .services import (auth, case_flow, case_views, custody, db, hashchain, investigation, profiles,
+from .services import (auth, authz, case_flow, case_views, custody, db, hashchain, investigation, profiles,
                        review, rule_meta, storage, veris)
 from .services.rules import RULE_LABELS
 from .services.severity import LEVELS, WEIGHT
@@ -687,8 +687,15 @@ def main() -> int:
                     help="the account (users.json email) every access is recorded under")
     args = ap.parse_args()
     email = auth.normalize_email(args.actor)
-    if email not in auth.load_users():
+    user = auth.load_users().get(email)
+    if user is None:
         print(f"--actor {email}: no such account (tools/create_user.py list)", file=sys.stderr)
+        return 2
+    # The same rule as the web app: an account that may not read (no role, or
+    # disabled) reads nothing here either (IAI-14).
+    if user.get("disabled") or not authz.can(user, authz.READ):
+        print(f"--actor {email}: this account may not read case data (role {user.get('role')!r}"
+              f"{', disabled' if user.get('disabled') else ''})", file=sys.stderr)
         return 2
     serve(email)
     return 0

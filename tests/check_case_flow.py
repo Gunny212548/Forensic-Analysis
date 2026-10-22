@@ -80,7 +80,7 @@ def main() -> int:
         z.write(uc / "nightfall-firewall.csv", "nightfall-firewall.csv")
     os.environ["DATA_DIR"] = str(store)
     subprocess.run([sys.executable, str(repo / "tools" / "create_user.py"), "add", EMAIL,
-                    "--name", "analyst", "--role", "analyst", "--password-stdin"],
+                    "--name", "analyst", "--role", "manager", "--password-stdin"],
                    input=PW + "\n", text=True, capture_output=True, check=True)
     unit_standards(repo)
 

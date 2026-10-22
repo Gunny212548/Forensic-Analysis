@@ -1,3 +1,5 @@
+import { ROLE_NAMES } from '../permissions.js'
+
 /** Menu groups from FR-0.1. `route` is the hash page; `ready: false` marks a
  *  page that is still a placeholder, so the menu says so instead of the
  *  analyst finding out by clicking.
@@ -20,7 +22,7 @@ export const NAV_GROUPS = [
     label: 'Manage',
     items: [
       { route: 'customers', label: 'Customers' },
-      { route: 'settings', label: 'Settings', ready: false },
+      { route: 'settings', label: 'Settings' },
     ],
   },
 ]
@@ -63,13 +65,13 @@ export default function Sidebar({ active, counts = {}, user, onLogout }) {
         ))}
       </nav>
 
-      {/* FR-0.3. The role is a stored label only - what each role may do is
-          undefined until IAI-14, so nothing is enforced from it yet. */}
+      {/* FR-0.3. The role decides what the account may do (IAI-14,
+          app/services/authz.py). */}
       <div className="sidebar-user">
         <div className="avatar" aria-hidden="true">{initials(user.name)}</div>
         <div>
           <div className="sidebar-user-name" title={user.email}>{user.name}</div>
-          <div className="sidebar-user-role">{user.role}</div>
+          <div className="sidebar-user-role">{ROLE_NAMES[user.role] || user.role}</div>
           <button type="button" className="link-button" onClick={onLogout}>
             Log out
           </button>

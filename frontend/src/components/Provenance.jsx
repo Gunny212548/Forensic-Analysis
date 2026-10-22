@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { putProvenance, reprocessCase } from '../api.js'
 import { fmtNum } from '../format.js'
+import { useAccess } from '../permissions.js'
 
 /** Where each evidence item came from, and what its clock said
  *  (app/services/provenance.py). Every field optional (D9). A declared zone
@@ -22,6 +23,7 @@ function ItemCard({ caseId, item, single, onSaved }) {
   const a = item.time_applied
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({})
+  const { can, why } = useAccess()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -106,7 +108,14 @@ function ItemCard({ caseId, item, single, onSaved }) {
           ) : (
             <div className="muted">No provenance recorded.</div>
           )}
-          <button className="secondary" type="button" onClick={edit} style={{ marginTop: 6 }}>
+          <button
+            className="secondary"
+            type="button"
+            onClick={edit}
+            style={{ marginTop: 6 }}
+            disabled={!can('evidence:provenance')}
+            title={why('evidence:provenance')}
+          >
             {recorded.length ? 'Edit provenance' : 'Record provenance'}
           </button>
         </>
@@ -119,6 +128,7 @@ export default function Provenance({ caseId, ingest, onSaved, onReprocessed }) {
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const { can, why } = useAccess()
   const items = ingest.items || []
   const processing = ['queued', 'processing'].includes(ingest.status)
 
@@ -148,7 +158,8 @@ export default function Provenance({ caseId, ingest, onSaved, onReprocessed }) {
           <button
             className={ingest.reprocess_needed ? 'rv-btn' : 'secondary'}
             type="button"
-            disabled={processing}
+            disabled={processing || !can('case:reprocess')}
+            title={why('case:reprocess')}
             onClick={() => setConfirm(true)}
           >
             {processing ? 'Processing...' : ingest.reprocess_needed ? 'Re-process to apply the time settings' : 'Re-process'}

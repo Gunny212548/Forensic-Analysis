@@ -196,8 +196,12 @@ anything. The page and its bundle stay public; they hold no data.
   ends their sessions at once**; what logout cannot do is revoke a copy of
   the cookie taken before it expires - but a password reset does end them (gotcha #47).
   Failed sign-ins are throttled and every sign-in event is audit-logged (gotcha #47).
-- `role` is a stored display label only. Roles are undefined until IAI-14,
-  so nothing is permitted or denied by it.
+- **Roles since IAI-14 (2026-10-22, `specs/IAI-14_rbac.md`):** admin (accounts + read only),
+  manager (case work + customers, merge, assign, close / reopen), analyst (case work). One table,
+  `authz.PERMISSIONS`; deny by default; a route asks `authz.require`, the UI reads the same table
+  through `/api/auth/me` (`frontend/src/permissions.js`) but the server is the gate. Accounts are
+  managed on the Users page (admin only, `routers/users.py`), every change hash-chained to
+  `AUTH_DIR/audit/accounts.jsonl`; the last admin cannot be removed or demoted.
 - **The review actor comes from the session, not the request body.** It used
   to be whatever name the browser sent (typed once, kept in localStorage as
   `analyst-name`), which let any client write any name into an audit log
@@ -697,8 +701,9 @@ Two more checks, each for its own layer:
   (~100 checks: threshold, ids, source events, related findings, the Findings page,
   every refusal and both close paths, Customers, the Overview figures, a forged
   custody log); needs the container (`static/`). Gotcha #49 / #50.
-- **Authorisation seam** - `tests/check_authz.py [repo]` (ADR-3, gotcha #51): allows
-  everything today, and a denial becomes a 403.
+- **Authorisation** - `tests/check_authz.py [repo]` (ADR-3, gotcha #51, IAI-14): the permission
+  table per role, every case route answering 403 exactly where `authz.can` says no, the Users
+  routes, wrong-typed account changes refused.
 - **Customer isolation** - `tests/check_customer_isolation.py <scratch>
   --repo /app` (31 checks, gotchas #40/#41, and projects); run it in the container the same
   way as check_mcp. Run it after touching `storage.py`, any path helper or

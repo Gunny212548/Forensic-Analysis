@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..services import overview, storage
+from ..services import authz, overview, storage
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
 
@@ -24,7 +24,7 @@ def company_summary():
 
 
 @router.post("")
-async def create_company(payload: CompanyIn):
+async def create_company(payload: CompanyIn, request: Request):
     name = payload.name.strip()
     if not name:
         raise HTTPException(400, "Company name is required")
@@ -33,6 +33,10 @@ async def create_company(payload: CompanyIn):
     existing = storage.find_company_by_name(name)
     if existing:
         return existing
+    try:
+        authz.require(request.state.user, authz.CUSTOMERS)  # a new customer is a manager's (IAI-14)
+    except authz.Forbidden as exc:
+        raise HTTPException(403, str(exc))
     return storage.create_company(name)
 
 

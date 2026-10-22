@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Body, HTTPException, Request, Response
 
 from .. import config
-from ..services import auth
+from ..services import auth, authz
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def _session_view(user: dict) -> dict:
+    """The account, its permissions, and which roles each action needs - so
+    the page can say why a control is disabled (IAI-14)."""
+    return {**auth.public(user), "needs": authz.NEEDS}
 
 
 @router.get("/config")
@@ -59,7 +65,7 @@ def login(request: Request, response: Response, body: dict = Body(...)):
         samesite="lax",
         secure=request.url.scheme == "https",
     )
-    return auth.public(user)
+    return _session_view(user)
 
 
 @router.post("/logout")
@@ -73,4 +79,4 @@ def logout(request: Request, response: Response):
 @router.get("/me")
 async def me(request: Request):
     # The middleware in main.py has already rejected a missing session.
-    return auth.public(request.state.user)
+    return _session_view(request.state.user)

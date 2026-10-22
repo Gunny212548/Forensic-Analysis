@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAccess } from '../permissions.js'
 import { putQuestion } from '../api.js'
 import { fmtTime } from '../format.js'
 
@@ -26,6 +27,7 @@ function draftOf(q) {
 export default function Question({ caseId, investigation, onSaved }) {
   const q = investigation.question || {}
   const [editing, setEditing] = useState(false)
+  const { can, why } = useAccess() // the question is a manager's (IAI-14)
   const [draft, setDraft] = useState(() => draftOf(q))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -112,7 +114,13 @@ export default function Question({ caseId, investigation, onSaved }) {
         </div>
       ))}
       <div className="lc-actions" style={{ marginTop: 8 }}>
-        <button className="secondary" type="button" onClick={edit}>
+        <button
+          className="secondary"
+          type="button"
+          onClick={edit}
+          disabled={!can('investigation:question')}
+          title={why('investigation:question')}
+        >
           {q.question ? 'Edit' : 'Record the question'}
         </button>
         {investigation.updated_by && (

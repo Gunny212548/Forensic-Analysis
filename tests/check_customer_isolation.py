@@ -53,7 +53,7 @@ def main() -> int:
                    check=True, capture_output=True)
     os.environ["DATA_DIR"] = str(store)
     subprocess.run([sys.executable, str(repo / "tools" / "create_user.py"), "add", EMAIL,
-                    "--name", "Isolation", "--role", "analyst", "--password-stdin"],
+                    "--name", "Isolation", "--role", "manager", "--password-stdin"],
                    input=PASSWORD + "\n", text=True, capture_output=True, check=True)
     sys.path.insert(0, str(repo))
     from fastapi.testclient import TestClient

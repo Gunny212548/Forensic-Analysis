@@ -62,7 +62,7 @@ def main() -> int:
     (scratch / "mixed.log").write_text(MIXED, encoding="utf-8")
     os.environ["DATA_DIR"] = str(store)
     subprocess.run([sys.executable, str(repo / "tools" / "create_user.py"), "add", EMAIL,
-                    "--name", "analyst", "--role", "analyst", "--password-stdin"],
+                    "--name", "analyst", "--role", "manager", "--password-stdin"],
                    input=PW + "\n", text=True, capture_output=True, check=True)
     sys.path.insert(0, str(repo))
 

@@ -13,8 +13,11 @@ so deleting a user ends their sessions immediately. The price of being
 stateless is that logging out clears the cookie in the browser but cannot
 revoke a copy of it taken elsewhere before it expires (SESSION_HOURS).
 
-`role` is a stored label only. Roles and what each may do are undefined until
-IAI-14, so nothing here enforces one.
+An account's `role` (admin, manager, analyst) decides what it may do -
+`authz.py` (IAI-14). Accounts are changed here, by an administrator through the
+Users page or by `tools/create_user.py`, and every change is a hash-chained
+line in AUTH_DIR/audit/accounts.jsonl (NIST SP 800-53 AC-2(7), AC-6(9)). A
+disabled account cannot sign in and its sessions end at once.
 """
 
 import base64
@@ -29,7 +32,7 @@ import time
 from pathlib import Path
 
 from .. import config
-from . import hashchain
+from . import authz, hashchain
 
 COOKIE_NAME = "fa_session"
 DEFAULT_ROLE = "analyst"
@@ -106,15 +109,18 @@ def normalize_email(email: str) -> str:
 
 
 def public(user: dict) -> dict:
-    """What the browser is allowed to see - never the hash."""
+    """What the browser is allowed to see - never the hash. `permissions` are
+    the authz actions the account may take, so the page can say which
+    controls need another role (the server decides regardless)."""
     return {"email": user["email"], "name": user.get("name") or user["email"],
-            "role": user.get("role") or DEFAULT_ROLE}
+            "role": user.get("role") or DEFAULT_ROLE, "disabled": bool(user.get("disabled")),
+            "permissions": authz.permissions(user)}
 
 
 def authenticate(email: str, password: str) -> dict | None:
     user = load_users().get(normalize_email(email))
     ok = _check_hash(password or "", user["password"] if user else _DUMMY_HASH)
-    return user if (user and ok) else None
+    return user if (user and ok and not user.get("disabled")) else None
 
 
 # --- sessions --------------------------------------------------------------
@@ -173,6 +179,8 @@ def user_from_token(token: str | None) -> dict | None:
     user = load_users().get(data.get("email"))
     if user is None or not hmac.compare_digest(str(data.get("pv", "")), _password_version(user)):
         return None  # no such account any more, or its password changed since
+    if user.get("disabled"):
+        return None  # disabled since the session began
     return user
 
 
@@ -284,3 +292,127 @@ def audit(event: str, *, account: str | None, client: str | None,
         hashchain.append(audit_path(), entry)
     except Exception:
         logging.getLogger("forensic").exception("could not write the sign-in audit log")
+
+
+# --- account management (IAI-14) -------------------------------------------
+
+MIN_PASSWORD = 10
+_accounts_lock = threading.Lock()
+
+
+class AccountError(ValueError):
+    """A refused account change; the message says why."""
+
+
+def accounts_audit_path() -> Path:
+    return Path(config.AUTH_DIR) / "audit" / "accounts.jsonl"
+
+
+def _audit_account(actor: str, event: str, account: str, **details) -> None:
+    """The line first: an account change that is not in the chain did not
+    happen (AC-6(9)) - unlike the sign-in log, a failure here refuses the
+    change. Never a password."""
+    hashchain.append(accounts_audit_path(), {"event": event, "actor": actor, "account": account, **details})
+
+
+def _check_password(password: str) -> None:
+    if not isinstance(password, str) or len(password) < MIN_PASSWORD:
+        raise AccountError(f"a password needs at least {MIN_PASSWORD} characters")
+    if len(password) > MAX_PASSWORD:
+        raise AccountError("that password is too long")
+
+
+def _check_role(role: str) -> None:
+    if role not in authz.ROLES:
+        raise AccountError(f"role must be one of {', '.join(authz.ROLES)}")
+
+
+def _admins_left(users: dict) -> int:
+    return sum(1 for u in users.values() if u.get("role") == authz.ADMIN and not u.get("disabled"))
+
+
+def create_account(actor: str, email: str, name: str, role: str, password: str) -> dict:
+    email = normalize_email(email)
+    if "@" not in email or len(email) > MAX_EMAIL:
+        raise AccountError("an account ID is an email address")
+    _check_role(role)
+    _check_password(password)
+    with _accounts_lock:
+        users = load_users()
+        if email in users:
+            raise AccountError(f"{email} already has an account")
+        user = {"email": email, "name": (name or "").strip()[:200], "role": role,
+                "password": hash_password(password), "created_at": _now(), "created_by": actor}
+        _audit_account(actor, "account_created", email, role=role, name=user["name"])
+        users[email] = user
+        save_users(users)
+    return user
+
+
+def update_account(actor: str, email: str, *, name: str | None = None, role: str | None = None,
+                   disabled: bool | None = None) -> dict:
+    """Name, role, enabled. An administrator does not change their own role or
+    disable themself (another administrator does), and the last enabled
+    administrator stays one - or nobody could manage accounts again."""
+    email = normalize_email(email)
+    if name is not None and not isinstance(name, str):
+        raise AccountError("a name is text")
+    if disabled is not None and not isinstance(disabled, bool):
+        raise AccountError("disabled is true or false")  # "false" would read as true
+    with _accounts_lock:
+        users = load_users()
+        user = users.get(email)
+        if user is None:
+            raise LookupError(f"no account {email}")
+        changes = {}
+        if name is not None and name.strip()[:200] != (user.get("name") or ""):
+            changes["name"] = [user.get("name") or "", name.strip()[:200]]
+        if role is not None and role != user.get("role"):
+            _check_role(role)
+            changes["role"] = [user.get("role"), role]
+        if disabled is not None and bool(disabled) != bool(user.get("disabled")):
+            changes["disabled"] = [bool(user.get("disabled")), bool(disabled)]
+        if not changes:
+            return user
+        if email == actor and ({"role", "disabled"} & set(changes)):
+            raise AccountError("you cannot change your own role or disable yourself - ask another administrator")
+        after = {**user, **{k: v[1] for k, v in changes.items()}}
+        if user.get("role") == authz.ADMIN and _admins_left({**users, email: after}) == 0:
+            raise AccountError("this is the last enabled administrator")
+        _audit_account(actor, "account_changed", email, changes=changes)
+        users[email] = {k: v for k, v in after.items() if not (k == "disabled" and not v)}
+        save_users(users)
+    return users[email]
+
+
+def reset_password(actor: str, email: str, password: str) -> None:
+    """A new password; the account's sessions end (the session is bound to it)."""
+    email = normalize_email(email)
+    _check_password(password)
+    with _accounts_lock:
+        users = load_users()
+        if email not in users:
+            raise LookupError(f"no account {email}")
+        _audit_account(actor, "password_reset", email)
+        users[email] = {**users[email], "password": hash_password(password)}
+        save_users(users)
+
+
+def remove_account(actor: str, email: str) -> None:
+    email = normalize_email(email)
+    with _accounts_lock:
+        users = load_users()
+        user = users.get(email)
+        if user is None:
+            raise LookupError(f"no account {email}")
+        if email == actor:
+            raise AccountError("you cannot remove your own account - ask another administrator")
+        rest = {k: v for k, v in users.items() if k != email}
+        if user.get("role") == authz.ADMIN and _admins_left(rest) == 0:
+            raise AccountError("this is the last enabled administrator")
+        _audit_account(actor, "account_removed", email, role=user.get("role"))
+        save_users(rest)
+
+
+def _now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

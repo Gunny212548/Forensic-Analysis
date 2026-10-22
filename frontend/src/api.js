@@ -310,3 +310,38 @@ export function uploadFile({ file, note, companyId, companyName, projectId, proj
     xhr.send(fd)
   })
 }
+
+// --- Accounts (IAI-14): the Users page, admin only ---------------------------
+
+async function sendJson(url, method, body, fallback) {
+  const resp = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  return jsonOrThrow(resp, fallback)
+}
+
+export async function listUsers() {
+  return jsonOrThrow(await fetch('/api/users'), 'Could not load the accounts')
+}
+
+export async function createUser(body) {
+  return sendJson('/api/users', 'POST', body, 'Could not create the account')
+}
+
+export async function updateUser(email, body) {
+  return sendJson(`/api/users/${encodeURIComponent(email)}`, 'PATCH', body, 'Could not change the account')
+}
+
+export async function resetUserPassword(email, password) {
+  return sendJson(`/api/users/${encodeURIComponent(email)}/password`, 'POST', { password }, 'Could not reset the password')
+}
+
+export async function removeUser(email) {
+  return sendJson(`/api/users/${encodeURIComponent(email)}`, 'DELETE', undefined, 'Could not remove the account')
+}
+
+export async function getAccountAudit() {
+  return jsonOrThrow(await fetch('/api/users/audit'), 'Could not load the account history')
+}

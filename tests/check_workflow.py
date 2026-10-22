@@ -151,7 +151,7 @@ def main() -> int:
     os.environ["DATA_DIR"] = str(store)
     for email, pw in ((A_EMAIL, A_PW), (B_EMAIL, B_PW)):
         subprocess.run([sys.executable, str(repo / "tools" / "create_user.py"), "add", email,
-                        "--name", email.split("@")[0], "--role", "analyst", "--password-stdin"],
+                        "--name", email.split("@")[0], "--role", "manager", "--password-stdin"],
                        input=pw + "\n", text=True, capture_output=True, check=True)
     sys.path.insert(0, str(repo))
     unit_related()
