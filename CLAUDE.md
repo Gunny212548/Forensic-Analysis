@@ -20,10 +20,14 @@ confirm the attack events (the system and the AI only suggest), then build the
 attack timeline, the attack path and a graph of what the attacker did - which
 command, from which host, to which host. Flow: **Ingest -> Timeline -> Attack
 events -> Attack timeline -> Attack path / graph -> Report**; the Respond step
-(lifecycle, MTTC) is to be removed. **The 20 in-house rules stay** and SigmaHQ
-rules are added beside them (revision 5 - revision 4 had retired the in-house
-rules; reversed the same day after ADR-006 measured the cost). **Every step must cite a standard that was
-actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
+(lifecycle, MTTC) is to be removed. **Detection rules are per product since 2026-10-22**
+(`specs/per_product_rules.md`, D10-D16; gotchas #61-#63): logs are Firewall or OS, each
+product has its own rules over six areas, every rule names its behaviour and the document
+saying why it is a finding, and its line comes from the case's own evidence (legitimate
+members only) or TRW - no number set on one customer applied to another. Palo Alto and Check
+Point have theirs; the generic R-rules still run on every other product's rows. **Before the
+analyst decides, an AI reviews every suggestion** (gotcha #64). **Every step must cite a
+standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
 revisions 1-4 on branch `IAI-92-identify-logsource`; most of what follows still
 describes the code before that direction.
 
@@ -69,15 +73,21 @@ pipeline.process_case  (services/pipeline.py)
   .zip → each log member, one at a time, through the paths above into
          the SAME raw_events (row ids continue), so rules correlate
          across files. Member → row_id ranges go on the manifest
-         (`members`, `skipped_members`); raw_events has no source column.
+         (`members`, `skipped_members`); after ingest each row gets its
+         `product` (gotcha #61).
   progress → manifest `progress: {stage, pct, estimated}` about once a
-         second (FR-2.5; ingest 0-90, intel 90-92, rules 92-100). Measured
+         second (FR-2.5; ingest 0-90, intel 90-92, rules 92-99, ai 99). Measured
          for line logs/JSON (bytes read), zip members and rules. The CSV fast
          path is ONE DuckDB statement and 1.1.3 had no query_progress(), so
          its share is an elapsed-time estimate at ~60 MB/s, held at 95% of
          the file, flagged `estimated` (the UI prefixes "~"). Manifests are
          now written tmp-then-rename, since they are rewritten while polled.
-  then → rules.apply_rules() = SQL INSERT ... SELECT per rule
+  then → products.mark + period per evidence item (gotcha #61)
+       → rules.apply_rules() = SQL INSERT ... SELECT per rule; a product
+         rule reads its product's rows, a line-drawing rule takes its line
+         from lines.py and the manifest keeps it (`lines`, gotcha #62)
+       → escalations, profiles, FD ids
+       → triage.review_case: the AI's advice on each suggestion (gotcha #64)
        → status=ready (or failed + error/traceback on the manifest)
 
 data/customers/{company_id}/db/{case_id}.duckdb   (gotcha #40)
@@ -99,7 +109,11 @@ GET  /api/companies/{id}/projects            the customer's projects (storage.py
 GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
 GET  /api/cases/{id}/findings                collapsed findings + computed
                                              confidence + review status + FD id +
-                                             related findings (gotcha #49)
+                                             related findings (gotcha #49) + the
+                                             AI's advice + ATT&CK tactics
+DELETE /api/cases/{id}                       admin / manager: every file of the
+                                             case, recorded in the customer's
+                                             deleted/log.jsonl (specs/case_delete.md)
 GET  /api/cases/{id}/findings/events?key=    the events behind one finding, each
                                              with its source file (gotcha #49)
 GET  /api/findings                           the Findings page: workflow findings
@@ -161,7 +175,8 @@ since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything
 of that customer and nothing of anyone else's: `customer.json` the customer
 record · `projects/` its projects, one JSON each · `cases/` manifests (small JSON) · `db/` per-case DuckDB · `raw/`
 original uploaded files, compressed ones kept compressed (audit trail) ·
-`analysis/` cached AI output · `jobs/` one file per unfinished case (gotcha #48) ·
+`analysis/` cached AI output and the AI's review of the suggestions (`<case>.triage.json`) ·
+`deleted/log.jsonl` hash-chained record of every case deleted · `jobs/` one file per unfinished case (gotcha #48) ·
 `findings/ids.jsonl` the hash-chained FD-id registry (gotcha #49) · `review/` append-only analyst decision logs,
 one JSONL per case (see gotcha #19) · `custody/` hash-chained
 chain-of-custody logs, one JSONL per case (gotcha #28). Where older gotchas
@@ -440,8 +455,7 @@ the story open: IAI-12's open-findings badge became **IAI-78** (Sprint 3) that w
 
 Built in Sprint 1 (verified in Docker, 2026-09-29):
 - **IAI-12 app shell / IAI-13 login** - grouped sidebar, user + role +
-  logout, English per the Figma. Role is a label until IAI-14 (RBAC, not yet
-  in any sprint) defines roles.
+  logout, English per the Figma. Roles since IAI-14 (see *Login*).
 - **IAI-22/23/25/27 upload** - customer required, 10 GB after
   decompression, 2.5x disk check, `.gz` streamed, `.zip` → one case,
   separate upload / processing percentages.
@@ -543,7 +557,9 @@ What the data forced onto the Figma, measured on the same corpus:
 - **ATT&CK map:** ~98% of findings are `T1071` (C2, 65,774) and `T1595`
   (Reconnaissance, 28,889) - neither is among the Figma's 9 tactic columns,
   nor is Discovery (`T1046`). Show the tactics actually found, out of the
-  14 Enterprise tactics.
+  Enterprise tactics (15 since ATT&CK v20). The Attack timeline step does exactly that since
+  2026-10-22: a row of chevrons, one per tactic its confirmed groups reach, in ATT&CK's order
+  (`rule_meta.TACTIC_ORDER`, `tactics_of`), each filtering the time-ordered list.
 - **Timeline "last 24h" is always empty:** uploaded events are months old
   (Dec 2025 - Jun 2026 in the corpus). Timelines use the case's event-time
   range; MTTC and the per-day charts use finding *creation* time.
@@ -558,6 +574,13 @@ What the data forced onto the Figma, measured on the same corpus:
   keeps them as FR-11/FR-12; they need designing.
 
 ## Environment / secrets
+
+**Ollama must be running on the host** (`ollama serve`, or the Ollama app) for the AI review of
+suggestions (gotcha #64) and the narrative; without it a case is still processed, with the
+reason recorded. On 2026-10-22 it was not running, and when started from a Claude Code shell it
+was later stopped for low memory - qwen3.5:9b, the 8091 container and the dev container together
+are a lot for this PC; stop the dev container when not in use. `TRIAGE_ENABLED=0` turns the AI
+review off (every rule check sets it; the dev container has it off unless `DEV_TRIAGE_ENABLED=1`).
 
 **The narrative LLM is local now (2026-10-12): `LLM_PROVIDER=ollama`,
 `OLLAMA_MODEL=qwen2.5:7b-instruct`, then `qwen3.5:9b` from 2026-10-14 (see
@@ -722,6 +745,11 @@ Two more checks, each for its own layer:
   (gotcha #60): event XML from the committed samples; with `--evtx` (lab folder outside the repo,
   copied into the container) every .evtx record counted against its chunk header and compared item
   by item with Windows' own `.ToXml()` rendering. Check Point Log Exporter: `tests/check_checkpoint_le.py`.
+- **Detection accuracy** - `tests/gen_checkpoint_quarter.py <outdir>` (seeded): three months of
+  Check Point Log Exporter records with attacks I1-I6 buried in an office's traffic and a
+  `ground_truth.csv` for every non-benign row. Upload the zip, then score findings and the AI's
+  advice per incident against the ground truth (gotchas #62, #64). The file was not in git on
+  2026-10-22, nor are the scoring scripts.
 - **Firewall rules** - `tests/check_firewall_rules.py` (gotcha #62): Palo Alto and Check Point -
   TRW, the measured line and the no-line case, each behaviour's non-events, service names where a
   log has no port, Detect as neither verdict, no product's rule on another product's rows.
@@ -808,7 +836,18 @@ localises; interpretation still needs an analyst.
 
 ## Extending the rule engine
 
-Rules live in `rules.py` as `(rule_id, SQL)` pairs — each is one
+**A new rule is a product rule now** (`specs/per_product_rules.md`). Firewall products share
+`rules_firewall.build(product, prefix, service, unit)` - vertical / horizontal scan, allowed after
+probing, beaconing, feed matches - and add their own in `rules_<product>.py` (Palo Alto's PAN-DB
+category, Check Point's Threat Prevention verdict); `rules.py` appends each module's `RULES`,
+`PREPARE` (lines), `LEVEL`, `LABELS`, `FAMILY` (confidence family = the generic twin's),
+`EQUIVALENT` (the generic rule of the same behaviour, for escalations and VERIS) and
+`SUPERSEDES` (generic rules that stop on its rows). A product rule reads `product_events`; a
+line-drawing rule binds `$above` / `$minimum` / `$note` (`lines.evidence_line`, `lines.trw`); ids
+follow `RULE_ID_PATTERN`. Every rule needs its behaviour's document read (D14), a `RULE_META`
+entry, a place in `areas.py`, and a case in `tests/check_firewall_rules.py`.
+
+The generic rules live in `rules.py` as `(rule_id, SQL)` pairs — each is one
 `INSERT INTO findings SELECT ...` over `raw_events`. Correlation rules join
 against a `GROUP BY ... HAVING` subquery. Conventions: `R1xxx` single-event
 host/auth, `R2xxx` correlation, `R3xxx` network/firewall. Insert `lvl` as
@@ -827,15 +866,14 @@ category, false positives and the ADS sections. `python
 tests/check_rule_meta.py` fails until the metadata exists and its
 techniques match the SQL - run it with the parity check.
 
-Current set: R1000-R1004 (SSH auth failed/success/invalid user/connection,
-password change) · R2000 brute-force burst · R2001 repeated blocks ·
-R2002 port scan · R2003 service sweep (both deny-restricted, gotcha #23) ·
-R2004 policy gap ·
-R3000 high-risk app allowed · R3001 large transfer · R3002 malware category ·
-R2005 password spray (many sources, one account) · R2006 multi-source logins
-within an hour · R2007 beaconing (low-jitter egress intervals) ·
-R3003/R3004 threat-intel match on destination / source (allowed) ·
-R3005/R3006 the same matches on blocked traffic (medium / informational).
+Current set: **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
+CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **generic** (every other product's
+rows; superseded on Palo Alto / Check Point rows, gotcha #63): R2000 brute-force burst · R2002
+port scan · R2003 service sweep · R2004 policy gap · R2005 spray (many sources, one account) ·
+R2006 multi-source logins within an hour · R2007 beaconing · R2008 login after brute force ·
+R2009 measured spray · R3001 large transfer (everywhere - no data-transfer rule yet) · R3002
+malware category · R3003-R3005 threat-intel matches. R1000-R1004, R2001, R3000 and R3006 left
+the set on 2026-10-20 (gotcha #56).
 
 Three things worth copying when writing new correlation rules:
 - **Get the MITRE tag right — it propagates.** `R2001` was originally tagged
@@ -868,9 +906,10 @@ DuckDB bulk-load fix, and ~38s total while decode was still Python-per-row.
 
 Any change to ingest or rules should be checked for **parity**, and the
 baseline to check against is `tests/baseline.json`, not this file - per-file
-`rows / flagged / per-rule` counts for **75 files, 642,028 rows, 176,656
-flagged** (IAI-30: `log_8_-01.txt` read correctly, gotcha #46) (2026-10-14: +4 JSON files of gotcha #39, R3004 re-taken on the
-refreshed feeds - gotcha #17), asserted by `tests/check_parity.py`. A silent drop to 0 findings
+`rows / flagged / per-rule` counts, **668 entries** since 2026-10-22 (re-taken on the dev
+container for the product rules - gotcha #63; the Elastic PAN-OS samples added), asserted by
+`tests/check_parity.py`. Run it against the dev container (`--url http://127.0.0.1:8092`) with
+the AI review off there (gotcha #64) - with it on, a hundred uploads take hours. A silent drop to 0 findings
 is exactly the failure mode gotcha #2 describes, and a *plausible* wrong
 finding is gotcha #22.
 
@@ -919,12 +958,13 @@ unchanged corpus took 52s, 60s, 67s and 74s - that spread is host I/O for a
 hundred sequential uploads, not the pipeline. Re-processing all 211 cases
 already in the store, which skips upload entirely, takes **53s**.
 
-**Validating costs store space, and nothing in the app deletes a case.**
+**Validating costs store space.** Since 2026-10-22 an admin or a manager can delete a case
+(`DELETE /api/cases/{id}`, specs/case_delete.md); duplicates are still pruned with the tool below.
 `check_parity.py` uploads the whole corpus on every run and a re-process
 replaces nothing, so a handful of validation runs took one store from ~99 to
 **619 cases** - 547 of them byte-identical re-uploads of 71 files, 4.8 GB on
-disk and a dashboard nobody can read. There is no DELETE endpoint;
-`tools/prune_cases.py` is the cleanup, dry-run by default:
+disk and a dashboard nobody can read. `tools/prune_cases.py` is the bulk cleanup, dry-run by
+default:
 
 ```bash
 docker exec forensic-analyzer-forensic-analyzer-1 python tools/prune_cases.py
