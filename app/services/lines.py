@@ -8,8 +8,9 @@ Two methods, both read (docs/standards/SOURCES.md):
   The paper's parameters (Q68): a benign source succeeds with probability 0.8,
   a scanner 0.2; false alarms <= 0.01, detection >= 0.99 - which decides after
   4 failures or 4 successes. No population and no time window. A firewall
-  refusal is read as a failure - an adaptation, stated: the paper's failure is
-  an attempt to an inactive host or service.
+  refusal is read as a failure and an allowed connection as a success - an
+  adaptation, stated: the paper's failure is an attempt to an inactive host or
+  service. Any other verdict (Check Point's Detect, a sign-in) is neither.
 - **Evidence line** - Javed & Paxson 2013, §3.1: measure how the evidence's own
   *legitimate* members behave and draw the line well above that tail - here
   above twice their 99th percentile (Q66). The members are chosen by a
@@ -54,7 +55,7 @@ def trw(con, product: str, deny_verdicts: str) -> dict:
                  row_number() OVER (PARTITION BY srcip, dstip ORDER BY ts, row_id) AS k
           FROM raw_events
           WHERE product = '{product}' AND srcip IS NOT NULL AND dstip IS NOT NULL
-            AND ts IS NOT NULL AND verdict IS NOT NULL),
+            AND ts IS NOT NULL AND (verdict = 'allow' OR verdict IN {deny_verdicts})),
         firsts AS (
           SELECT srcip, dstip, failed,
                  row_number() OVER (PARTITION BY srcip ORDER BY ts, row_id) AS n

@@ -1,6 +1,7 @@
-"""Palo Alto rules (app/services/rules_paloalto.py, specs/per_product_rules.md story 2).
+"""Firewall rules: Palo Alto and Check Point (rules_firewall.py, rules_paloalto.py,
+rules_checkpoint.py; specs/per_product_rules.md stories 2-3).
 
-    python tests/check_paloalto.py [--repo DIR]
+    python tests/check_firewall_rules.py [--repo DIR]
 
 In-memory DuckDB with hand-built Palo Alto rows whose every expected finding is
 known: a horizontal scanner TRW decides after 4 refused hosts, benign sources
@@ -35,9 +36,9 @@ def build(con, benign: int):
     t0 = datetime(2026, 3, 1, 9, 0, 0)
     rows = []
 
-    def ev(src, dst, port, verdict, sec, product="paloalto", category="any"):
-        rows.append((len(rows), t0 + timedelta(seconds=sec), src, dst, str(port), verdict, category,
-                     product))
+    def ev(src, dst, port, verdict, sec, product="paloalto", category="any", app=None):
+        rows.append((len(rows), t0 + timedelta(seconds=sec), src, dst,
+                     None if port is None else str(port), verdict, category, product, app))
 
     # Benign internal sources: each reaches 5 hosts, all allowed (TRW: benign after 4).
     for i in range(benign):
@@ -52,20 +53,31 @@ def build(con, benign: int):
     # Not a scan: refused 30 times on one port.
     for k in range(30):
         ev("203.0.113.6", "10.9.2.2", 3389, "deny", 7000 + k * 30)
-    # Allowed after refusals within the hour; and refusals then an allow 2 h later.
+    # Allowed after probing 3 services within the hour; refusals on 2 services then
+    # an allow 2 h later; one service refused 3 times then an allow (a retry, Q71).
     for k in range(3):
-        ev("203.0.113.8", "10.9.2.3", 8080, "deny", 9000 + k * 60)
+        ev("203.0.113.8", "10.9.2.3", 8080 + k, "deny", 9000 + k * 60)
     ev("203.0.113.8", "10.9.2.3", 443, "allow", 9000 + 1200)
     ev("203.0.113.9", "10.9.2.4", 8080, "deny", 9000)
+    ev("203.0.113.9", "10.9.2.4", 8081, "deny", 9010)
     ev("203.0.113.9", "10.9.2.4", 443, "allow", 9000 + 7200)
+    for k in range(3):
+        ev("203.0.113.10", "10.9.2.5", 443, "deny", 9000 + k)
+    ev("203.0.113.10", "10.9.2.5", 443, "allow", 9100)
     # PAN-DB categories: malware (flagged), grayware (not).
     ev("10.0.0.1", "192.0.2.10", 443, "allow", 11000, category="malware")
     ev("10.0.0.1", "192.0.2.11", 443, "allow", 11001, category="grayware")
-    # Check Point rows shaped like a scan: never a Palo Alto finding.
+    # Check Point rows shaped like a scan: never a Palo Alto finding, but a
+    # Check Point one - by port (Log Exporter) and by service name with no port
+    # (SmartConsole, gotcha #8). Detect is neither a refusal nor an accept.
     for p in range(10):
         ev("203.0.113.50", "10.9.3.1", 2000 + p, "deny", 12000 + p, product="checkpoint")
+    for k, name in enumerate(("http", "ftp", "telnet")):
+        ev("203.0.113.51", "10.9.3.2", None, "drop", 12100 + k, product="checkpoint", app=name)
+    for h in range(6):
+        ev("203.0.113.52", f"10.9.4.{h}", 443, "detect", 12200 + h, product="checkpoint")
     con.executemany("INSERT INTO raw_events (row_id, ts, srcip, dstip, dstport, verdict, category, "
-                    "product) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", rows)
+                    "product, app) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
 
 
 def findings(con, rid):
@@ -98,18 +110,24 @@ def main() -> int:
           f"TRW decisions recorded ({trw['sources']})")
     check(trw["measured_success_benign"] == 1.0 and trw["assumption_holds"],
           "benign success ratio measured beside the paper's 0.8")
-    check(findings(con, "PAN-SCAN-1") == {"203.0.113.5"}, f"vertical scan only ({findings(con, 'PAN-SCAN-1')})")
-    check(matched.get("PAN-SCAN-1") == 10, f"its 10 refused rows ({matched.get('PAN-SCAN-1')})")
+    vertical = {"203.0.113.5", "203.0.113.8", "203.0.113.9"}  # the probes refused on 2+ ports too
+    check(findings(con, "PAN-SCAN-1") == vertical,
+          f"vertical scans: 2+ distinct refused ports, never one port repeated ({findings(con, 'PAN-SCAN-1')})")
+    check(matched.get("PAN-SCAN-1") == 15, f"their 10 + 3 + 2 refused rows ({matched.get('PAN-SCAN-1')})")
     s1 = rec["PAN-SCAN-1"]
     check(s1["method"] == "evidence-line" and s1["members"] == 127 and s1["above"] == 0 and s1["minimum"] == 2,
           f"line over 127 benign pairs (25 x 5 + 10.0.0.1's two category rows), p99 0 -> the 2-port minimum decides ({s1['members']}, {s1['above']})")
     check(findings(con, "PAN-SCAN-3") == {"203.0.113.8"},
-          f"allowed after refusals within the hour only ({findings(con, 'PAN-SCAN-3')})")
+          f"allowed after probing within the hour only - not 2 h later, not a retry ({findings(con, 'PAN-SCAN-3')})")
     check(findings(con, "PAN-MAL-2") == {"10.0.0.1"} and matched.get("PAN-MAL-2") == 1,
           "malware category flagged, grayware not")
     pan = con.execute("SELECT count(*) FROM findings f JOIN raw_events r USING (row_id) "
                       "WHERE f.rid LIKE 'PAN-%' AND r.product <> 'paloalto'").fetchone()[0]
     check(pan == 0, "no Palo Alto rule touched a Check Point row")
+    check(findings(con, "CP-SCAN-1") == {"203.0.113.50", "203.0.113.51"},
+          f"Check Point vertical scans, by port and by service name ({findings(con, 'CP-SCAN-1')})")
+    check(not findings(con, "CP-SCAN-2") and rec["CP-SCAN-2"]["sources"]["scanner"] == 0,
+          "six Detect verdicts are no scan: neither refusals nor accepts")
     tags = dict(con.execute("SELECT DISTINCT rid, mitre FROM findings WHERE rid IN ('PAN-SCAN-1', 'PAN-SCAN-2')").fetchall())
     check(tags == {"PAN-SCAN-1": ["T1595"], "PAN-SCAN-2": ["T1595.001"]},
           f"an outside source is reconnaissance, not discovery ({tags})")
@@ -121,11 +139,11 @@ def main() -> int:
     rules.apply_rules(con, lines=rec)
     check(rec["PAN-SCAN-1"]["method"] == "no-line" and rec["PAN-SCAN-1"]["members"] == 17,
           f"17 legitimate pairs - no line ({rec['PAN-SCAN-1']['members']})")
-    check(findings(con, "PAN-SCAN-1") == {"203.0.113.5"},
+    check(findings(con, "PAN-SCAN-1") == {"203.0.113.5", "203.0.113.8", "203.0.113.9"},
           "every pair with 2 or more refused ports still goes to the analyst")
     check(findings(con, "PAN-SCAN-3") == {"203.0.113.8"}, "allowed after refusals, no line")
 
-    print("\nPALO ALTO RULES OK" if not FAILED else f"\n{len(FAILED)} FAILED")
+    print("\nFIREWALL RULES OK" if not FAILED else f"\n{len(FAILED)} FAILED")
     return 1 if FAILED else 0
 
 

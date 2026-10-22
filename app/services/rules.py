@@ -586,12 +586,14 @@ def _products_present(con: duckdb.DuckDBPyConnection) -> set[str]:
 
 # Product rule sets (D11), after everything above they import. They run after
 # the generic rules, which stay until story 4 retires them.
-from . import rules_paloalto  # noqa: E402
+from . import rules_checkpoint, rules_firewall, rules_paloalto  # noqa: E402
 
-for _rid, _sql in rules_paloalto.RULES + rules_paloalto.from_generic(dict(RULES)):
-    RULES.append((_rid, _sql))
-    RULE_PRODUCT[_rid] = rules_paloalto.PRODUCT
-RULE_PREPARE.update(rules_paloalto.PREPARE)
-RULE_FAMILY.update(rules_paloalto.FAMILY)
-RULE_LEVEL.update(rules_paloalto.LEVEL)
-RULE_LABELS.update(rules_paloalto.LABELS)
+_GENERIC = dict(RULES)
+for _mod in (rules_paloalto, rules_checkpoint):
+    for _rid, _sql in _mod.RULES + rules_firewall.from_generic(_mod.FROM_GENERIC, _GENERIC):
+        RULES.append((_rid, _sql))
+        RULE_PRODUCT[_rid] = _mod.PRODUCT
+    RULE_PREPARE.update(_mod.PREPARE)
+    RULE_FAMILY.update(_mod.FAMILY)
+    RULE_LEVEL.update(_mod.LEVEL)
+    RULE_LABELS.update(_mod.LABELS)

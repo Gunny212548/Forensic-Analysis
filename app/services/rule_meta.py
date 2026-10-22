@@ -58,6 +58,7 @@ TACTICS = {
 AUTH_SOURCES = ["openssh-sshd", "entra-signin"]
 FIREWALL_SOURCES = ["paloalto-traffic", "checkpoint-smartconsole", "fortigate-traffic"]
 PALOALTO_SOURCES = ["paloalto-traffic"]
+CHECKPOINT_SOURCES = ["checkpoint-log-exporter", "checkpoint-smartconsole"]
 
 RULE_META: dict[str, dict] = {
     "R1000": {
@@ -490,7 +491,7 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "Vertical scans of one host (PAN-SCAN-1); distributed scans from many "
                            "sources; a scanner mixing in connections to known servers (paper §6).",
             "validation": "Customer Traffic exports (424,948 rows): 0 scanners, 167 benign, 1,106 "
-                          "pending; benign first contacts succeeded 99.6%. Synthetic: tests/check_paloalto.py.",
+                          "pending; benign first contacts succeeded 99.6%. Synthetic: tests/check_firewall_rules.py.",
             "response": "Low: reconnaissance. Look for an allow from the same source afterwards.",
         },
     },
@@ -512,7 +513,7 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "Scans the firewall allowed; scans slower than 2 ports an hour; scans spread "
                            "over many sources.",
             "validation": "Customer Traffic exports: refused rows are 24 sources x 9 hosts x 5 ports, at "
-                          "most 2 ports to a host in an hour - no scan. Synthetic: tests/check_paloalto.py.",
+                          "most 2 ports to a host in an hour - no scan. Synthetic: tests/check_firewall_rules.py.",
             "response": "Low unless the same source is later allowed (PAN-SCAN-3).",
         },
     },
@@ -522,16 +523,18 @@ RULE_META: dict[str, dict] = {
         "status": "experimental",
         "techniques": [],
         "category": "firewall", "log_sources": PALOALTO_SOURCES,
-        "falsepositives": ["A client refused on one service and allowed on another of the same host"],
+        "falsepositives": ["A client refused on several services of a host and allowed on another"],
         "ads": {
-            "goal": "Detect a source let through to a host it was refused by shortly before - a gap "
-                    "in the policy found by probing (behaviour S5).",
-            "strategy": "An allowed connection with refusals of the same source -> host in the hour "
-                        "before. Line as PAN-SCAN-1 on the refusals before an allow, at least 1.",
+            "goal": "Detect a source let through to a host it probed shortly before - a gap in the "
+                    "policy found by probing (behaviour S5).",
+            "strategy": "An allowed connection after refusals of the same source -> host on several "
+                        "distinct services in the hour before. Line as PAN-SCAN-1 on the distinct "
+                        "services refused before an allow, at least 2 (Q71: one refusal was a retry).",
             "technical_context": "No ATT&CK analytic names it: an internal method (the SOC benchmark's "
                                  "implied-rule bypass), stated as one.",
             "blind_spots": "A probe and its success more than an hour apart; a different target host.",
-            "validation": "Customer Traffic exports: 3 such pairs. Synthetic: tests/check_paloalto.py.",
+            "validation": "Customer Traffic exports: 1 pair (one refused service before: 2 more pairs, "
+                          "dropped by Q71). Synthetic: tests/check_firewall_rules.py.",
             "response": "High: something got through. Read the allowed session and the rule it matched.",
         },
     },
@@ -624,6 +627,40 @@ RULE_META: dict[str, dict] = {
         },
     },
 }
+
+
+# Check Point (rules_checkpoint.py, story 3): the shared firewall rules
+# (rules_firewall.py) - the same method as their Palo Alto twins, on Check Point
+# rows, with a destination service being the port or, in a SmartConsole export,
+# the service name. Measured on the customer's Log Exporter export (20,000
+# records, 2026-10-21 10:18-10:23).
+_CHECKPOINT = {
+    "SCAN-2": ("3ac9f3f5-0f66-46ad-8818-504a66982bb0",
+               "Customer export: TRW decided 7 scanners, 41 benign, 315 pending; benign first contacts "
+               "succeeded 99.4%. All 7 external, each dropped on one service across 4-5 public "
+               "addresses (ICMP echo, 3389, 9443, 264, 1114)."),
+    "SCAN-1": ("b80451f9-72ba-4552-9ff9-efa5ddd6a1f3",
+               "Customer export: line above 2 services (p99 1 over 1,138 benign pairs); 3 external "
+               "pairs, e.g. 8 consecutive ports 25376-25383 of one public address."),
+    "SCAN-3": ("6308d47b-aaf6-429e-a9d2-60593187a9fc",
+               "Customer export: none. One refusal before an accept was 9 internal clients' HTTPS to a "
+               "CDN - why two distinct services are required (Q71)."),
+    "MAL-1": ("6b43eb82-43c2-4173-98ed-712f67ba8be9", "Customer export: none (5 minutes of records)."),
+    "INTEL-1": ("d228ddcc-c5cd-4fa4-bcd0-a60decba39b5", "As R3003."),
+    "INTEL-2": ("fbd2238e-db87-4a0b-8bf7-1fbffcfc9833", "As R3004."),
+    "INTEL-3": ("720132b7-34f8-4d41-8386-a59b2ad50999", "As R3005."),
+}
+for _suffix, (_uuid, _validation) in _CHECKPOINT.items():
+    _pan = RULE_META[f"PAN-{_suffix}"]
+    RULE_META[f"CP-{_suffix}"] = {
+        **_pan, "id": _uuid, "title": _pan["title"].replace("Palo Alto", "Check Point"),
+        "status": "experimental" if _suffix.startswith("SCAN") else _pan["status"],
+        "log_sources": CHECKPOINT_SOURCES,
+        "ads": {**_pan["ads"], "validation": _validation,
+                "technical_context": _pan["ads"]["technical_context"] + " Check Point: a service is the "
+                "Log Exporter `service` port, or the SmartConsole Service name (gotcha #8); Detect is "
+                "neither a refusal nor an accept."},
+    }
 
 
 def tags(rid: str) -> list[str]:

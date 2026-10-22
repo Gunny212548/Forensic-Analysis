@@ -154,3 +154,11 @@ that was read is cited first.
 | ISO 9241-110:2020 | interaction principles for the step bar and menu | none found | 5 |
 | ISO/IEC 27001:2022 Annex A (A.5.15, A.8.3, A.8.15) | access control, access restriction, logging (existing rows 13, 16) | none | 1 - already cited |
 | ISO/IEC 27004:2016 | measurement constructs | SP 800-55v1 3.1.1 | **not needed** - SP 800-55v1 covers it |
+
+Vendor pages not obtained (2026-10-22, story 3 of `specs/per_product_rules.md`): Check Point's
+Identity Awareness and Logging administration guide pages (R81.20 paths 404), so the values of
+`auth_status` / an Identity Awareness `action` are not documented here; Check Point URL
+Filtering category definitions (urlcat.checkpoint.com renders by script; the R82 Harmony
+Endpoint page 404; the Harmony Mobile page defines its own feature categories, not the
+gateway's). Consequence: no Check Point sign-in rule and no Check Point category rule
+(`rules_checkpoint.py`).

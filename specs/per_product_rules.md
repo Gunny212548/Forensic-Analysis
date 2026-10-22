@@ -99,7 +99,9 @@ verifier must disable an authenticator after **at most 100** consecutive failure
 300 attempts per hour per account guessing, about four per hour spraying, Quad7 one per 24 h
 precisely to stay under thresholds. So a fixed count alone misses low-and-slow guessing (Q62).
 
-The Check Point export holds one `Failed Log In` (Web UI): an event, not B1-B4.
+The Check Point export holds one `Failed Log In` - Identity Awareness, `auth_method` Machine
+Identity Propagation, no user (corrected 2026-10-22; it was first read as Web UI): an event, not
+B1-B4.
 
 The fuller theory - ten behaviours a brute-force detection measures, each sourced (ATT&CK,
 CISA TA18-086A, Microsoft's password spray playbook, OWASP OAT-007/008, NIST SP 800-63B-4) - is
@@ -198,7 +200,17 @@ docs. Cases processed before keep their R-ids until re-processed.
    Internal -> public bytes: 821 pairs, p99 0.73 MB/h. Built in this story: PAN-SCAN-1..3,
    PAN-MAL-1..2, PAN-INTEL-1..3; PAN-DATA-1 waits for Q70's D1 criterion. **Built 2026-10-22**
    (gotcha #62); generic rules unchanged (host parity 51 files, 0 moved).
-3. Check Point rules.
+3. Check Point rules. **Built 2026-10-22** (gotcha #62): CP-SCAN-1..3, CP-MAL-1, CP-INTEL-1..3 -
+   the firewall rules every firewall shares (`rules_firewall.py`), a service being the Log
+   Exporter port or the SmartConsole Service name. On the customer's export (20,000 records,
+   five minutes): TRW 7 scanners (all external, each dropped on one service across 4-5 public
+   addresses), 41 benign, 315 pending; CP-SCAN-1 3 external pairs (e.g. 8 consecutive ports).
+   **Not written ("no rule yet")**: CP-AUTH / CP-BRUTE - `auth_status` values undocumented in
+   anything read, one machine-identity failure in the data; CP-MAL-2 - no Check Point category
+   definitions obtainable, no Threat Prevention record in the data (SOURCES.md, *Not obtained*).
+   Check Point's 61 Detect records are HTTPS inspection certificate notes (OCSP unreachable,
+   expired certificate), not threats - no rule reads Detect as one. CP-DATA-1 waits with
+   PAN-DATA-1.
 4. Retire R2000-R3005 and re-base everything that reads an R-id; baseline re-taken and explained.
 5. Windows · 6. Linux · 7. FortiGate · 8. Cisco (reader first).
 
@@ -225,6 +237,12 @@ docs. Cases processed before keep their R-ids until re-processed.
   minimum (S1: 2 distinct refused ports to one host in an hour - one port is an event, not a
   scan; S5: a denial then an allow to the same host within an hour). D1 data transfer has no
   legitimacy criterion yet - its rule waits.
+- **Q71 - S5 needs probing, not one refusal** (story 3, 2026-10-22, proposed to the user): with a
+  minimum of 1 refusal before an allow, the Check Point export gave 44 high findings - 9 internal
+  clients whose HTTPS to a CDN was dropped once, then accepted - and the Palo Alto exports 32.
+  The behaviour is a gap found by probing (the SOC benchmark: a scan, then accepts), so the value
+  is now the **distinct services refused** in the hour before the allow, minimum 2: Check Point
+  0, Palo Alto 1 pair (6 rows).
 - **Q69 - log sources outside D10's two types** (story 1). VMware ESXi was filed as an **OS**
   (a hypervisor's own operating system; its auth.log is OpenSSH / PAM lines). Microsoft Entra ID
   sign-ins and Exchange Online message trace are neither a firewall nor an OS: their type is left

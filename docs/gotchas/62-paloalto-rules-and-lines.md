@@ -38,3 +38,20 @@ of `specs/per_product_rules.md`, branch `rules-per-product`, 2026-10-22).**
 - **While the generic rules still run (until story 4) a Palo Alto case has both**: R2007 and
   PAN-MAL-1 on the same rows, two workflow findings for one beacon. Do not deploy story 2 alone.
 - Feed matches do not yet check the indicator's validity at the event's time (T4).
+
+**Story 3 (Check Point, same day).** The scanning, beaconing and feed-match rules moved to
+`rules_firewall.build(product, prefix, service, unit)`, shared by every firewall product; Palo Alto
+adds its PAN-DB category rule. Check Point's destination service is `coalesce(dstport, app)` - the
+Log Exporter port, or the SmartConsole Service name (gotcha #8). Two things the Check Point data
+taught:
+- **Only allow and refusal count.** TRW and S5 read `verdict = 'allow'` as success and a refusal
+  as failure; anything else is neither. Before, every non-refusal was a "success" - Check Point's
+  Detect (61 records, all HTTPS inspection certificate notes) and a `failed log in` would have
+  counted as successful connections.
+- **S5 needs probing (Q71).** One refusal before an allow flagged 9 internal clients whose HTTPS to
+  a CDN was dropped once (44 high findings); the value is now the distinct services refused in
+  the hour before the allow, minimum 2 - Check Point 0, Palo Alto 1 pair.
+TRW on the export: 7 scanners, all external sweeps of the public addresses
+(ICMP echo, 3389, 9443) - real horizontal scans, refused. No Check Point sign-in or category rule:
+their documentation could not be obtained (SOURCES.md, *Not obtained*). The test is
+`tests/check_firewall_rules.py` (was check_paloalto.py).
