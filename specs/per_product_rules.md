@@ -211,6 +211,11 @@ docs. Cases processed before keep their R-ids until re-processed.
    Check Point's 61 Detect records are HTTPS inspection certificate notes (OCSP unreachable,
    expired certificate), not threats - no rule reads Detect as one. CP-DATA-1 waits with
    PAN-DATA-1.
+   **Then (2026-10-22, the user's test on a synthetic Check Point quarter):** CP-MAL-2 added -
+   the Threat Prevention blades' Prevent / Detect (sk144192 fields); TRW restarts after a benign
+   decision and leaves internal -> internet contacts out (gotcha #62). Still missing for that
+   test: a Check Point sign-in rule (I3 spray), connection volume to a login service (I6),
+   internal fan-out of allowed connections (lateral SMB / RDP), a data-transfer rule.
 4. Retire R2000-R3005 and re-base everything that reads an R-id; baseline re-taken and explained.
    **Built 2026-10-22, per product** (gotcha #63): the generic rules a product's rules replace stop
    running on that product's rows and keep running elsewhere - FortiGate, ESXi, sshd, Entra and

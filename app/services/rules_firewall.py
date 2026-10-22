@@ -60,7 +60,7 @@ def build(product: str, prefix: str, service: str = "dstport", unit: str = "port
     only = f"AND product = '{product}'"
 
     def trw(con) -> dict:
-        return lines.trw(con, product, DENY_VERDICTS)
+        return lines.trw(con, product, DENY_VERDICTS, NON_PUBLIC_IPV4_RE)
 
     def benign_pairs(value_sql: str, value: str) -> str:
         """Every (source, host) pair of a TRW-benign source, with its value or 0."""
@@ -106,11 +106,14 @@ def build(product: str, prefix: str, service: str = "dstport", unit: str = "port
             INSERT INTO findings
             SELECT e.row_id, '{s2}', NULL,
                    'Horizontal scan from ' || e.srcip || ': TRW decided scanner after ' ||
-                   t.n_decided || ' new hosts (' || t.hosts || ' hosts tried)',
+                   t.n_decided || ' new hosts from ' || strftime(t.episode_start, '%Y-%m-%d %H:%M') ||
+                   ' (' || t.hosts || ' hosts tried in the evidence)',
                    CASE WHEN {_INTERNAL} THEN ['T1046'] ELSE ['T1595.001'] END
             FROM product_events e
             JOIN trw_{product} t ON t.srcip = e.srcip AND t.decision = 'scanner'
-            WHERE e.verdict IN {DENY_VERDICTS}
+            -- The refusals of the scanning episode, not the source's whole history
+            -- (TRW restarts after each benign decision - lines.trw).
+            WHERE e.verdict IN {DENY_VERDICTS} AND e.ts >= t.episode_start
         """),
         # S1 vertical scan - one source, many refused services of one host in an
         # hour (T1046 DET0376 AN1057/AN1058; from outside T1595 DET0830).

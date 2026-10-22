@@ -15,9 +15,18 @@ Not written, and why (the case shows "no rule yet"):
 - Authentication / Brute force: sk144192 documents `auth_status` but not its
   values, and the Identity Awareness pages could not be fetched; the export
   holds one Identity Awareness "Failed Log In" (a machine identity, no user).
-- Malware & C2 by Check Point's own verdict (URL category, Threat Prevention
-  blades): no Check Point category definitions were obtainable, and the export
-  holds no Anti-Bot / IPS / Anti-Virus record.
+- Malware & C2 by Check Point's URL category: no Check Point category
+  definitions were obtainable.
+
+CP-MAL-2 reads the Threat Prevention blades' own verdict (story 3b, the user's
+test of 2026-10-22): sk144192 documents `product` ("Blade"), the Security
+Gateway sections IPS / Anti-Bot / Anti-Virus / Threat Emulation, their action
+(Prevent / Detect), `protection_name`, `malware_action` ("Communication with
+C&C"), ThreatCloud `severity` and `confidence_level`. Those fields have no
+canonical column, so the rule reads them from the Log Exporter record kept in
+`raw` (checkpoint_le.py); a SmartConsole export's Blade column is not read yet.
+A Prevent is a refusal, so its level is capped at medium like any refused row
+(rules.apply_rules); a Detect let the connection through and stays high.
 """
 
 from . import rules_firewall
@@ -25,14 +34,38 @@ from . import rules_firewall
 PRODUCT = "checkpoint"
 _SHARED = rules_firewall.build(PRODUCT, "CP", service="coalesce(dstport, app)", unit="services")
 
-RULES: list[tuple[str, str]] = _SHARED["RULES"]
+# The Threat Prevention blades - sk144192's "Security Gateway - <blade> Fields".
+THREAT_BLADES = ("IPS", "Anti-Bot", "Anti-Virus", "Threat Emulation")
+
+
+def _field(name: str) -> str:
+    """One Log Exporter field of the record kept in `raw` (values may be wrapped
+    in doubled quotes, as the EventLog Analyzer CSV writes them - gotcha #59)."""
+    return f"nullif(regexp_extract(raw, '{name}:\"+([^\";]*)', 1), '')"
+
+
+RULES: list[tuple[str, str]] = _SHARED["RULES"] + [
+    # M5 the firewall's own verdict: a Threat Prevention blade prevented or
+    # detected (let pass) the connection. Anti-Bot's C&C verdicts are T1071
+    # (DET0444); IPS / Anti-Virus / Threat Emulation carry no technique until
+    # their ATT&CK pages (T1190, T1105) are read.
+    ("CP-MAL-2", f"""
+        INSERT INTO findings
+        SELECT row_id, 'CP-MAL-2', NULL,
+               'Check Point ' || {_field('product')} || ' ' || upper(verdict[1]) || verdict[2:] || ': ' ||
+               coalesce({_field('protection_name')}, {_field('malware_action')}, 'protection') ||
+               ' (' || coalesce(srcip, '?') || ' -> ' || coalesce(dstip, '?') ||
+               coalesce(', severity ' || {_field('severity')}, '') || ')',
+               CASE WHEN {_field('product')} = 'Anti-Bot' THEN ['T1071'] ELSE []::VARCHAR[] END
+        FROM product_events
+        WHERE verdict IN ('prevent', 'detect')
+          AND {_field('product')} IN {THREAT_BLADES}
+    """),
+]
 FROM_GENERIC = _SHARED["FROM_GENERIC"]
 PREPARE = _SHARED["PREPARE"]
-LEVEL = _SHARED["LEVEL"]
-LABELS = _SHARED["LABELS"]
-FAMILY = _SHARED["FAMILY"]
-EQUIVALENT = _SHARED["EQUIVALENT"]
-# R3002 (a malware-like category) keeps running on Check Point rows: there is no
-# Check Point category rule to replace it (the category column is not read for
-# Check Point yet, so it cannot fire there either).
-SUPERSEDES = _SHARED["SUPERSEDES"]
+LEVEL = {**_SHARED["LEVEL"], "CP-MAL-2": "high"}
+LABELS = {**_SHARED["LABELS"], "CP-MAL-2": "threat prevention verdict"}
+FAMILY = {**_SHARED["FAMILY"], "CP-MAL-2": "R3"}
+EQUIVALENT = {**_SHARED["EQUIVALENT"], "CP-MAL-2": "R3002"}
+SUPERSEDES = (*_SHARED["SUPERSEDES"], "R3002")

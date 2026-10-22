@@ -662,6 +662,32 @@ for _suffix, (_uuid, _validation) in _CHECKPOINT.items():
                 "neither a refusal nor an accept."},
     }
 
+RULE_META["CP-MAL-2"] = {
+    "id": "c8f26b0c-c3df-42c0-8ddc-bc63bd0f37cb",
+    "title": "Check Point: Threat Prevention verdict",
+    "status": "experimental",
+    "techniques": ["T1071"],
+    "category": "firewall", "log_sources": ["checkpoint-log-exporter"],
+    "falsepositives": ["A protection matching benign traffic (ThreatCloud confidence below High)"],
+    "ads": {
+        "goal": "Report what Check Point's own Threat Prevention blades decided: IPS, Anti-Bot, "
+                "Anti-Virus or Threat Emulation prevented or detected a connection (behaviour M5).",
+        "strategy": "Log Exporter record whose product (Blade) is one of those four and whose action is "
+                    "Prevent or Detect (sk144192). Anti-Bot verdicts are T1071 (C&C, DET0444); the others "
+                    "carry no technique until T1190 / T1105 are read.",
+        "technical_context": "The blade, protection name, malware action and ThreatCloud severity are read "
+                             "from the record kept in raw - no canonical column holds them. A Detect of the "
+                             "URL Filtering / HTTPS inspection blade (certificate notes) is not a threat blade "
+                             "and is not read.",
+        "blind_spots": "SmartConsole exports (their Blade column is not read yet); blades in Bypass.",
+        "validation": "Customer export: no Threat Prevention record. Synthetic Check Point quarter "
+                      "(tests/gen_checkpoint_quarter.py): IPS Log4Shell / CVE-2024-24919, Anti-Bot QakBot "
+                      "and the I2 beacon. tests/check_firewall_rules.py.",
+        "response": "High when Detect (it passed); a Prevent is capped at medium - read what else the "
+                    "source did.",
+    },
+}
+
 
 def tags(rid: str) -> list[str]:
     """Sigma tags: tactic(s) first, then the techniques, lower-case."""

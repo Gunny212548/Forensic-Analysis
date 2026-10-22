@@ -1393,12 +1393,12 @@
  },
  "Search_Report-2026_10_21-10_23_21_869.csv": [
   {
-   "flagged": 53,
+   "flagged": 66,
    "md5": "dc301d76bad6e32f5a5a89a4c30ed672",
    "rows": 20000,
    "rules": {
     "CP-INTEL-2": 9,
-    "CP-SCAN-1": 12,
+    "CP-SCAN-1": 25,
     "CP-SCAN-2": 30,
     "R3001": 2
    }

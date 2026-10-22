@@ -24,7 +24,7 @@ AREAS: list[dict] = [
               "CP-SCAN-1", "CP-SCAN-2", "CP-SCAN-3")},
     {"id": "malware-c2", "name": "Malware & C2",
      "about": "Malware-category traffic and regular beaconing to external addresses",
-     "rids": ("R2007", "R3002", "PAN-MAL-1", "PAN-MAL-2", "CP-MAL-1")},
+     "rids": ("R2007", "R3002", "PAN-MAL-1", "PAN-MAL-2", "CP-MAL-1", "CP-MAL-2")},
     {"id": "data-apps", "name": "Data transfer",
      "about": "Large outbound transfers",
      "rids": ("R3001",)},

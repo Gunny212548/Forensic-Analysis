@@ -36,9 +36,9 @@ def build(con, benign: int):
     t0 = datetime(2026, 3, 1, 9, 0, 0)
     rows = []
 
-    def ev(src, dst, port, verdict, sec, product="paloalto", category="any", app=None):
+    def ev(src, dst, port, verdict, sec, product="paloalto", category="any", app=None, raw=None):
         rows.append((len(rows), t0 + timedelta(seconds=sec), src, dst,
-                     None if port is None else str(port), verdict, category, product, app))
+                     None if port is None else str(port), verdict, category, product, app, raw))
 
     # Benign internal sources: each reaches 5 hosts, all allowed (TRW: benign after 4).
     for i in range(benign):
@@ -76,11 +76,31 @@ def build(con, benign: int):
         ev("203.0.113.51", "10.9.3.2", None, "drop", 12100 + k, product="checkpoint", app=name)
     for h in range(6):
         ev("203.0.113.52", f"10.9.4.{h}", 443, "detect", 12200 + h, product="checkpoint")
+    # Ordinary first, a sweep weeks later (the QakBot host of the Check Point
+    # quarter): 5 allowed new hosts, a refused repeat, then 10 refused new hosts.
+    # TRW decides benign, restarts, then decides scanner - only the sweep is flagged.
+    for h in range(5):
+        ev("10.0.77.7", f"10.8.0.{h}", 443, "allow", 14000 + h)
+    ev("10.0.77.7", "10.8.0.0", 8443, "deny", 14100)
+    for h in range(10):
+        ev("10.0.77.7", f"10.8.1.{h}", 445, "deny", 14000 + 86400 * 20 + h)
+    # Check Point Threat Prevention verdicts (CP-MAL-2), as Log Exporter records -
+    # the CSV doubles the quotes (gotcha #59). URL Filtering's Detect is a
+    # certificate note, not a threat blade.
+    ev("10.0.88.8", "198.51.100.66", 443, "prevent", 15000, product="checkpoint",
+       raw='[action:""Prevent""; product:""Anti-Bot""; protection_name:""Qakbot.TC.a""; severity:""Critical""]')
+    ev("198.51.100.67", "203.0.113.10", 443, "detect", 15001, product="checkpoint",
+       raw='[action:""Detect""; product:""IPS""; protection_name:""Apache Log4j RCE (CVE-2021-44228)""]')
+    ev("10.0.88.9", "192.0.2.80", 443, "detect", 15002, product="checkpoint",
+       raw='[action:""Detect""; product:""URL Filtering""; certificate_validation:""Unreached OCSP""]')
+    # A user refused at six blocked web sites in a row: going out, not scanning the site.
+    for h in range(6):
+        ev("10.0.99.9", f"198.51.100.{100 + h}", 443, "deny", 16000 + h)
     # FortiGate has no rule set yet: its scan is still the generic R2002's (story 4).
     for p in range(10):
         ev("203.0.113.60", "10.9.5.1", 3000 + p, "deny", 13000 + p, product="fortigate")
     con.executemany("INSERT INTO raw_events (row_id, ts, srcip, dstip, dstport, verdict, category, "
-                    "product, app) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+                    "product, app, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
 
 
 def findings(con, rid):
@@ -106,10 +126,16 @@ def main() -> int:
     build(con, 25)
     rec: dict = {}
     matched = rules.apply_rules(con, lines=rec)
-    check(findings(con, "PAN-SCAN-2") == {"198.51.100.7"}, f"horizontal scanner ({findings(con, 'PAN-SCAN-2')})")
-    check(matched.get("PAN-SCAN-2") == 6, f"its 6 refused rows ({matched.get('PAN-SCAN-2')})")
+    check(findings(con, "PAN-SCAN-2") == {"198.51.100.7", "10.0.77.7"},
+          f"horizontal scanners ({findings(con, 'PAN-SCAN-2')})")
+    check(matched.get("PAN-SCAN-2") == 6 + 10, f"its 6 refused rows, and the later sweep's 10 ({matched.get('PAN-SCAN-2')})")
+    swept = {r[0] for r in con.execute(
+        "SELECT r.dstip FROM findings f JOIN raw_events r USING (row_id) WHERE f.rid = 'PAN-SCAN-2' "
+        "AND r.srcip = '10.0.77.7'").fetchall()}
+    check(swept == {f"10.8.1.{h}" for h in range(10)},
+          "a host ordinary for weeks is decided again: its later sweep is a scan, its earlier refusal is not")
     trw = rec["PAN-SCAN-2"]
-    check(trw["sources"]["scanner"] == 1 and trw["sources"]["benign"] == 25,
+    check(trw["sources"]["scanner"] == 2 and trw["sources"]["benign"] == 25,
           f"TRW decisions recorded ({trw['sources']})")
     check(trw["measured_success_benign"] == 1.0 and trw["assumption_holds"],
           "benign success ratio measured beside the paper's 0.8")
@@ -129,6 +155,15 @@ def main() -> int:
     check(pan == 0, "no Palo Alto rule touched a Check Point row")
     check(findings(con, "CP-SCAN-1") == {"203.0.113.50", "203.0.113.51"},
           f"Check Point vertical scans, by port and by service name ({findings(con, 'CP-SCAN-1')})")
+    mal = dict(con.execute("SELECT r.srcip, f.mitre FROM findings f JOIN raw_events r USING (row_id) "
+                           "WHERE f.rid = 'CP-MAL-2'").fetchall())
+    check(mal == {"10.0.88.8": ["T1071"], "198.51.100.67": []},
+          f"Threat Prevention verdicts: Anti-Bot (T1071) and IPS, not URL Filtering's Detect ({mal})")
+    lvl = dict(con.execute("SELECT r.verdict, f.lvl FROM findings f JOIN raw_events r USING (row_id) "
+                           "WHERE f.rid = 'CP-MAL-2'").fetchall())
+    from app.services.severity import WEIGHT
+    check(lvl == {"prevent": WEIGHT["medium"], "detect": WEIGHT["high"]},
+          "a Prevent is capped at medium, a Detect (it passed) stays high")
     check(not findings(con, "CP-SCAN-2") and rec["CP-SCAN-2"]["sources"]["scanner"] == 0,
           "six Detect verdicts are no scan: neither refusals nor accepts")
     check(findings(con, "R2002") == {"203.0.113.60"},
@@ -145,9 +180,12 @@ def main() -> int:
           "FortiGate's still lists the generic rules")
     check(con.execute(f"SELECT {rules.generic_sql(repr('PAN-MAL-1'))}").fetchone()[0] == "R2007",
           "PAN-MAL-1 counts as R2007's behaviour (escalation, VERIS)")
-    tags = dict(con.execute("SELECT DISTINCT rid, mitre FROM findings WHERE rid IN ('PAN-SCAN-1', 'PAN-SCAN-2')").fetchall())
-    check(tags == {"PAN-SCAN-1": ["T1595"], "PAN-SCAN-2": ["T1595.001"]},
-          f"an outside source is reconnaissance, not discovery ({tags})")
+    tags = {(rid, src): m for rid, src, m in con.execute(
+        "SELECT DISTINCT f.rid, r.srcip, f.mitre FROM findings f JOIN raw_events r USING (row_id) "
+        "WHERE f.rid = 'PAN-SCAN-2' OR (f.rid = 'PAN-SCAN-1' AND r.srcip = '203.0.113.5')").fetchall()}
+    check(tags == {("PAN-SCAN-1", "203.0.113.5"): ["T1595"], ("PAN-SCAN-2", "198.51.100.7"): ["T1595.001"],
+                   ("PAN-SCAN-2", "10.0.77.7"): ["T1046"]},
+          f"an outside source is reconnaissance, an inside one discovery ({tags})")
 
     print("with 3 benign sources (no line: every pair showing the behaviour)")
     con = duckdb.connect()

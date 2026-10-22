@@ -55,3 +55,31 @@ TRW on the export: 7 scanners, all external sweeps of the public addresses
 (ICMP echo, 3389, 9443) - real horizontal scans, refused. No Check Point sign-in or category rule:
 their documentation could not be obtained (SOURCES.md, *Not obtained*). The test is
 `tests/check_firewall_rules.py` (was check_paloalto.py).
+
+**Measured on a synthetic Check Point quarter with ground truth (2026-10-22,
+`tests/gen_checkpoint_quarter.py`, 166,268 rows, attacks I1-I6).** Before: I1 fully, I2's
+discovery and C2, half its exfiltration; no false positive on ~116,000 plain rows; I3-I6
+missed. Three changes followed:
+- **TRW restarts after a benign decision.** The paper decides a remote host once over 24-hour
+  traces; over a quarter the QakBot workstation (I4) was decided benign on its first four
+  ordinary contacts and its sweep of 508 hosts weeks later (85% refused) was never looked at.
+  `lines.trw` now walks each source in Python, starts again after every benign decision, and a
+  scanner decision carries `episode_start` (its first refused new host) - PAN/CP-SCAN-2 flag
+  only that episode's refusals. I4's sweep: 0 -> 507 of 508 rows.
+- **Internal -> internet contacts are not TRW observations.** With restarts, a user refused at
+  four blocked web sites in a row became a "scanner" (17 plain rows). The paper tests accesses
+  to the site's own addresses, so contacts from a private source to a public destination are
+  left out; the false positive went. Consequence: on the customer's Check Point export the
+  benign population is now 1 source (35 pairs), the vertical-scan line drops to its 2-service
+  minimum, CP-SCAN-1 12 -> 25 rows - all external sources probing 2-4 services of a public
+  address (baseline updated).
+- **CP-MAL-2** (`rules_checkpoint.py`): the Threat Prevention blades' own verdict - IPS,
+  Anti-Bot, Anti-Virus, Threat Emulation with Prevent / Detect, fields per sk144192, read from
+  the Log Exporter record in `raw`. I5's Log4Shell 174 of 177, I2's CVE-2024-24919 scan and
+  file read 26 of 26, Anti-Bot on the I2 beacon and I4's QakBot all caught. URL Filtering's
+  Detect (certificate notes) is not a threat blade.
+After: still missed - I3 (VPN password spray: no Check Point sign-in rule), I6 (SSH brute force
+seen only as connection volume), I2's VPN sign-ins / RDP / most SMB spread (allowed internal
+fan-out), I4's C2 on 443/995/2222 (too few, too irregular), half of I2's exfiltration (no
+data-transfer rule). False positives by design: the Zabbix heartbeat as beaconing (8,876 rows),
+OneDrive uploads over R3001's 50 MB (14).
