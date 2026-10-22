@@ -213,6 +213,24 @@ check(f"every change is in the hash-chained account log, newest first ({len(even
 check("the log holds no password", PW not in auth.accounts_audit_path().read_text(encoding="utf-8"))
 check("the chain verifies on disk", hashchain.verify(auth.accounts_audit_path()).get("intact"))
 
+print("a finding key is used exactly as it is (a user name ending in a space)")
+from app.services import db  # noqa: E402
+
+spaced = storage.create_case("cp.csv", "csv", 1, company_id=co["company_id"])["case_id"]
+con = db.init(spaced)
+con.execute("INSERT INTO raw_events (row_id, srcip, username) VALUES (0, '192.168.10.62', 'Ekkachai Suwan (ekkachai.s) ')")
+con.execute("INSERT INTO findings VALUES (0, 'R3001', 1, 'Large outbound transfer', ['T1041'])")
+con.close()
+storage.update_case(spaced, status="ready")
+key = "R3001|192.168.10.62|Ekkachai Suwan (ekkachai.s) "
+check("a reviewer accepts a finding whose key ends in a space",
+      admin.post(f"/api/cases/{spaced}/review", json={"finding_key": key, "action": "accept"}).status_code == 200)
+check("the same key stripped is another key, and not found",
+      admin.post(f"/api/cases/{spaced}/review",
+                 json={"finding_key": key.strip(), "action": "accept"}).status_code == 404)
+check("an empty or blank key is refused (400)",
+      admin.post(f"/api/cases/{spaced}/review", json={"finding_key": "  ", "action": "accept"}).status_code == 400)
+
 print("deleting a case (specs/case_delete.md)")
 from app.services import case_delete  # noqa: E402
 

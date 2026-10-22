@@ -403,7 +403,9 @@ async def change_lifecycle(case_id: str, request: Request, body: dict = Body(...
     if manifest is None:
         raise HTTPException(404, "Case not found")
     _authorize(request, authz.LIFECYCLE, manifest.get("company_id"))
-    key = (body.get("finding_key") or "").strip()
+    # The key exactly as sent: a user name can end in a space (a Check Point
+    # src_user_name did), and a stripped key then matches no finding.
+    key = body.get("finding_key") or ""
     finding = next((f for f in db.collapsed_findings(case_id) if f["key"] == key), None)
     if finding is None:
         raise HTTPException(404, "Finding not found in this case")
@@ -439,8 +441,8 @@ async def record_review(case_id: str, request: Request, body: dict = Body(...)):
         raise HTTPException(404, "Case not found")
     _authorize(request, authz.REVIEW, manifest.get("company_id"))
 
-    key = (body.get("finding_key") or "").strip()
-    if not key:
+    key = body.get("finding_key") or ""  # as sent, never stripped (see the lifecycle route)
+    if not isinstance(key, str) or not key.strip():
         raise HTTPException(400, "finding_key is required")
     if key not in {f["key"] for f in db.collapsed_findings(case_id)}:
         raise HTTPException(404, f"No finding '{key}' in this case")
