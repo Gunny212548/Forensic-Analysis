@@ -19,6 +19,7 @@ import sys
 import zipfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
+os.environ.setdefault("TRIAGE_ENABLED", "0")  # rules are measured here, not the AI review (triage.py)
 
 FAILED: list[str] = []
 

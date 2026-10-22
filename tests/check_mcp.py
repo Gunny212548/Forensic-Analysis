@@ -26,6 +26,7 @@ import sys
 import threading
 import zipfile
 from pathlib import Path
+os.environ.setdefault("TRIAGE_ENABLED", "0")  # rules are measured here, not the AI review (triage.py)
 
 HERE = Path(__file__).resolve().parent
 EMAIL, PASSWORD = "mcp-check@test.local", "mcp-check-throwaway-password"

@@ -873,6 +873,13 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             finding_ids.ensure(case_id)
         except Exception:  # noqa: BLE001
             log.exception("case %s: could not assign finding ids", case_id)
+        # The AI reviews each suggestion before the findings are shown (the
+        # user's Q78, specs/ai_triage.md); never fails the case.
+        if flagged:
+            from . import case_views, triage  # imported here: case_views reads the case views this run builds
+            progress.set("ai", 99, force=True)
+            manifest_now = storage.load_manifest(case_id) or {}
+            triage.review_case(case_id, case_views.findings_view(case_id, manifest_now, assign_ids=False))
         storage.update_case(
             case_id,
             status="ready",

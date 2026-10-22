@@ -28,6 +28,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+os.environ.setdefault("TRIAGE_ENABLED", "0")  # rules are measured here, not the AI review (triage.py)
 
 REPO = Path(__file__).resolve().parent.parent
 FAILED: list[str] = []

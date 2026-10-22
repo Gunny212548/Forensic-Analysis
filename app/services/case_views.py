@@ -8,7 +8,7 @@ MCP server call it.
 """
 
 from . import (confidence, custody, db, finding_ids, investigation, lifecycle, provenance, related, review,
-               storage, veris)
+               storage, triage, veris)
 
 
 def integrity_refused(manifest: dict) -> bool:
@@ -116,6 +116,7 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
     # and the other findings of the same attack chain (related.py).
     ids = finding_ids.ensure(case_id, manifest, findings) if assign_ids else finding_ids.lookup(case_id)
     chains = related.chains(db.finding_edges(case_id))
+    ai_items = triage.load(case_id).get("items") or {}
     for f in findings:
         f["fd"] = ids.get(f["key"])
         rel = chains.get(f["key"])
@@ -132,6 +133,8 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
             f["lifecycle"] = {"tracked": True, **lc, "csf": lifecycle.CSF[lc["status"]]}
         else:
             f["lifecycle"] = {"tracked": False}
+        # The AI's advice on this suggestion (triage.py), if it was reviewed.
+        f["ai_review"] = ai_items.get(f["key"])
     return findings
 
 

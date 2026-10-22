@@ -26,6 +26,7 @@ os.environ["AUTH_DIR"] = str(scratch / "auth")
 sys.path.insert(0, args.repo)
 
 from fastapi.testclient import TestClient  # noqa: E402
+os.environ.setdefault("TRIAGE_ENABLED", "0")  # rules are measured here, not the AI review (triage.py)
 
 from app.services import auth, authz, hashchain, storage  # noqa: E402
 

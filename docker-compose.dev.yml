@@ -20,6 +20,9 @@ services:
     # container, so watchfiles would never see a save.
     environment:
       - WATCHFILES_FORCE_POLLING=true
+      # Off here by default: parity uploads a hundred cases, and the AI review takes minutes
+      # each. DEV_TRIAGE_ENABLED=1 to try it.
+      - TRIAGE_ENABLED=${DEV_TRIAGE_ENABLED:-0}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
               "--reload", "--reload-dir", "/app/app"]
     volumes:

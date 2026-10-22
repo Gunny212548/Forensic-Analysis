@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from .. import config
 from ..services import (analysis, analysis_jobs, attack_layer, auth, case_delete, case_flow, case_views, custody,
                         db, authz, investigation, jobs, lifecycle, merge, profiles, provenance, review,
-                        stix_export, storage, veris)
+                        stix_export, storage, triage, veris)
 from ..services.rules import RULE_ID_PATTERN
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -455,6 +455,7 @@ async def record_review(case_id: str, request: Request, body: dict = Body(...)):
             actor=request.state.user["email"],
             reason_code=(body.get("reason_code") or "").strip(),
             note=body.get("note") or "",
+            ai=triage.assessment_of(case_id, key),
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))

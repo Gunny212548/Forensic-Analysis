@@ -394,6 +394,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #58 Ingest: question on the project (hash-chained log), provenance per evidence item (custody lines), declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
 **AI narrative** (`analysis.py`, `llm.py`, `grounding.py`, `veris.py`)
+- #64 The AI reviews every suggestion while the case is processed (`triage.py`): facts computed in SQL (a destination's popularity among internal hosts, the rule's documented false positives), a schema, an address check; advice under each suggestion, kept on the review line; `TRIAGE_ENABLED=0` in every rule check and in dev.
 - #5 Groq's output-token limits and the measured sweeps (events 15, max_tokens 950); schema key order is the priority list. Groq only - not the local model.
 - #10 The attack graph is SQL (`db.build_graph()`), not AI - don't hand it back to the model.
 - #13 Every wrong narrative was missing input, never reasoning: compute the discriminating fact in SQL and hand it over; prompt hardening was measured to do nothing.
@@ -724,6 +725,8 @@ Two more checks, each for its own layer:
 - **Firewall rules** - `tests/check_firewall_rules.py` (gotcha #62): Palo Alto and Check Point -
   TRW, the measured line and the no-line case, each behaviour's non-events, service names where a
   log has no port, Detect as neither verdict, no product's rule on another product's rows.
+- **AI review of suggestions** - `tests/check_triage.py <scratch>` (gotcha #64): the facts, the schema's
+  enums, the address and cross-citation checks, a model that cannot be reached; a fake model, no Ollama.
 - **Products and periods** - `tests/check_products.py <scratch>` (gotcha #61): product per row, a
   product rule on its rows only, periods and gaps, the n/a matrix, findings unchanged end to end.
 - **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states, and

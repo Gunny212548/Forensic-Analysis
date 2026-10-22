@@ -450,6 +450,8 @@ def case_files(store: Path, case_id: str) -> list[Path]:
         store / "analysis" / f"{case_id}.json",
         # The map-reduce narrative job's progress sidecar.
         store / "analysis" / f"{case_id}.job.json",
+        # The AI's review of each suggestion (triage.py).
+        store / "analysis" / f"{case_id}.triage.json",
         store / "review" / f"{case_id}.jsonl",
         store / "custody" / f"{case_id}.jsonl",
         store / "jobs" / f"{case_id}.json",

@@ -782,3 +782,17 @@ button.danger-outline { color: var(--danger); border-color: var(--danger-border)
 .delete-case label { display: grid; gap: 4px; text-transform: none; letter-spacing: normal; }
 .delete-case input { font-family: 'IBM Plex Mono', monospace; }
 .delete-actions { display: flex; gap: 8px; }
+
+/* The AI's advice on a suggestion (AiReview.jsx). */
+.ai-review { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--border, #E3E6EB); border-left: 3px solid var(--accent);
+  border-radius: 6px; background: var(--subtle, #F7F8FA); font-size: 13px; display: grid; gap: 4px; }
+.ai-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ai-label { font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; color: var(--muted); }
+.ai-chip { padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.ai-attack { background: var(--danger-tint); color: var(--danger); }
+.ai-benign { background: #E7F5EC; color: #1F7A3F; }
+.ai-uncertain { background: #EEF0F3; color: var(--muted); }
+.ai-reasons { margin: 2px 0 0 18px; padding: 0; }
+.ai-fact { display: inline-block; margin-left: 2px; padding: 0 4px; border-radius: 4px; background: #E3E6EB;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: help; }
+.ai-warn { color: var(--danger); }

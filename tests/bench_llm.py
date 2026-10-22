@@ -23,6 +23,7 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
+os.environ.setdefault("TRIAGE_ENABLED", "0")  # rules are measured here, not the AI review (triage.py)
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_MODELS = ["qwen2.5:7b-instruct", "qwen3.5:9b", "gemma4:e4b", "gemma4:12b-it-qat"]

@@ -9,6 +9,8 @@ services:
       - ANALYSIS_PROVIDER=groq
       # groq (hosted, needs GROQ_API_KEY) or ollama (local, no key, no limits)
       - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      # The AI reviews each suggestion while a case is processed (triage.py); 0 turns it off.
+      - TRIAGE_ENABLED=${TRIAGE_ENABLED:-1}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
       - MAX_EVENTS_FOR_ANALYSIS=${MAX_EVENTS_FOR_ANALYSIS:-15}

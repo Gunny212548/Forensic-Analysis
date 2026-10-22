@@ -169,6 +169,10 @@ MAP_COMPLETION_TOKENS = int(os.environ.get("MAP_COMPLETION_TOKENS", "300"))
 ANALYSIS_OTPM_BUDGET = int(os.environ.get("ANALYSIS_OTPM_BUDGET", "1000"))
 
 
+# The AI's review of each suggestion while a case is processed (triage.py,
+# specs/ai_triage.md). Off only where no model is wanted at all.
+TRIAGE_ENABLED = os.environ.get("TRIAGE_ENABLED", "1").strip().lower() not in ("0", "false", "no", "")
+
 # --- effective per-provider settings ---------------------------------------
 # Resolved once here rather than branched at every call site, so everything
 # downstream (analysis.plan_map_reduce, the /analyze fast path, the prompt

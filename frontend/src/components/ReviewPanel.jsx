@@ -5,6 +5,7 @@ import { Empty, MitreTags } from './common.jsx'
 import FindingEvents from './FindingEvents.jsx'
 import RuleCard from './RuleCard.jsx'
 import { useAccess } from '../permissions.js'
+import AiReview from './AiReview.jsx'
 
 // Unreviewed first, whatever its confidence: a high-confidence finding
 // nobody has looked at must never sit above a reviewed one (NFR-9).
@@ -222,6 +223,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
               {f.descr || ''} <MitreTags list={f.mitre} />
             </div>
             {openRule === f.key && <RuleCard rid={f.rid} />}
+            <AiReview r={f.ai_review} />
             {/* Where the finding comes from (FR-4.1): the events behind it with
                 their source file, and the other findings of the same attack
                 chain (related.py: linked through pivot hosts, never through a

@@ -86,7 +86,10 @@ def current(case_id: str) -> dict[str, dict]:
 
 
 def record_review(case_id: str, finding_key: str, action: str, actor: str,
-                  reason_code: str = "", note: str = "") -> dict:
+                  reason_code: str = "", note: str = "", ai: dict | None = None) -> dict:
+    """`ai`: what the AI advised on this suggestion when the analyst decided
+    (triage.assessment_of, the user's Q80) - kept so the record shows whether
+    the analyst followed or overrode it."""
     if action not in ACTIONS:
         raise ValueError(f"unknown action '{action}' (expected one of {sorted(ACTIONS)})")
     if action == "reject" and reason_code not in REASON_CODES:
@@ -102,6 +105,7 @@ def record_review(case_id: str, finding_key: str, action: str, actor: str,
         "actor": actor or "unknown",
         "reason_code": reason_code,
         "note": note[:1000],
+        **({"ai": ai} if ai else {}),
     })
 
 

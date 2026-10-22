@@ -447,6 +447,8 @@ export default function Upload({ user }) {
                         <div className="cell-sub">
                           {m.progress.estimated ? '~' : ''}
                           {m.progress.pct}%
+                          {/* The AI reviews each suggestion before the findings show (triage.py). */}
+                          {m.progress.stage === 'ai' ? ' · AI reviewing the findings' : ''}
                         </div>
                       )}
                     </td>
