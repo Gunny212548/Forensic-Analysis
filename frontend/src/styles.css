@@ -775,9 +775,10 @@
 
 /* Deleting a case (DeleteCase.jsx): the confirmation sits in the header. */
 button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
-button.danger-outline { color: var(--danger); border-color: var(--danger-border); }
+button.danger-outline { color: var(--danger); border-color: var(--danger-border); white-space: nowrap; }
 .delete-case { max-width: 420px; padding: 12px 14px; border: 1px solid var(--danger-border);
   background: var(--danger-tint); border-radius: 8px; font-size: 13px; display: grid; gap: 8px; }
-.delete-case label { display: grid; gap: 4px; }
+/* Labels are upper-cased elsewhere; the case id must be typed as it is shown. */
+.delete-case label { display: grid; gap: 4px; text-transform: none; letter-spacing: normal; }
 .delete-case input { font-family: 'IBM Plex Mono', monospace; }
 .delete-actions { display: flex; gap: 8px; }
