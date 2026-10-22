@@ -190,7 +190,14 @@ docs. Cases processed before keep their R-ids until re-processed.
 
 1. Engine: product on every row, rule declares product and area, "not applicable" on the case.
    **Built 2026-10-22** (gotcha #61), with D15's period per evidence item; no finding moved.
-2. Palo Alto rules (table above), with their sources read and tests.
+2. Palo Alto rules (table above), with their sources read and tests. Measured on the customer's
+   36 Traffic exports first (424,948 rows, counts only, 2026-10-22): TRW decided 167 sources
+   benign, 0 scanners, 1,106 pending (1-3 hosts each); benign first contacts succeeded 99.6%
+   (the paper assumes 0.8 - holds). Refused rows: 24 sources, 9 hosts, 5 ports - repeats, not
+   scans (at most 2 ports to a host in an hour). Allowed after denied within an hour: 3 pairs.
+   Internal -> public bytes: 821 pairs, p99 0.73 MB/h. Built in this story: PAN-SCAN-1..3,
+   PAN-MAL-1..2, PAN-INTEL-1..3; PAN-DATA-1 waits for Q70's D1 criterion. **Built 2026-10-22**
+   (gotcha #62); generic rules unchanged (host parity 51 files, 0 moved).
 3. Check Point rules.
 4. Retire R2000-R3005 and re-base everything that reads an R-id; baseline re-taken and explained.
 5. Windows · 6. Linux · 7. FortiGate · 8. Cisco (reader first).
@@ -206,6 +213,18 @@ docs. Cases processed before keep their R-ids until re-processed.
   when a real GlobalProtect / Authentication export arrives, so every rule is tested on real data.
 - **Q62 - thresholds. Answered 2026-10-22 (D16): evidence-derived + TRW.** Was:
   published (A) / ranked within the evidence (B) / analyst-adjustable (C) / several signals (D).
+- **Q70 - answered 2026-10-22: the line is measured on the legitimate members only.** Found in
+  story 2: a 99th percentile over *every* member lets the attackers raise the line above
+  themselves unless they are under 1% of the population (computed with DuckDB `quantile_cont`,
+  one attacker at 50 ports among members at 1: missed at 20, 31 and 50 members, caught from 99;
+  two attackers missed at 101 and 150, caught at 201) - and no member count can promise that.
+  Javed & Paxson avoid it by measuring legitimate users only (sign-ins that end in success).
+  So each rule selects its legitimate population by a criterion that does not depend on the
+  line: B1 episodes ending in a success; S1 / S5 the sources TRW decided benign (TRW needs no
+  population). Q67's 20 counts legitimate members. A line is never below the behaviour's own
+  minimum (S1: 2 distinct refused ports to one host in an hour - one port is an event, not a
+  scan; S5: a denial then an allow to the same host within an hour). D1 data transfer has no
+  legitimacy criterion yet - its rule waits.
 - **Q69 - log sources outside D10's two types** (story 1). VMware ESXi was filed as an **OS**
   (a hypervisor's own operating system; its auth.log is OpenSSH / PAM lines). Microsoft Entra ID
   sign-ins and Exchange Online message trace are neither a firewall nor an OS: their type is left

@@ -851,8 +851,11 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             log.info("case %s: %s threat-intel indicators apply", case_id, indicators)
 
         progress.set("rules", INTEL_END, force=True)
+        # Where each line-drawing rule put its line on this evidence (lines.py).
+        rule_lines: dict = {}
         matched = rules.apply_rules(
-            con, on_rule=lambda i, n: progress.set("rules", INTEL_END + (99 - INTEL_END) * i / n))
+            con, on_rule=lambda i, n: progress.set("rules", INTEL_END + (99 - INTEL_END) * i / n),
+            lines=rule_lines)
         escalated = severity.escalate(con)
         sev_summary = severity.summary(con)
         # Behaviour profiles (layer C facts, profiles.py): after the rules,
@@ -885,6 +888,7 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             products=present,
             detection=products.matrix(present, rules.RULE_PRODUCT),
             periods=periods,
+            lines=rule_lines,
             **extra,
         )
         # The reproducibility record (repro.py): what produced these findings.

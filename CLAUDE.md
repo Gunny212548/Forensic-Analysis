@@ -348,6 +348,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+- #62 Palo Alto rules (`rules_paloalto.py`): lines from the legitimate members only (TRW-benign sources) or TRW (`lines.py`) - a percentile over everyone is raised by the attackers; rule ids are `RULE_ID_PATTERN`, families `RULE_FAMILY`; both rule sets run until story 4 - do not deploy story 2 alone.
 - #61 Every row carries its product (`products.py`, written after ingest - readers insert positionally); a product rule (`rules.RULE_PRODUCT`) reads `product_events` only; n/a per product and area with its reason; the period each evidence item covers (`period.py`). Story 1 of `specs/per_product_rules.md`.
 - #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; W3 Splunk WinEventLog text: items named from Windows' own message templates (`app/data/windows`, `tools/export_win_templates.ps1`), values as rendered. W4 Winlogbeat / NXLog JSON (`json_shape`): Winlogbeat writes rendered values and leaves out empty items; NXLog's own fields set aside by its documented list, but a template-named item always kept.
 - #59 Check Point Log Exporter records inside a ManageEngine EventLog Analyzer search export (`checkpoint_le.py`): record documented, wrapper observed; fields via `regexp_extract_all`; update logs sharing a `loguid` are `log_update` rows with no verdict; epoch `time` states its zone.
@@ -718,6 +719,8 @@ Two more checks, each for its own layer:
   (gotcha #60): event XML from the committed samples; with `--evtx` (lab folder outside the repo,
   copied into the container) every .evtx record counted against its chunk header and compared item
   by item with Windows' own `.ToXml()` rendering. Check Point Log Exporter: `tests/check_checkpoint_le.py`.
+- **Palo Alto rules** - `tests/check_paloalto.py` (gotcha #62): TRW, the measured line and the
+  no-line case, each behaviour's non-events, no Palo Alto rule on another product's rows.
 - **Products and periods** - `tests/check_products.py <scratch>` (gotcha #61): product per row, a
   product rule on its rows only, periods and gaps, the n/a matrix, findings unchanged end to end.
 - **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states, and

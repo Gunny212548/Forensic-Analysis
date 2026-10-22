@@ -42,7 +42,7 @@ from pathlib import Path
 from . import config
 from .services import (auth, authz, case_flow, case_views, custody, db, hashchain, investigation, profiles,
                        review, rule_meta, storage, veris)
-from .services.rules import RULE_LABELS
+from .services.rules import RULE_ID_PATTERN, RULE_LABELS
 from .services.severity import LEVELS, WEIGHT
 
 SERVER_NAME = "forensic-analyzer"
@@ -74,7 +74,7 @@ You are an assistant to the analyst, not the judge of the evidence:
 
 GMT7 = timezone(timedelta(hours=7))
 _CASE_ID = re.compile(r"^case-\d{8}-\d{6}-[0-9a-f]{8}$")
-_RULE_ID = re.compile(r"^R\d{4}$")
+_RULE_ID = re.compile(rf"^{RULE_ID_PATTERN}$")
 MAX_ROWS = 200
 
 _write_lock = threading.Lock()

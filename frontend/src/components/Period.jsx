@@ -102,3 +102,53 @@ export function Detection({ detection }) {
     </div>
   )
 }
+
+/** How each line-drawing rule decided on this evidence (lines.py, D16): TRW's
+ *  decisions, or the line measured on the legitimate members, or no line. */
+export function Lines({ lines }) {
+  const rows = Object.entries(lines || {})
+  if (!rows.length) return null
+  return (
+    <div className="table-scroll">
+      <table className="ov-table">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>Method</th>
+            <th>On this evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([rid, r]) => (
+            <tr key={rid}>
+              <td className="mono">{rid}</td>
+              <td>
+                {r.method === 'trw' ? 'TRW' : r.method === 'no-line' ? 'No line' : 'Line from the evidence'}
+                <div className="muted">{r.source}</div>
+              </td>
+              <td>
+                {r.method === 'trw' ? (
+                  <>
+                    {fmtNum(r.sources.scanner)} scanner · {fmtNum(r.sources.benign)} benign ·{' '}
+                    {fmtNum(r.sources.pending)} undecided
+                    <div className="muted">
+                      benign sources succeeded{' '}
+                      {r.measured_success_benign == null ? '-' : `${(r.measured_success_benign * 100).toFixed(1)}%`} of
+                      first attempts (the paper assumes 80%)
+                      {r.assumption_holds === false && ' - the assumption does not hold on this evidence'}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {r.note}
+                    <div className="muted">{r.population}</div>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}

@@ -9,6 +9,7 @@ from .. import config
 from ..services import (analysis, analysis_jobs, attack_layer, auth, case_flow, case_views, custody,
                         db, authz, investigation, jobs, lifecycle, merge, profiles, provenance, review,
                         stix_export, storage, veris)
+from ..services.rules import RULE_ID_PATTERN
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -315,7 +316,7 @@ async def get_finding_events(
     # must open too - that is how an analyst checks them against the evidence.
     if manifest.get("status") != "ready" and not case_views.integrity_refused(manifest):
         raise HTTPException(409, f"Case is not ready yet (status: {manifest.get('status')})")
-    if not re.match(r"^R\d{4}\|", key) or key.count("|") != 2:
+    if not re.match(rf"^{RULE_ID_PATTERN}\|", key) or key.count("|") != 2:
         raise HTTPException(400, "key must be a finding key: rid|srcip|username")
     res = await asyncio.to_thread(case_views.finding_sources, case_id, manifest, key, limit, offset)
     if not res["total"]:

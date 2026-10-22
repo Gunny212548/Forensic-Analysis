@@ -11,7 +11,7 @@ import MappingNote from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
 import Question from '../components/Question.jsx'
 import Provenance, { Method } from '../components/Provenance.jsx'
-import { Detection, Periods } from '../components/Period.jsx'
+import { Detection, Lines, Periods } from '../components/Period.jsx'
 import Veris from '../components/Veris.jsx'
 import {
   AnalysisMeta,
@@ -319,6 +319,12 @@ function IngestRecord({ caseId, status, reload, children }) {
         <>
           <div className="section-label">Rules per product and area</div>
           <Detection detection={data.detection} />
+        </>
+      )}
+      {data.lines && Object.keys(data.lines).length > 0 && (
+        <>
+          <div className="section-label">How each line was drawn</div>
+          <Lines lines={data.lines} />
         </>
       )}
       <div className="section-label">Provenance</div>

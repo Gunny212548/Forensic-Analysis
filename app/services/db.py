@@ -24,7 +24,7 @@ from . import confidence
 from . import storage
 from . import winevent
 from .rule_meta import RULE_META
-from .rules import DENY_VERDICTS, RULE_LABELS, RULE_LEVEL
+from .rules import DENY_VERDICTS, RULE_LABELS, RULE_LEVEL, family_sql
 from .severity import PATTERNS, level_of
 
 RAW_COLUMNS = [
@@ -604,7 +604,7 @@ def collapsed_findings(case_id: str) -> list[dict]:
     con = connect(case_id, read_only=True)
     try:
         rows = con.execute(
-            """
+            f"""
             WITH grouped AS (
                 SELECT f.rid, r.srcip, r.username,
                        max(f.lvl)            AS lvl,
@@ -631,7 +631,7 @@ def collapsed_findings(case_id: str) -> list[dict]:
             entity_rules AS (
                 SELECT coalesce(r.srcip, r.username)   AS entity,
                        count(DISTINCT f.rid)           AS n_rules,
-                       count(DISTINCT substr(f.rid, 1, 2)) AS n_families
+                       count(DISTINCT {family_sql('f.rid')}) AS n_families
                 FROM findings f
                 JOIN raw_events r USING (row_id)
                 WHERE coalesce(r.srcip, r.username) IS NOT NULL

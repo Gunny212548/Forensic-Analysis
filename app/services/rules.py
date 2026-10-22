@@ -485,6 +485,11 @@ RULE_LEVEL: dict[str, str] = {
 }
 
 
+# What a rule id looks like: a generic R-rule (R2000) or a product rule
+# (PAN-SCAN-1, <PRODUCT>-<AREA>-<n>, specs/per_product_rules.md). For checking
+# the shape of input; whether the rule exists is rule_meta's to say.
+RULE_ID_PATTERN = r"(?:R\d{4}|[A-Z]{2,4}-[A-Z]{3,5}-\d{1,3})"
+
 # The product a rule is written for (specs/per_product_rules.md, D11). Such a
 # rule reads `product_events` - the rows of its product only - instead of
 # raw_events, so it can never match another product's rows; it is skipped when
@@ -492,12 +497,32 @@ RULE_LEVEL: dict[str, str] = {
 # R-rules, until story 4 retires them.
 RULE_PRODUCT: dict[str, str] = {}
 
+# The rule family confidence counts (confidence.py, gotcha #20): an R-rule's is
+# its first two characters (R2 correlation / R3 network). A product rule is in
+# the family of the generic rule it matches the same behaviour as, so a scan
+# flagged by both R2002 and PAN-SCAN-1 is one family, not two - until story 4
+# retires the generic rules and re-bases families.
+RULE_FAMILY: dict[str, str] = {}
+
+
+def family_sql(rid: str) -> str:
+    """SQL for the family of the rule id expression `rid`."""
+    whens = " ".join(f"WHEN '{r}' THEN '{f}'" for r, f in sorted(RULE_FAMILY.items()))
+    return f"CASE {rid} {whens} ELSE substr({rid}, 1, 2) END" if whens else f"substr({rid}, 1, 2)"
+
+
+# A rule that draws a line (lines.py, D16): run before its SQL, it returns the
+# SQL's named parameters ($above, $minimum) and the line's record, which the
+# case keeps (apply_rules' `lines`).
+RULE_PREPARE: dict = {}
+
 
 def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
-                rule_product=None) -> dict[str, int]:
+                rule_product=None, lines: dict | None = None) -> dict[str, int]:
     """Runs every rule against the case's raw_events, filling findings.
     Returns {rule_id: rows_matched} so the pipeline can log/report it.
     `on_rule(done, total)` is called after each rule, for progress (FR-2.5).
+    `lines`, when given, receives each line-drawing rule's record.
     `rules` / `rule_product` replace RULES / RULE_PRODUCT (tests)."""
     rules = RULES if rules is None else rules
     rule_product = RULE_PRODUCT if rule_product is None else rule_product
@@ -513,8 +538,13 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
             # The value is one of products.PRODUCTS' ids (checked), never input.
             con.execute("CREATE OR REPLACE TEMP VIEW product_events AS "
                         f"SELECT * FROM raw_events WHERE product = '{_product_id(product)}'")
+        params = None
+        if rid in RULE_PREPARE:
+            params, record = RULE_PREPARE[rid](con)
+            if lines is not None:
+                lines[rid] = record
         before = con.execute("SELECT count(*) FROM findings").fetchone()[0]
-        con.execute(sql)
+        con.execute(sql, params or None)
         after = con.execute("SELECT count(*) FROM findings").fetchone()[0]
         if after > before:
             matched[rid] = after - before
@@ -552,3 +582,16 @@ def _products_present(con: duckdb.DuckDBPyConnection) -> set[str]:
         return set()
     return {r[0] for r in con.execute(
         "SELECT DISTINCT product FROM raw_events WHERE product IS NOT NULL").fetchall()}
+
+
+# Product rule sets (D11), after everything above they import. They run after
+# the generic rules, which stay until story 4 retires them.
+from . import rules_paloalto  # noqa: E402
+
+for _rid, _sql in rules_paloalto.RULES + rules_paloalto.from_generic(dict(RULES)):
+    RULES.append((_rid, _sql))
+    RULE_PRODUCT[_rid] = rules_paloalto.PRODUCT
+RULE_PREPARE.update(rules_paloalto.PREPARE)
+RULE_FAMILY.update(rules_paloalto.FAMILY)
+RULE_LEVEL.update(rules_paloalto.LEVEL)
+RULE_LABELS.update(rules_paloalto.LABELS)

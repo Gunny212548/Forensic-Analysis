@@ -158,8 +158,10 @@ def end_to_end(scratch: Path) -> None:
     intel.create_table(con)
     con.execute("INSERT INTO ioc SELECT * FROM c.ioc")
     before = rules.apply_rules(con)
-    check(before == (man.get("rules_matched") or {}),
-          f"findings unchanged by the product column ({before})")
+    generic = {k: v for k, v in (man.get("rules_matched") or {}).items() if k not in rules.RULE_PRODUCT}
+    check(before == generic, f"generic rules' findings unchanged by the product column ({before})")
+    check(not any(k in rules.RULE_PRODUCT for k in before),
+          "without the column no product rule runs")
 
 
 def main() -> int:

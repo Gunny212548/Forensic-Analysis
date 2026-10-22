@@ -63,6 +63,8 @@ def ingest_view(case_id: str, manifest: dict) -> dict:
         # and what each product's areas run; absent on a case processed before.
         "periods": manifest.get("periods"),
         "detection": manifest.get("detection"),
+        # D16: where each line-drawing rule put its line on this evidence.
+        "lines": manifest.get("lines"),
         "warnings": ingest_warnings(manifest),
     }
 

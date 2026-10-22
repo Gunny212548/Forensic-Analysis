@@ -57,6 +57,7 @@ TACTICS = {
 
 AUTH_SOURCES = ["openssh-sshd", "entra-signin"]
 FIREWALL_SOURCES = ["paloalto-traffic", "checkpoint-smartconsole", "fortigate-traffic"]
+PALOALTO_SOURCES = ["paloalto-traffic"]
 
 RULE_META: dict[str, dict] = {
     "R1000": {
@@ -464,6 +465,162 @@ RULE_META: dict[str, dict] = {
             "validation": "Not separately measured on the current corpus.",
             "response": "Deprecated 2026-10-20 - no longer a finding; now a context fact (layer C): the events table shows the threat-intel listing "
                         "(specs/rules_review.md).",
+        },
+    },
+    # ---- Palo Alto (rules_paloalto.py, specs/per_product_rules.md story 2) ----
+    "PAN-SCAN-2": {
+        "id": "6016da59-0b4f-45e0-89bd-f4242047308d",
+        "title": "Palo Alto: horizontal scan (TRW)",
+        "status": "experimental",
+        "techniques": ["T1046", "T1595.001"],
+        "category": "firewall", "log_sources": PALOALTO_SOURCES,
+        "falsepositives": ["Vulnerability scanners and monitoring run by the customer",
+                           "Web crawlers and proxies reaching many hosts"],
+        "ads": {
+            "goal": "Detect one source probing many hosts, most of which refuse it (behaviour S2, "
+                    "detection-behaviours.md; ATT&CK DET0817 AN1949, DET0376 AN1057).",
+            "strategy": "Threshold Random Walk (Jung, Paxson, Berger & Balakrishnan 2004, §4): the "
+                        "first attempt to each new destination host is a success (allow) or a failure "
+                        "(refused); Wald's sequential test with success 0.8 benign / 0.2 scanner, "
+                        "alpha 0.01, beta 0.99 decides scanner after 4 failures in a row. The source's "
+                        "refused rows are flagged. T1046 from an internal source, T1595.001 from outside.",
+            "technical_context": "A firewall refusal is read as the paper's failure (an attempt to an "
+                                 "inactive host or service) - an adaptation. Needs source, destination, "
+                                 "Action and time (PAN-OS Traffic Log Fields).",
+            "blind_spots": "Vertical scans of one host (PAN-SCAN-1); distributed scans from many "
+                           "sources; a scanner mixing in connections to known servers (paper §6).",
+            "validation": "Customer Traffic exports (424,948 rows): 0 scanners, 167 benign, 1,106 "
+                          "pending; benign first contacts succeeded 99.6%. Synthetic: tests/check_paloalto.py.",
+            "response": "Low: reconnaissance. Look for an allow from the same source afterwards.",
+        },
+    },
+    "PAN-SCAN-1": {
+        "id": "49e5995a-97d8-47c5-8c30-a36928cb5cb9",
+        "title": "Palo Alto: vertical scan",
+        "status": "experimental",
+        "techniques": ["T1046", "T1595"],
+        "category": "firewall", "log_sources": PALOALTO_SOURCES,
+        "falsepositives": ["Customer-run scanners", "Clients retrying several services of one server"],
+        "ads": {
+            "goal": "Detect one source probing many ports of one host (behaviour S1; ATT&CK DET0376 "
+                    "AN1057 / AN1058, DET0830).",
+            "strategy": "Distinct refused destination ports per source -> host within any hour. The line "
+                        "is measured on the evidence (lines.py, D16): above 2 x the 99th percentile of "
+                        "the (source, host) pairs of TRW-benign sources, and at least 2 ports; under 20 "
+                        "such pairs, no line - every pair with 2 or more goes to the analyst (Q67, Q70).",
+            "technical_context": "Needs Destination Port and Action (PAN-OS Traffic Log Fields).",
+            "blind_spots": "Scans the firewall allowed; scans slower than 2 ports an hour; scans spread "
+                           "over many sources.",
+            "validation": "Customer Traffic exports: refused rows are 24 sources x 9 hosts x 5 ports, at "
+                          "most 2 ports to a host in an hour - no scan. Synthetic: tests/check_paloalto.py.",
+            "response": "Low unless the same source is later allowed (PAN-SCAN-3).",
+        },
+    },
+    "PAN-SCAN-3": {
+        "id": "7d2b75fa-f551-4c35-8d13-bb1087cf9154",
+        "title": "Palo Alto: allowed after refusals",
+        "status": "experimental",
+        "techniques": [],
+        "category": "firewall", "log_sources": PALOALTO_SOURCES,
+        "falsepositives": ["A client refused on one service and allowed on another of the same host"],
+        "ads": {
+            "goal": "Detect a source let through to a host it was refused by shortly before - a gap "
+                    "in the policy found by probing (behaviour S5).",
+            "strategy": "An allowed connection with refusals of the same source -> host in the hour "
+                        "before. Line as PAN-SCAN-1 on the refusals before an allow, at least 1.",
+            "technical_context": "No ATT&CK analytic names it: an internal method (the SOC benchmark's "
+                                 "implied-rule bypass), stated as one.",
+            "blind_spots": "A probe and its success more than an hour apart; a different target host.",
+            "validation": "Customer Traffic exports: 3 such pairs. Synthetic: tests/check_paloalto.py.",
+            "response": "High: something got through. Read the allowed session and the rule it matched.",
+        },
+    },
+    "PAN-MAL-1": {
+        "id": "8158add6-94a0-4849-891f-33d752466053",
+        "title": "Palo Alto: beaconing to a public address",
+        "status": "test",
+        "techniques": ["T1071"],
+        "category": "firewall", "log_sources": PALOALTO_SOURCES,
+        "falsepositives": ["Update checks, telemetry and monitoring agents with fixed timers"],
+        "ads": {
+            "goal": "Detect an implant checking in at regular intervals (behaviour M1; ATT&CK DET0444 "
+                    "AN1226 'beacon-like intervals').",
+            "strategy": "R2007's measured method on Palo Alto rows only: >=30 intervals, mean 30-3600 s, "
+                        "jitter < 0.6, public destination.",
+            "technical_context": "The SQL is R2007's own until story 4 retires the generic rule.",
+            "blind_spots": "As R2007.",
+            "validation": "As R2007 (calibrated on the customer's compromised host).",
+            "response": "High: find the process on the host.",
+        },
+    },
+    "PAN-MAL-2": {
+        "id": "a1538b29-09f8-43e1-a1b1-f667c8bf0165",
+        "title": "Palo Alto: malicious PAN-DB category",
+        "status": "experimental",
+        "techniques": ["T1071.001"],
+        "category": "firewall", "log_sources": PALOALTO_SOURCES,
+        "falsepositives": ["A category assigned wrongly by PAN-DB"],
+        "ads": {
+            "goal": "Report traffic to destinations Palo Alto's own URL database classifies as "
+                    "malicious (behaviour M5).",
+            "strategy": "Category is malware, command-and-control, ransomware, compromised-website or "
+                        "phishing - the categories PAN-DB's 'URL Categories' page defines as malicious "
+                        "content or C2. Grayware ('does not pose a direct security threat') is not.",
+            "technical_context": "The Traffic log's Category is the URL category of the session; the "
+                                 "customer's exports carry 'any' / 'not-resolved' almost everywhere.",
+            "blind_spots": "Uncategorised destinations; Threat logs are not read.",
+            "validation": "Customer exports: 31 rows with a real category, none of these. Synthetic: "
+                          "nightfall-firewall.csv (1).",
+            "response": "High when allowed; a refused one is capped at medium.",
+        },
+    },
+    "PAN-INTEL-1": {
+        "id": "981933e7-d750-437e-9257-3cfc2d4b4813",
+        "title": "Palo Alto: known-bad destination (allowed)",
+        "status": "test",
+        "techniques": ["T1071"],
+        "category": "firewall", "log_sources": PALOALTO_SOURCES,
+        "falsepositives": ["Feed entries for shared or reassigned addresses"],
+        "ads": {
+            "goal": "Traffic allowed to an address a feed lists (behaviour T1; NIST SP 800-150 §2.1).",
+            "strategy": "R3003's feed match on Palo Alto rows only.",
+            "technical_context": "Offline feeds (gotcha #17); the match is evidence, not a verdict (SP "
+                                 "800-150 §4.3).",
+            "blind_spots": "The indicator's validity at the event's time is not checked yet (T4).",
+            "validation": "As R3003.",
+            "response": "High: confirm the indicator was valid when the event happened.",
+        },
+    },
+    "PAN-INTEL-2": {
+        "id": "0a129f2e-4aeb-4502-97c7-f625d27e3439",
+        "title": "Palo Alto: known-bad source (allowed)",
+        "status": "test",
+        "techniques": ["T1595"],
+        "category": "firewall", "log_sources": PALOALTO_SOURCES,
+        "falsepositives": ["Feed entries for shared or reassigned addresses"],
+        "ads": {
+            "goal": "Traffic allowed from an address a feed lists (behaviour T2).",
+            "strategy": "R3004's feed match on Palo Alto rows only.",
+            "technical_context": "As PAN-INTEL-1.",
+            "blind_spots": "As PAN-INTEL-1.",
+            "validation": "As R3004.",
+            "response": "Medium: what did the source reach?",
+        },
+    },
+    "PAN-INTEL-3": {
+        "id": "fe4a315c-080e-4aaa-8348-e644db1ace52",
+        "title": "Palo Alto: known-bad destination (blocked)",
+        "status": "test",
+        "techniques": ["T1071"],
+        "category": "firewall", "log_sources": PALOALTO_SOURCES,
+        "falsepositives": ["Feed entries for shared or reassigned addresses"],
+        "ads": {
+            "goal": "An attempt to reach a listed address that the firewall refused (behaviour T3).",
+            "strategy": "R3005's feed match on Palo Alto rows only.",
+            "technical_context": "As PAN-INTEL-1.",
+            "blind_spots": "As PAN-INTEL-1.",
+            "validation": "As R3005.",
+            "response": "Medium: the defence worked; which host tried, and why?",
         },
     },
 }
