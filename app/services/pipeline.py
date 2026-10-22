@@ -27,7 +27,8 @@ from pathlib import Path
 
 from .. import config
 from . import (archive, checkpoint_le, custody, db, decode, finding_ids, identify, intel, logsources,
-               parsers, profiles, provenance, repro, rules, severity, storage, winevent)
+               parsers, period, products, profiles, provenance, repro, rules, severity, storage,
+               winevent)
 
 log = logging.getLogger(__name__)
 
@@ -750,6 +751,41 @@ def _apply_declared_time(con, manifest: dict, extra: dict) -> list[dict]:
     return applied
 
 
+def _items(manifest: dict, extra: dict) -> list[tuple[str, str, list, dict]]:
+    """(item name, WHERE over its rows, params, its mapping) per evidence item
+    that produced rows: each zip member by its row range, or the one file."""
+    members = extra.get("members")
+    if not members:
+        return [(manifest.get("original_filename") or "", "TRUE", [], extra.get("mapping") or {})]
+    return [(m["name"], "row_id BETWEEN ? AND ?", [m["row_id_first"], m["row_id_last"]],
+             m.get("mapping") or {})
+            for m in members if m.get("row_id_first") is not None]
+
+
+def mark_products(con, items: list[tuple[str, str, list, dict]]) -> list[str]:
+    """Write each item's product (products.py, D11) on its rows, from what the
+    file was identified as. Added after ingest, so no reader's INSERT changes.
+    Returns the products present, in order of first appearance."""
+    con.execute("ALTER TABLE raw_events ADD COLUMN IF NOT EXISTS product VARCHAR")
+    present = []
+    for _item, where, params, mapping in items:
+        pid = products.of_profile((mapping.get("logsource") or {}).get("profile"))
+        if pid is None:
+            continue
+        con.execute(f"UPDATE raw_events SET product = ? WHERE {where}", [pid, *params])
+        if pid not in present:
+            present.append(pid)
+    return present
+
+
+def _periods(con, items: list[tuple[str, str, list, dict]]) -> list[dict]:
+    """What period each evidence item covers (period.py, D15)."""
+    return [{"item": item,
+             "product": products.of_profile((mapping.get("logsource") or {}).get("profile")),
+             **period.measure(con, where, params)}
+            for item, where, params, mapping in items]
+
+
 class IntegrityError(Exception):
     """The preserved file no longer matches its acquisition digest."""
 
@@ -800,6 +836,13 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
         # corrected `ts`. `ts_raw` keeps the source text as written.
         time_applied = _apply_declared_time(con, storage.load_manifest(case_id) or {}, extra)
 
+        # Which product each row came from (D11), so a product's rules read
+        # only its rows, and what period each evidence item covers (D15) -
+        # after the declared time, so days are the corrected ones.
+        items = _items(storage.load_manifest(case_id) or {}, extra)
+        present = mark_products(con, items)
+        periods = _periods(con, items)
+
         # Threat-intel indicators are loaded now that the traffic is known,
         # so only the ones this case can match are stored (see intel.fill).
         progress.set("intel", INGEST_END, force=True)
@@ -839,6 +882,9 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             error=None,
             progress={"stage": "done", "pct": 100, "estimated": False},
             time_applied=time_applied,
+            products=present,
+            detection=products.matrix(present, rules.RULE_PRODUCT),
+            periods=periods,
             **extra,
         )
         # The reproducibility record (repro.py): what produced these findings.

@@ -59,6 +59,10 @@ def ingest_view(case_id: str, manifest: dict) -> dict:
         "reprocess_needed": provenance.reprocess_needed(manifest),
         "duplicate_of": manifest.get("duplicate_of") or [],
         "method": method,
+        # D15 / D11 (specs/per_product_rules.md): the period each item covers
+        # and what each product's areas run; absent on a case processed before.
+        "periods": manifest.get("periods"),
+        "detection": manifest.get("detection"),
         "warnings": ingest_warnings(manifest),
     }
 
@@ -77,6 +81,13 @@ def ingest_warnings(manifest: dict) -> list[str]:
         if a.get("rows_without_offset") and not a.get("zone"):
             out.append(f"{a['item']}: {a['rows_without_offset']:,} events state no time zone - "
                        "GMT+7 was assumed; record the source's zone in its provenance if known")
+    if manifest.get("status") == "ready" and manifest.get("periods") is None:
+        out.append("Processed before the period and product of each file were recorded - "
+                   "re-process to see them")
+    for p in manifest.get("periods") or []:
+        if p.get("rows_without_time"):
+            out.append(f"{p['item']}: {p['rows_without_time']:,} events carry no time - they fall "
+                       "on no day and in no rule's window")
     for item, gaps in provenance.missing(manifest).items():
         out.append(f"{item}: provenance not recorded - {', '.join(g.replace('_', ' ') for g in gaps)}")
     return out

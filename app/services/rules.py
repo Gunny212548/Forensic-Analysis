@@ -34,6 +34,7 @@ the next story (rules_review.md Q18, measured on our own data).
 
 import duckdb
 
+from .products import PRODUCTS
 from .severity import WEIGHT
 
 DENY_VERDICTS = (
@@ -484,19 +485,41 @@ RULE_LEVEL: dict[str, str] = {
 }
 
 
-def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None) -> dict[str, int]:
+# The product a rule is written for (specs/per_product_rules.md, D11). Such a
+# rule reads `product_events` - the rows of its product only - instead of
+# raw_events, so it can never match another product's rows; it is skipped when
+# the case holds none. A rule absent here is generic and reads every row: the
+# R-rules, until story 4 retires them.
+RULE_PRODUCT: dict[str, str] = {}
+
+
+def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
+                rule_product=None) -> dict[str, int]:
     """Runs every rule against the case's raw_events, filling findings.
     Returns {rule_id: rows_matched} so the pipeline can log/report it.
-    `on_rule(done, total)` is called after each rule, for progress (FR-2.5)."""
+    `on_rule(done, total)` is called after each rule, for progress (FR-2.5).
+    `rules` / `rule_product` replace RULES / RULE_PRODUCT (tests)."""
+    rules = RULES if rules is None else rules
+    rule_product = RULE_PRODUCT if rule_product is None else rule_product
+    present = _products_present(con)
     matched: dict[str, int] = {}
-    for i, (rid, sql) in enumerate(RULES, 1):
+    for i, (rid, sql) in enumerate(rules, 1):
+        product = rule_product.get(rid)
+        if product is not None:
+            if product not in present:
+                if on_rule:
+                    on_rule(i, len(rules))
+                continue
+            # The value is one of products.PRODUCTS' ids (checked), never input.
+            con.execute("CREATE OR REPLACE TEMP VIEW product_events AS "
+                        f"SELECT * FROM raw_events WHERE product = '{_product_id(product)}'")
         before = con.execute("SELECT count(*) FROM findings").fetchone()[0]
         con.execute(sql)
         after = con.execute("SELECT count(*) FROM findings").fetchone()[0]
         if after > before:
             matched[rid] = after - before
         if on_rule:
-            on_rule(i, len(RULES))
+            on_rule(i, len(rules))
 
     whens = " ".join(f"WHEN '{rid}' THEN {WEIGHT[lvl]}" for rid, lvl in RULE_LEVEL.items())
     con.execute(f"UPDATE findings SET lvl = CASE rid {whens} ELSE {WEIGHT['low']} END")
@@ -513,3 +536,19 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None) -> dict[str, int]:
         """
     )
     return matched
+
+
+def _product_id(product: str) -> str:
+    if product not in PRODUCTS:
+        raise ValueError(f"unknown product {product!r}")
+    return product
+
+
+def _products_present(con: duckdb.DuckDBPyConnection) -> set[str]:
+    """The products of the case's rows; empty for a store from before the
+    product column (pipeline.mark_products)."""
+    cols = {r[0] for r in con.execute("DESCRIBE raw_events").fetchall()}
+    if "product" not in cols:
+        return set()
+    return {r[0] for r in con.execute(
+        "SELECT DISTINCT product FROM raw_events WHERE product IS NOT NULL").fetchall()}

@@ -189,6 +189,7 @@ docs. Cases processed before keep their R-ids until re-processed.
 ## Stories
 
 1. Engine: product on every row, rule declares product and area, "not applicable" on the case.
+   **Built 2026-10-22** (gotcha #61), with D15's period per evidence item; no finding moved.
 2. Palo Alto rules (table above), with their sources read and tests.
 3. Check Point rules.
 4. Retire R2000-R3005 and re-base everything that reads an R-id; baseline re-taken and explained.
@@ -205,6 +206,10 @@ docs. Cases processed before keep their R-ids until re-processed.
   when a real GlobalProtect / Authentication export arrives, so every rule is tested on real data.
 - **Q62 - thresholds. Answered 2026-10-22 (D16): evidence-derived + TRW.** Was:
   published (A) / ranked within the evidence (B) / analyst-adjustable (C) / several signals (D).
+- **Q69 - log sources outside D10's two types** (story 1). VMware ESXi was filed as an **OS**
+  (a hypervisor's own operating system; its auth.log is OpenSSH / PAM lines). Microsoft Entra ID
+  sign-ins and Exchange Online message trace are neither a firewall nor an OS: their type is left
+  unset. Open: which type (or a third one) do they belong to?
 - **Q63 - answered:** `FG` = FloodGate-1 (an inference, see above; the user agrees).
 - **Q64 - the missing samples.** Paused by the user 2026-10-22 ("one product at a time").
 - **Q65 - answered 2026-10-22:** treat it as a failed sign-in and decide from documented

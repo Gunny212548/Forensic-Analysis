@@ -11,6 +11,7 @@ import MappingNote from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
 import Question from '../components/Question.jsx'
 import Provenance, { Method } from '../components/Provenance.jsx'
+import { Detection, Periods } from '../components/Period.jsx'
 import Veris from '../components/Veris.jsx'
 import {
   AnalysisMeta,
@@ -312,6 +313,14 @@ function IngestRecord({ caseId, status, reload, children }) {
       <div className="section-label">Question</div>
       <Question caseId={caseId} investigation={data.investigation} onSaved={saved} />
       <div key={`${version}-${status}`}>{children}</div>
+      <div className="section-label">Period each file covers</div>
+      <Periods periods={data.periods} />
+      {data.detection && (
+        <>
+          <div className="section-label">Rules per product and area</div>
+          <Detection detection={data.detection} />
+        </>
+      )}
       <div className="section-label">Provenance</div>
       <Provenance caseId={caseId} ingest={data} onSaved={saved} onReprocessed={saved} />
       <div className="section-label">Method of the last run</div>
