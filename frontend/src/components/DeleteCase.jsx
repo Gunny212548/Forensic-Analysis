@@ -4,8 +4,9 @@ import { useAccess } from '../permissions.js'
 
 /** Delete the case and its evidence for good (specs/case_delete.md): admin and
  *  manager. Inline confirmation - the case id typed back - never a browser
- *  dialog. After it, the customer's page. */
-export default function DeleteCase({ manifest }) {
+ *  dialog. After it `onDeleted(caseId)` (the Cases list drops the row), or,
+ *  without one, the customer's page. */
+export default function DeleteCase({ manifest, onDeleted }) {
   const { can, why } = useAccess()
   const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')
@@ -19,6 +20,10 @@ export default function DeleteCase({ manifest }) {
     setError('')
     try {
       await deleteCase(manifest.case_id)
+      if (onDeleted) {
+        onDeleted(manifest.case_id)
+        return
+      }
       window.location.hash = manifest.company_id ? `#/customers/${manifest.company_id}` : '#/cases'
     } catch (err) {
       setError(err.message)

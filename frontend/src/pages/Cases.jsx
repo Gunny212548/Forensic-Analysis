@@ -3,6 +3,7 @@ import { getFlow, listCases, listCompanies } from '../api.js'
 import { fmtTime } from '../format.js'
 import { Empty, StatusBadge } from '../components/common.jsx'
 import { stepHref } from '../components/StepBar.jsx'
+import DeleteCase from '../components/DeleteCase.jsx'
 
 // Steps are asked per case, a few at a time, newest first: each answer reads
 // the case's findings, so a long list is filled in as it arrives.
@@ -85,6 +86,7 @@ export default function Cases() {
                   <th>Uploaded</th>
                   <th>Status</th>
                   <th>Current step</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -114,6 +116,10 @@ export default function Cases() {
                         ) : (
                           <span className="muted">{fl === null ? '-' : '...'}</span>
                         )}
+                      </td>
+                      <td>
+                        <DeleteCase manifest={m}
+                                    onDeleted={(id) => setCases((prev) => prev.filter((c) => c.case_id !== id))} />
                       </td>
                     </tr>
                   )
