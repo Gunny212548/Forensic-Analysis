@@ -772,3 +772,12 @@
   .ing-items { display: grid; gap: 10px; }
   .ing-item { padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 4px; background: var(--panel); }
   .ing-item-head { font-weight: 600; margin-bottom: 4px; }
+
+/* Deleting a case (DeleteCase.jsx): the confirmation sits in the header. */
+button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+button.danger-outline { color: var(--danger); border-color: var(--danger-border); }
+.delete-case { max-width: 420px; padding: 12px 14px; border: 1px solid var(--danger-border);
+  background: var(--danger-tint); border-radius: 8px; font-size: 13px; display: grid; gap: 8px; }
+.delete-case label { display: grid; gap: 4px; }
+.delete-case input { font-family: 'IBM Plex Mono', monospace; }
+.delete-actions { display: flex; gap: 8px; }

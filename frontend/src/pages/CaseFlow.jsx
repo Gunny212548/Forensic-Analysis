@@ -13,6 +13,7 @@ import Question from '../components/Question.jsx'
 import Provenance, { Method } from '../components/Provenance.jsx'
 import { Detection, Lines, Periods } from '../components/Period.jsx'
 import Veris from '../components/Veris.jsx'
+import DeleteCase from '../components/DeleteCase.jsx'
 import {
   AnalysisMeta,
   AnalysisProgress,
@@ -238,6 +239,7 @@ export default function CaseFlow({ caseId, stepId }) {
             )}
           </div>
         </div>
+        <DeleteCase manifest={manifest} />
       </div>
 
       {error && <div className="panel"><Empty>Could not load: {error}</Empty></div>}

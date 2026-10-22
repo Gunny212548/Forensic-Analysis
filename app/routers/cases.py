@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Requ
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import (analysis, analysis_jobs, attack_layer, auth, case_flow, case_views, custody,
+from ..services import (analysis, analysis_jobs, attack_layer, auth, case_delete, case_flow, case_views, custody,
                         db, authz, investigation, jobs, lifecycle, merge, profiles, provenance, review,
                         stix_export, storage, veris)
 from ..services.rules import RULE_ID_PATTERN
@@ -23,8 +23,8 @@ def _authorize(request: Request, action: str, company_id: str | None = None) -> 
 
 
 def _case_workers() -> list[dict]:
-    """The accounts a finding can be assigned to: those who work cases (an
-    admin takes no case action - IAI-14, Q56)."""
+    """The accounts a finding can be assigned to: those who work cases
+    (IAI-14; an admin too since the user's decision of 2026-10-22)."""
     return [u for u in sorted(auth.load_users().values(), key=lambda u: u["email"])
             if authz.can(u, authz.REVIEW) and not u.get("disabled")]
 
@@ -183,6 +183,24 @@ async def verify_evidence(case_id: str, request: Request):
                        purpose="on request",
                        **({} if ok else {"note": "no acquisition digest was recorded for this file"}))
     return {"match": ok, "sha256": actual, **case_views.custody_view(case_id, manifest)}
+
+
+@router.delete("/{case_id}")
+async def delete_case(case_id: str, request: Request):
+    """Delete the case and its evidence for good (specs/case_delete.md): admin
+    and manager only; refused while it is processed or analysed. The deletion
+    is recorded, hash-chained, in the customer's deleted/log.jsonl."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    _authorize(request, authz.DELETE_CASE, manifest.get("company_id"))
+    try:
+        record = await asyncio.to_thread(case_delete.delete, case_id, request.state.user["email"])
+    except case_delete.Busy as exc:
+        raise HTTPException(409, str(exc))
+    except LookupError:
+        raise HTTPException(404, "Case not found")
+    return {"deleted": case_id, "record": record}
 
 
 @router.get("/{case_id}/ingest")

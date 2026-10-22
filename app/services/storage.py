@@ -440,6 +440,29 @@ def raw_path(case_id: str, ext: str) -> Path:
     return case_dir(case_id, "raw") / f"{case_id}.{ext}"
 
 
+def case_files(store: Path, case_id: str) -> list[Path]:
+    """Every file belonging to one case, in its customer's store `store` -
+    what deleting it removes (case_delete.py, tools/prune_cases.py)."""
+    found = [
+        store / "cases" / f"{case_id}.json",
+        store / "db" / f"{case_id}.duckdb",
+        store / "db" / f"{case_id}.duckdb.wal",
+        store / "analysis" / f"{case_id}.json",
+        # The map-reduce narrative job's progress sidecar.
+        store / "analysis" / f"{case_id}.job.json",
+        store / "review" / f"{case_id}.jsonl",
+        store / "custody" / f"{case_id}.jsonl",
+        store / "jobs" / f"{case_id}.json",
+    ]
+    found += list((store / "raw").glob(f"{case_id}.*"))
+    return [p for p in found if p.exists()]
+
+
+def forget_case(case_id: str) -> None:
+    """Drop a deleted case from the case -> customer cache."""
+    _owner.pop(case_id, None)
+
+
 def analysis_path(case_id: str) -> Path:
     return case_dir(case_id, "analysis") / f"{case_id}.json"
 

@@ -45,7 +45,7 @@ TABLE = {
     authz.PROVENANCE: {A, M, N}, authz.VERIFY: {A, M, N}, authz.REPROCESS: {A, M, N},
     authz.MERGE: {A, M}, authz.ANALYZE: {A, M, N}, authz.REVIEW: {A, M, N}, authz.ASSIGN: {A, M},
     authz.WORK: {A, M}, authz.CLOSE: {A, M}, authz.REOPEN: {A, M}, authz.ACCOUNTS: {A},
-    authz.LIFECYCLE: {A, M, N},
+    authz.LIFECYCLE: {A, M, N}, authz.DELETE_CASE: {A, M},
 }
 wrong = [(action, role) for action, roles in TABLE.items() for role in authz.ROLES
          if authz.can({"role": role}, action) != (role in roles)]
@@ -212,6 +212,39 @@ check(f"every change is in the hash-chained account log, newest first ({len(even
                   for e in audit["entries"]))
 check("the log holds no password", PW not in auth.accounts_audit_path().read_text(encoding="utf-8"))
 check("the chain verifies on disk", hashchain.verify(auth.accounts_audit_path()).get("intact"))
+
+print("deleting a case (specs/case_delete.md)")
+from app.services import case_delete  # noqa: E402
+
+auth.create_account("check", "manager3@x.test", "Deleter", M, PW)
+manager = client("manager3@x.test")  # the accounts section above ended the first one's sessions
+
+keep = storage.create_case("keep.log", "log", 1, company_id=co["company_id"])["case_id"]
+storage.update_case(keep, status="ready")
+gone = storage.create_case("gone.log", "log", 1, company_id=co["company_id"])["case_id"]
+storage.update_case(gone, status="ready")
+storage.raw_path(gone, "log").write_text("evidence\n", encoding="utf-8")
+busy = storage.create_case("busy.log", "log", 1, company_id=co["company_id"])["case_id"]
+storage.update_case(busy, status="processing")
+check("an analyst may not delete a case", analyst.delete(f"/api/cases/{gone}").status_code == 403)
+check("a case being processed is not deleted (409)", manager.delete(f"/api/cases/{busy}").status_code == 409)
+r = manager.delete(f"/api/cases/{gone}")
+check("a manager deletes a case", r.status_code == 200 and r.json()["deleted"] == gone)
+store = storage.customer_dir(co["company_id"])
+check("every file of it is gone, and only its", not storage.case_files(store, gone)
+      and storage.load_manifest(keep) is not None and storage.load_manifest(busy) is not None)
+check("it answers 404 afterwards, and leaves the case list",
+      manager.get(f"/api/cases/{gone}").status_code == 404
+      and gone not in {c["case_id"] for c in manager.get("/api/cases").json()})
+storage.update_case(busy, status="ready")
+check("an admin deletes a case", admin.delete(f"/api/cases/{busy}").status_code == 200)
+rec = case_delete.records(co["company_id"])
+check("each deletion is recorded outside the case: who, what, its files",
+      [(e["case_id"], e["actor"]) for e in rec] == [(gone, "manager3@x.test"), (busy, "admin@x.test")]
+      and f"raw/{gone}.log" in rec[0]["files_removed"] and rec[0]["original_filename"] == "gone.log")
+check("the deletion log is hash-chained and intact",
+      hashchain.verify(case_delete.log_path(co["company_id"])).get("intact"))
+check("a deleted case cannot be deleted twice (404)", manager.delete(f"/api/cases/{gone}").status_code == 404)
 
 print("\nAUTHZ OK" if not failures else f"\n{failures} FAILED")
 sys.exit(1 if failures else 0)

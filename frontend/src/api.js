@@ -224,6 +224,14 @@ export async function reprocessCase(caseId, reason) {
   return jsonOrThrow(resp, 'Could not re-process the case')
 }
 
+/** Delete the case and its evidence for good (admin, manager). */
+export async function deleteCase(caseId) {
+  return jsonOrThrow(
+    await fetch(`/api/cases/${encodeURIComponent(caseId)}`, { method: 'DELETE' }),
+    'Could not delete the case',
+  )
+}
+
 export async function verifyEvidence(caseId) {
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/verify`, { method: 'POST' }),
