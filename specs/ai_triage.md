@@ -2,7 +2,9 @@
 
 Status: **Answered 2026-10-22 and built**: Q78 automatic, while the case is processed, before
 the findings show; Q79 advice - why the finding fired and what caused it; Q80 (unanswered) as
-recommended - the advice is kept on the review line.
+recommended - the advice is kept on the review line. **Q78 changed 2026-10-26**
+(`specs/ai_review_coverage.md`, Q101 a): every suggestion is reviewed, so the case is ready after the
+rules and the review runs on in the background.
 Requirement (the user, 2026-10-22): "ขั้นตอนก่อนให้ Analyze กด Accept หรือ Reject คิดว่าต้องมี AI
 narrative มาตรวจ" - before the analyst accepts or rejects a suggestion on the Attack events
 step, an AI should check it.

@@ -789,6 +789,7 @@ button.danger-outline { color: var(--danger); border-color: var(--danger-border)
   border-radius: 6px; background: var(--subtle, #F7F8FA); font-size: 13px; display: grid; gap: 4px; }
 .ai-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .ai-label { font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; color: var(--muted); }
+.ai-review.ai-pending { display: block; border-left-color: var(--border, #E3E6EB); }
 .ai-chip { padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
 .ai-attack { background: var(--danger-tint); color: var(--danger); }
 .ai-benign { background: #E7F5EC; color: #1F7A3F; }

@@ -131,6 +131,10 @@ async def on_startup():
     # old layout: those cases are not visible to it.
     if not legacy:
         jobs.start()
+        # And the AI reviews a stop cut short: only what has no advice yet is sent again
+        # (services/triage.py, specs/ai_review_coverage.md C-D4).
+        from .services import triage
+        triage.resume()
 
 
 @app.on_event("shutdown")

@@ -27,7 +27,9 @@ A model that cannot be reached leaves the case ready, with the reason recorded.
 import asyncio
 import json
 import logging
+import queue
 import re
+import threading
 from datetime import datetime, timezone
 
 from .. import config
@@ -36,8 +38,6 @@ from .rules import NON_PUBLIC_IPV4_RE, RULE_LABELS
 
 log = logging.getLogger(__name__)
 
-MAX_SUGGESTIONS = 80   # reviewed per case, highest level first
-BATCH = 5              # suggestions per model call
 ASSESSMENTS = ("likely attack", "likely benign", "uncertain")
 DECISIONS = ("accept", "reject", "undecided")
 REJECT_REASONS = ("misinterpretation", "insufficient_evidence", "better_technique", "other", "none")
@@ -223,69 +223,255 @@ async def _review_batch(client, batch) -> list[dict]:
     return out
 
 
-async def _run(case_id: str, findings: list[dict], on_progress=None) -> dict:
+def _order(findings: list[dict]) -> list[dict]:
+    """Every rule first, then round by round (specs/ai_review_coverage.md C-D3, Q102): the first
+    batches cover every kind of behaviour instead of one rule's volume. Within a rule, and among
+    the rules, highest level first, then the most events."""
+    def rank(f):
+        return (_LEVEL_ORDER.get(f.get("level"), 9), -(f.get("cnt") or 0), f["key"])
+
+    by_rule: dict[str, list[dict]] = {}
+    for f in sorted(findings, key=rank):
+        by_rule.setdefault(f["rid"], []).append(f)
+    rules = sorted(by_rule, key=lambda r: rank(by_rule[r][0]))
+    out, i = [], 0
+    while len(out) < len(findings):
+        for r in rules:
+            if i < len(by_rule[r]):
+                out.append(by_rule[r][i])
+        i += 1
+    return out
+
+
+def _accept(r: dict, sid: str, fs: list[str]) -> dict:
+    fact_text = " ".join(fs)
+    r["facts"] = {f"{sid}.f{i + 1}": t for i, t in enumerate(fs)}
+    r["ungrounded"] = _ground(r, fact_text)
+    # The schema's fact enum spans the batch, so a reason can cite another
+    # suggestion's fact (seen on the quarter: the beacon cited S2's). Listed.
+    r["cited_elsewhere"] = sorted({c for x in r.get("reasons") or [] for c in x.get("facts") or []
+                                   if not c.startswith(f"{sid}.")})
+    return r
+
+
+async def _review_chunk(client, chunk) -> tuple[dict, dict, list[str]]:
+    """One batch, so that every suggestion in it ends with advice or an error (C-D4, Q103): the
+    batch, once more if it failed or left some out, then each one left on its own.
+    Returns ({key: advice}, {key: error}, [batch-level error lines])."""
+    items, failed, notes = {}, {}, []
+    left = list(chunk)
+    for attempt in ("batch", "retry", "single"):
+        if not left:
+            break
+        groups = [left] if attempt != "single" else [[x] for x in left]
+        still = []
+        for g in groups:
+            batch = [(sid, fs, fpl) for sid, fs, fpl, _ in g]
+            try:
+                reviews = await _review_batch(client, batch)
+                err = None
+            except Exception as exc:  # noqa: BLE001 - recorded, then retried smaller
+                reviews, err = [], f"{type(exc).__name__}: {exc}"[:300]
+                notes.append(f"suggestions {g[0][0]}-{g[-1][0]} ({attempt}): {err}")
+            by_sid = {r.get("suggestion"): r for r in reviews}
+            for sid, fs, _, f in g:
+                r = by_sid.get(sid)
+                if r:
+                    items[f["key"]] = _accept(r, sid, fs)
+                else:
+                    still.append((sid, fs, _, f))
+                    if attempt == "single":
+                        failed[f["key"]] = err or "the model's answer left this suggestion out"
+        left = still
+    return items, failed, notes
+
+
+async def _run(case_id: str, findings: list[dict], on_progress=None, done: dict | None = None,
+               on_batch=None) -> dict:
+    """Review every suggestion not in `done` (no cap - the user: every finding is reviewed by
+    the AI, C-D1). `on_batch(items, failed, notes)` is called after each batch, so the advice is
+    kept and shown as it arrives; `on_progress(reviewed, total, failed)` counts suggestions."""
+    items = dict(done or {})
+    todo = [f for f in _order(findings) if f["key"] not in items]
     con = db.connect(case_id, read_only=True)
     try:
-        todo = sorted(findings, key=lambda f: (_LEVEL_ORDER.get(f.get("level"), 9), -f.get("cnt", 0), f["key"]))
-        todo = todo[:MAX_SUGGESTIONS]
         prepared = []
         for i, f in enumerate(todo, 1):
             fs = facts(con, f)
             prepared.append((f"S{i}", fs, rule_meta.RULE_META.get(f["rid"], {}).get("falsepositives") or [], f))
     finally:
         con.close()
-    items, errors = {}, []
-    # on_progress(done, total, failed batches): the case's progress shows the count (Upload page).
+    failed: dict = {}
+    notes: list[str] = []
     if on_progress:
-        on_progress(0, len(prepared), 0)
+        on_progress(len(items), len(findings), 0)
     async with llm._client() as client:
-        for start in range(0, len(prepared), BATCH):
-            chunk = prepared[start:start + BATCH]
-            batch = [(sid, fs, fpl) for sid, fs, fpl, _ in chunk]
-            try:
-                reviews = await _review_batch(client, batch)
-            except Exception as exc:  # noqa: BLE001 - one batch failing is recorded, not fatal
-                errors.append(f"suggestions {chunk[0][0]}-{chunk[-1][0]}: {type(exc).__name__}: {exc}"[:300])
-                reviews = []
-            by_sid = {r.get("suggestion"): r for r in reviews}
-            for sid, fs, _, f in chunk:
-                r = by_sid.get(sid)
-                if not r:
-                    continue
-                fact_text = " ".join(fs)
-                r["facts"] = {f"{sid}.f{i + 1}": t for i, t in enumerate(fs)}
-                r["ungrounded"] = _ground(r, fact_text)
-                # The schema's fact enum spans the batch, so a reason can cite another
-                # suggestion's fact (seen on the quarter: the beacon cited S2's). Listed.
-                r["cited_elsewhere"] = sorted({c for x in r.get("reasons") or [] for c in x.get("facts") or []
-                                               if not c.startswith(f"{sid}.")})
-                items[f["key"]] = r
+        for start in range(0, len(prepared), config.TRIAGE_BATCH):
+            got, bad, why = await _review_chunk(client, prepared[start:start + config.TRIAGE_BATCH])
+            items.update(got)
+            failed.update(bad)
+            notes += why
+            if on_batch and on_batch(items, failed, notes) is False:
+                break   # the case was re-processed or deleted under the review
             if on_progress:
-                on_progress(start + len(chunk), len(prepared), len(errors))
-    return {"model": config.LLM_MODEL, "provider": config.LLM_PROVIDER,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "reviewed": len(items), "suggestions": len(findings),
-            "skipped": max(0, len(findings) - len(todo)), "errors": errors, "items": items}
+                on_progress(len(items), len(findings), len(failed))
+    return {"items": items, "failed": failed, "errors": notes}
 
 
-def review_case(case_id: str, findings: list[dict], on_progress=None) -> dict:
-    """Review a processed case's suggestions and keep the result. Never raises:
-    a model that cannot be reached is recorded and the case stays usable."""
-    if not config.TRIAGE_ENABLED:
-        result = {"skipped_all": "AI review is switched off (TRIAGE_ENABLED)"}
-    else:
-        try:
-            llm._preflight()
-            result = asyncio.run(_run(case_id, findings, on_progress))
-        except Exception as exc:  # noqa: BLE001
-            log.warning("case %s: AI review failed", case_id, exc_info=True)
-            result = {"error": f"{type(exc).__name__}: {exc}"[:500],
-                      "created_at": datetime.now(timezone.utc).isoformat()}
+def _write(case_id: str, result: dict) -> None:
     p = path(case_id)
     tmp = p.with_suffix(".tmp")
     tmp.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     tmp.replace(p)
+
+
+def review_case(case_id: str, findings: list[dict], on_progress=None, again: bool = False,
+                should_continue=None) -> dict:
+    """Review the case's suggestions and keep the result, written after every batch. With
+    `again`, only those without advice yet (a failure, a review cut short) are sent - "Review
+    again" (C-D4). Never raises: a model that cannot be reached is recorded and the case stays
+    usable. `should_continue()` returning False stops it between batches."""
+    keep = load(case_id) if again else {}
+    started = keep.get("created_at") or datetime.now(timezone.utc).isoformat()
+    base = {"model": config.LLM_MODEL, "provider": config.LLM_PROVIDER, "created_at": started,
+            "suggestions": len(findings)}
+    if not config.TRIAGE_ENABLED:
+        result = {"skipped_all": "AI review is switched off (TRIAGE_ENABLED)"}
+        _write(case_id, result)
+        return result
+    keys = {f["key"] for f in findings}
+    done = {k: v for k, v in (keep.get("items") or {}).items() if k in keys}
+
+    def snapshot(items, failed, notes, status):
+        return {**base, "status": status, "updated_at": datetime.now(timezone.utc).isoformat(),
+                "reviewed": len(items), "items": items,
+                "failed": {k: v for k, v in failed.items() if k not in items}, "errors": notes}
+
+    def on_batch(items, failed, notes):
+        # Checked before writing: a case deleted under the review must not get its file back.
+        if should_continue and not should_continue():
+            return False
+        _write(case_id, snapshot(items, failed, notes, "running"))
+        return True
+
+    try:
+        llm._preflight()
+        out = asyncio.run(_run(case_id, findings, on_progress, done, on_batch))
+        result = snapshot(out["items"], out["failed"], out["errors"], "done")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("case %s: AI review failed", case_id, exc_info=True)
+        result = {**snapshot(done, {}, [], "failed"), "error": f"{type(exc).__name__}: {exc}"[:500]}
+    if should_continue is None or should_continue():
+        _write(case_id, result)
     return result
+
+
+# --- in the background (C-D2, Q101): the case is ready after the rules; the review runs on ------
+
+_queue: "queue.Queue[tuple[str, bool]]" = queue.Queue()
+_worker: threading.Thread | None = None
+_guard = threading.Lock()
+
+
+def _set(case_id: str, **fields) -> None:
+    m = storage.load_manifest(case_id)
+    if m is None:
+        return
+    storage.update_case(case_id, ai_review={**(m.get("ai_review") or {}), **fields})
+
+
+def enqueue(case_id: str, again: bool = False) -> None:
+    """Queue the case's AI review. A fresh review (after processing) starts from nothing - the
+    old advice belonged to the old findings; `again` sends only what has no advice yet."""
+    global _worker
+    if not config.TRIAGE_ENABLED:
+        _set(case_id, status="off", reason="AI review is switched off (TRIAGE_ENABLED)")
+        return
+    run = datetime.now(timezone.utc).isoformat()
+    if not again:
+        path(case_id).unlink(missing_ok=True)
+    _set(case_id, status="queued", run=run, model=config.LLM_MODEL, error=None)
+    _queue.put((case_id, run))
+    with _guard:
+        if _worker is None or not _worker.is_alive():
+            _worker = threading.Thread(target=_work, name="ai-review", daemon=True)
+            _worker.start()
+
+
+def _work() -> None:
+    # One review at a time: one model on this machine (specs/ai_review_coverage.md C-D5).
+    while True:
+        case_id, run = _queue.get()
+        try:
+            _review_queued(case_id, run)
+        except Exception:  # noqa: BLE001 - the worker outlives any one case
+            log.exception("AI review of %s failed", case_id)
+            _set(case_id, status="failed", error="the review stopped on an internal error")
+        finally:
+            _queue.task_done()
+
+
+def _review_queued(case_id: str, run: str) -> None:
+    from . import case_views  # imported here: case_views imports this module
+
+    def current() -> bool:
+        m = storage.load_manifest(case_id)
+        return bool(m) and m.get("status") == "ready" and (m.get("ai_review") or {}).get("run") == run
+
+    if not current():
+        return  # deleted, re-processed or queued again since
+    manifest = storage.load_manifest(case_id)
+    findings = case_views.findings_view(case_id, manifest, assign_ids=False)
+    again = bool(load(case_id).get("items"))
+    _set(case_id, status="running", total=len(findings), done=0, failed=0, started_at=datetime.now(timezone.utc).isoformat())
+
+    def progress(done, total, failed):
+        if current():
+            _set(case_id, done=done, total=total, failed=failed)
+
+    result = review_case(case_id, findings, on_progress=progress, again=again, should_continue=current)
+    if current():
+        _set(case_id, status="done" if result.get("status") == "done" else "failed",
+             done=result.get("reviewed", 0), total=len(findings), failed=len(result.get("failed") or {}),
+             error=result.get("error"), finished_at=datetime.now(timezone.utc).isoformat())
+
+
+def resume() -> list[str]:
+    """At startup: every case whose review was queued or running when the process stopped is
+    queued again, sending only what has no advice yet."""
+    out = []
+    root = storage.customers_dir()
+    for store in (sorted(root.iterdir()) if root.is_dir() else []):
+        for mp in sorted((store / "cases").glob("case-*.json")):
+            try:
+                m = json.loads(mp.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if m.get("status") == "ready" and (m.get("ai_review") or {}).get("status") in ("queued", "running"):
+                enqueue(m["case_id"], again=True)
+                out.append(m["case_id"])
+    return out
+
+
+def wait_idle(timeout: float = 60.0) -> bool:
+    """Block until the queue is empty (tests)."""
+    import time
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if _queue.unfinished_tasks == 0:
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def state_of(case_id: str, manifest: dict, key: str, items: dict, failed: dict) -> str:
+    """'done', 'pending' or 'failed' for one suggestion - what its page says when there is no advice."""
+    if key in items:
+        return "done"
+    if key in failed:
+        return "failed"
+    status = (manifest.get("ai_review") or {}).get("status")
+    return "pending" if status in ("queued", "running") else ("off" if status == "off" else "failed")
 
 
 def assessment_of(case_id: str, key: str) -> dict | None:

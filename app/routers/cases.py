@@ -272,6 +272,25 @@ async def reprocess(case_id: str, request: Request, body: dict = Body(default={}
     return storage.load_manifest(case_id)
 
 
+@router.post("/{case_id}/ai-review")
+async def ai_review_again(case_id: str, request: Request):
+    """Send the suggestions that have no AI advice yet - a failed call, a review cut short - to
+    the model again (specs/ai_review_coverage.md C-D4, Q103). Nothing else is re-sent."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    _authorize(request, authz.REPROCESS, manifest.get("company_id"))
+    if manifest.get("status") != "ready":
+        raise HTTPException(409, "The case is not ready")
+    if (manifest.get("ai_review") or {}).get("status") in ("queued", "running"):
+        raise HTTPException(409, "The AI review is already queued or running")
+    if not config.TRIAGE_ENABLED:
+        raise HTTPException(409, "AI review is switched off (TRIAGE_ENABLED)")
+    custody.record(case_id, "ai_review_requested", request.state.user["email"])
+    triage.enqueue(case_id, again=True)
+    return storage.load_manifest(case_id).get("ai_review")
+
+
 @router.post("/merge")
 async def merge_cases_route(request: Request, body: dict = Body(...)):
     """Concatenate several already-ingested line-log cases into one new case
@@ -358,6 +377,9 @@ async def get_case_findings(case_id: str):
         "findings": findings,
         "count": len(findings),
         "review_summary": counts,
+        # The AI review's own state (specs/ai_review_coverage.md): queued / running / done /
+        # failed / off, with how many suggestions it has advised on.
+        "ai_review": manifest.get("ai_review"),
         "lifecycle_summary": lifecycle.summary(findings, case_views.created_at(case_id, manifest)),
         "classifications": lifecycle.CLASSIFICATIONS,
         "assignees": [{"email": u["email"], "name": u.get("name") or u["email"], "role": u.get("role")}

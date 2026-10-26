@@ -80,17 +80,6 @@ class Progress:
             storage.update_case(self.case_id, progress={
                 "stage": stage, "pct": self._pct, "estimated": estimated})
 
-    def ai(self, done: int, total: int, failed: int) -> None:
-        """The AI review's own count (triage.py). The bar stays at 99% for the
-        minutes the model takes, so the screen shows how many suggestions it
-        has reviewed instead. Written after every batch, never throttled: a
-        batch takes seconds, not milliseconds."""
-        with self._lock:
-            self._last, self._pct = time.monotonic(), max(99, self._pct)
-            storage.update_case(self.case_id, progress={
-                "stage": "ai", "pct": self._pct, "estimated": False,
-                "ai": {"done": done, "total": total, "failed": failed, "model": config.LLM_MODEL}})
-
     def ingest(self, fraction: float, estimated: bool = False) -> None:
         self.set("ingest", fraction * INGEST_END, estimated)
 
@@ -884,14 +873,6 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             finding_ids.ensure(case_id)
         except Exception:  # noqa: BLE001
             log.exception("case %s: could not assign finding ids", case_id)
-        # The AI reviews each suggestion before the findings are shown (the
-        # user's Q78, specs/ai_triage.md); never fails the case.
-        if flagged:
-            from . import case_views, triage  # imported here: case_views reads the case views this run builds
-            progress.set("ai", 99, force=True)
-            manifest_now = storage.load_manifest(case_id) or {}
-            triage.review_case(case_id, case_views.findings_view(case_id, manifest_now, assign_ids=False),
-                               on_progress=progress.ai)
         storage.update_case(
             case_id,
             status="ready",
@@ -915,6 +896,15 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
         custody.record(case_id, "processed", "system", rows=total_rows, flagged=flagged,
                        rules=matched, method=repro.record(mappings, time_applied))
         log.info("case %s ready: %s rows, %s flagged", case_id, total_rows, flagged)
+        # The AI reviews every suggestion, after the case is ready (specs/ai_review_coverage.md
+        # C-D1 / C-D2, Q101 - it was before, Q78): one review at a time in the background, the
+        # count on the manifest's `ai_review`; never fails the case.
+        from . import triage
+        if flagged:
+            triage.enqueue(case_id)
+        else:
+            triage.path(case_id).unlink(missing_ok=True)
+            storage.update_case(case_id, ai_review=None)
 
     except Exception as exc:  # noqa: BLE001 - surface any ingest failure to the UI
         log.exception("case %s failed", case_id)

@@ -116,7 +116,8 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
     # and the other findings of the same attack chain (related.py).
     ids = finding_ids.ensure(case_id, manifest, findings) if assign_ids else finding_ids.lookup(case_id)
     chains = related.chains(db.finding_edges(case_id))
-    ai_items = triage.load(case_id).get("items") or {}
+    ai = triage.load(case_id)
+    ai_items, ai_failed = ai.get("items") or {}, ai.get("failed") or {}
     for f in findings:
         f["fd"] = ids.get(f["key"])
         rel = chains.get(f["key"])
@@ -133,8 +134,11 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
             f["lifecycle"] = {"tracked": True, **lc, "csf": lifecycle.CSF[lc["status"]]}
         else:
             f["lifecycle"] = {"tracked": False}
-        # The AI's advice on this suggestion (triage.py), if it was reviewed.
+        # The AI's advice on this suggestion (triage.py), if it was reviewed; else whether it is
+        # still to come or failed (specs/ai_review_coverage.md C-D2 / C-D4).
         f["ai_review"] = ai_items.get(f["key"])
+        f["ai_state"] = triage.state_of(case_id, manifest, f["key"], ai_items, ai_failed)
+        f["ai_error"] = ai_failed.get(f["key"]) if f["ai_state"] == "failed" else None
         # Its ATT&CK tactics, in ATT&CK's order - the Attack timeline's stages.
         f["tactics"] = rule_meta.tactics_of(f.get("mitre"))
     return findings

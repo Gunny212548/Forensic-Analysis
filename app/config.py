@@ -172,6 +172,8 @@ ANALYSIS_OTPM_BUDGET = int(os.environ.get("ANALYSIS_OTPM_BUDGET", "1000"))
 # The AI's review of each suggestion while a case is processed (triage.py,
 # specs/ai_triage.md). Off only where no model is wanted at all.
 TRIAGE_ENABLED = os.environ.get("TRIAGE_ENABLED", "1").strip().lower() not in ("0", "false", "no", "")
+# Suggestions per model call (specs/ai_review_coverage.md C-D5: measured, see gotcha #71).
+TRIAGE_BATCH = max(1, int(os.environ.get("TRIAGE_BATCH", "5")))
 
 # --- effective per-provider settings ---------------------------------------
 # Resolved once here rather than branched at every call site, so everything

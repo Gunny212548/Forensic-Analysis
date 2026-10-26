@@ -1,6 +1,6 @@
 # The AI reviews every suggestion (design)
 
-Status: **proposed 2026-10-26**, waiting for Q101-Q104. The user: "หาขั้นตอนวิธีการทำให้ Ai review
+Status: **approved 2026-10-26** (Q100 no, Q101 a, Q102-Q104 yes - "ทำตาม design เลย"); **built** (gotcha #71). C-D5 measured: batch 5 kept - 10 and 15 are cut off at the 3,000-token cap and fall back to single calls (~32 s a suggestion against ~9 s). The user: "หาขั้นตอนวิธีการทำให้ Ai review
 ครบทุก Finding", then, on the first draft (one review per pattern, the advice inherited by the other
 members): **"ทุก Finding ที่เจอต้องได้รับการ review จาก AI"** - every finding must be reviewed by the
 AI itself. Inherited advice is therefore out (Q100, answered no). Builds on `specs/ai_triage.md` (Q78:

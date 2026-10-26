@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getFindings, postReview } from '../api.js'
+import { aiReviewAgain, getFindings, postReview } from '../api.js'
 import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
 import FindingEvents from './FindingEvents.jsx'
@@ -40,6 +40,27 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
   useEffect(() => {
     load()
   }, [load])
+
+  // The AI review runs after the case is ready (triage.py): while it does, its advice arrives
+  // batch by batch, so the list is read again every 20 s until it is done.
+  const aiStatus = data?.ai_review?.status
+  useEffect(() => {
+    if (aiStatus !== 'queued' && aiStatus !== 'running') return undefined
+    const t = setInterval(load, 20000)
+    return () => clearInterval(t)
+  }, [aiStatus, load])
+  const [aiBusy, setAiBusy] = useState(false)
+  async function reviewAgain() {
+    setAiBusy(true)
+    try {
+      await aiReviewAgain(caseId)
+      await load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setAiBusy(false)
+    }
+  }
 
   // A narrative citation asked for this finding (Result.jsx): bring it into
   // view and mark it briefly. After a frame, because the tab it lives in is
@@ -127,6 +148,30 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
           Unreviewed {unreviewed}
         </span>
       </div>
+
+      {/* The AI reviews every suggestion (specs/ai_review_coverage.md): how far it is, and the
+          ones a failed call left without advice, which Review again sends once more. */}
+      {data.ai_review && data.ai_review.status !== 'off' && (() => {
+        const a = data.ai_review
+        const missing = (data.findings || []).filter((f) => !f.ai_review).length
+        return (
+          <div className={`rv-chain ${a.status === 'done' && !missing ? 'ev-ok' : 'rv-chain-warn'}`}>
+            {a.status === 'queued' && 'AI review queued - it starts when the model is free.'}
+            {a.status === 'running' &&
+              `AI reviewing every suggestion: ${a.done ?? 0} of ${a.total ?? '?'} done${a.model ? ` (${a.model})` : ''}` +
+                (a.failed ? `, ${a.failed} failed so far` : '') + ' - advice appears as it arrives.'}
+            {a.status === 'done' && !missing && `AI reviewed all ${a.total} suggestions${a.model ? ` (${a.model})` : ''}.`}
+            {(a.status === 'failed' || (a.status === 'done' && missing > 0)) &&
+              `AI advice on ${(a.total ?? 0) - missing} of ${a.total ?? '?'} suggestions; ${missing} not reviewed` +
+                (a.error ? ` (${a.error})` : '') + '.'}
+            {(a.status === 'failed' || (a.status === 'done' && missing > 0)) && can('case:reprocess') && (
+              <button type="button" className="rv-btn" style={{ marginLeft: 8 }} disabled={aiBusy} onClick={reviewAgain}>
+                {aiBusy ? 'Starting...' : 'Review again'}
+              </button>
+            )}
+          </div>
+        )
+      })()}
 
       {/* The decisions above are only as good as their history: the review
           log is hash-chained (hashchain.py), and an edited or deleted
@@ -223,7 +268,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
               {f.descr || ''} <MitreTags list={f.mitre} />
             </div>
             {openRule === f.key && <RuleCard rid={f.rid} />}
-            <AiReview r={f.ai_review} />
+            <AiReview r={f.ai_review} state={f.ai_state} error={f.ai_error} />
             {/* Where the finding comes from (FR-4.1): the events behind it with
                 their source file, and the other findings of the same attack
                 chain (related.py: linked through pivot hosts, never through a

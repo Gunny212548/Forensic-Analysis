@@ -15,8 +15,22 @@ const REASON = {
  *  why the rule fired, the likely cause, its reasons - each citing the facts it
  *  was given (hover a fact id to read it) - and what it would press. Advice
  *  only: the analyst decides. */
-export default function AiReview({ r }) {
-  if (!r) return null
+export default function AiReview({ r, state = null, error = null }) {
+  if (!r) {
+    if (state === 'pending')
+      return (
+        <div className="ai-review ai-pending">
+          <span className="ai-label">AI review</span> <span className="muted">pending - every suggestion is reviewed; this one has not had its turn yet</span>
+        </div>
+      )
+    if (state === 'failed')
+      return (
+        <div className="ai-review ai-pending">
+          <span className="ai-label">AI review</span> <span className="muted">not reviewed{error ? `: ${error}` : ''} - use Review again above</span>
+        </div>
+      )
+    return null
+  }
   const facts = r.facts || {}
   return (
     <div className="ai-review">

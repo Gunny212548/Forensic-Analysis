@@ -215,6 +215,12 @@ export async function putProvenance(caseId, item, body) {
   return putJson(`/api/cases/${encodeURIComponent(caseId)}/provenance${q}`, body, 'Could not save the provenance')
 }
 
+/** Send the suggestions that have no AI advice yet to the model again (triage.py, C-D4). */
+export async function aiReviewAgain(caseId) {
+  const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}/ai-review`, { method: 'POST' })
+  return jsonOrThrow(resp, 'Could not start the AI review again')
+}
+
 export async function reprocessCase(caseId, reason) {
   const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}/reprocess`, {
     method: 'POST',

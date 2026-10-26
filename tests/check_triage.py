@@ -9,7 +9,8 @@ a one-host upload), the schema's enums (only this batch's suggestion and fact
 ids), the grounding check, the file kept with the case and deleted with it, a
 model that cannot be reached leaving the case ready, and the AI's advice kept
 on the analyst's review line (Q80). The model's own accuracy is measured on the
-synthetic Check Point quarter, not here.
+synthetic Check Point quarter, not here. Since specs/ai_review_coverage.md: no cap, every rule
+first, retries then one by one, Review again, the review queued after the case is ready.
 """
 
 import argparse
@@ -116,7 +117,7 @@ def main() -> int:
     check(entry["ai"]["assessment"] == "likely attack" and entry["ai"]["suggested_decision"] == "accept",
           "assessment and suggestion recorded with the decision")
 
-    print("a model that cannot be reached")
+    print("a model that cannot be reached: retried, then one by one, every failure listed")
 
     async def down(*a, **k):
         raise llm.AnalysisError("connection refused")
@@ -124,20 +125,82 @@ def main() -> int:
     llm._chat = down
     counts = []
     res = triage.review_case(cid, findings, on_progress=lambda *c: counts.append(c))
-    check(res.get("reviewed") == 0 and len(res.get("errors") or []) == 3,
-          "every batch's failure recorded; review_case does not raise")
-    check(counts[-1] == (13, 13, 3), f"failed batches counted in the progress ({counts[-1:]})")
+    check(res.get("reviewed") == 0 and len(res.get("failed") or {}) == 13 and res.get("status") == "done",
+          f"each of the 13 suggestions listed with its error; review_case does not raise ({len(res.get('failed') or {})})")
+    check(counts[-1] == (0, 13, 13), f"failed suggestions counted in the progress ({counts[-1:]})")
 
-    print("the count reaches the case's progress (pipeline.Progress.ai)")
-    from app.services import pipeline
-    pg = pipeline.Progress(cid)
-    pg.set("ai", 99, force=True)
-    pg.ai(5, 13, 1)
-    p = storage.load_manifest(cid)["progress"]
-    check(p["stage"] == "ai" and p["pct"] == 99 and p["ai"]["done"] == 5 and p["ai"]["total"] == 13
-          and p["ai"]["failed"] == 1 and p["ai"]["model"], f"stage, 99% and the count on the manifest ({p})")
-    pg.ai(10, 13, 1)
-    check(storage.load_manifest(cid)["progress"]["ai"]["done"] == 10, "the next batch is written at once, not throttled")
+    print("specs/ai_review_coverage.md: every suggestion, every rule first, retries, Review again")
+    cid2 = storage.create_case("many.csv", "csv", 1, company_id=co)["case_id"]
+    con = db.init(cid2)
+    n = 0
+    for rid_, k in (("R3001", 85), ("R2002", 3), ("R2003", 2)):   # 90 suggestions over three rules
+        for i in range(k):
+            con.execute("INSERT INTO raw_events (row_id, ts, srcip, dstip, verdict, bytes_sent) "
+                        "VALUES (?, TIMESTAMP '2026-09-26 02:00:00', ?, '198.51.100.9', 'allow', 1)",
+                        [n, f"10.9.{rid_[-1]}.{i}"])
+            con.execute("INSERT INTO findings (row_id, rid, lvl, descr, mitre) VALUES (?, ?, 2, 'x', ['T1041'])",
+                        [n, rid_])
+            n += 1
+    con.close()
+    storage.update_case(cid2, status="ready")
+    many = case_views.findings_view(cid2, storage.load_manifest(cid2), assign_ids=False)
+    order = [f["rid"] for f in triage._order(many)]
+    check(len(many) == 90 and set(order[:3]) == {"R3001", "R2002", "R2003"},
+          f"every rule's first suggestion comes first ({order[:4]})")
+    calls, drop = [], {"S7"}
+
+    async def flaky(client, payload, *a, **k):
+        ids = payload["_schema"]["properties"]["reviews"]["items"]["properties"]["suggestion"]["enum"]
+        calls.append(list(ids))
+        keep = [x for x in ids if not (x in drop and len(ids) > 1)]   # S7 only answered on its own
+        return {"choices": [{"message": {"content": json.dumps({"reviews": [
+            {"suggestion": x, "why_it_fired": "w", "cause": "c", "assessment": "uncertain", "reasons": [],
+             "matches_false_positive": "none", "suggested_decision": "undecided", "reject_reason": "none",
+             "check_next": "n"} for x in keep]})}, "finish_reason": "stop"}]}
+
+    llm._chat = flaky
+    res = triage.review_case(cid2, many)
+    check(res["reviewed"] == 90 and not res["failed"], f"all 90 reviewed - no cap ({res['reviewed']})")
+    check(["S7"] in calls, "a suggestion the answer left out is retried, then sent on its own")
+    saved = triage.load(cid2)
+    check(saved.get("status") == "done" and saved.get("reviewed") == 90, "the file says done, with every one")
+
+    # One suggestion that always fails, then Review again sends only it.
+    bad = triage._order(many)[11]
+    bad_key = bad["key"]
+
+    async def one_bad(client, payload, *a, **k):
+        if any(f"Source {bad['srcip']} is" in m["content"] for m in payload["messages"]):
+            raise llm.AnalysisError("the model timed out")
+        return await flaky(client, payload)
+
+    drop.clear()
+    llm._chat = one_bad
+    res = triage.review_case(cid2, many)
+    check(res["reviewed"] == 89 and list(res["failed"]) == [bad_key],
+          f"the one that keeps failing is listed, the rest reviewed ({res['reviewed']}, {list(res['failed'])})")
+    v = {f["key"]: f for f in case_views.findings_view(cid2, storage.load_manifest(cid2), assign_ids=False)}
+    check(v[bad_key]["ai_state"] == "failed" and "timed out" in (v[bad_key]["ai_error"] or ""),
+          "the finding says it was not reviewed, and why")
+    calls.clear()
+    llm._chat = flaky
+    res = triage.review_case(cid2, many, again=True)
+    check(res["reviewed"] == 90 and len(calls) == 1 and len(calls[0]) == 1,
+          f"Review again sends only the one without advice ({[len(c) for c in calls]})")
+
+    print("in the background, after the case is ready (C-D2)")
+    calls.clear()
+    triage.enqueue(cid2)
+    check(storage.load_manifest(cid2)["ai_review"]["status"] in ("queued", "running", "done"), "queued on the manifest")
+    triage.wait_idle(60)
+    a = storage.load_manifest(cid2)["ai_review"]
+    check(a["status"] == "done" and a["done"] == 90 and a["total"] == 90 and a["failed"] == 0,
+          f"the manifest counts it to the end ({a})")
+    check(sum(len(c) for c in calls) == 90, "a fresh review sends every suggestion again (new findings, new advice)")
+    storage.update_case(cid2, ai_review={**a, "status": "running"})
+    check(triage.state_of(cid2, storage.load_manifest(cid2), "R9|x|y", {}, {}) == "pending",
+          "a suggestion still to come is pending while the review runs")
+    storage.update_case(cid2, ai_review={**a, "status": "done"})
     check(storage.case_files(storage.customer_dir(co), cid)
           and any(p.name.endswith(".triage.json") for p in storage.case_files(storage.customer_dir(co), cid)),
           "the review file is one of the case's files - deleted with it")

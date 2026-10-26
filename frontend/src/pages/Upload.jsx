@@ -14,21 +14,25 @@ function processingText(m) {
   if (!m) return ''
   if (m.status === 'queued') return 'Queued'
   if (m.status === 'failed') return 'Failed'
-  if (m.status === 'ready') return 'Done'
+  if (m.status === 'ready') return `Done${aiText(m)}`
   const p = m.progress
   if (!p) return 'Processing...'
-  return `Processing ${p.estimated ? '~' : ''}${p.pct}%${aiText(p)}`
+  return `Processing ${p.estimated ? '~' : ''}${p.pct}%`
 }
 
-/** " · AI reviewing suggestions 15 of 52 (qwen3.5:9b)" while the AI reviews
- *  each suggestion (triage.py) - the bar stays at 99% for those minutes, so
- *  the count is what shows it is moving. Empty in every other stage. */
-function aiText(p) {
-  if (p.stage !== 'ai') return ''
-  const a = p.ai
-  if (!a) return ' · AI reviewing the findings'
-  const failed = a.failed ? ` · ${a.failed} batch${a.failed === 1 ? '' : 'es'} failed` : ''
-  return ` · AI reviewing suggestions ${a.done} of ${a.total}${a.model ? ` (${a.model})` : ''}${failed}`
+/** " · AI reviewing 15 of 526 (qwen3.5:9b)" - the AI reviews every suggestion after the case
+ *  is ready (triage.py, specs/ai_review_coverage.md), so a ready case can still be moving.
+ *  Empty when there is nothing to say. */
+function aiText(m) {
+  const a = m?.ai_review
+  if (!a) return ''
+  const failed = a.failed ? ` · ${a.failed} failed` : ''
+  if (a.status === 'queued') return ' · AI review queued'
+  if (a.status === 'running')
+    return ` · AI reviewing ${a.done ?? 0} of ${a.total ?? '?'}${a.model ? ` (${a.model})` : ''}${failed}`
+  if (a.status === 'failed') return ` · AI review stopped${a.error ? `: ${a.error}` : ''}`
+  if (a.status === 'done' && a.failed) return ` · AI reviewed ${a.done} of ${a.total}${failed}`
+  return ''
 }
 
 function processingPct(m) {
@@ -458,9 +462,9 @@ export default function Upload({ user }) {
                         <div className="cell-sub">
                           {m.progress.estimated ? '~' : ''}
                           {m.progress.pct}%
-                          {aiText(m.progress)}
                         </div>
                       )}
+                      {m.status === 'ready' && aiText(m) && <div className="cell-sub">{aiText(m).slice(3)}</div>}
                     </td>
                     <td>{ready ? <SeverityPill severity={m.severity} /> : '—'}</td>
                   </tr>

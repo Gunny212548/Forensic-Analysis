@@ -77,8 +77,7 @@ pipeline.process_case  (services/pipeline.py)
          (`members`, `skipped_members`); after ingest each row gets its
          `product` (gotcha #61).
   progress → manifest `progress: {stage, pct, estimated}` about once a
-         second (FR-2.5; ingest 0-90, intel 90-92, rules 92-99, ai 99 - which
-         also carries `ai: {done, total, failed, model}`, gotcha #64). Measured
+         second (FR-2.5; ingest 0-90, intel 90-92, rules 92-99). Measured
          for line logs/JSON (bytes read), zip members and rules. The CSV fast
          path is ONE DuckDB statement and 1.1.3 had no query_progress(), so
          its share is an elapsed-time estimate at ~60 MB/s, held at 95% of
@@ -89,8 +88,10 @@ pipeline.process_case  (services/pipeline.py)
          rule reads its product's rows, a line-drawing rule takes its line
          from lines.py and the manifest keeps it (`lines`, gotcha #62)
        → escalations, profiles, FD ids
-       → triage.review_case: the AI's advice on each suggestion (gotcha #64)
        → status=ready (or failed + error/traceback on the manifest)
+       → triage.enqueue: the AI reviews every suggestion in the background, one
+         case at a time; the count on the manifest's `ai_review: {status, done,
+         total, failed, model}` (gotchas #64, #71)
 
 data/customers/{company_id}/db/{case_id}.duckdb   (gotcha #40)
   raw_events  every row, canonical typed columns
@@ -417,7 +418,8 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #58 Ingest: question on the project (hash-chained log), provenance per evidence item (custody lines), declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
 **AI narrative** (`analysis.py`, `llm.py`, `grounding.py`, `veris.py`)
-- #64 The AI reviews every suggestion while the case is processed (`triage.py`): facts computed in SQL (a destination's popularity among internal hosts, the rule's documented false positives), a schema, an address check; advice under each suggestion, kept on the review line; the Upload page counts the suggestions reviewed; `TRIAGE_ENABLED=0` in every rule check and in dev.
+- #71 Every suggestion is reviewed by the AI itself, no cap (the user's requirement): the case is ready after the rules and the review runs on in the background (`triage.enqueue`, one worker, resumed at start-up), every rule first, a failed batch retried then sent one by one, what is left listed with "Review again" (`POST /ai-review`); batch size measured (`TRIAGE_BATCH`).
+- #64 The AI reviews every suggestion while the case is processed (`triage.py`; since #71 after it is ready): facts computed in SQL (a destination's popularity among internal hosts, the rule's documented false positives), a schema, an address check; advice under each suggestion, kept on the review line; the Upload page counts the suggestions reviewed; `TRIAGE_ENABLED=0` in every rule check and in dev.
 - #5 Groq's output-token limits and the measured sweeps (events 15, max_tokens 950); schema key order is the priority list. Groq only - not the local model.
 - #10 The attack graph is SQL (`db.build_graph()`), not AI - don't hand it back to the model.
 - #13 Every wrong narrative was missing input, never reasoning: compute the discriminating fact in SQL and hand it over; prompt hardening was measured to do nothing.
