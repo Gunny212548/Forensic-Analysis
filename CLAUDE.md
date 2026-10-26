@@ -158,7 +158,7 @@ GET  /api/overview                           KPIs, MTTC, detection areas, attent
 ```
 
 **The Overview was redesigned on 2026-10-19 (gotcha #50)** - an attention banner,
-a KPI strip, six detection-area cards, findings per day, top affected, urgent
+a KPI strip, the detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), findings per day, top affected, urgent
 findings and recent activity, in the light palette; the status workflow it needed
 exists since Sprint 3 (gotcha #49). The case table is no longer on it. No figure is a
 placeholder. "Top affected"
@@ -366,6 +366,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+- #66 Windows lateral movement / host rules: steps linked by the session (TargetLogonId -> SubjectLogonId, Sysmon ProcessGuid; ASOF to the latest 4624), no window; WIN-LAT-1 = an RDP pair seen on one day of the evidence (the user's choice); WIN-LAT-3 compares an account with its own Kerberos; two areas, eight Overview cards; the OTRF reconnect (4624 type 7) and a dump with no Sysmon 10 are missed.
 - #65 Windows sign-in rules (`rules_windows.py`): one attempt however many events record it - a DC's 4771 / 4776 within 1 s of a host's 4625 joins it, its address kept; 4771 / 4776 counted (Q84 reverses Q41); WIN-BRUTE-1..3 / WIN-AUTH-1 supersede R2000 / R2005 / R2006 / R2008 / R2009 on Windows rows; measured on `tests/gen_windows_domain.py`.
 - #63 Generic rules are superseded per product (`RULE_SUPERSEDED`: not on Palo Alto / Check Point rows, nor the sign-in rules on Windows rows (#65); still on FortiGate, ESXi, sshd, Entra); escalations and VERIS count behaviours via `RULE_EQUIVALENT` / `generic_sql`; baseline re-taken (668 entries).
 - #62 Firewall rules (`rules_firewall.py` shared, `rules_paloalto.py`, `rules_checkpoint.py`): lines from the legitimate members only (TRW-benign sources) or TRW (`lines.py`) - a percentile over everyone is raised by the attackers; rule ids are `RULE_ID_PATTERN`, families `RULE_FAMILY`; both rule sets run until story 4 - do not deploy story 2 alone.
@@ -759,7 +760,8 @@ Two more checks, each for its own layer:
 - **Windows sign-in rules** - `tests/check_windows_rules.py <scratch>` (gotcha #65): one attempt per
   4625 + 4771 / 4776, then `tests/gen_windows_domain.py` (seeded: a domain's three months, incidents
   W1-W9 and look-alikes, `ground_truth.csv`) scored per incident - no plain or look-alike row may be
-  flagged - and the real PurpleSharp spray.
+  flagged - and the real PurpleSharp spray; the lateral-movement and host rules (gotcha #66) on the same
+  quarter and the real OTRF RDP / LSASS capture.
 - **AI review of suggestions** - `tests/check_triage.py <scratch>` (gotcha #64): the facts, the schema's
   enums, the address and cross-citation checks, a model that cannot be reached; a fake model, no Ollama.
 - **Products and periods** - `tests/check_products.py <scratch>` (gotcha #61): product per row, a
@@ -813,7 +815,8 @@ R2006 177 / R2008 3, and 54 files of the lab's Security events rendered in Splun
 `tests/make_splunk_text.ps1`) and, in `tests/samples`, `windows-security.log` 0 -> 4 rows plus
 `windows-security-text-spray.log` (162 rows, R2000 20 / R2009 20 - since 2026-10-26 WIN-BRUTE-2
 40, and `windows-security-xml-spray.log` 50 -> WIN-BRUTE-2 100: each attempt is a 4625 + a 4776,
-both flagged now, gotcha #65; the lab's Windows entries were not re-run - the folder is gone).
+both flagged now, gotcha #65; the lab's Windows entries were not re-run - the folder is gone;
+`otrf/rdp_interactive_taskmanager_lsass_dump.json` 0 -> WIN-LAT-3 1, gotcha #66).
 W4 added `winlogbeat/` (Elastic's 105 test `.evtx` and the 113 JSON files Winlogbeat wrote from
 them) and `nxlog/` (7 OTRF datasets, 2 of them flat JSON kept as no_reader) - 225 entries, 0
 flagged - and `tests/samples/otrf/` (283 NXLog records, 0 flagged).
@@ -877,7 +880,7 @@ techniques match the SQL - run it with the parity check.
 
 Current set: **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
 CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **Windows** WIN-BRUTE-1..3,
-WIN-AUTH-1 (gotcha #65) · **generic** (every other product's rows; superseded on Palo Alto /
+WIN-AUTH-1 (gotcha #65), WIN-LAT-1..3, WIN-HOST-1..2 (gotcha #66) · **generic** (every other product's rows; superseded on Palo Alto /
 Check Point rows, and the sign-in ones on Windows rows, gotcha #63): R2000 brute-force burst · R2002
 port scan · R2003 service sweep · R2004 policy gap · R2005 spray (many sources, one account) ·
 R2006 multi-source logins within an hour · R2007 beaconing · R2008 login after brute force ·

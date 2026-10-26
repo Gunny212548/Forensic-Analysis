@@ -61,6 +61,10 @@ NOT_APPLICABLE: dict[tuple[str, str], str] = {
         "5157 would; not read yet)",
     ("windows", "data-apps"):
         "Windows Security and Sysmon logs carry no byte counts",
+    # The host areas (W-D3): a firewall sees connections, not what ran on a host.
+    **{(fw, area): "A firewall log records connections, not what ran on a host"
+       for fw in ("paloalto", "checkpoint", "fortigate", "cisco")
+       for area in ("lateral-movement", "host-activity")},
 }
 
 

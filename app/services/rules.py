@@ -566,7 +566,8 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
         params = None
         if rid in RULE_PREPARE:
             params, record = RULE_PREPARE[rid](con)
-            if lines is not None:
+            # A preparation that draws no line (it builds tables) returns no record.
+            if lines is not None and record is not None:
                 lines[rid] = record
         before = con.execute("SELECT count(*) FROM findings").fetchone()[0]
         con.execute(sql, params or None)

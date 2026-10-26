@@ -138,7 +138,14 @@ SAMPLES comes back if `D:\logtest\windows` is restored (Q64, paused).
   W-D4 as built: a DC's 4771 / 4776 / 4768 joins a host's 4625 / 4624 of the same account and
   outcome within one second; the same event id twice is two attempts.
 - **5b - lateral movement and host activity:** WIN-LAT-1..3, WIN-HOST-1..2, the two areas (W-D3),
-  the events to type.
+  the events to type. **Built 2026-10-26** (gotcha #66). Q87 (the user, 2026-10-26): WIN-LAT-1 flags
+  an RDP session that ran a process only when its (source, account, host) shows RDP on **one day**
+  of the evidence (AN0931's first-time pairs) - admins' recurring sessions are a habit. No event was
+  typed: the five rules need only 4624 / 4688 / 4697 / 4698 / 4769 and Sysmon 1 / 10 / 11, already
+  typed; 4778 (RDP reconnect), 5140 / 5145 and 7045 wait for their pages and a rule that needs them.
+  Synthetic quarter: W5, W7, W8 found, the Zabbix rollout found (btp), 0 plain or look-alike events.
+  Real OTRF RDP capture: the outside client's NTLM logon found (WIN-LAT-3); the reconnect (type 7)
+  and the dump without a Sysmon 10 missed - blind spots on the rules.
 - **5c - network on the host:** WIN-MAL-1, WIN-INTEL-1..3.
 - Not in story 5: SigmaHQ's single-event rules - ADR-006's own story.
 

@@ -140,7 +140,9 @@ def main() -> int:
         elif label != "btp":
             wrong[(rid, label)] += 1
     expect = {"W1": {"WIN-BRUTE-2", "WIN-AUTH-1"}, "W2": {"WIN-BRUTE-1"}, "W6": {"WIN-BRUTE-1", "WIN-AUTH-1"},
-              "W9": {"WIN-BRUTE-3"}}
+              "W9": {"WIN-BRUTE-3"},
+              # story 5b
+              "W5": {"WIN-HOST-1"}, "W7": {"WIN-LAT-1", "WIN-HOST-2"}, "W8": {"WIN-LAT-2", "WIN-LAT-3"}}
     for inc, rids in expect.items():
         check(rids <= found[inc], f"{inc} found by {sorted(rids)} ({sorted(found[inc])})")
     check(not wrong, f"no plain or look-alike event flagged ({dict(wrong)})")
@@ -158,7 +160,22 @@ def main() -> int:
           "Scanning and Data transfer are n/a on Windows, with a reason")
     check({"WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3"} <= set(w.get("account-attacks", {}).get("rules", [])),
           "Brute force on Windows runs the WIN rules")
+    check(set(w.get("lateral-movement", {}).get("rules", [])) == {"WIN-LAT-1", "WIN-LAT-2", "WIN-LAT-3"}
+          and set(w.get("host-activity", {}).get("rules", [])) == {"WIN-HOST-1", "WIN-HOST-2"},
+          "the two host areas run the 5b rules")
+    lat2 = con.execute("SELECT count(DISTINCT descr) FROM findings WHERE rid = 'WIN-LAT-2' "
+                       "AND descr LIKE '%Zabbix%'").fetchone()[0]
+    check(lat2 == 4, f"the agent rollout to 4 servers is found - a benign true positive for the analyst ({lat2})")
+    seq = con.execute("SELECT w.event_id, count(*) FROM findings f JOIN win_events w USING (row_id) "
+                      "WHERE f.rid = 'WIN-LAT-1' GROUP BY 1 ORDER BY 1").fetchall()
+    check(dict(seq).get(4624) == 1 and dict(seq).get(4688, 0) >= 6,
+          f"WIN-LAT-1 flags the logon and the processes of its session ({seq})")
     con.close()
+    from app.services import products
+    fw = {d["product"]: {a["area"]: a for a in d["areas"]} for d in products.matrix(
+        ["paloalto"], __import__("app.services.rules", fromlist=["RULE_PRODUCT"]).RULE_PRODUCT)}
+    check(fw["paloalto"]["lateral-movement"]["status"] == "n/a" and fw["paloalto"]["host-activity"]["status"] == "n/a",
+          "a firewall shows the host areas as n/a, with a reason")
 
     print("real data: attack_data's purplesharp spray")
     sample = Path(args.repo) / "tests" / "samples" / "attack-data" / "windows-security-xml-spray.log"
@@ -166,6 +183,17 @@ def main() -> int:
     rows = con.execute("SELECT w.event_id, count(*) FROM findings f JOIN win_events w USING (row_id) "
                        "WHERE f.rid = 'WIN-BRUTE-2' GROUP BY 1 ORDER BY 1").fetchall()
     check(rows == [(4625, 50), (4776, 50)], f"50 attempts, each a 4625 and a 4776, flagged as a spray ({rows})")
+    con.close()
+
+    print("real data: OTRF's RDP session and Task Manager LSASS dump")
+    sample = Path(args.repo) / "tests" / "samples" / "otrf" / "rdp_interactive_taskmanager_lsass_dump.json"
+    cid, man, con = run(sample, "json")
+    got = dict(con.execute("SELECT rid, count(*) FROM findings GROUP BY rid").fetchall())
+    check(got == {"WIN-LAT-3": 1}, f"the outside client's NTLM logon is WIN-LAT-3's ({got})")
+    # Known, measured (rule_meta blind spots): the reconnect is 4624 type 7 and its processes carry the
+    # first logon's id, which is not in the capture; the dump file has no Sysmon 10 before it.
+    check("WIN-LAT-1" not in got and "WIN-HOST-2" not in got,
+          "the RDP reconnect and the dump without an access event are not found (blind spots, said so)")
     con.close()
 
     print("\nWINDOWS RULES OK" if not FAILED else f"\n{len(FAILED)} FAILED")

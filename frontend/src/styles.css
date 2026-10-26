@@ -653,7 +653,8 @@
   .area-title { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 14px; }
   .area-title h2 { margin: 0; }
   .area-title .muted { font-size: 12px; }
-  .area-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  /* Eight areas since the host areas (specs/windows_rules.md W-D3): two rows of four. */
+  .area-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
   .area-card { --tone: var(--ok); display: flex; flex-direction: column; gap: 10px; min-height: 126px;
     padding: 14px 16px 0; overflow: hidden; text-decoration: none; color: inherit;
     background: var(--panel); border: 1px solid var(--panel-border); border-top: 3px solid var(--tone);

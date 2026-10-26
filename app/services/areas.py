@@ -28,6 +28,13 @@ AREAS: list[dict] = [
     {"id": "data-apps", "name": "Data transfer",
      "about": "Large outbound transfers",
      "rids": ("R3001",)},
+    # Host areas (specs/windows_rules.md W-D3, Q83): what a host's own log shows.
+    {"id": "lateral-movement", "name": "Lateral movement",
+     "about": "Uncommon RDP followed by commands, remote services and tasks, NTLM logons without Kerberos",
+     "rids": ("WIN-LAT-1", "WIN-LAT-2", "WIN-LAT-3")},
+    {"id": "host-activity", "name": "Host activity",
+     "about": "Credential theft on a host: Kerberoasting, LSASS dumped",
+     "rids": ("WIN-HOST-1", "WIN-HOST-2")},
     {"id": "threat-intel", "name": "Threat intelligence",
      "about": "Traffic to or from addresses on the threat-intel feeds",
      "rids": ("R3003", "R3004", "R3005", "PAN-INTEL-1", "PAN-INTEL-2", "PAN-INTEL-3",

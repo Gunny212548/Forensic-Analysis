@@ -54,6 +54,12 @@ TACTICS = {
     "t1041": ["exfiltration"],
     "t1105": ["command_and_control"],
     "t1190": ["initial_access"],
+    # Windows story 5b - each technique page's Tactic field (content v20.0, read 2026-10-26).
+    "t1021": ["lateral_movement"],
+    "t1569": ["execution"],
+    "t1550": ["lateral_movement"],
+    "t1558": ["credential_access"],
+    "t1003": ["credential_access"],
 }
 
 # The Enterprise tactics in the order ATT&CK lists them (attack.mitre.org/tactics/enterprise,
@@ -817,6 +823,128 @@ RULE_META.update({
             "validation": _WIN_VALIDATION.format(found="W1 (the sprayed account's TGT), W6 (adm.backup), W7 "
                                                        "(adm.backup reused on RDP)"),
             "response": "High: the account is likely in the attacker's hands - read what it did next.",
+        },
+    },
+})
+
+# Story 5b: sequences on one host, joined by the logon session (TargetLogonId -> SubjectLogonId /
+# Sysmon LogonId) or the Sysmon process GUID - no window, no number (W-D2).
+_WIN_SESSION = ("Joined by the session: a 4624's TargetLogonId is the SubjectLogonId of the 4688 / 4697 / "
+                "4698 it causes on that host and Sysmon 1's LogonId; an event belongs to the latest 4624 "
+                "of that id on that host before it.")
+_WIN_5B = ("Synthetic Windows quarter (tests/gen_windows_domain.py, ground truth): {found}; no plain or "
+           "look-alike event flagged. tests/check_windows_rules.py.")
+RULE_META.update({
+    "WIN-LAT-1": {
+        "id": "319f4e3a-3548-4f75-900f-f4cf01631855",
+        "title": "Windows: uncommon RDP, then commands",
+        "status": "experimental",
+        "techniques": ["T1021.001"],
+        "category": "process_creation", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["An administrator connecting to a server for the first and only time in the "
+                           "evidence", "Evidence of one day: every pair is seen on one day"],
+        "ads": {
+            "goal": "Detect an RDP logon followed by process execution, from a source / account / host "
+                    "combination that is not a habit (T1021.001 DET0327 AN0931, its HostAccessPatterns: "
+                    "\"first-time source/destination pairs\").",
+            "strategy": "4624 LogonType 10 with a source address, then 4688 / Sysmon 1 in that session; "
+                        "flagged when the (source, account, host) shows RDP on one day of the evidence only "
+                        "(the user's choice, 2026-10-26). The finding lists what ran.",
+            "technical_context": _WIN_SESSION,
+            "blind_spots": "An attacker returning on several days; an RDP reconnect to an existing session "
+                           "(4624 type 7 + 4778 - its processes carry the first logon's id; measured on the "
+                           "OTRF RDP capture); a session whose 4624 is outside the evidence.",
+            "validation": _WIN_5B.format(found="W7, RDP from a user workstation as adm.backup, then "
+                                               "discovery and procdump; admins' recurring RDP not flagged"),
+            "response": "Read the commands; ask whether the account's owner made the connection.",
+        },
+    },
+    "WIN-LAT-2": {
+        "id": "71f1f03c-2637-4231-b293-d8272558835f",
+        "title": "Windows: remote service or task in a network logon",
+        "status": "experimental",
+        "techniques": ["T1021.002", "T1569.002"],
+        "category": "process_creation", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["Software deployment tools (SCCM, monitoring agents) installing a service remotely",
+                           "Administrators using PsExec"],
+        "ads": {
+            "goal": "Detect a service or scheduled task created through a network logon - PsExec's shape "
+                    "(T1021.002 DET0530 AN1468; T1569.002 DET0421 AN1185).",
+            "strategy": "4624 LogonType 3, then 4697 (service installed) or 4698 (task created) in that "
+                        "session on that host. A service carries T1569.002 too.",
+            "technical_context": _WIN_SESSION + " A service installed through the System log only (7045) "
+                                                "has no session and is not read.",
+            "blind_spots": "Services created over WMI or with no 4697 audit; tasks on another host than the "
+                           "logon's.",
+            "validation": _WIN_5B.format(found="W8 PSEXESVC in the pass-the-hash session; the Zabbix rollout "
+                                               "found and labelled a benign true positive"),
+            "response": "Read the service's file and what it ran; a deployment tool is closed as benign.",
+        },
+    },
+    "WIN-LAT-3": {
+        "id": "7499c1dc-23c3-42f3-b982-05ef8e188ba8",
+        "title": "Windows: NTLM network logon without Kerberos",
+        "status": "experimental",
+        "techniques": ["T1550.002"],
+        "category": "authentication", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["A user reaching a host from a computer outside the domain (NLA from home)",
+                           "Access by address instead of name, which falls back to NTLM"],
+        "ads": {
+            "goal": "Detect NTLM network logons \"with no accompanying domain logon events\" (T1550.002 "
+                    "DET0409 AN1144) - a sign of pass-the-hash.",
+            "strategy": "4624 LogonType 3, AuthenticationPackageName NTLM, from an address, for an account "
+                        "that has Kerberos tickets (4768 / 4769 status 0x0) in the evidence but never from "
+                        "that address. Computer accounts and ANONYMOUS LOGON left out.",
+            "technical_context": "Needs the domain controller's 4768 / 4769 in the same case; an account with "
+                                 "no Kerberos at all (a scanner on a share) is not anomalous by this test.",
+            "blind_spots": "Pass-the-hash from a host the victim also used legitimately; a case without the "
+                           "DC's log.",
+            "validation": _WIN_5B.format(found="W8, adm.it from WS023 to FS01 / SQL01 / DC01; the scanner's "
+                                               "NTLM-only account not flagged") +
+                          " Real: OTRF RDP capture - the NLA logon from the outside client (1.2.3.4).",
+            "response": "High: read where the account's hash could have been taken (WIN-HOST-2).",
+        },
+    },
+    "WIN-HOST-1": {
+        "id": "f4335dd9-1620-4ed5-8697-104a179688be",
+        "title": "Windows: Kerberoasting",
+        "status": "experimental",
+        "techniques": ["T1558.003"],
+        "category": "authentication", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["A legacy application whose service accounts only support RC4, used by one "
+                           "account for many services"],
+        "ads": {
+            "goal": "Detect one account asking for weak-encryption service tickets for several services in "
+                    "a short time (T1558.003 DET0157 AN0444).",
+            "strategy": "4769 status 0x0 with a Ticket Encryption Type other than 0x11 / 0x12 (Microsoft "
+                        "4769), services of people only (no ...$, no krbtgt); distinct services per account "
+                        "within any hour. Line on the accounts' AES-only requests (lines.py), at least 2.",
+            "technical_context": "Needs the domain controller's 4769.",
+            "blind_spots": "Roasting slowly (one service an hour); AES roasting; AS-REP roasting (4768).",
+            "validation": _WIN_5B.format(found="W5, 14 RC4 tickets in 90 s; the finance users' daily RC4 "
+                                               "ticket to one legacy service not flagged"),
+            "response": "High: the service accounts' passwords should be changed.",
+        },
+    },
+    "WIN-HOST-2": {
+        "id": "61e80a22-14db-42cd-b13a-8602b8ea190b",
+        "title": "Windows: LSASS read, then a file written",
+        "status": "experimental",
+        "techniques": ["T1003.001"],
+        "category": "process_access", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["Security products that read lsass and write their own files"],
+        "ads": {
+            "goal": "Detect a process that opens lsass.exe and then writes a file - a memory dump "
+                    "(T1003.001 DET0363 AN1030).",
+            "strategy": "Sysmon 10 with TargetImage lsass.exe, then Sysmon 11 by the same process "
+                        "(SourceProcessGUID = ProcessGuid) on the same host. Registry writes are left out.",
+            "technical_context": "Needs Sysmon with process access (10) and file creation (11) logged.",
+            "blind_spots": "A Sysmon configuration that does not log the access (measured: the OTRF Task "
+                           "Manager dump has the lsass.DMP file but no Sysmon 10 for it); dumps written by "
+                           "another process.",
+            "validation": _WIN_5B.format(found="W7, procdump on RDS01; Defender's daily lsass read with no "
+                                               "file not flagged"),
+            "response": "High: every account signed in on that host should be treated as exposed.",
         },
     },
 })

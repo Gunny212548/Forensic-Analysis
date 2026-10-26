@@ -64,7 +64,7 @@ finding ใดต้อง <b>เข้า workflow</b>, การวัด <b>M
 ป้ายที่แสดงให้ผู้ใช้เห็นคือชื่อระดับเสมอ</p>
 <div class="note">ไม่มี rule เดี่ยวตัวใดได้ระดับ critical เพราะ Sigma สงวน critical ไว้สำหรับกรณีที่ความน่าจะเป็น "เกือบแน่นอน"
 ซึ่งเหตุการณ์เดียวใน log แทบไม่เคยถึง ระดับ critical จึงมาจากการยกระดับตาม attack path (ข้อ 2.3) เท่านั้น
-ปัจจุบันมี rule ระดับ high 15 ตัว, medium 13 ตัว,
+ปัจจุบันมี rule ระดับ high 18 ตัว, medium 15 ตัว,
 low 6 ตัว, informational 0 ตัว</div>
 
 <h3>2.2 การจำกัดระดับเมื่อ firewall ปฏิเสธ</h3>
@@ -170,7 +170,7 @@ finding ระดับต่ำกว่ายังแสดงในเคส
 เพราะต้องใช้ข้อมูลผลกระทบและการกู้คืน ซึ่ง log อย่างเดียวให้ไม่ได้</li>
 <li><b>ODNI ↔ ATT&amp;CK:</b> ยังไม่พบเอกสารทางการที่จับคู่ทั้งสองไว้ การจับคู่เป็นของระบบเอง โดยยึดเส้นการบุกรุกที่ ODNI นิยามไว้</li>
 <li><b>ไม่มี rule ใดเป็น <i>stable</i></b> ตามนิยามของ Sigma: ตอนนี้มี 19 ตัวเป็น test
-และ 15 ตัวเป็น experimental เพราะเพิ่งพิสูจน์กับข้อมูลของลูกค้ารายเดียว</li>
+และ 20 ตัวเป็น experimental เพราะเพิ่งพิสูจน์กับข้อมูลของลูกค้ารายเดียว</li>
 <li>ยังไม่มีรูปแบบ <b>lateral movement</b> เพราะใน corpus ไม่มีข้อมูลที่ใช้ปรับเกณฑ์ได้</li>
 <li>เกณฑ์เข้า workflow (high ขึ้นไป) <b>ต่างจากถ้อยคำใน FR-4.3</b> ("Critical หรือ ≥ 2 family")
 ซึ่งเขียนไว้สำหรับสเกล 0-15 แบบเดิม</li>
@@ -213,6 +213,11 @@ finding ระดับต่ำกว่ายังแสดงในเคส
 <tr><td class='mono'>WIN-BRUTE-2</td><td>Windows: password spray</td><td class='lv lv-medium'>medium</td><td class='mono'>T1110.003</td><td>experimental</td><td>A shared terminal or jump host where many users mistype on their first sign-in</td></tr>
 <tr><td class='mono'>WIN-BRUTE-3</td><td>Windows: one account failing from many sources</td><td class='lv lv-medium'>medium</td><td class='mono'>T1110.001</td><td>experimental</td><td>A user moving between machines while the password is wrong</td></tr>
 <tr><td class='mono'>WIN-AUTH-1</td><td>Windows: sign-in after flagged failures</td><td class='lv lv-high'>high</td><td class='mono'>T1078</td><td>experimental</td><td>The owner signing in after mistyping (said so when the pair signed in before the failures began)</td></tr>
+<tr><td class='mono'>WIN-LAT-1</td><td>Windows: uncommon RDP, then commands</td><td class='lv lv-medium'>medium</td><td class='mono'>T1021.001</td><td>experimental</td><td>An administrator connecting to a server for the first and only time in the evidence</td></tr>
+<tr><td class='mono'>WIN-LAT-2</td><td>Windows: remote service or task in a network logon</td><td class='lv lv-medium'>medium</td><td class='mono'>T1021.002, T1569.002</td><td>experimental</td><td>Software deployment tools (SCCM, monitoring agents) installing a service remotely</td></tr>
+<tr><td class='mono'>WIN-LAT-3</td><td>Windows: NTLM network logon without Kerberos</td><td class='lv lv-high'>high</td><td class='mono'>T1550.002</td><td>experimental</td><td>A user reaching a host from a computer outside the domain (NLA from home)</td></tr>
+<tr><td class='mono'>WIN-HOST-1</td><td>Windows: Kerberoasting</td><td class='lv lv-high'>high</td><td class='mono'>T1558.003</td><td>experimental</td><td>A legacy application whose service accounts only support RC4, used by one account for many services</td></tr>
+<tr><td class='mono'>WIN-HOST-2</td><td>Windows: LSASS read, then a file written</td><td class='lv lv-high'>high</td><td class='mono'>T1003.001</td><td>experimental</td><td>Security products that read lsass and write their own files</td></tr>
 </table>
 
 <h2>9. แหล่งอ้างอิง</h2>

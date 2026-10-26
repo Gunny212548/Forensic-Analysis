@@ -2647,10 +2647,12 @@
   "rules": {}
  },
  "rdp_interactive_taskmanager_lsass_dump.json": {
-  "flagged": 0,
+  "flagged": 1,
   "md5": "18644d2ff70a4f8b327c92db146881bf",
   "rows": 283,
-  "rules": {}
+  "rules": {
+   "WIN-LAT-3": 1
+  }
  },
  "rdp_interactive_taskmanager_lsass_dump_2020-09-22043748.json": {
   "flagged": 0,
