@@ -749,8 +749,8 @@ Two more checks, each for its own layer:
 - **Detection accuracy** - `tests/gen_checkpoint_quarter.py <outdir>` (seeded): three months of
   Check Point Log Exporter records with attacks I1-I6 buried in an office's traffic and a
   `ground_truth.csv` for every non-benign row. Upload the zip, then score findings and the AI's
-  advice per incident against the ground truth (gotchas #62, #64). The file was not in git on
-  2026-10-22, nor are the scoring scripts.
+  advice per incident against the ground truth (gotchas #62, #64). In git since 2026-10-26; the
+  scoring scripts are not.
 - **Firewall rules** - `tests/check_firewall_rules.py` (gotcha #62): Palo Alto and Check Point -
   TRW, the measured line and the no-line case, each behaviour's non-events, service names where a
   log has no port, Detect as neither verdict, no product's rule on another product's rows.
