@@ -611,10 +611,10 @@ def _products_present(con: duckdb.DuckDBPyConnection) -> set[str]:
 
 # Product rule sets (D11), after everything above they import. They run after
 # the generic rules, which stay until story 4 retires them.
-from . import rules_checkpoint, rules_firewall, rules_paloalto  # noqa: E402
+from . import rules_checkpoint, rules_firewall, rules_paloalto, rules_windows  # noqa: E402
 
 _GENERIC = dict(RULES)
-for _mod in (rules_paloalto, rules_checkpoint):
+for _mod in (rules_paloalto, rules_checkpoint, rules_windows):
     for _rid, _sql in _mod.RULES + rules_firewall.from_generic(_mod.FROM_GENERIC, _GENERIC):
         RULES.append((_rid, _sql))
         RULE_PRODUCT[_rid] = _mod.PRODUCT

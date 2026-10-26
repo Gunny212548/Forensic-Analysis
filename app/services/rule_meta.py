@@ -720,6 +720,107 @@ RULE_META["CP-MAL-2"] = {
     },
 }
 
+# Windows (specs/windows_rules.md, story 5a): sign-ins from the Security log, one attempt however
+# many events record it (rules_windows.py).
+WINDOWS_SOURCES = ["windows-event-xml", "windows-evtx", "windows-splunk-text", "windows-winlogbeat-json",
+                   "windows-nxlog-json"]
+_WIN_ATTEMPT = ("Failures: 4625 SubStatus / Status 0xC000006A or 0xC0000064, 4771 Failure Code 0x18 or "
+                "0x6, 4776 Error Code 0xC000006A or 0xC0000064 (Microsoft's event pages); a DC's 4771 / "
+                "4776 within a second of a host's 4625 for the same account is the same attempt and counts "
+                "once. The source is the address (::ffff: read as IPv4), else a 4776's Source Workstation "
+                "name, else the host's console.")
+_WIN_VALIDATION = ("Synthetic Windows quarter (tests/gen_windows_domain.py, ground truth): {found}; no "
+                   "plain or look-alike event flagged. Real: attack_data purplesharp spray (XML and Splunk "
+                   "text) - 50 attempts logged as 4625 + 4776 on the DC, merged. tests/check_windows_rules.py.")
+RULE_META.update({
+    "WIN-BRUTE-1": {
+        "id": "5fdc5aef-7088-4d76-8353-3d0a7d41e4d8",
+        "title": "Windows: password guessing",
+        "status": "experimental",
+        "techniques": ["T1110.001"],
+        "category": "authentication", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["A service or scheduled task still using an old password",
+                           "A user retrying a forgotten password many times within an hour"],
+        "ads": {
+            "goal": "Detect a series of failed sign-ins against one account from one source (behaviour B1; "
+                    "T1110.001 DET0551 AN1521-AN1523).",
+            "strategy": "Failed attempts of one (account, source) within any hour. The line is measured on "
+                        "the evidence (lines.py, D16, Q66): above 2 x the 99th percentile of the sign-in "
+                        "episodes that ended in a success (failures in the hour before it), and at least 2; "
+                        "under 20 such episodes, no line.",
+            "technical_context": _WIN_ATTEMPT,
+            "blind_spots": "Guessing slower than the line per hour (B5, low-and-slow - no rule yet); guessing "
+                           "spread over sources (WIN-BRUTE-3); failures with other codes (locked, disabled).",
+            "validation": _WIN_VALIDATION.format(found="W2 RDP brute force (800) and W6 NTLM guessing "
+                                                       "(280 attempts, 560 events)"),
+            "response": "Read whether it ended in a success (WIN-AUTH-1) and what the source did next.",
+        },
+    },
+    "WIN-BRUTE-2": {
+        "id": "5149dab3-38c0-4676-9d78-feda3b013e3c",
+        "title": "Windows: password spray",
+        "status": "experimental",
+        "techniques": ["T1110.003"],
+        "category": "authentication", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["A shared terminal or jump host where many users mistype on their first sign-in"],
+        "ads": {
+            "goal": "Detect one source failing across many accounts (behaviour B2; T1110.003 DET0487 AN1336 / "
+                    "AN1339).",
+            "strategy": "TRW over accounts (Jung et al. 2004 §4, adapted from hosts to accounts): each "
+                        "source's first attempt at each account is a success or a failure; the paper's "
+                        "parameters decide sprayer / benign / pending, with no time window.",
+            "technical_context": _WIN_ATTEMPT,
+            "blind_spots": "A spray from many sources, a few accounts each; a source that also signs in "
+                           "successfully to most accounts it tries.",
+            "validation": _WIN_VALIDATION.format(found="W1 Kerberos spray (4771 on the DC, 71 accounts)"),
+            "response": "Read whether any sprayed account then signed in from the source (WIN-AUTH-1).",
+        },
+    },
+    "WIN-BRUTE-3": {
+        "id": "a892a19e-0134-45a4-9bf6-66f78c06b8af",
+        "title": "Windows: one account failing from many sources",
+        "status": "experimental",
+        "techniques": ["T1110.001"],
+        "category": "authentication", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["A user moving between machines while the password is wrong",
+                           "Several devices of one user holding an old password"],
+        "ads": {
+            "goal": "Detect guessing of one account spread over several sources (behaviour B3; AN1521 "
+                    "\"from one or more remote IPs\").",
+            "strategy": "Distinct failing sources of one account within any hour; computer accounts (names "
+                        "ending in $, Microsoft 4769) left out. Line on the accounts' own failures that were "
+                        "followed by a success from the same source within the hour, at least 2 sources.",
+            "technical_context": _WIN_ATTEMPT,
+            "blind_spots": "Distributed guessing slower than one source an hour per account.",
+            "validation": _WIN_VALIDATION.format(found="W9 distributed guessing (30 internet addresses)"),
+            "response": "Read where the sources come from and whether the account then signed in.",
+        },
+    },
+    "WIN-AUTH-1": {
+        "id": "c92b388f-b4d1-4542-93e8-1bfb906bcd9e",
+        "title": "Windows: sign-in after flagged failures",
+        "status": "experimental",
+        "techniques": ["T1078"],
+        "category": "authentication", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["The owner signing in after mistyping (said so when the pair signed in before "
+                           "the failures began)"],
+        "ads": {
+            "goal": "Detect the success that follows guessing or spraying (behaviour B4; T1110 DET0463 "
+                    "AN1275 / AN1276, AN1522, AN1524).",
+            "strategy": "A success (4624 interactive / network / unlock / RDP / cached, 4768 or 4776 status "
+                        "0x0) from a source WIN-BRUTE-1..3 flagged, after its first flagged failure: for the "
+                        "same account, or for any account when the source was a sprayer. A pair that signed "
+                        "in before the failures began is named likely the owner (Javed & Paxson §4.2).",
+            "technical_context": _WIN_ATTEMPT,
+            "blind_spots": "A success from another source than the failures; failures the BRUTE rules did "
+                           "not flag.",
+            "validation": _WIN_VALIDATION.format(found="W1 (the sprayed account's TGT), W6 (adm.backup), W7 "
+                                                       "(adm.backup reused on RDP)"),
+            "response": "High: the account is likely in the attacker's hands - read what it did next.",
+        },
+    },
+})
+
 
 def tags(rid: str) -> list[str]:
     """Sigma tags: tactic(s) first, then the techniques, lower-case."""

@@ -25,7 +25,8 @@ events -> Attack timeline -> Attack path / graph -> Report**; the Respond step
 product has its own rules over six areas, every rule names its behaviour and the document
 saying why it is a finding, and its line comes from the case's own evidence (legitimate
 members only) or TRW - no number set on one customer applied to another. Palo Alto and Check
-Point have theirs; the generic R-rules still run on every other product's rows. **Before the
+Point have theirs, Windows its sign-in rules (gotcha #65, `specs/windows_rules.md`); the generic
+R-rules still run on every other product's rows. **Before the
 analyst decides, an AI reviews every suggestion** (gotcha #64). **Every step must cite a
 standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
 revisions 1-4 on branch `IAI-92-identify-logsource`; most of what follows still
@@ -365,7 +366,8 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
-- #63 Generic rules are superseded per product (`RULE_SUPERSEDED`: not on Palo Alto / Check Point rows, still on FortiGate, ESXi, sshd, Entra, Windows); escalations and VERIS count behaviours via `RULE_EQUIVALENT` / `generic_sql`; baseline re-taken (668 entries).
+- #65 Windows sign-in rules (`rules_windows.py`): one attempt however many events record it - a DC's 4771 / 4776 within 1 s of a host's 4625 joins it, its address kept; 4771 / 4776 counted (Q84 reverses Q41); WIN-BRUTE-1..3 / WIN-AUTH-1 supersede R2000 / R2005 / R2006 / R2008 / R2009 on Windows rows; measured on `tests/gen_windows_domain.py`.
+- #63 Generic rules are superseded per product (`RULE_SUPERSEDED`: not on Palo Alto / Check Point rows, nor the sign-in rules on Windows rows (#65); still on FortiGate, ESXi, sshd, Entra); escalations and VERIS count behaviours via `RULE_EQUIVALENT` / `generic_sql`; baseline re-taken (668 entries).
 - #62 Firewall rules (`rules_firewall.py` shared, `rules_paloalto.py`, `rules_checkpoint.py`): lines from the legitimate members only (TRW-benign sources) or TRW (`lines.py`) - a percentile over everyone is raised by the attackers; rule ids are `RULE_ID_PATTERN`, families `RULE_FAMILY`; both rule sets run until story 4 - do not deploy story 2 alone.
 - #61 Every row carries its product (`products.py`, written after ingest - readers insert positionally); a product rule (`rules.RULE_PRODUCT`) reads `product_events` only; n/a per product and area with its reason; the period each evidence item covers (`period.py`). Story 1 of `specs/per_product_rules.md`.
 - #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; W3 Splunk WinEventLog text: items named from Windows' own message templates (`app/data/windows`, `tools/export_win_templates.ps1`), values as rendered. W4 Winlogbeat / NXLog JSON (`json_shape`): Winlogbeat writes rendered values and leaves out empty items; NXLog's own fields set aside by its documented list, but a template-named item always kept.
@@ -754,6 +756,10 @@ Two more checks, each for its own layer:
 - **Firewall rules** - `tests/check_firewall_rules.py` (gotcha #62): Palo Alto and Check Point -
   TRW, the measured line and the no-line case, each behaviour's non-events, service names where a
   log has no port, Detect as neither verdict, no product's rule on another product's rows.
+- **Windows sign-in rules** - `tests/check_windows_rules.py <scratch>` (gotcha #65): one attempt per
+  4625 + 4771 / 4776, then `tests/gen_windows_domain.py` (seeded: a domain's three months, incidents
+  W1-W9 and look-alikes, `ground_truth.csv`) scored per incident - no plain or look-alike row may be
+  flagged - and the real PurpleSharp spray.
 - **AI review of suggestions** - `tests/check_triage.py <scratch>` (gotcha #64): the facts, the schema's
   enums, the address and cross-citation checks, a model that cannot be reached; a fake model, no Ollama.
 - **Products and periods** - `tests/check_products.py <scratch>` (gotcha #61): product per row, a
@@ -805,7 +811,9 @@ Windows detections are the SigmaHQ story's). The clone's stray `.log` / `.txt` /
 came in with them. W3 added `splunk-text/` (attack_data's account_lockout, 9,245 rows, R2000 24 /
 R2006 177 / R2008 3, and 54 files of the lab's Security events rendered in Splunk's layout by
 `tests/make_splunk_text.ps1`) and, in `tests/samples`, `windows-security.log` 0 -> 4 rows plus
-`windows-security-text-spray.log` (162 rows, R2000 20 / R2009 20).
+`windows-security-text-spray.log` (162 rows, R2000 20 / R2009 20 - since 2026-10-26 WIN-BRUTE-2
+40, and `windows-security-xml-spray.log` 50 -> WIN-BRUTE-2 100: each attempt is a 4625 + a 4776,
+both flagged now, gotcha #65; the lab's Windows entries were not re-run - the folder is gone).
 W4 added `winlogbeat/` (Elastic's 105 test `.evtx` and the 113 JSON files Winlogbeat wrote from
 them) and `nxlog/` (7 OTRF datasets, 2 of them flat JSON kept as no_reader) - 225 entries, 0
 flagged - and `tests/samples/otrf/` (283 NXLog records, 0 flagged).
@@ -868,8 +876,9 @@ tests/check_rule_meta.py` fails until the metadata exists and its
 techniques match the SQL - run it with the parity check.
 
 Current set: **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
-CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **generic** (every other product's
-rows; superseded on Palo Alto / Check Point rows, gotcha #63): R2000 brute-force burst · R2002
+CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **Windows** WIN-BRUTE-1..3,
+WIN-AUTH-1 (gotcha #65) · **generic** (every other product's rows; superseded on Palo Alto /
+Check Point rows, and the sign-in ones on Windows rows, gotcha #63): R2000 brute-force burst · R2002
 port scan · R2003 service sweep · R2004 policy gap · R2005 spray (many sources, one account) ·
 R2006 multi-source logins within an hour · R2007 beaconing · R2008 login after brute force ·
 R2009 measured spray · R3001 large transfer (everywhere - no data-transfer rule yet) · R3002

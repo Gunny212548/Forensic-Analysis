@@ -54,6 +54,13 @@ NOT_APPLICABLE: dict[tuple[str, str], str] = {
     ("paloalto", "account-attacks"):
         "A Palo Alto Traffic log records sessions, not sign-ins (Q61); needs a GlobalProtect "
         "or Authentication log",
+    # specs/windows_rules.md: the Security and Sysmon logs record no refused
+    # connection (the Filtering Platform's 5157 would - not read yet) and no byte count.
+    ("windows", "scanning-policy"):
+        "Windows Security and Sysmon logs record no refused connection (the Filtering Platform's "
+        "5157 would; not read yet)",
+    ("windows", "data-apps"):
+        "Windows Security and Sysmon logs carry no byte counts",
 }
 
 

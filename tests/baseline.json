@@ -4062,21 +4062,19 @@
   "rules": {}
  },
  "windows-security-text-spray.log": {
-  "flagged": 20,
+  "flagged": 40,
   "md5": "d7d28e325fc6108166e5d36ac486d7e1",
   "rows": 162,
   "rules": {
-   "R2000": 20,
-   "R2009": 20
+   "WIN-BRUTE-2": 40
   }
  },
  "windows-security-xml-spray.log": {
-  "flagged": 50,
+  "flagged": 100,
   "md5": "589ecf58da9c91d05d9aca1150e8dd6d",
   "rows": 232,
   "rules": {
-   "R2000": 50,
-   "R2009": 50
+   "WIN-BRUTE-2": 100
   }
  },
  "windows-security.log": {

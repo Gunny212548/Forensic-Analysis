@@ -79,6 +79,15 @@ of the count because a DC can log them beside a 4625 for the same attempt. Propo
 per account, source and second** (an internal method, stated), so a doubled attempt counts once.
 The status values come from the 4771 / 4776 Microsoft pages already read for W1.
 
+As read (2026-10-26, `SOURCES.md`): a bad password is 4625 Status / SubStatus `0xC000006A`, 4771
+Failure Code (`Status`) `0x18`, 4776 Error Code `0xC000006A`; an unknown user name `0xC0000064` /
+4771 `0x6` (counted too - the analytics name failures "for valid or invalid users"). **4776 has no
+source address**, only the Source Workstation name, and it is logged on the DC for an NTLM attempt
+that the target host logs again as a 4625. So: 4625 and 4771 are counted with their IpAddress; a
+4776 is counted only when no 4625 for the same account falls in the same second, and its source is
+the workstation name, said so on the finding. A machine account (a name ending in `$`, "Computer
+account name ends with $", 4769 page) is left out of BRUTE-3.
+
 ## Proposed rules
 
 | Id | Behaviour | Windows events | Line / link | ATT&CK |
@@ -122,7 +131,12 @@ SAMPLES comes back if `D:\logtest\windows` is restored (Q64, paused).
 ## Stories (Q86)
 
 - **5a - sign-ins:** WIN-BRUTE-1..3, WIN-AUTH-1, W-D4, the domain generator, R-rules superseded on
-  Windows rows.
+  Windows rows. **Built 2026-10-26** (gotcha #65): on the synthetic quarter (88 files, 98,403 events)
+  W1, W2, W6, W9 and W7's reuse of the guessed account found, 0 plain or look-alike events flagged
+  (the generic rules: W1 missed, 3,079 plain rows); W3 low-and-slow missed (B5, no rule). One
+  incident added to the generator for B3: W9, distributed guessing from 30 internet addresses.
+  W-D4 as built: a DC's 4771 / 4776 / 4768 joins a host's 4625 / 4624 of the same account and
+  outcome within one second; the same event id twice is two attempts.
 - **5b - lateral movement and host activity:** WIN-LAT-1..3, WIN-HOST-1..2, the two areas (W-D3),
   the events to type.
 - **5c - network on the host:** WIN-MAL-1, WIN-INTEL-1..3.

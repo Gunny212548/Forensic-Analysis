@@ -10,14 +10,14 @@ Throwaway store, the real pipeline, no server. Checks:
 - the committed Splunk attack_data captures read to the letter: the Sysmon
   sample and PurpleSharp's NTLM spray (Security XML) - counts per event ID,
   event types, every item kept in win_events under its own name, UTC -> GMT+7;
-- the spray fires the existing sign-in rules (R2000, R2009) from 4625 and
-  IpAddress, and 4776 is typed but not counted (Q41);
+- the spray fires the Windows sign-in rules (WIN-BRUTE-2, rules_windows.py): the DC's 4625 and
+  4776 of each attempt count once (Q84, which reopened Q41) - tests/check_windows_rules.py has the rest;
 - a synthetic file: an XML declaration and an <Events> wrapper, an event that
   spans lines, a 1102 with UserData, unnamed Data items (param<n>), a damaged
   event counted and kept as text - never dropped;
 - the same counts through .gz and inside a .zip;
 - Splunk's classic text (W3): attack_data's PurpleSharp spray capture named item by item
-  from Windows' message templates (R2000 / R2009 as for XML), hex values in the stored
+  from Windows' message templates (WIN-BRUTE-2 as for XML), hex values in the stored
   form, multi-line values whole, damage and unmatched messages kept, .gz / .zip.
 - JSON (W4): synthetic Winlogbeat records (event_data, user_data, an Elasticsearch `_source`,
   a broken line) and OTRF's NXLog records (tests/samples/otrf, MIT): identification, items under
@@ -254,8 +254,8 @@ def check_json(lab: Path | None, scratch: Path, run, win, query) -> None:
     check(m["status"] == "ready" and (w.get("events"), w.get("unreadable")) == (14, 1)
           and m["mapping"]["json"]["unparseable"] == 1,
           f"14 events, the broken line kept as a row and counted ({w.get('events')}, {w.get('unreadable')})")
-    check(m.get("rules_matched") == {"R2000": 12, "R2008": 1},
-          f"12 failures then a sign-in from one address: R2000, R2008 ({m.get('rules_matched')})")
+    check(m.get("rules_matched") == {"WIN-BRUTE-1": 12, "WIN-AUTH-1": 1},
+          f"12 failures then a sign-in from one address: WIN-BRUTE-1, WIN-AUTH-1 ({m.get('rules_matched')})")
     row = query(m["case_id"], "SELECT e.ts, e.srcip, w.data['Status'] FROM raw_events e JOIN win_events w "
                 "USING (row_id) WHERE w.event_id = 4625 ORDER BY row_id LIMIT 1")[0]
     check(str(row[0]) == "2026-03-01 08:00:00.123456" and row[1:] == ("203.0.113.7", "0xc000006d"),
@@ -348,8 +348,9 @@ def check_splunk(lab: Path | None, scratch: Path, run, win, query) -> None:
     w = win(m)
     check(m["status"] == "ready" and (w.get("events"), w.get("unreadable"), w.get("unmatched_messages")) == (162, 0, 0),
           f"162 events, every message named from its template ({w.get('events')}, {w.get('unmatched_messages')})")
-    check(m.get("rules_matched") == {"R2000": 20, "R2009": 20},
-          f"the spray fires R2000 and R2009 as the XML capture does ({m.get('rules_matched')})")
+    check(m.get("rules_matched") == {"WIN-BRUTE-2": 40},
+          f"the spray fires WIN-BRUTE-2 as the XML capture does - 20 attempts, a 4625 and a 4776 each "
+          f"({m.get('rules_matched')})")
     row = query(m["case_id"], "SELECT e.ts, e.ts_raw, e.srcip, e.username, e.app, w.data FROM raw_events e "
                 "JOIN win_events w USING (row_id) WHERE w.event_id = 4625 ORDER BY row_id LIMIT 1")[0]
     d = row[5]
@@ -403,8 +404,8 @@ def check_splunk(lab: Path | None, scratch: Path, run, win, query) -> None:
     check(m["status"] == "ready" and (w.get("events"), w.get("unmatched_messages"), ids) == (9245, 0, 46),
           f"attack_data account_lockout: 9,245 events of 46 event IDs, every message named "
           f"({w.get('events')}, {w.get('unmatched_messages')}, {ids} IDs)")
-    check(m.get("rules_matched", {}).get("R2000") == 24 and m.get("rules_matched", {}).get("R2008") == 3,
-          f"the account brute-forced, then signed in to (R2000, R2008) ({m.get('rules_matched')})")
+    check(m.get("rules_matched", {}).get("WIN-BRUTE-1") and m.get("rules_matched", {}).get("WIN-AUTH-1"),
+          f"the account brute-forced, then signed in to (WIN-BRUTE-1, WIN-AUTH-1) ({m.get('rules_matched')})")
 
     # Windows' own rendering of the lab's Security events (tests/make_splunk_text.ps1),
     # read back and compared item by item with the same events' XML.
@@ -489,8 +490,8 @@ def main() -> int:
     ids = dict(query(m["case_id"], "SELECT event_id, count(*) FROM win_events GROUP BY 1"))
     check(ids == {4625: 50, 4776: 50, 4648: 50, 4688: 36, 4624: 21, 4634: 21, 4672: 3, 4719: 1},
           f"every event ID counted as in the capture ({ids})")
-    check(m.get("rules_matched") == {"R2000": 50, "R2009": 50},
-          f"the spray fires R2000 and R2009 from 4625 + IpAddress ({m.get('rules_matched')})")
+    check(m.get("rules_matched") == {"WIN-BRUTE-2": 100},
+          f"the spray fires WIN-BRUTE-2 - 50 attempts, a 4625 and a 4776 each ({m.get('rules_matched')})")
     acts = dict(query(m["case_id"], "SELECT coalesce(action, '-'), count(*) FROM raw_events GROUP BY 1"))
     check(acts.get("auth_failed") == 50 and acts.get("ntlm_validation") == 50,
           "4625 is a sign-in failure; 4776 typed, not counted as one (Q41)")

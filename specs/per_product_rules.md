@@ -222,7 +222,9 @@ docs. Cases processed before keep their R-ids until re-processed.
    Windows have no rule set yet, and deleting the R-rules would have left them with none. R3001
    and the sign-in rules stay everywhere. Escalations and VERIS count behaviours
    (`RULE_EQUIVALENT`). Baseline 648 -> 668, every move a rename or a new product-rule finding.
-5. Windows · 6. Linux · 7. FortiGate · 8. Cisco (reader first).
+5. Windows - its own design, `specs/windows_rules.md` (5a sign-ins **built 2026-10-26**, gotcha #65;
+   5b lateral movement / host activity, 5c Sysmon network) · 6. Linux · 7. FortiGate · 8. Cisco
+   (reader first).
 
 ## Questions
 

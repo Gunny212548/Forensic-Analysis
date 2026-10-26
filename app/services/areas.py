@@ -13,11 +13,11 @@ would be counted nowhere on the Overview.
 AREAS: list[dict] = [
     {"id": "authentication", "name": "Authentication",
      "about": "Logins that succeeded after an attack, one account logging in from many sources",
-     "rids": ("R2008", "R2006")},
+     "rids": ("R2008", "R2006", "WIN-AUTH-1")},
     {"id": "account-attacks", "name": "Brute force & spraying",
      "about": "Repeated failures from one source, one source failing against many accounts, "
               "one account failing from many sources",
-     "rids": ("R2000", "R2009", "R2005")},
+     "rids": ("R2000", "R2009", "R2005", "WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3")},
     {"id": "scanning-policy", "name": "Scanning & policy",
      "about": "Port scans, service sweeps, traffic allowed despite many blocks",
      "rids": ("R2002", "R2003", "R2004", "PAN-SCAN-1", "PAN-SCAN-2", "PAN-SCAN-3",

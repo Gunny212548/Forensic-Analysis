@@ -2,13 +2,13 @@
 <html lang="th"><head><meta charset="utf-8">
 <title>วิธีวัดระดับผลการวิเคราะห์ - forensic-analyzer</title>
 <style>
-@font-face{font-family:'PlexThai';font-weight:400;src:url('file:///D:/forensic-analyzer-s4/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-thai-400-normal.woff2') format('woff2');}
-@font-face{font-family:'PlexThai';font-weight:400;src:url('file:///D:/forensic-analyzer-s4/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-latin-400-normal.woff2') format('woff2');}
-@font-face{font-family:'PlexThai';font-weight:600;src:url('file:///D:/forensic-analyzer-s4/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-thai-600-normal.woff2') format('woff2');}
-@font-face{font-family:'PlexThai';font-weight:600;src:url('file:///D:/forensic-analyzer-s4/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-latin-600-normal.woff2') format('woff2');}
-@font-face{font-family:'PlexThai';font-weight:700;src:url('file:///D:/forensic-analyzer-s4/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-thai-700-normal.woff2') format('woff2');}
-@font-face{font-family:'PlexThai';font-weight:700;src:url('file:///D:/forensic-analyzer-s4/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-latin-700-normal.woff2') format('woff2');}
-@font-face{font-family:'PlexMono';font-weight:400;src:url('file:///D:/forensic-analyzer-s4/frontend/node_modules/%40fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2') format('woff2');}
+@font-face{font-family:'PlexThai';font-weight:400;src:url('file:///D:/forensic-analyzer/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-thai-400-normal.woff2') format('woff2');}
+@font-face{font-family:'PlexThai';font-weight:400;src:url('file:///D:/forensic-analyzer/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-latin-400-normal.woff2') format('woff2');}
+@font-face{font-family:'PlexThai';font-weight:600;src:url('file:///D:/forensic-analyzer/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-thai-600-normal.woff2') format('woff2');}
+@font-face{font-family:'PlexThai';font-weight:600;src:url('file:///D:/forensic-analyzer/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-latin-600-normal.woff2') format('woff2');}
+@font-face{font-family:'PlexThai';font-weight:700;src:url('file:///D:/forensic-analyzer/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-thai-700-normal.woff2') format('woff2');}
+@font-face{font-family:'PlexThai';font-weight:700;src:url('file:///D:/forensic-analyzer/frontend/node_modules/%40fontsource/ibm-plex-sans-thai/files/ibm-plex-sans-thai-latin-700-normal.woff2') format('woff2');}
+@font-face{font-family:'PlexMono';font-weight:400;src:url('file:///D:/forensic-analyzer/frontend/node_modules/%40fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2') format('woff2');}
 @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
 body { font-family: 'PlexThai', sans-serif; font-size: 10.5pt; line-height: 1.6; color: #1d2330; }
 h1 { font-size: 20pt; margin: 0 0 4pt; color: #8a5200; }
@@ -36,7 +36,7 @@ ul { margin: 3pt 0 6pt 16pt; padding: 0; } li { margin: 1.5pt 0; }
 
 <div class="cover">
 <h1>วิธีวัดระดับผลการวิเคราะห์</h1>
-<div class="sub">forensic-analyzer · Finding Response Console · ฉบับวันที่ 2026-10-20<br>
+<div class="sub">forensic-analyzer · Finding Response Console · ฉบับวันที่ 2026-10-26<br>
 ตารางและเกณฑ์ในเอกสารนี้สร้างจากโค้ดของระบบโดยตรง (<code>tools/build_measurement_doc.py</code>)</div>
 </div>
 
@@ -64,8 +64,8 @@ finding ใดต้อง <b>เข้า workflow</b>, การวัด <b>M
 ป้ายที่แสดงให้ผู้ใช้เห็นคือชื่อระดับเสมอ</p>
 <div class="note">ไม่มี rule เดี่ยวตัวใดได้ระดับ critical เพราะ Sigma สงวน critical ไว้สำหรับกรณีที่ความน่าจะเป็น "เกือบแน่นอน"
 ซึ่งเหตุการณ์เดียวใน log แทบไม่เคยถึง ระดับ critical จึงมาจากการยกระดับตาม attack path (ข้อ 2.3) เท่านั้น
-ปัจจุบันมี rule ระดับ high 6 ตัว, medium 6 ตัว,
-low 2 ตัว, informational 0 ตัว</div>
+ปัจจุบันมี rule ระดับ high 15 ตัว, medium 13 ตัว,
+low 6 ตัว, informational 0 ตัว</div>
 
 <h3>2.2 การจำกัดระดับเมื่อ firewall ปฏิเสธ</h3>
 <p>แถวที่ firewall บล็อก (deny, drop, reject, reset ฯลฯ) จะมีระดับ <b>ไม่เกิน medium</b> ไม่ว่าจะเป็น rule ใด
@@ -169,8 +169,8 @@ finding ระดับต่ำกว่ายังแสดงในเคส
 <li><b>CISA NCISS:</b> ระบบสอดคล้องกับ attribute "Observed Activity" แต่ไม่ได้คำนวณคะแนน NCISS
 เพราะต้องใช้ข้อมูลผลกระทบและการกู้คืน ซึ่ง log อย่างเดียวให้ไม่ได้</li>
 <li><b>ODNI ↔ ATT&amp;CK:</b> ยังไม่พบเอกสารทางการที่จับคู่ทั้งสองไว้ การจับคู่เป็นของระบบเอง โดยยึดเส้นการบุกรุกที่ ODNI นิยามไว้</li>
-<li><b>ไม่มี rule ใดเป็น <i>stable</i></b> ตามนิยามของ Sigma: ตอนนี้มี 11 ตัวเป็น test
-และ 3 ตัวเป็น experimental เพราะเพิ่งพิสูจน์กับข้อมูลของลูกค้ารายเดียว</li>
+<li><b>ไม่มี rule ใดเป็น <i>stable</i></b> ตามนิยามของ Sigma: ตอนนี้มี 19 ตัวเป็น test
+และ 15 ตัวเป็น experimental เพราะเพิ่งพิสูจน์กับข้อมูลของลูกค้ารายเดียว</li>
 <li>ยังไม่มีรูปแบบ <b>lateral movement</b> เพราะใน corpus ไม่มีข้อมูลที่ใช้ปรับเกณฑ์ได้</li>
 <li>เกณฑ์เข้า workflow (high ขึ้นไป) <b>ต่างจากถ้อยคำใน FR-4.3</b> ("Critical หรือ ≥ 2 family")
 ซึ่งเขียนไว้สำหรับสเกล 0-15 แบบเดิม</li>
@@ -193,6 +193,26 @@ finding ระดับต่ำกว่ายังแสดงในเคส
 <tr><td class='mono'>R3005</td><td>Blocked attempt to reach a known-bad address</td><td class='lv lv-medium'>medium</td><td class='mono'>T1071</td><td>test</td><td>DNS/NetBIOS leakage to listed addresses</td></tr>
 <tr><td class='mono'>R3004</td><td>Traffic allowed from a known-bad address</td><td class='lv lv-medium'>medium</td><td class='mono'>T1595</td><td>test</td><td>Scanner lists (blocklist.de) name any host that ever probed anyone</td></tr>
 <tr><td class='mono'>R3002</td><td>Traffic in a malware or C2 category</td><td class='lv lv-high'>high</td><td class='mono'>T1105</td><td>experimental</td><td>Category databases misclassifying a site</td></tr>
+<tr><td class='mono'>PAN-SCAN-2</td><td>Palo Alto: horizontal scan (TRW)</td><td class='lv lv-low'>low</td><td class='mono'>T1046, T1595.001</td><td>experimental</td><td>Vulnerability scanners and monitoring run by the customer</td></tr>
+<tr><td class='mono'>PAN-SCAN-1</td><td>Palo Alto: vertical scan</td><td class='lv lv-low'>low</td><td class='mono'>T1046, T1595</td><td>experimental</td><td>Customer-run scanners</td></tr>
+<tr><td class='mono'>PAN-SCAN-3</td><td>Palo Alto: allowed after refusals</td><td class='lv lv-high'>high</td><td class='mono'>-</td><td>experimental</td><td>A client refused on several services of a host and allowed on another</td></tr>
+<tr><td class='mono'>PAN-MAL-2</td><td>Palo Alto: malicious PAN-DB category</td><td class='lv lv-high'>high</td><td class='mono'>T1071.001</td><td>experimental</td><td>A category assigned wrongly by PAN-DB</td></tr>
+<tr><td class='mono'>PAN-MAL-1</td><td>Palo Alto: beaconing to a public address</td><td class='lv lv-high'>high</td><td class='mono'>T1071</td><td>test</td><td>Update checks, telemetry and monitoring agents with fixed timers</td></tr>
+<tr><td class='mono'>PAN-INTEL-1</td><td>Palo Alto: known-bad destination (allowed)</td><td class='lv lv-high'>high</td><td class='mono'>T1071</td><td>test</td><td>Feed entries for shared or reassigned addresses</td></tr>
+<tr><td class='mono'>PAN-INTEL-2</td><td>Palo Alto: known-bad source (allowed)</td><td class='lv lv-medium'>medium</td><td class='mono'>T1595</td><td>test</td><td>Feed entries for shared or reassigned addresses</td></tr>
+<tr><td class='mono'>PAN-INTEL-3</td><td>Palo Alto: known-bad destination (blocked)</td><td class='lv lv-medium'>medium</td><td class='mono'>T1071</td><td>test</td><td>Feed entries for shared or reassigned addresses</td></tr>
+<tr><td class='mono'>CP-SCAN-2</td><td>Check Point: horizontal scan (TRW)</td><td class='lv lv-low'>low</td><td class='mono'>T1046, T1595.001</td><td>experimental</td><td>Vulnerability scanners and monitoring run by the customer</td></tr>
+<tr><td class='mono'>CP-SCAN-1</td><td>Check Point: vertical scan</td><td class='lv lv-low'>low</td><td class='mono'>T1046, T1595</td><td>experimental</td><td>Customer-run scanners</td></tr>
+<tr><td class='mono'>CP-SCAN-3</td><td>Check Point: allowed after refusals</td><td class='lv lv-high'>high</td><td class='mono'>-</td><td>experimental</td><td>A client refused on several services of a host and allowed on another</td></tr>
+<tr><td class='mono'>CP-MAL-2</td><td>Check Point: Threat Prevention verdict</td><td class='lv lv-high'>high</td><td class='mono'>T1071, T1190</td><td>experimental</td><td>A protection matching benign traffic (ThreatCloud confidence below High)</td></tr>
+<tr><td class='mono'>CP-MAL-1</td><td>Check Point: beaconing to a public address</td><td class='lv lv-high'>high</td><td class='mono'>T1071</td><td>test</td><td>Update checks, telemetry and monitoring agents with fixed timers</td></tr>
+<tr><td class='mono'>CP-INTEL-1</td><td>Check Point: known-bad destination (allowed)</td><td class='lv lv-high'>high</td><td class='mono'>T1071</td><td>test</td><td>Feed entries for shared or reassigned addresses</td></tr>
+<tr><td class='mono'>CP-INTEL-2</td><td>Check Point: known-bad source (allowed)</td><td class='lv lv-medium'>medium</td><td class='mono'>T1595</td><td>test</td><td>Feed entries for shared or reassigned addresses</td></tr>
+<tr><td class='mono'>CP-INTEL-3</td><td>Check Point: known-bad destination (blocked)</td><td class='lv lv-medium'>medium</td><td class='mono'>T1071</td><td>test</td><td>Feed entries for shared or reassigned addresses</td></tr>
+<tr><td class='mono'>WIN-BRUTE-1</td><td>Windows: password guessing</td><td class='lv lv-medium'>medium</td><td class='mono'>T1110.001</td><td>experimental</td><td>A service or scheduled task still using an old password</td></tr>
+<tr><td class='mono'>WIN-BRUTE-2</td><td>Windows: password spray</td><td class='lv lv-medium'>medium</td><td class='mono'>T1110.003</td><td>experimental</td><td>A shared terminal or jump host where many users mistype on their first sign-in</td></tr>
+<tr><td class='mono'>WIN-BRUTE-3</td><td>Windows: one account failing from many sources</td><td class='lv lv-medium'>medium</td><td class='mono'>T1110.001</td><td>experimental</td><td>A user moving between machines while the password is wrong</td></tr>
+<tr><td class='mono'>WIN-AUTH-1</td><td>Windows: sign-in after flagged failures</td><td class='lv lv-high'>high</td><td class='mono'>T1078</td><td>experimental</td><td>The owner signing in after mistyping (said so when the pair signed in before the failures began)</td></tr>
 </table>
 
 <h2>9. แหล่งอ้างอิง</h2>

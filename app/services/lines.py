@@ -66,6 +66,14 @@ def trw(con, product: str, deny_verdicts: str, non_public_re: str) -> dict:
         SELECT srcip, dstip, ts, failed,
                row_number() OVER (PARTITION BY srcip ORDER BY ts, row_id) AS n
         FROM tried WHERE k = 1""")
+    return decide(con, table)
+
+
+def decide(con, table: str) -> dict:
+    """Walk TEMP TABLE `<table>_walk` (srcip, failed, ts, n: each source's first
+    attempt at each new target, numbered in time order) and write the decision
+    of every source into TEMP TABLE `<table>`. Shared by the firewall's hosts
+    (trw above) and other targets - a sign-in source's accounts (rules_windows)."""
     # The walk itself, per source in time order. **After a benign decision it
     # starts again** (the user's test, 2026-10-22): the paper decides each
     # remote host once, over 24-hour traces; over months a workstation that was
