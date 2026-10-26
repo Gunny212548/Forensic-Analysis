@@ -243,8 +243,64 @@ habitual reconnects, software deployment through ADMIN$ (a btp, as the Zabbix ro
 mistyped user name. Scored as before: every incident found, no plain or look-alike row flagged, W3
 by WIN-BRUTE-4 and not by chance; parity and the OTRF capture re-run (the dump expected found).
 
+## Story 5e - two false positives the blind test found (proposed 2026-10-26)
+
+The user's blind test (`D:\logtest\blind-windows`, `gen_windows_blind.py` seed 20260401 - a textile
+company's quarter, incidents K1-K15, an answer key) was uploaded to 8091
+(case-20261026-090407-fbc50d64) and scored once against its answer key, with the rules unchanged.
+43,523 rows that are not attacks were flagged; two causes are fixed here. **After this story the
+kinnaree quarter is no longer blind** for these two rules: its answer key has been read, so a result
+on it measures the fix, not the rule set. An honest re-test needs a quarter the rules were not fixed
+on (another seed, its key unread).
+
+### W-D10 - a sprayer's own computer account is not an account it broke into (Q98)
+
+WIN-AUTH-1 flags a success from a source WIN-BRUTE-1..3 flagged - for the same account, or for **any**
+account when the source was a sprayer. On the blind quarter the sprayer is WEB01 (K2 / K3, after the
+web shell): its machine account `web01$` signs in from its own address all day, and every one of those
+was flagged - 231 rows, the finding text itself saying "likely the owner". Proposed: the spray branch
+leaves out computer accounts (a name ending in `$` - Microsoft 4769, read), as WIN-BRUTE-3 already
+does; the same-account branch is unchanged (a guessed machine account that then signs in is still
+flagged). Measured on the two cases: blind quarter 231 -> 0 (K3's pimchanok.k / napat.s, K5's
+svc_print and K14 kept); Mekong unchanged (no computer account in WIN-AUTH-1).
+
+### W-D11 - a beacon every host makes is not to a rare destination (Q99)
+
+The analytics behind beaconing ask for regular callbacks to **rare** destinations from processes that
+do not belong there: "beacon-like patterns or POST-heavy behavior to rare domains" (T1071.001 DET0027
+AN0076), "encrypted TLS traffic to rare external hosts" (T1573 DET0273 AN0761), "abnormal processes"
+(T1071 DET0444 AN1225) - re-read 2026-10-26; none defines "rare". On the blind quarter 40,725 of the
+59,143 flagged rows (69%) are one beacon: ESET's `ekrn.exe` checking in with `198.51.100.10` on a
+timer - the same process to the same address on **40 of the 43 hosts** with Sysmon network events. The
+real beacons are one host each (K7 `wuauhelper.exe`, K15 `rundll32.exe`; Mekong's W4 `updater.exe`).
+
+Proposed: a (process image, destination) that beacons on **more than half** of the hosts with Sysmon
+network events in the evidence is the fleet's, not a rare destination - left out of WIN-MAL-1, and
+listed on the case's line record (`lines`, "fleet-wide timers left out: ekrn.exe -> 198.51.100.10 on 40
+of 43 hosts") so the analyst can see what was not flagged. "More than half" is an internal method,
+stated, not a measured threshold (D16 has nothing to measure "rare" on: the evidence holds no
+legitimate beacons to draw a line over). Measured: blind quarter 40,725 -> 0, K7 and K15 kept; Mekong
+unchanged.
+
+**The risk, said plainly:** an implant on more than half of the machines, all calling the same address,
+would be left out - and listed on the line record. Under half, it is flagged as today. The other choice
+(Q99 b) keeps them flagged at level low: no beacon hidden, but the 40,725 rows stay false positives and
+each host stays a suggestion.
+
+### Tests
+
+`tests/check_windows_rules.py`: a small capture - a sprayer whose own `...$` signs in (not flagged) and a
+sprayed user who signs in (flagged); one process to one address on most hosts (left out, on the line
+record) beside one host's beacon (flagged). The Mekong quarter unchanged; parity. The blind quarter
+re-scored and reported as a measurement of the fix only.
+
 ## Questions
 
+- **Q98 - the sprayer's own computer account (W-D10).** Leave computer accounts out of WIN-AUTH-1's
+  spray branch only? Recommended: yes.
+- **Q99 - fleet-wide beacons (W-D11).** (a) leave a (process, destination) beaconing on more than half
+  of the Sysmon hosts out of WIN-MAL-1, listed on the line record; or (b) keep it at level low.
+  Recommended: (a).
 - **Q81 - the split (W-D1).** Write in-house WIN rules only for sequences and counts, and leave
   single events to the SigmaHQ story? Recommended: yes.
 - **Q82 - link by session (W-D2).** Join one host's events by LogonId / ProcessGuid instead of a
