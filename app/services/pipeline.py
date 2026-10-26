@@ -80,6 +80,17 @@ class Progress:
             storage.update_case(self.case_id, progress={
                 "stage": stage, "pct": self._pct, "estimated": estimated})
 
+    def ai(self, done: int, total: int, failed: int) -> None:
+        """The AI review's own count (triage.py). The bar stays at 99% for the
+        minutes the model takes, so the screen shows how many suggestions it
+        has reviewed instead. Written after every batch, never throttled: a
+        batch takes seconds, not milliseconds."""
+        with self._lock:
+            self._last, self._pct = time.monotonic(), max(99, self._pct)
+            storage.update_case(self.case_id, progress={
+                "stage": "ai", "pct": self._pct, "estimated": False,
+                "ai": {"done": done, "total": total, "failed": failed, "model": config.LLM_MODEL}})
+
     def ingest(self, fraction: float, estimated: bool = False) -> None:
         self.set("ingest", fraction * INGEST_END, estimated)
 
@@ -879,7 +890,8 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             from . import case_views, triage  # imported here: case_views reads the case views this run builds
             progress.set("ai", 99, force=True)
             manifest_now = storage.load_manifest(case_id) or {}
-            triage.review_case(case_id, case_views.findings_view(case_id, manifest_now, assign_ids=False))
+            triage.review_case(case_id, case_views.findings_view(case_id, manifest_now, assign_ids=False),
+                               on_progress=progress.ai)
         storage.update_case(
             case_id,
             status="ready",

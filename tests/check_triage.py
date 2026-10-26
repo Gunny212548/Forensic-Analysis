@@ -95,9 +95,12 @@ def main() -> int:
                              "finish_reason": "stop"}]}
 
     llm._chat = fake_chat
-    res = triage.review_case(cid, findings)
+    counts = []
+    res = triage.review_case(cid, findings, on_progress=lambda *c: counts.append(c))
     check(res.get("reviewed") == 13 and not res.get("errors"), f"13 suggestions reviewed ({res.get('reviewed')})")
     check(len(seen_payloads) == 3 and all(p["_schema"] for p in seen_payloads), "in batches of 5, each with its schema")
+    check(counts == [(0, 13, 0), (5, 13, 0), (10, 13, 0), (13, 13, 0)],
+          f"progress counted before the first batch and after each ({counts})")
     check(triage.path(cid).exists(), "kept with the case")
     benign = [r for r in res["items"].values() if r["assessment"] == "likely benign"]
     check(len(benign) == 12 and all(r["ungrounded"] == ["203.0.113.250"] for r in benign),
@@ -119,9 +122,22 @@ def main() -> int:
         raise llm.AnalysisError("connection refused")
 
     llm._chat = down
-    res = triage.review_case(cid, findings)
+    counts = []
+    res = triage.review_case(cid, findings, on_progress=lambda *c: counts.append(c))
     check(res.get("reviewed") == 0 and len(res.get("errors") or []) == 3,
           "every batch's failure recorded; review_case does not raise")
+    check(counts[-1] == (13, 13, 3), f"failed batches counted in the progress ({counts[-1:]})")
+
+    print("the count reaches the case's progress (pipeline.Progress.ai)")
+    from app.services import pipeline
+    pg = pipeline.Progress(cid)
+    pg.set("ai", 99, force=True)
+    pg.ai(5, 13, 1)
+    p = storage.load_manifest(cid)["progress"]
+    check(p["stage"] == "ai" and p["pct"] == 99 and p["ai"]["done"] == 5 and p["ai"]["total"] == 13
+          and p["ai"]["failed"] == 1 and p["ai"]["model"], f"stage, 99% and the count on the manifest ({p})")
+    pg.ai(10, 13, 1)
+    check(storage.load_manifest(cid)["progress"]["ai"]["done"] == 10, "the next batch is written at once, not throttled")
     check(storage.case_files(storage.customer_dir(co), cid)
           and any(p.name.endswith(".triage.json") for p in storage.case_files(storage.customer_dir(co), cid)),
           "the review file is one of the case's files - deleted with it")

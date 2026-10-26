@@ -36,3 +36,8 @@
 - Ollama must be running on the host (`ollama serve`); the container reaches it at
   `host.docker.internal:11434`. On 2026-10-22 it was not running and the container answered
   "Network is unreachable".
+- The bar sits at 99% for the minutes the review takes, so the case's progress carries the count
+  (`progress.ai = {done, total, failed, model}`, `pipeline.Progress.ai`, written before the first
+  batch and after each - never throttled), and the Upload page shows "AI reviewing suggestions 5
+  of 9 (qwen3.5:9b)" plus failed batches (2026-10-26, the user's request). Counted in
+  suggestions, moving in steps of `BATCH`; no time estimate - a batch's time is not steady.

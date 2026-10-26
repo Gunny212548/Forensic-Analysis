@@ -198,6 +198,9 @@ async def _run(case_id: str, findings: list[dict], on_progress=None) -> dict:
     finally:
         con.close()
     items, errors = {}, []
+    # on_progress(done, total, failed batches): the case's progress shows the count (Upload page).
+    if on_progress:
+        on_progress(0, len(prepared), 0)
     async with llm._client() as client:
         for start in range(0, len(prepared), BATCH):
             chunk = prepared[start:start + BATCH]
@@ -221,7 +224,7 @@ async def _run(case_id: str, findings: list[dict], on_progress=None) -> dict:
                                                if not c.startswith(f"{sid}.")})
                 items[f["key"]] = r
             if on_progress:
-                on_progress(min(1.0, (start + len(chunk)) / max(1, len(prepared))))
+                on_progress(start + len(chunk), len(prepared), len(errors))
     return {"model": config.LLM_MODEL, "provider": config.LLM_PROVIDER,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "reviewed": len(items), "suggestions": len(findings),

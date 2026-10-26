@@ -17,7 +17,18 @@ function processingText(m) {
   if (m.status === 'ready') return 'Done'
   const p = m.progress
   if (!p) return 'Processing...'
-  return `Processing ${p.estimated ? '~' : ''}${p.pct}%`
+  return `Processing ${p.estimated ? '~' : ''}${p.pct}%${aiText(p)}`
+}
+
+/** " · AI reviewing suggestions 15 of 52 (qwen3.5:9b)" while the AI reviews
+ *  each suggestion (triage.py) - the bar stays at 99% for those minutes, so
+ *  the count is what shows it is moving. Empty in every other stage. */
+function aiText(p) {
+  if (p.stage !== 'ai') return ''
+  const a = p.ai
+  if (!a) return ' · AI reviewing the findings'
+  const failed = a.failed ? ` · ${a.failed} batch${a.failed === 1 ? '' : 'es'} failed` : ''
+  return ` · AI reviewing suggestions ${a.done} of ${a.total}${a.model ? ` (${a.model})` : ''}${failed}`
 }
 
 function processingPct(m) {
@@ -447,8 +458,7 @@ export default function Upload({ user }) {
                         <div className="cell-sub">
                           {m.progress.estimated ? '~' : ''}
                           {m.progress.pct}%
-                          {/* The AI reviews each suggestion before the findings show (triage.py). */}
-                          {m.progress.stage === 'ai' ? ' · AI reviewing the findings' : ''}
+                          {aiText(m.progress)}
                         </div>
                       )}
                     </td>
