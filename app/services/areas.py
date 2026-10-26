@@ -17,7 +17,7 @@ AREAS: list[dict] = [
     {"id": "account-attacks", "name": "Brute force & spraying",
      "about": "Repeated failures from one source, one source failing against many accounts, "
               "one account failing from many sources",
-     "rids": ("R2000", "R2009", "R2005", "WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3")},
+     "rids": ("R2000", "R2009", "R2005", "WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3", "WIN-BRUTE-4")},
     {"id": "scanning-policy", "name": "Scanning & policy",
      "about": "Port scans, service sweeps, traffic allowed despite many blocks",
      "rids": ("R2002", "R2003", "R2004", "PAN-SCAN-1", "PAN-SCAN-2", "PAN-SCAN-3",
@@ -30,8 +30,9 @@ AREAS: list[dict] = [
      "rids": ("R3001",)},
     # Host areas (specs/windows_rules.md W-D3, Q83): what a host's own log shows.
     {"id": "lateral-movement", "name": "Lateral movement",
-     "about": "Uncommon RDP followed by commands, remote services and tasks, NTLM logons without Kerberos",
-     "rids": ("WIN-LAT-1", "WIN-LAT-2", "WIN-LAT-3")},
+     "about": "Uncommon RDP followed by commands, remote services and tasks, files copied to admin shares "
+              "and run, NTLM logons without Kerberos",
+     "rids": ("WIN-LAT-1", "WIN-LAT-2", "WIN-LAT-3", "WIN-LAT-4")},
     {"id": "host-activity", "name": "Host activity",
      "about": "Credential theft on a host: Kerberoasting, LSASS dumped",
      "rids": ("WIN-HOST-1", "WIN-HOST-2")},

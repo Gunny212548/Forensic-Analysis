@@ -12,6 +12,10 @@ Three parts, no network, no model (TRIAGE_ENABLED=0):
    Windows cells of the detection matrix.
 3. Real data: attack_data's purplesharp spray (tests/samples) - 50 attempts the DC logged as a
    4625 and a 4776 each, decided a spray by TRW.
+Story 5d adds: a refused TGT for an unknown name (4768 0x6) counted, a revoked one (0x12) not; the
+CUSUM of WIN-BRUTE-4 (lines.py) on a known series; W3 (low-and-slow), W10 (an RDP session taken
+over by a reconnect), W11 (Kerberos user-name enumeration) and W8's ADMIN$ copy on the quarter;
+OTRF's reconnect found through the session's own logon id.
 """
 
 import argparse
@@ -97,6 +101,11 @@ def main() -> int:
     for i in range(4):
         lines.append(event(4771, t0 + timedelta(minutes=20 + i), "dc01.corp.local",
                            {"TargetUserName": "PRN01$", "Status": "0x18", "IpAddress": f"::ffff:10.0.9.{i + 1}"}))
+    # A refused TGT: 0x6 (no such user) is a failed attempt, 0x12 (account revoked) is not (W-D6).
+    lines.append(event(4768, t0 + timedelta(minutes=30), "dc01.corp.local",
+                       {"TargetUserName": "nosuchuser", "Status": "0x6", "IpAddress": "::ffff:10.0.0.8"}))
+    lines.append(event(4768, t0 + timedelta(minutes=31), "dc01.corp.local",
+                       {"TargetUserName": "leaver", "Status": "0x12", "IpAddress": "::ffff:10.0.0.8"}))
     small = scratch / "attempts.xml"
     small.write_text("\n".join(lines) + "\n", encoding="utf-8")
     cid, man, con = run(small, "log")
@@ -120,11 +129,34 @@ def main() -> int:
           f"a lone 4776 is sourced by its workstation name ({att['bob']})")
     check(att["carl"][0] == 2, f"a 4771 3 s after the 4625 is another attempt ({att['carl']})")
     check(att["prn01$"][0] == 4 and len(att["prn01$"][1]) == 4, "the computer account's four sources are read")
+    check(att.get("nosuchuser", [0])[0] == 1 and "leaver" not in att,
+          f"4768 0x6 is a failed attempt, 0x12 a refusal only ({att.get('nosuchuser')}, {att.get('leaver')})")
     mem.close()
     con = db.connect(cid, read_only=True)
     flagged = {r[0]: r[1] for r in con.execute("SELECT rid, count(*) FROM findings GROUP BY rid").fetchall()}
     check("WIN-BRUTE-3" not in flagged, f"a computer account is left out of WIN-BRUTE-3 ({flagged})")
     con.close()
+
+    print("CUSUM (Javed & Paxson §4.1) on known series")
+    from app.services import lines as ln
+    import random
+    rng = random.Random(7)
+    normal = [sum(rng.random() < 0.008 for _ in range(100)) for _ in range(400)]
+    fit = ln.beta_binomial(normal, 100)
+    m = ln.CUSUM_SCALE
+    c = round(m * (fit["mean"] + 0.5))
+    h, arl = ln.cusum_h(fit["pmf"], c, m)
+    check(arl >= ln.CUSUM_ARL and (h == 0 or ln.cusum_arl(fit["pmf"], c, h - 1, m) < ln.CUSUM_ARL),
+          f"H is the smallest with an in-control ARL of {ln.CUSUM_ARL} events (H {h / m:g}, ARL {arl:.0f})")
+    _, runs = ln.cusum_run(normal, fit["mean"], c, h, m)
+    check(not runs, f"no alarm on the normal series itself ({runs})")
+    shifted = normal[:200] + [y + (1 if rng.random() < 0.9 else 0) for y in normal[200:300]] + normal[300:]
+    _, runs = ln.cusum_run(shifted, fit["mean"], c, h, m)
+    check(bool(runs) and 200 <= runs[0][0] < 300,
+          f"one more failure per event from event 200 is caught inside the shift ({runs})")
+    check(ln.automated([t0 + timedelta(minutes=15 * i, seconds=rng.uniform(0, 20)) for i in range(200)])
+          and not ln.automated([t0 + timedelta(seconds=rng.uniform(0, 3 * 86400)) for _ in range(200)]),
+          "a 15-minute job is automation by §5's chi-squared test, a person's times are not")
 
     print("feed matches on a connection and on a sign-in attempt")
     intel_file = scratch / "intel.xml"
@@ -168,12 +200,19 @@ def main() -> int:
               # story 5b
               "W5": {"WIN-HOST-1"}, "W7": {"WIN-LAT-1", "WIN-HOST-2"}, "W8": {"WIN-LAT-2", "WIN-LAT-3"},
               # story 5c - W2's source is on the test feed
-              "W4": {"WIN-MAL-1"}}
+              "W4": {"WIN-MAL-1"},
+              # story 5d
+              "W3": {"WIN-BRUTE-4"}, "W10": {"WIN-LAT-1"}, "W11": {"WIN-BRUTE-2"}}
+    expect["W8"] = expect["W8"] | {"WIN-LAT-4"}
     expect["W2"] = expect["W2"] | {"WIN-INTEL-2"}
     for inc, rids in expect.items():
         check(rids <= found[inc], f"{inc} found by {sorted(rids)} ({sorted(found[inc])})")
     check(not wrong, f"no plain or look-alike event flagged ({dict(wrong)})")
-    check("WIN-BRUTE-1" not in found["W3"], "W3 low-and-slow is not WIN-BRUTE-1's (B5, a known gap)")
+    w3 = con.execute("SELECT count(DISTINCT row_id) FROM findings WHERE rid = 'WIN-BRUTE-4'").fetchone()[0]
+    check(w3 >= 150, f"WIN-BRUTE-4 flags most of W3's 246 failures, measured 156 ({w3})")
+    b5 = (man.get("lines") or {}).get("WIN-BRUTE-4", {})
+    check(b5.get("method") == "cusum" and b5.get("in_control_arl", 0) >= 3720 and b5.get("epochs", 0) >= 1,
+          f"WIN-BRUTE-4's CUSUM kept on the case ({b5.get('note')}, {b5.get('epochs')} epochs)")
     rids = {r[0] for r in con.execute("SELECT DISTINCT rid FROM findings").fetchall()}
     check(not rids & {"R2000", "R2005", "R2006", "R2008", "R2009", "R2007", "R3003", "R3004", "R3005"},
           f"the generic sign-in, beaconing and feed rules are silent on Windows rows ({sorted(rids)})")
@@ -187,12 +226,18 @@ def main() -> int:
           "Scanning and Data transfer are n/a on Windows, with a reason")
     check({"WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3"} <= set(w.get("account-attacks", {}).get("rules", [])),
           "Brute force on Windows runs the WIN rules")
-    check(set(w.get("lateral-movement", {}).get("rules", [])) == {"WIN-LAT-1", "WIN-LAT-2", "WIN-LAT-3"}
+    check(set(w.get("lateral-movement", {}).get("rules", [])) == {"WIN-LAT-1", "WIN-LAT-2", "WIN-LAT-3", "WIN-LAT-4"}
           and set(w.get("host-activity", {}).get("rules", [])) == {"WIN-HOST-1", "WIN-HOST-2"},
           "the two host areas run the 5b rules")
     lat2 = con.execute("SELECT count(DISTINCT descr) FROM findings WHERE rid = 'WIN-LAT-2' "
                        "AND descr LIKE '%Zabbix%'").fetchone()[0]
     check(lat2 == 4, f"the agent rollout to 4 servers is found - a benign true positive for the analyst ({lat2})")
+    copied = con.execute("SELECT count(DISTINCT descr) FROM findings WHERE rid = 'WIN-LAT-4' "
+                         "AND descr LIKE '%kb5043145%'").fetchone()[0]
+    check(copied == 3, f"the patch copied through C$ to 3 servers is found - a benign true positive ({copied})")
+    share = con.execute("SELECT count(*) FROM findings WHERE rid = 'WIN-LAT-2' AND descr LIKE '%opened%ADMIN$%'"
+                        ).fetchone()[0]
+    check(share >= 1, f"WIN-LAT-2 names the ADMIN$ opened in W8's session ({share})")
     seq = con.execute("SELECT w.event_id, count(*) FROM findings f JOIN win_events w USING (row_id) "
                       "WHERE f.rid = 'WIN-LAT-1' GROUP BY 1 ORDER BY 1").fetchall()
     check(dict(seq).get(4624) == 1 and dict(seq).get(4688, 0) >= 6,
@@ -216,11 +261,13 @@ def main() -> int:
     sample = Path(args.repo) / "tests" / "samples" / "otrf" / "rdp_interactive_taskmanager_lsass_dump.json"
     cid, man, con = run(sample, "json")
     got = dict(con.execute("SELECT rid, count(*) FROM findings GROUP BY rid").fetchall())
-    check(got == {"WIN-LAT-3": 1}, f"the outside client's NTLM logon is WIN-LAT-3's ({got})")
-    # Known, measured (rule_meta blind spots): the reconnect is 4624 type 7 and its processes carry the
-    # first logon's id, which is not in the capture; the dump file has no Sysmon 10 before it.
-    check("WIN-LAT-1" not in got and "WIN-HOST-2" not in got,
-          "the RDP reconnect and the dump without an access event are not found (blind spots, said so)")
+    check(got.get("WIN-LAT-3") == 1, f"the outside client's NTLM logon is WIN-LAT-3's ({got})")
+    # Story 5d: the reconnect's 4778 carries the session's own id (0x10ac67), which Task Manager runs
+    # under; the 4624 type 7 of the reconnect have new ids. The dump file still has no Sysmon 10.
+    lat1 = dict(con.execute("SELECT w.event_id, count(*) FROM findings f JOIN win_events w USING (row_id) "
+                            "WHERE f.rid = 'WIN-LAT-1' GROUP BY 1").fetchall())
+    check(lat1.get(4778) == 1 and lat1.get(1, 0) >= 1, f"the RDP reconnect and what it ran are WIN-LAT-1's ({lat1})")
+    check("WIN-HOST-2" not in got, "the dump without an access event is not found (a blind spot, said so)")
     con.close()
 
     print("\nWINDOWS RULES OK" if not FAILED else f"\n{len(FAILED)} FAILED")

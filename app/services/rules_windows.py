@@ -13,7 +13,8 @@ each event's Microsoft page (SOURCES.md, read 2026-10-26):
   failure  4625 Status / SubStatus 0xC000006A (bad password) or 0xC0000064
            (unknown user name); 4771 Failure Code 0x18 (PREAUTH_FAILED, "the wrong
            password") or 0x6 (client unknown); 4776 Error Code 0xC000006A /
-           0xC0000064 - the analytics name failures "for valid or invalid users"
+           0xC0000064; 4768 Result Code 0x6 ("The username doesn't exist", story
+           5d) - the analytics name failures "for valid or invalid users"
   success  4624 of an interactive, network, unlock, remote-interactive or cached
            logon (types 2, 3, 7, 10, 11); 4768 / 4776 with status 0x0
 
@@ -41,11 +42,15 @@ event belongs to the latest 4624 of that id on that host before it (ASOF JOIN).
 Each sequence is an ATT&CK analytic's (SOURCES.md, read 2026-10-26); none needs a
 window or a number.
 
-Not here (specs/windows_rules.md): a failed 4768 (a TGT request refused -
-its page not read for its failure codes yet); low-and-slow guessing over days (B5 - no rule
-yet); a sequence across two hosts (AN1468's share access on the target, 5140 /
-5145 - not read yet); Sysmon network (story 5c).
+Story 5d (specs/windows_rules.md W-D5..W-D9): low-and-slow guessing (B5) by Javed &
+Paxson's CUSUM over the site's failures per 100 attempts, then who took part
+(WIN-BRUTE-4); an RDP reconnect (4778) starts a session for WIN-LAT-1; ADMIN$ / C$
+opened (5140) in WIN-LAT-2's session, and a file written there (5145) then run
+(WIN-LAT-4). Not here: the source host's side of a share access (it needs a time
+window); System 7045 (no Microsoft page found - not typed).
 """
+
+import math
 
 from . import lines
 from .rules import IPV4_RE, NON_PUBLIC_IPV4_RE
@@ -54,6 +59,10 @@ PRODUCT = "windows"
 
 BAD_PASSWORD = ("0xc000006a", "0xc0000064")   # 4625 / 4776, lower case as Windows writes them
 KERBEROS_FAILED = ("0x18", "0x6")             # 4771
+# 4768: 0x6 "The username doesn't exist"; 0x18 cannot occur in it (4771 carries a wrong
+# password). 0x12 (disabled, expired, locked out) and 0x17 (password expired) are refusals,
+# not guesses - Timeline events (W-D6, Q89).
+TGT_UNKNOWN_USER = "0x6"
 SUCCESS_LOGON_TYPES = ("2", "3", "7", "10", "11")
 LOOPBACK = ("", "-", "127.0.0.1", "::1")
 MIN_FAILURES = 2   # B1: one failed sign-in is an event, not guessing (D14)
@@ -74,6 +83,7 @@ a AS (
                                      OR lower(d['Status']) IN {BAD_PASSWORD}) THEN 'fail'
            WHEN event_id = 4771 AND lower(d['Status']) IN {KERBEROS_FAILED} THEN 'fail'
            WHEN event_id = 4776 AND lower(d['Status']) IN {BAD_PASSWORD} THEN 'fail'
+           WHEN event_id = 4768 AND lower(d['Status']) = '{TGT_UNKNOWN_USER}' THEN 'fail'
            WHEN event_id = 4624 AND trim(d['LogonType']) IN {SUCCESS_LOGON_TYPES} THEN 'success'
            WHEN event_id IN (4768, 4776) AND lower(d['Status']) = '0x0' THEN 'success'
          END AS outcome,
@@ -198,6 +208,95 @@ def prepare_brute_3(con):
     return _params(rec, "accounts"), rec
 
 
+B5_DELTA = 1   # the shift to detect: one more failure per 100 attempts (Q88; the paper's 10 never sees W3)
+
+
+def prepare_brute_4(con):
+    """B5 low-and-slow (W-D5, Q88): Javed & Paxson's site analyzer over the case's attempts.
+    Writes TEMP TABLE win_b5_epochs (epoch, first_event, last_event, start_ts, end_ts) - the
+    coordinated attack epochs - and win_b5_attempts (attempt_id, event_no)."""
+    _attempts(con)
+    n, delta = lines.CUSUM_N, B5_DELTA
+    # The paper runs on data "filtered to remove high-rate brute-forcers that can be detected
+    # pointwise" (§3.1, Fig. 5, footnote 3): the attempts WIN-BRUTE-1..3 flagged are left out.
+    att = con.execute("""
+        SELECT attempt_id, ts, source, outcome = 'fail' FROM win_attempts a
+        WHERE NOT EXISTS (SELECT 1 FROM findings f JOIN win_attempt_rows r ON r.row_id = f.row_id
+                          WHERE r.attempt_id = a.attempt_id
+                            AND f.rid IN ('WIN-BRUTE-1', 'WIN-BRUTE-2', 'WIN-BRUTE-3'))
+        ORDER BY ts, attempt_id""").fetchall()
+    # §5's cleaning: sources that never succeed, and sources failing >= 95% of >= 20 attempts.
+    per = {}
+    for _, _, src, failed in att:
+        f, t = per.get(src, (0, 0))
+        per[src] = (f + failed, t + 1)
+    dropped = {s for s, (f, t) in per.items() if f == t or (t >= 20 and f / t >= 0.95)}
+    # ... and automations (§5): a source's attempts in a 3-day window, when there are >= 50 and
+    # their clock is not a person's - a job with a stale password is a misconfigured automation.
+    t0 = att[0][1] if att else None
+    windows = {}
+    for a in att:
+        windows.setdefault((a[2], (a[1] - t0).days // lines.AUTOMATION_WINDOW_DAYS), []).append(a[1])
+    machine = {k for k, ts in windows.items() if len(ts) >= lines.AUTOMATION_MIN and lines.automated(ts)}
+    clean = [a[3] for a in att if a[2] not in dropped
+             and (a[2], (a[1] - t0).days // lines.AUTOMATION_WINDOW_DAYS) not in machine]
+    ys_clean = [sum(clean[i:i + n]) for i in range(0, len(clean) - n + 1, n)]
+    events = len(att) // n
+    rec = {"method": "cusum", "source": lines.CUSUM_SOURCE, "attempts": len(att), "events": events,
+           "normal_events": len(ys_clean), "sources_left_out_of_normal": len(dropped),
+           "automation_windows_left_out_of_normal": len(machine),
+           "parameters": {"n": n, "delta": delta, "in_control_arl_target": lines.CUSUM_ARL}}
+    con.execute("CREATE OR REPLACE TEMP TABLE win_b5_epochs (epoch INT, first_event INT, last_event INT, "
+                "start_ts TIMESTAMP, end_ts TIMESTAMP)")
+    con.execute("CREATE OR REPLACE TEMP TABLE win_b5_attempts AS "
+                "SELECT unnest($1::BIGINT[]) AS attempt_id, unnest($2::INT[]) AS event_no",
+                [[a[0] for a in att[:events * n]], [i // n for i in range(events * n)]])
+    if len(ys_clean) < lines.MIN_LEGIT:
+        rec.update(note=f"{len(ys_clean)} events of {n} ordinary attempts - under {lines.MIN_LEGIT}, "
+                        "the normal failure rate cannot be modelled; not run", epochs=0)
+        return {"note": rec["note"]}, rec
+    fit = lines.beta_binomial(ys_clean, n)
+    mu = fit["mean"]
+    m = lines.CUSUM_SCALE
+    c = max(1, round(m * (mu + delta / 2)))   # m (mu + k), k = delta / 2 to the nearest 1/m (§4.1)
+    h, arl_in = lines.cusum_h(fit["pmf"], c, m)
+    arl_out = lines.cusum_arl(fit["pmf"], c - m * delta, h, m)
+    back = 0 if math.isinf(arl_out) else max(0, round(arl_out) - 1)
+    ys = [sum(a[3] for a in att[i * n:(i + 1) * n]) for i in range(events)]
+    _, runs = lines.cusum_run(ys, mu, c, h, m)
+    epochs = []
+    for first, last in runs:
+        first = max(0, first - back)
+        if epochs and first <= epochs[-1][1] + 1:
+            epochs[-1] = (epochs[-1][0], last)
+        else:
+            epochs.append((first, last))
+    # §4.1's singleton filter: still alarming without the source of most failures in the epoch?
+    kept = []
+    for first, last in epochs:
+        fails = {}
+        for a in att[first * n:(last + 1) * n]:
+            if a[3]:
+                fails[a[2]] = fails.get(a[2], 0) + 1
+        top = max(fails, key=fails.get)
+        ys_minus = [sum(a[3] and a[2] != top for a in att[i * n:(i + 1) * n]) for i in range(events)]
+        flags, _ = lines.cusum_run(ys_minus, mu, c, h, m)
+        if any(flags[first:last + 1]):
+            kept.append((first, last))
+    if kept:
+        con.execute("INSERT INTO win_b5_epochs SELECT unnest($1::INT[]), unnest($2::INT[]), unnest($3::INT[]), "
+                    "unnest($4::TIMESTAMP[]), unnest($5::TIMESTAMP[])",
+                    [list(range(1, len(kept) + 1)), [f for f, _ in kept], [l for _, l in kept],
+                     [att[f * n][1] for f, _ in kept], [att[(l + 1) * n - 1][1] for _, l in kept]])
+    note = (f"CUSUM over failures per {n} attempts: normal mean {mu:.2f} from {len(ys_clean)} events "
+            f"({fit['fit']}), k = {c / m - mu:.2f}, H = {h / m:g} (in-control ARL {arl_in:.0f} events)")
+    rec.update(fit=fit["fit"], mean=round(mu, 4), var=round(fit["var"], 4), rho=round(fit["rho"], 4),
+               k=round(c / m - mu, 4), H=h / m, in_control_arl=None if math.isinf(arl_in) else round(arl_in, 1),
+               out_of_control_arl=None if math.isinf(arl_out) else round(arl_out, 2),
+               epochs=len(kept), singleton_epochs=len(epochs) - len(kept), note=note)
+    return {"note": note}, rec
+
+
 RULES: list[tuple[str, str]] = [
     # B1 password guessing: one account, one source, failures within an hour
     # (T1110.001, DET0551 AN1521-AN1523; Microsoft 4771 / 4776: many 0x18 /
@@ -257,6 +356,30 @@ RULES: list[tuple[str, str]] = [
           GROUP BY f.attempt_id, f.account) g
         JOIN win_attempt_rows r USING (attempt_id)
     """),
+    # B5 low-and-slow guessing (T1110.001; Javed & Paxson §4.1-4.2): the failed attempts of a
+    # coordinated epoch whose (source, account) never signs in in the evidence, nor the source
+    # as an account one letter away (a forgotten user name, §4.2). The paper finds the
+    # "coordination glue" by hand: the analyst decides who took part.
+    ("WIN-BRUTE-4", """
+        INSERT INTO findings
+        WITH ok AS (SELECT DISTINCT source, account FROM win_attempts WHERE outcome = 'success'),
+        p AS (SELECT a.attempt_id, a.account, a.source, a.source_kind, e.epoch, e.start_ts, e.end_ts
+              FROM win_attempts a JOIN win_b5_attempts b USING (attempt_id)
+              JOIN win_b5_epochs e ON b.event_no BETWEEN e.first_event AND e.last_event
+              WHERE a.outcome = 'fail'
+                AND NOT EXISTS (SELECT 1 FROM ok WHERE ok.source = a.source
+                                AND (ok.account = a.account OR levenshtein(ok.account, a.account) = 1))),
+        s AS (SELECT epoch, count(*) AS n, count(DISTINCT source) AS sources, count(DISTINCT account) AS accounts
+              FROM p GROUP BY epoch)
+        SELECT r.row_id, 'WIN-BRUTE-4', NULL,
+               'Low-and-slow guessing: failed sign-in for ' || p.account || ' from ' || p.source_kind || ' ' ||
+               p.source || ' during a site-wide rise in failures ' || strftime(p.start_ts, '%Y-%m-%d %H:%M') ||
+               ' - ' || strftime(p.end_ts, '%Y-%m-%d %H:%M') || ' (' || s.n || ' such failures from ' ||
+               s.sources || ' sources against ' || s.accounts || ' accounts; this pair never signed in; ' ||
+               $note || ')',
+               ['T1110.001']
+        FROM p JOIN s USING (epoch) JOIN win_attempt_rows r USING (attempt_id)
+    """),
     # B4 failures, then a success: an account signed in from a source the rules
     # above flagged - for that account (guessing), or for any account the
     # sprayer tried (T1110 DET0463 AN1275 / AN1276, AN1522, AN1524). A pair that
@@ -303,6 +426,12 @@ def _addr(expr: str) -> str:
             f"THEN regexp_replace(lower(trim({expr})), '^::ffff:', '') END")
 
 
+def _admin_share(expr: str) -> str:
+    # 5140 / 5145 write a share as \\*\ADMIN$; AN1468 names ADMIN$ and C$.
+    return (f"(ends_with(upper(trim({expr})), '\\ADMIN$') "
+            f"OR ends_with(upper(trim({expr})), '\\C$'))")
+
+
 def _account(expr: str) -> str:
     return f"lower(regexp_replace(split_part({expr}, '@', 1), '^.*\\\\', ''))"
 
@@ -322,13 +451,39 @@ CREATE OR REPLACE TEMP TABLE win_session_acts AS
 WITH x AS (
   SELECT e.row_id, e.ts, {HOST} AS host, w.event_id,
          lower(trim(CASE WHEN w.provider = '{SYSMON}' THEN w.data['LogonId'] ELSE w.data['SubjectLogonId'] END)) AS lid,
-         coalesce(e.program, w.data['ServiceName'], w.data['TaskName']) AS what
+         coalesce(e.program, w.data['ServiceName'], w.data['TaskName'], w.data['ShareName']) AS what
   FROM product_events e JOIN win_events w USING (row_id)
   WHERE e.ts IS NOT NULL
-    AND ((w.provider = '{SECURITY}' AND w.event_id IN (4688, 4697, 4698))
+    AND ((w.provider = '{SECURITY}' AND w.event_id IN (4688, 4697, 4698, 5140))
          OR (w.provider = '{SYSMON}' AND w.event_id = 1)))
 SELECT x.*, l.row_id AS logon_row
 FROM x ASOF JOIN win_logons l ON x.host = l.host AND x.lid = l.lid AND x.ts >= l.ts
+WHERE x.lid NOT IN {SYSTEM_SESSIONS};
+
+-- RDP sessions as they start: a RemoteInteractive logon (4624 type 10), or a reconnect to an
+-- existing session (4778, SessionName RDP-Tcp#N - "Console" is Fast User Switching). A
+-- reconnect's LogonID is the session's own: what runs after it carries that id (W-D7, Q90).
+CREATE OR REPLACE TEMP TABLE win_rdp_starts AS
+SELECT row_id, ts, host, lid, account, source, 'logon' AS how FROM win_logons WHERE ltype = '10'
+UNION ALL
+SELECT e.row_id, e.ts, {HOST}, lower(trim(w.data['LogonID'])), {_account("w.data['AccountName']")},
+       CASE WHEN upper(trim(w.data['ClientAddress'])) <> 'LOCAL' THEN {_addr("w.data['ClientAddress']")} END,
+       'reconnect'
+FROM product_events e JOIN win_events w USING (row_id)
+WHERE w.provider = '{SECURITY}' AND w.event_id = 4778 AND e.ts IS NOT NULL
+  AND upper(trim(w.data['SessionName'])) LIKE 'RDP-TCP#%';
+
+-- Each process to the latest RDP start of its session before it.
+CREATE OR REPLACE TEMP TABLE win_rdp_acts AS
+WITH x AS (
+  SELECT e.row_id, e.ts, {HOST} AS host,
+         lower(trim(CASE WHEN w.provider = '{SYSMON}' THEN w.data['LogonId'] ELSE w.data['SubjectLogonId'] END)) AS lid,
+         e.program AS what
+  FROM product_events e JOIN win_events w USING (row_id)
+  WHERE e.ts IS NOT NULL
+    AND ((w.provider = '{SECURITY}' AND w.event_id = 4688) OR (w.provider = '{SYSMON}' AND w.event_id = 1)))
+SELECT x.*, s.row_id AS start_row
+FROM x ASOF JOIN win_rdp_starts s ON x.host = s.host AND x.lid = s.lid AND x.ts >= s.ts
 WHERE x.lid NOT IN {SYSTEM_SESSIONS};
 """
 
@@ -371,39 +526,87 @@ RULES += [
     # day of the evidence only (T1021.001 DET0327 AN0931 - its HostAccessPatterns:
     # "first-time source/destination pairs"; the user's choice of 2026-10-26). A
     # pair seen on two or more days is someone's habit.
+    # A reconnect (4778) starts a session as a logon does (W-D7, Q90).
     ("WIN-LAT-1", """
         INSERT INTO findings
-        WITH l AS (SELECT * FROM win_logons WHERE ltype = '10' AND source IS NOT NULL),
+        WITH l AS (SELECT * FROM win_rdp_starts WHERE source IS NOT NULL),
         pd AS (SELECT source, account, host, count(DISTINCT CAST(ts AS DATE)) AS days FROM l GROUP BY ALL),
         span AS (SELECT count(DISTINCT CAST(ts AS DATE)) AS days FROM win_logons),
-        p AS (SELECT logon_row, string_agg(DISTINCT what, ', ' ORDER BY what) AS progs
-              FROM win_session_acts WHERE event_id IN (4688, 1) GROUP BY logon_row),
-        hit AS (SELECT l.*, p.progs FROM l JOIN p ON p.logon_row = l.row_id
+        p AS (SELECT start_row, string_agg(DISTINCT what, ', ' ORDER BY what) AS progs
+              FROM win_rdp_acts GROUP BY start_row),
+        hit AS (SELECT l.*, p.progs FROM l JOIN p ON p.start_row = l.row_id
                 JOIN pd USING (source, account, host) WHERE pd.days = 1),
-        r AS (SELECT row_id, row_id AS logon_row FROM win_logons
-              UNION ALL SELECT row_id, logon_row FROM win_session_acts)
+        r AS (SELECT row_id, row_id AS start_row FROM win_rdp_starts
+              UNION ALL SELECT row_id, start_row FROM win_rdp_acts)
         SELECT r.row_id, 'WIN-LAT-1', NULL,
-               'RDP to ' || hit.host || ' as ' || hit.account || ' from ' || hit.source ||
+               CASE hit.how WHEN 'logon' THEN 'RDP to ' ELSE 'RDP session reconnected on ' END ||
+               hit.host || ' as ' || hit.account || ' from ' || hit.source ||
                ' - a pair seen on 1 of the ' || span.days || ' days of the evidence - then ran: ' || hit.progs,
                ['T1021.001']
-        FROM hit CROSS JOIN span JOIN r ON r.logon_row = hit.row_id
+        FROM hit CROSS JOIN span JOIN r ON r.start_row = hit.row_id
     """),
     # A network logon, then a service or a scheduled task created in that session -
     # PsExec's shape (T1021.002 DET0530 AN1468 "remote service creation, task
     # scheduling"; a service: T1569.002 DET0421 AN1185, PsExec "creating temporary
     # services").
-    ("WIN-LAT-2", """
+    ("WIN-LAT-2", f"""
         INSERT INTO findings
         WITH a AS (SELECT a.*, l.account, l.source FROM win_session_acts a
                    JOIN win_logons l ON l.row_id = a.logon_row
                    WHERE a.event_id IN (4697, 4698) AND l.ltype = '3'),
-        r AS (SELECT row_id, row_id AS act FROM a UNION ALL SELECT logon_row, row_id FROM a)
+        -- AN1468's "access to ADMIN$ / C$" in the same session (5140, logged once per session).
+        sh AS (SELECT row_id, logon_row, what AS share, ts FROM win_session_acts
+               WHERE event_id = 5140 AND {_admin_share("what")}),
+        r AS (SELECT row_id, row_id AS act FROM a UNION ALL SELECT logon_row, row_id FROM a
+              UNION ALL SELECT sh.row_id, a.row_id FROM sh JOIN a ON a.logon_row = sh.logon_row AND sh.ts <= a.ts)
         SELECT DISTINCT r.row_id, 'WIN-LAT-2', NULL,
                'Network logon to ' || a.host || ' as ' || a.account || ' from ' || coalesce(a.source, '?') ||
+               coalesce(', opened ' || (SELECT string_agg(DISTINCT sh.share, ', ') FROM sh
+                                        WHERE sh.logon_row = a.logon_row AND sh.ts <= a.ts), '') ||
                ', then ' || CASE a.event_id WHEN 4697 THEN 'service' ELSE 'scheduled task' END || ' "' ||
                a.what || '" created in that session',
                ['T1021.002'] || CASE WHEN a.event_id = 4697 THEN ['T1569.002'] ELSE []::VARCHAR[] END
         FROM a JOIN r ON r.act = a.row_id
+    """),
+    # A file written into ADMIN$ / C$ over the network, then run on that host - PsExec copies
+    # PSEXESVC.exe to ADMIN$ and installs it (T1021.002 AN1468, W-D8, Q91). 5145 names the file
+    # (RelativeTargetName under ShareLocalPath) and the access (AccessMask 0x2 WriteData); it
+    # needs Detailed File Share auditing - a host without it shows nothing here. Joined by the
+    # file's path on the same host, the run after the write: no window.
+    ("WIN-LAT-4", f"""
+        INSERT INTO findings
+        WITH wr AS (
+          SELECT e.row_id, e.ts, {HOST} AS host, {_account("w.data['SubjectUserName']")} AS account,
+                 {_addr("w.data['IpAddress']")} AS source, trim(w.data['ShareName']) AS share,
+                 lower(replace(replace(trim(w.data['ShareLocalPath']), '\\??\\', '') || '\\' ||
+                               trim(w.data['RelativeTargetName']), '\\\\', '\\')) AS path
+          FROM product_events e JOIN win_events w USING (row_id)
+          WHERE w.provider = '{SECURITY}' AND w.event_id = 5145 AND e.ts IS NOT NULL
+            AND {_admin_share("w.data['ShareName']")}
+            AND (try_cast(trim(w.data['AccessMask']) AS BIGINT) & 2) <> 0
+            AND coalesce(trim(w.data['RelativeTargetName']), '') NOT IN ('', '\\')),
+        run AS (
+          SELECT e.row_id, e.ts, {HOST} AS host, w.event_id,
+                 lower(replace(CASE WHEN w.event_id = 4697 THEN w.data['ServiceFileName']
+                                    WHEN w.event_id = 4688 THEN w.data['NewProcessName']
+                                    ELSE w.data['Image'] END, '%systemroot%', 'c:\\windows')) AS image,
+                 coalesce(w.data['ServiceName'], e.program) AS what
+          FROM product_events e JOIN win_events w USING (row_id)
+          WHERE e.ts IS NOT NULL AND ((w.provider = '{SECURITY}' AND w.event_id IN (4697, 4688))
+                                      OR (w.provider = '{SYSMON}' AND w.event_id = 1))),
+        pairs AS (SELECT wr.row_id AS wrow, run.row_id AS rrow, wr.host, wr.account, wr.source, wr.share,
+                         wr.path, run.event_id, run.what
+                  FROM wr JOIN run ON run.host = wr.host AND run.ts >= wr.ts
+                                  AND (run.image = wr.path OR (run.event_id = 4697 AND contains(run.image, wr.path)))),
+        r AS (SELECT wrow AS row_id, wrow, rrow FROM pairs UNION ALL SELECT rrow, wrow, rrow FROM pairs)
+        SELECT r.row_id, 'WIN-LAT-4', NULL,
+               p.path || ' written to ' || p.share || ' on ' || p.host || ' as ' || p.account || ' from ' ||
+               coalesce(p.source, '?') || ', then run there as ' ||
+               CASE p.event_id WHEN 4697 THEN 'service "' || p.what || '"' ELSE 'process ' || p.what END,
+               ['T1021.002'] || CASE WHEN p.event_id = 4697 THEN ['T1569.002'] ELSE []::VARCHAR[] END
+        FROM pairs p JOIN r ON r.wrow = p.wrow AND r.rrow = p.rrow
+        -- One finding per event: the service install named when there is one.
+        QUALIFY row_number() OVER (PARTITION BY r.row_id ORDER BY p.event_id <> 4697, p.rrow) = 1
     """),
     # An NTLM network logon for an account that uses Kerberos in this evidence, but
     # never from this source - "NTLM LogonType 3 authentications with no
@@ -536,17 +739,21 @@ RULES += [
 ]
 
 # WIN-AUTH-1 reads the attempts the BRUTE rules' preparation built, and their findings.
-# WIN-LAT-2 / -3 read the sessions WIN-LAT-1's preparation built.
+# WIN-LAT-2 / -3 read the sessions WIN-LAT-1's preparation built; WIN-BRUTE-4 its own epochs.
 PREPARE = {"WIN-BRUTE-1": prepare_brute_1, "WIN-BRUTE-2": prepare_brute_2,
-           "WIN-BRUTE-3": prepare_brute_3, "WIN-LAT-1": prepare_sessions, "WIN-HOST-1": prepare_host_1}
-LEVEL = {"WIN-BRUTE-1": "medium", "WIN-BRUTE-2": "medium", "WIN-BRUTE-3": "medium",
+           "WIN-BRUTE-3": prepare_brute_3, "WIN-BRUTE-4": prepare_brute_4, "WIN-LAT-1": prepare_sessions,
+           "WIN-HOST-1": prepare_host_1}
+LEVEL = {"WIN-BRUTE-1": "medium", "WIN-BRUTE-2": "medium", "WIN-BRUTE-3": "medium", "WIN-BRUTE-4": "medium",
          "WIN-AUTH-1": "high", "WIN-LAT-1": "medium", "WIN-LAT-2": "medium", "WIN-LAT-3": "high",
+         "WIN-LAT-4": "medium",
          "WIN-HOST-1": "high", "WIN-HOST-2": "high", "WIN-MAL-1": "high", "WIN-INTEL-1": "high",
          "WIN-INTEL-2": "medium"}
 LABELS = {"WIN-BRUTE-1": "password guessing", "WIN-BRUTE-2": "password spray",
-          "WIN-BRUTE-3": "distributed guessing", "WIN-AUTH-1": "login after failures",
+          "WIN-BRUTE-3": "distributed guessing", "WIN-BRUTE-4": "low-and-slow guessing",
+          "WIN-AUTH-1": "login after failures",
           "WIN-LAT-1": "uncommon RDP, then commands", "WIN-LAT-2": "remote service or task",
-          "WIN-LAT-3": "NTLM without Kerberos", "WIN-HOST-1": "Kerberoasting", "WIN-HOST-2": "LSASS dump",
+          "WIN-LAT-3": "NTLM without Kerberos", "WIN-LAT-4": "file copied to admin share, then run",
+          "WIN-HOST-1": "Kerberoasting", "WIN-HOST-2": "LSASS dump",
           "WIN-MAL-1": "beaconing", "WIN-INTEL-1": "known-bad destination", "WIN-INTEL-2": "known-bad sign-in source"}
 # The sign-in and beaconing rules count in their generic twins' family (R2), the feed matches in R3's;
 # a host behaviour has none to share.

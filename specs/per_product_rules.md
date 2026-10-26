@@ -223,7 +223,7 @@ docs. Cases processed before keep their R-ids until re-processed.
    and the sign-in rules stay everywhere. Escalations and VERIS count behaviours
    (`RULE_EQUIVALENT`). Baseline 648 -> 668, every move a rename or a new product-rule finding.
 5. Windows - its own design, `specs/windows_rules.md` (5a sign-ins **built 2026-10-26**, gotcha #65;
-   5b lateral movement / host activity, 5c Sysmon network) · 6. Linux · 7. FortiGate · 8. Cisco
+   5b lateral movement / host activity, 5c Sysmon network, 5d low-and-slow / reconnects / admin shares) · 6. Linux · 7. FortiGate · 8. Cisco
    (reader first).
 
 ## Questions

@@ -366,6 +366,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+- #68 Windows story 5d: WIN-BRUTE-4 (B5) is Javed & Paxson's CUSUM and saw nothing until the normal was cleaned as the paper cleans it (pointwise brute-forcers out, §5's automation test) and Z counted in quarter failures (`lines.CUSUM_SCALE`) - W3 156 of 246; 4768 0x6 a failed attempt; a 4778 reconnect carries the session's own id (WIN-LAT-1, OTRF found); ADMIN$ / C$ in WIN-LAT-2, WIN-LAT-4 file copied then run; 7045 untyped.
 - #67 Windows beaconing and feeds (WIN-MAL-1, WIN-INTEL-1..2): R2007's method per (host, process, destination) with silences over an hour left out - R2007 missed a working-hours beacon; supersede R2007 / R3003-R3005 on Windows rows; documentation ranges never reach a feed.
 - #66 Windows lateral movement / host rules: steps linked by the session (TargetLogonId -> SubjectLogonId, Sysmon ProcessGuid; ASOF to the latest 4624), no window; WIN-LAT-1 = an RDP pair seen on one day of the evidence (the user's choice); WIN-LAT-3 compares an account with its own Kerberos; two areas, eight Overview cards; the OTRF reconnect (4624 type 7) and a dump with no Sysmon 10 are missed.
 - #65 Windows sign-in rules (`rules_windows.py`): one attempt however many events record it - a DC's 4771 / 4776 within 1 s of a host's 4625 joins it, its address kept; 4771 / 4776 counted (Q84 reverses Q41); WIN-BRUTE-1..3 / WIN-AUTH-1 supersede R2000 / R2005 / R2006 / R2008 / R2009 on Windows rows; measured on `tests/gen_windows_domain.py`.
@@ -760,9 +761,10 @@ Two more checks, each for its own layer:
   log has no port, Detect as neither verdict, no product's rule on another product's rows.
 - **Windows sign-in rules** - `tests/check_windows_rules.py <scratch>` (gotcha #65): one attempt per
   4625 + 4771 / 4776, then `tests/gen_windows_domain.py` (seeded: a domain's three months, incidents
-  W1-W9 and look-alikes, `ground_truth.csv`) scored per incident - no plain or look-alike row may be
+  W1-W11 and look-alikes, `ground_truth.csv`) scored per incident - no plain or look-alike row may be
   flagged - and the real PurpleSharp spray; the lateral-movement and host rules (gotcha #66) on the same
-  quarter and the real OTRF RDP / LSASS capture.
+  quarter and the real OTRF RDP / LSASS capture; story 5d (gotcha #68): W3 / W10 / W11, the CUSUM on a
+  known series, 4768 0x6, the OTRF reconnect.
 - **AI review of suggestions** - `tests/check_triage.py <scratch>` (gotcha #64): the facts, the schema's
   enums, the address and cross-citation checks, a model that cannot be reached; a fake model, no Ollama.
 - **Products and periods** - `tests/check_products.py <scratch>` (gotcha #61): product per row, a
@@ -817,7 +819,8 @@ R2006 177 / R2008 3, and 54 files of the lab's Security events rendered in Splun
 `windows-security-text-spray.log` (162 rows, R2000 20 / R2009 20 - since 2026-10-26 WIN-BRUTE-2
 40, and `windows-security-xml-spray.log` 50 -> WIN-BRUTE-2 100: each attempt is a 4625 + a 4776,
 both flagged now, gotcha #65; the lab's Windows entries were not re-run - the folder is gone;
-`otrf/rdp_interactive_taskmanager_lsass_dump.json` 0 -> WIN-LAT-3 1, gotcha #66).
+`otrf/rdp_interactive_taskmanager_lsass_dump.json` 0 -> WIN-LAT-3 1, gotcha #66, then WIN-LAT-1 0 -> 8 -
+the RDP reconnect, gotcha #68).
 W4 added `winlogbeat/` (Elastic's 105 test `.evtx` and the 113 JSON files Winlogbeat wrote from
 them) and `nxlog/` (7 OTRF datasets, 2 of them flat JSON kept as no_reader) - 225 entries, 0
 flagged - and `tests/samples/otrf/` (283 NXLog records, 0 flagged).
@@ -882,7 +885,7 @@ techniques match the SQL - run it with the parity check.
 Current set: **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
 CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **Windows** WIN-BRUTE-1..3,
 WIN-AUTH-1 (gotcha #65), WIN-LAT-1..3, WIN-HOST-1..2 (gotcha #66), WIN-MAL-1, WIN-INTEL-1..2
-(gotcha #67) · **generic** (every other product's rows; superseded on Palo Alto /
+(gotcha #67), WIN-BRUTE-4, WIN-LAT-4 (gotcha #68) · **generic** (every other product's rows; superseded on Palo Alto /
 Check Point rows, and the sign-in ones on Windows rows, gotcha #63): R2000 brute-force burst · R2002
 port scan · R2003 service sweep · R2004 policy gap · R2005 spray (many sources, one account) ·
 R2006 multi-source logins within an hour · R2007 beaconing · R2008 login after brute force ·

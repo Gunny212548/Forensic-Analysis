@@ -731,7 +731,8 @@ RULE_META["CP-MAL-2"] = {
 WINDOWS_SOURCES = ["windows-event-xml", "windows-evtx", "windows-splunk-text", "windows-winlogbeat-json",
                    "windows-nxlog-json"]
 _WIN_ATTEMPT = ("Failures: 4625 SubStatus / Status 0xC000006A or 0xC0000064, 4771 Failure Code 0x18 or "
-                "0x6, 4776 Error Code 0xC000006A or 0xC0000064 (Microsoft's event pages); a DC's 4771 / "
+                "0x6, 4776 Error Code 0xC000006A or 0xC0000064, 4768 Result Code 0x6 (Microsoft's event "
+                "pages; 4768 0x12 / 0x17 are refusals, not counted); a DC's 4771 / "
                 "4776 within a second of a host's 4625 for the same account is the same attempt and counts "
                 "once. The source is the address (::ffff: read as IPv4), else a 4776's Source Workstation "
                 "name, else the host's console.")
@@ -755,7 +756,7 @@ RULE_META.update({
                         "episodes that ended in a success (failures in the hour before it), and at least 2; "
                         "under 20 such episodes, no line.",
             "technical_context": _WIN_ATTEMPT,
-            "blind_spots": "Guessing slower than the line per hour (B5, low-and-slow - no rule yet); guessing "
+            "blind_spots": "Guessing slower than the line per hour (B5, low-and-slow - WIN-BRUTE-4); guessing "
                            "spread over sources (WIN-BRUTE-3); failures with other codes (locked, disabled).",
             "validation": _WIN_VALIDATION.format(found="W2 RDP brute force (800) and W6 NTLM guessing "
                                                        "(280 attempts, 560 events)"),
@@ -800,6 +801,40 @@ RULE_META.update({
             "blind_spots": "Distributed guessing slower than one source an hour per account.",
             "validation": _WIN_VALIDATION.format(found="W9 distributed guessing (30 internet addresses)"),
             "response": "Read where the sources come from and whether the account then signed in.",
+        },
+    },
+    "WIN-BRUTE-4": {
+        "id": "12c8c0fc-93d8-4b8c-94f2-aa81c28d80bd",
+        "title": "Windows: low-and-slow guessing during a site-wide rise in failures",
+        "status": "experimental",
+        "techniques": ["T1110.001"],
+        "category": "authentication", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["A source that never signs in in the evidence but is someone's (a home router "
+                           "mistyping during an outage) caught in an epoch",
+                           "Evidence too short to model the normal failure rate"],
+        "ads": {
+            "goal": "Detect guessing spread so thin over sources and days that no source, account or hour "
+                    "shows it (behaviour B5; Javed & Paxson 2013).",
+            "strategy": "The case's attempts left after WIN-BRUTE-1..3 (the paper filters pointwise "
+                        "brute-forcers first) in time order, cut into events of 100; Y = failures per event. "
+                        "Normal from the evidence (§5): sources that never succeed, sources failing >= 95% "
+                        "of >= 20 attempts and automations (Zhang's chi-squared test, 3-day windows of >= 50 "
+                        "attempts, two-sided at 0.001) left out, a beta-binomial fitted by moments. CUSUM "
+                        "(§4.1) with k = delta / 2 (delta = 1 failure per 100 attempts, Q88) on a 1/4-failure "
+                        "lattice; H the smallest whose in-control ARL is the paper's 3,720 events; epochs "
+                        "stepped back by the out-of-control ARL; an epoch that no longer alarms without its "
+                        "top-failing source is a singleton and dropped. Flagged: the epoch's failures whose "
+                        "(source, account) never signs in, nor the source as an account one letter away "
+                        "(§4.2).",
+            "technical_context": _WIN_ATTEMPT + " The case keeps the fit, k, H and both ARLs (manifest lines).",
+            "blind_spots": "Guessing between alarms: an epoch ends at the first event at or below the normal "
+                           "mean, and a late run with no coordination left (singleton) is dropped - measured, "
+                           "W3's last month; under 20 events of ordinary attempts (2,000) the rule does not "
+                           "run; a guesser whose pair also signs in (stolen password).",
+            "validation": _WIN_VALIDATION.format(found="W3, 3 a day from rotating internet addresses for three "
+                                                       "months: 156 of 246 failures, Jul 2 - Aug 27"),
+            "response": "The paper decides participation by hand: read the sources and accounts the finding "
+                        "lists - shared targets, similar counts, timing.",
         },
     },
     "WIN-AUTH-1": {
@@ -847,15 +882,19 @@ RULE_META.update({
             "goal": "Detect an RDP logon followed by process execution, from a source / account / host "
                     "combination that is not a habit (T1021.001 DET0327 AN0931, its HostAccessPatterns: "
                     "\"first-time source/destination pairs\").",
-            "strategy": "4624 LogonType 10 with a source address, then 4688 / Sysmon 1 in that session; "
-                        "flagged when the (source, account, host) shows RDP on one day of the evidence only "
-                        "(the user's choice, 2026-10-26). The finding lists what ran.",
-            "technical_context": _WIN_SESSION,
-            "blind_spots": "An attacker returning on several days; an RDP reconnect to an existing session "
-                           "(4624 type 7 + 4778 - its processes carry the first logon's id; measured on the "
-                           "OTRF RDP capture); a session whose 4624 is outside the evidence.",
+            "strategy": "4624 LogonType 10 with a source address, or a reconnect to an existing session "
+                        "(4778, SessionName RDP-Tcp#N, its ClientAddress; story 5d), then 4688 / Sysmon 1 in "
+                        "that session after it; flagged when the (source, account, host) shows RDP on one day "
+                        "of the evidence only (the user's choice, 2026-10-26). The finding lists what ran.",
+            "technical_context": _WIN_SESSION + " A 4778's LogonID is the session's own; the reconnect's "
+                                                "4624 type 7 have new ids that run nothing.",
+            "blind_spots": "An attacker returning on several days; a session whose start (4624 or 4778) is "
+                           "outside the evidence; reconnects without Other Logon/Logoff auditing (no 4778).",
             "validation": _WIN_5B.format(found="W7, RDP from a user workstation as adm.backup, then "
-                                               "discovery and procdump; admins' recurring RDP not flagged"),
+                                               "discovery and procdump; W10, an admin's session taken over by "
+                                               "a reconnect from outside; admins' recurring RDP and "
+                                               "reconnects not flagged") +
+                          " Real: OTRF RDP capture - the reconnect from 1.2.3.4 and Task Manager in it.",
             "response": "Read the commands; ask whether the account's owner made the connection.",
         },
     },
@@ -871,14 +910,40 @@ RULE_META.update({
             "goal": "Detect a service or scheduled task created through a network logon - PsExec's shape "
                     "(T1021.002 DET0530 AN1468; T1569.002 DET0421 AN1185).",
             "strategy": "4624 LogonType 3, then 4697 (service installed) or 4698 (task created) in that "
-                        "session on that host. A service carries T1569.002 too.",
-            "technical_context": _WIN_SESSION + " A service installed through the System log only (7045) "
-                                                "has no session and is not read.",
+                        "session on that host; ADMIN$ / C$ opened in the session before it (5140) is named "
+                        "and kept on the finding. A service carries T1569.002 too.",
+            "technical_context": _WIN_SESSION + " System 7045 is not typed - no Microsoft page for it was "
+                                                "found; a host that logs a service only there is not read.",
             "blind_spots": "Services created over WMI or with no 4697 audit; tasks on another host than the "
                            "logon's.",
             "validation": _WIN_5B.format(found="W8 PSEXESVC in the pass-the-hash session; the Zabbix rollout "
                                                "found and labelled a benign true positive"),
             "response": "Read the service's file and what it ran; a deployment tool is closed as benign.",
+        },
+    },
+    "WIN-LAT-4": {
+        "id": "ff261617-38f6-45f8-ae24-c2f8b380e0bc",
+        "title": "Windows: file copied to an admin share, then run",
+        "status": "experimental",
+        "techniques": ["T1021.002", "T1569.002"],
+        "category": "file_event", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["Software deployment that copies an installer through ADMIN$ / C$ and runs it",
+                           "Administrators using PsExec"],
+        "ads": {
+            "goal": "Detect a file written into ADMIN$ or C$ over the network and then run on that host - "
+                    "PsExec copies PSEXESVC.exe to ADMIN$ and installs it (T1021.002 DET0530 AN1468).",
+            "strategy": "5145 on ADMIN$ / C$ with WriteData (AccessMask 0x2), the file = ShareLocalPath + "
+                        "RelativeTargetName; then on the same host a 4697 whose ServiceFileName names it "
+                        "(%SystemRoot% read as C:\\Windows) or a 4688 / Sysmon 1 of that image. Joined by the "
+                        "path, no window. A service carries T1569.002 too.",
+            "technical_context": "Needs Detailed File Share auditing (5145), which many sites leave off; a "
+                                 "host without it shows nothing here (Microsoft 5145).",
+            "blind_spots": "A copy through another share or protocol; the source host's side (which session "
+                           "started it - a time window, left out); a file renamed after the copy.",
+            "validation": _WIN_5B.format(found="W8, PSEXESVC.exe copied to SQL01's ADMIN$ and run; the "
+                                               "patch copied through C$ found and labelled a benign true "
+                                               "positive"),
+            "response": "Read the file and its service; a deployment tool is closed as benign.",
         },
     },
     "WIN-LAT-3": {

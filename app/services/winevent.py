@@ -184,6 +184,10 @@ SECURITY_TYPES = {
     # beside it for the same attempt.
     4771: "kerberos_preauth_failed",  # "fails to issue a Kerberos Ticket Granting Ticket"
     4776: "ntlm_validation",         # "a credential validation occurs using NTLM authentication"
+    4778: "session_reconnected",     # "reconnects to an existing Terminal Services session"
+    4779: "session_disconnected",    # "disconnects from an existing Terminal Services session"
+    5140: "share_accessed",          # "network share object was accessed"
+    5145: "share_object_checked",    # "checked to see whether client can be granted desired access"
     1102: "audit_log_cleared",       # "Windows Security audit log was cleared"
 }
 
@@ -213,6 +217,10 @@ TYPE_NAMES = {
     "kerberos_service_ticket": "Kerberos service ticket requested",
     "kerberos_preauth_failed": "Kerberos pre-authentication failed",
     "ntlm_validation": "NTLM credential validation",
+    "session_reconnected": "Session reconnected",
+    "session_disconnected": "Session disconnected",
+    "share_accessed": "Network share accessed",
+    "share_object_checked": "Network share object checked",
     "audit_log_cleared": "Security audit log cleared",
     "file_time_changed": "File creation time changed",
     "network_connection": "Network connection",
@@ -252,8 +260,9 @@ LOGON_TYPES = {"0": "System", "2": "Interactive", "3": "Network", "4": "Batch", 
                "12": "CachedRemoteInteractive", "13": "CachedUnlock"}
 
 # Item names that carry the canonical values, first non-empty wins.
-_USER = ("TargetUserName", "SubjectUserName", "User")
-_SRCIP = ("IpAddress", "SourceIp")
+_USER = ("TargetUserName", "SubjectUserName", "User", "AccountName")
+# 4778 / 4779 name the client ClientAddress, "LOCAL" for the console (their page).
+_SRCIP = ("IpAddress", "SourceIp", "ClientAddress")
 _PROCESS = ("NewProcessName", "Image", "ProcessName")
 # Shown first in `raw` - what the analyst reads first.
 _FIRST = ("CommandLine", "ParentCommandLine", "NewProcessName", "Image", "ParentImage",
@@ -461,10 +470,11 @@ def timeline_row(ev: dict) -> dict:
     # PrivilegeList spans lines) stays as written in win_events.
     body = " · ".join(f"{n}={re.sub(r'\s+', ' ', d[n].strip())}" for n in shown
                       if (d[n] or "").strip() not in _EMPTY)
+    srcip = _first(d, _SRCIP)
     return {
         "ts": _when(ev["time_created"]),
         "ts_raw": ev["time_created"],
-        "srcip": _first(d, _SRCIP),
+        "srcip": None if srcip == "LOCAL" else srcip,
         "dstip": _first(d, ("DestinationIp",)),
         "dstport": _first(d, ("DestinationPort",)),
         "username": _first(d, _USER),

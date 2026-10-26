@@ -152,6 +152,96 @@ SAMPLES comes back if `D:\logtest\windows` is restored (Q64, paused).
   over an hour left out (R2007 missed W4's working-hours beacon). With 5a-5c every incident of the
   quarter is found and no plain or look-alike event is flagged.
 - Not in story 5: SigmaHQ's single-event rules - ADR-006's own story.
+- **5d - what 5a-5c left** (below): B5 low-and-slow, failed 4768, the RDP reconnect, admin-share
+  access. **Approved 2026-10-26, Q88-Q92 as recommended** (the user: "Q88-Q92 : yes ทำตาม design
+  เลย"). **Built 2026-10-26** (gotcha #68): W3 156 of its 246 failures by WIN-BRUTE-4 (Jul 2 - Aug 27;
+  the last month missed - a late run dropped as a singleton), W10 by WIN-LAT-1 through the 4778, W11 by
+  WIN-BRUTE-2 through 4768 0x6, W8's copy by WIN-LAT-4; no plain or look-alike event flagged; the OTRF
+  reconnect found (WIN-LAT-1 8 rows). Two changes the measurement forced, both stated in gotcha #68: the
+  normal is cleaned as the paper cleans it (pointwise brute-forcers left out, §5's automation test),
+  and Z is counted in quarters of a failure, not whole ones.
+
+## Story 5d - what 5a-5c left (approved 2026-10-26)
+
+Documents read for it (`SOURCES.md`, 2026-10-26): Javed & Paxson §4.1, §5 and §6's parameters in
+full; Microsoft 4768's failure codes, 4778 / 4779, 5140, 5145. No Microsoft page for System 7045
+was found.
+
+### W-D5 - B5 low-and-slow: Javed & Paxson's two steps (WIN-BRUTE-4, Q88)
+
+W3 is three failures a day from a different internet address each time: no source, account or
+hour ever has enough to count, so BRUTE-1..3 cannot see it by design. Javed & Paxson detect it
+site-wide, then name who took part:
+
+1. **Site analyzer.** The case's attempts (`win_attempts`, one attempt however many events record
+   it) in time order, cut into *events* of n attempts; Y = failures per event (GFI, §4.1).
+   **Normal from the case's own evidence (§5, D16):** drop sources that never succeed and sources
+   with a failure ratio ≥ 0.95 over ≥ 20 attempts, fit a beta-binomial to the rest's Y by moments;
+   μ is its mean. CUSUM: Zn = Yn - μ - k, Sn = max(0, Sn-1 + Zn), alarm when Sn > H and rising;
+   **k = δ / 2**; **H from the in-control ARL** (the Markov chain of §4.1, over the fitted
+   distribution) for the paper's false-alarm rate, one per 3,720 events. An epoch = the alarmed
+   events plus the out-of-control ARL stepped back. An epoch that no longer alarms without its
+   top-failing source is a singleton and dropped - BRUTE-1 / BRUTE-2 already name it.
+2. **Participants (§4.2).** In an epoch, a failed attempt is benign if its (source, account) pair
+   succeeds anywhere in the evidence, or the source succeeds as an account at edit distance 1. The
+   rest are the finding, listed with what they share (target host, accounts). The paper does the
+   "coordination glue" step by hand; here the analyst does it too - the system orders, not decides.
+
+n stays the paper's 100. **δ is the open choice (Q88)**: the paper's δ = 10 failures per 100 was
+set for LBNL's rate and would never see W3. Rough prototype on the quarter (raw 4624 / 4625, not
+`win_attempts`): ~238 attempts a day, ordinary failures ~1 per 100 outside three spikes (W6),
+W3 ≈ +1.3 per 100. With δ = 1 to 2 the alarmed events held 110-149 of W3's 246 failures - and
+134-170 plain failures, which is what step 2 has to remove. To be measured with the rule itself.
+
+### W-D6 - a refused TGT (4768) is a failed attempt (Q89)
+
+4768's page: a refused TGT is a Failure event with a Result Code other than 0x0; **0x6 "The
+username doesn't exist"**; 0x18 (wrong password) cannot occur in 4768 - 4771 carries it. Proposed:
+4768 0x6 counts as a failed attempt (as 4771 0x6 and 4625 0xC0000064 already do), and joins a
+host's 4625 by W-D4's one-second rule. 0x12 (account disabled, expired or locked out) and 0x17
+(password expired) are refusals, not guesses - kept as Timeline events. This is what makes a
+Kerberos user-name enumeration (an AS-REQ per guessed name, nothing else logged) visible to
+BRUTE-2.
+
+### W-D7 - the RDP reconnect joins WIN-LAT-1 (Q90)
+
+4778 (Audit Other Logon/Logoff Events) records a reconnect to an existing session: SessionName
+`RDP-Tcp#N`, ClientAddress, AccountName, and **LogonID - the session's own id**. Checked on the
+OTRF capture: its 4778 carries `0x10ac67`, the id under which Taskmgr.exe (the LSASS dump) runs,
+while the four 4624 type 7 of the reconnect each have new ids that run nothing. So: a 4778 with
+an `RDP-Tcp#` session counts as an RDP session for WIN-LAT-1 - the same one-day rule (Q87) over
+(ClientAddress, account, host), the same process link through LogonID. `Console` (Fast User
+Switching) is not RDP and is left out. The OTRF dump would then be found.
+
+### W-D8 - admin-share access, on the target only (Q91)
+
+AN1468: ADMIN$ / C$ accessed, then on the target a remote service, a task or a process. 5140 is
+logged once per session at the first access, with the session's SubjectLogonId and IpAddress; 5145
+per file, with RelativeTargetName and AccessMask (0x2 = WriteData). Proposed, all on one host and
+linked by the session (W-D2), no window:
+- **WIN-LAT-2** also counts a session whose 5140 names `ADMIN$` or `C$` and then creates a service
+  or task (the share shown on the finding).
+- **WIN-LAT-4** (new): a file written into `ADMIN$` / `C$` (5145, AccessMask with 0x2) and then
+  run on that host - a 4697 ImagePath or a 4688 / Sysmon 1 image naming the same file (PsExec
+  copies PSEXESVC.exe to ADMIN$, then installs it). T1021.002 (AN1468); T1570 Lateral Tool Transfer only once its page is read.
+The step across two hosts (which session on the source started it) is left out: it needs a time
+window, and the target alone already shows the movement. 5145 needs Detailed File Share auditing,
+which many sites leave off - a host without 5145 is n/a for WIN-LAT-4 with that reason.
+
+### W-D9 - 7045 is not typed (Q92)
+
+No Microsoft page documents System 7045, so it is not typed (gotcha #55). 4697 covers a service
+install where Security System Extension auditing is on; a host that logs only 7045 is a blind spot
+recorded on WIN-LAT-2.
+
+### Test data for 5d
+
+`gen_windows_domain.py` gains: W8 with its 5140 ADMIN$ and 5145 write of PSEXESVC.exe; W10 an RDP
+reconnect at night from an outside address followed by commands; W11 a Kerberos user-name
+enumeration (4768 0x6 for 200 guessed names from one workstation). Look-alikes: an admin's
+habitual reconnects, software deployment through ADMIN$ (a btp, as the Zabbix rollout), a single
+mistyped user name. Scored as before: every incident found, no plain or look-alike row flagged, W3
+by WIN-BRUTE-4 and not by chance; parity and the OTRF capture re-run (the dump expected found).
 
 ## Questions
 
@@ -167,3 +257,13 @@ SAMPLES comes back if `D:\logtest\windows` is restored (Q64, paused).
 - **Q85 - test data.** Build `gen_windows_domain.py` with ground truth? Recommended: yes, before
   story 5a's rules. **Answered: yes, three months** (like the Check Point quarter).
 - **Q86 - order.** 5a -> 5b -> 5c, as above?
+- **Q88 - B5 (W-D5).** WIN-BRUTE-4 by Javed & Paxson's CUSUM + participants step, and which shift
+  δ to detect? Recommended: the method as written, δ = 1 failure per 100 attempts (k = 0.5), H from
+  the paper's false-alarm rate; the analyst decides the participants.
+- **Q89 - 4768 (W-D6).** Count 4768 0x6 as a failed attempt, 0x12 / 0x17 as Timeline only?
+  Recommended: yes.
+- **Q90 - reconnect (W-D7).** A 4778 `RDP-Tcp#` reconnect counts as an RDP session for WIN-LAT-1?
+  Recommended: yes.
+- **Q91 - shares (W-D8).** Widen WIN-LAT-2 with 5140 ADMIN$ / C$ and add WIN-LAT-4 (file written
+  to the share, then run), target host only? Recommended: yes, no cross-host step.
+- **Q92 - 7045 (W-D9).** Leave 7045 untyped until a document is found? Recommended: yes.
