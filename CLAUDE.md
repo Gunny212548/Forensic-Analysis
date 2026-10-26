@@ -25,9 +25,11 @@ events -> Attack timeline -> Attack path / graph -> Report**; the Respond step
 product has its own rules over six areas, every rule names its behaviour and the document
 saying why it is a finding, and its line comes from the case's own evidence (legitimate
 members only) or TRW - no number set on one customer applied to another. Palo Alto and Check
-Point have theirs, Windows its sign-in rules (gotcha #65, `specs/windows_rules.md`); the generic
-R-rules still run on every other product's rows. **Before the
-analyst decides, an AI reviews every suggestion** (gotcha #64). **Every step must cite a
+Point have theirs, Windows its sign-in, lateral-movement, host, beaconing and feed rules (gotchas
+#65-#70, `specs/windows_rules.md` stories 5a-5e); the generic R-rules still run on every other
+product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
+reviews every suggestion itself, no cap** - in the background once the case is ready (gotchas #64,
+#71; the user, 2026-10-26: "ทุก Finding ที่เจอต้องได้รับการ review จาก AI"). **Every step must cite a
 standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
 revisions 1-4 on branch `IAI-92-identify-logsource`; most of what follows still
 describes the code before that direction.
@@ -131,6 +133,8 @@ GET  /api/cases/{id}/ingest                  question, provenance, method, warni
 PUT  /api/cases/{id}/question | provenance   the investigation's question; one
                                              item's provenance (gotcha #58)
 POST /api/cases/{id}/reprocess               run the pipeline again from raw/
+POST /api/cases/{id}/ai-review               "Review again": send the suggestions with no AI
+                                             advice yet to the model (gotcha #71)
 POST /api/cases/{id}/lifecycle               one status change / assignment on a
                                              tracked finding (lifecycle.py)
 GET  /api/cases/{id}/stix                    STIX 2.1 bundle download; ready only
@@ -592,6 +596,14 @@ was later stopped for low memory - qwen3.5:9b, the 8091 container and the dev co
 are a lot for this PC; stop the dev container when not in use. `TRIAGE_ENABLED=0` turns the AI
 review off (every rule check sets it; the dev container has it off unless `DEV_TRIAGE_ENABLED=1`).
 
+**What the model costs on this PC (measured 2026-10-26, gotcha #71).** RTX 5050 Laptop, 8 GB VRAM:
+qwen3.5:9b loads 30 of 33 layers on the GPU (4.4 GB, KV 512 MB for one 16,384-token slot,
+`n_slots = 1`), ~35 tokens/s. The AI review writes ~300 tokens a suggestion: **~9 s a suggestion at
+`TRIAGE_BATCH` 5** - Mekong 61 in ~10 min, the blind quarter's 526 in ~80 min. A batch of 10 or 15
+is cut off at the 3,000-token cap and falls back to single calls (~32 s a suggestion) - keep 5. A
+single batch-5 call is ~1,500 tokens for one suggestion; running two requests at once
+(`OLLAMA_NUM_PARALLEL`) is proposed, not measured - it changes the user's Ollama settings, so ask.
+
 **The narrative LLM is local now (2026-10-12): `LLM_PROVIDER=ollama`,
 `OLLAMA_MODEL=qwen2.5:7b-instruct`, then `qwen3.5:9b` from 2026-10-14 (see
 below)** on the host's Ollama
@@ -768,9 +780,17 @@ Two more checks, each for its own layer:
   W1-W11 and look-alikes, `ground_truth.csv`) scored per incident - no plain or look-alike row may be
   flagged - and the real PurpleSharp spray; the lateral-movement and host rules (gotcha #66) on the same
   quarter and the real OTRF RDP / LSASS capture; story 5d (gotcha #68): W3 / W10 / W11, the CUSUM on a
-  known series, 4768 0x6, the OTRF reconnect.
-- **AI review of suggestions** - `tests/check_triage.py <scratch>` (gotcha #64): the facts, the schema's
-  enums, the address and cross-citation checks, a model that cannot be reached; a fake model, no Ollama.
+  known series, 4768 0x6, the OTRF reconnect; one suggestion per behaviour (gotcha #69); story 5e
+  (gotcha #70): a sprayer's own `...$`, a fleet-wide beacon.
+- **The user's blind Windows quarter** - `D:\logtest\blind-windows` (`gen_windows_blind.py`, seed
+  20260401, Kinnaree Textiles, K1-K15, `out/answer_key/`). **Its key has been read** (gotcha #70): it
+  measures fixes now, not the rule set; a fair blind test needs another seed whose key nobody reads.
+  Its `answer_key/*.csv` and `evidence/COLLECTION.txt` show as NEW in the `D:/logtest` parity run -
+  not logs, never `--update` them.
+- **AI review of suggestions** - `tests/check_triage.py <scratch>` (gotchas #64, #71): the facts, the
+  schema's enums, the address and cross-citation checks, a model that cannot be reached; no cap (90
+  suggestions), every rule first, retry then one by one, Review again, the background queue; a fake
+  model, no Ollama - run it with `TRIAGE_ENABLED=1`.
 - **Products and periods** - `tests/check_products.py <scratch>` (gotcha #61): product per row, a
   product rule on its rows only, periods and gaps, the n/a matrix, findings unchanged end to end.
 - **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states, and
