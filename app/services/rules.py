@@ -532,6 +532,8 @@ def generic_sql(rid: str) -> str:
 # SQL's named parameters ($above, $minimum) and the line's record, which the
 # case keeps (apply_rules' `lines`).
 RULE_PREPARE: dict = {}
+# Rules whose SQL writes the finding's entity (entity_src, entity_user) after mitre.
+RULE_ENTITY: set = set()
 
 
 def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
@@ -563,6 +565,10 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
             con.execute("CREATE OR REPLACE TEMP VIEW generic_events AS SELECT * FROM raw_events "
                         f"WHERE product IS NULL OR product NOT IN ({out})")
             sql = sql.replace("raw_events", "generic_events")
+        if rid not in RULE_ENTITY:
+            # A rule that names no entity writes the five columns it always has; the row's own
+            # srcip / username key its finding (specs/finding_entities.md E-D1).
+            sql = sql.replace("INSERT INTO findings", "INSERT INTO findings (row_id, rid, lvl, descr, mitre)", 1)
         params = None
         if rid in RULE_PREPARE:
             params, record = RULE_PREPARE[rid](con)
@@ -620,6 +626,7 @@ for _mod in (rules_paloalto, rules_checkpoint, rules_windows):
         RULES.append((_rid, _sql))
         RULE_PRODUCT[_rid] = _mod.PRODUCT
     RULE_PREPARE.update(_mod.PREPARE)
+    RULE_ENTITY.update(getattr(_mod, "ENTITY", ()))
     RULE_FAMILY.update(_mod.FAMILY)
     RULE_EQUIVALENT.update(_mod.EQUIVALENT)
     for _generic in _mod.SUPERSEDES:

@@ -263,6 +263,8 @@ LOGON_TYPES = {"0": "System", "2": "Interactive", "3": "Network", "4": "Batch", 
 _USER = ("TargetUserName", "SubjectUserName", "User", "AccountName")
 # 4778 / 4779 name the client ClientAddress, "LOCAL" for the console (their page).
 _SRCIP = ("IpAddress", "SourceIp", "ClientAddress")
+_MAPPED_V4 = re.compile(r"^(?:(?:0{1,4}:){5}|::(?:0{1,4}:){0,4}|(?:0{1,4}:){1,4}:)ffff:"
+                        r"(?=\d{1,3}(?:\.\d{1,3}){3}$)", re.IGNORECASE)
 _PROCESS = ("NewProcessName", "Image", "ProcessName")
 # Shown first in `raw` - what the analyst reads first.
 _FIRST = ("CommandLine", "ParentCommandLine", "NewProcessName", "Image", "ParentImage",
@@ -471,6 +473,11 @@ def timeline_row(ev: dict) -> dict:
     body = " · ".join(f"{n}={re.sub(r'\s+', ' ', d[n].strip())}" for n in shown
                       if (d[n] or "").strip() not in _EMPTY)
     srcip = _first(d, _SRCIP)
+    if srcip:
+        # A DC writes an IPv4 client as its IPv4-mapped IPv6 address (RFC 4291 §2.5.5.2,
+        # "::FFFF:129.144.52.38"); the timeline shows the IPv4 address it maps. win_events keeps
+        # what Windows wrote.
+        srcip = _MAPPED_V4.sub("", srcip)
     return {
         "ts": _when(ev["time_created"]),
         "ts_raw": ev["time_created"],

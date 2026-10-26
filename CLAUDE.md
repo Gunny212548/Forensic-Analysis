@@ -396,6 +396,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 
 **Findings, review and workflow** (`review.py`, `lifecycle.py`, `confidence.py`, `finding_ids.py`, `related.py`)
 - #19 Review state lives outside the case DuckDB, append-only, keyed by the collapsed finding `rid|srcip|username`.
+- #69 The key's source / account is the entity the rule decided on when it names one (`findings.entity_src` / `entity_user`, `RULE_ENTITY`, read through `db.entity_sql`), else the row's; insert into `findings` with named columns; the Windows quarter 517 -> 26 suggestions; a DC's `::ffff:` address is IPv4 in the timeline; the account's history is an AI fact (wrong rejects 8 of 76 -> 2 of 22).
 - #20 Confidence counts rule *families*, not ids; `timezone-unconfirmed` is tested on the source text, never on `ts`.
 - #30 Confidence is an Admiralty grade (reliability letter + credibility number).
 - #31 The review log is hash-chained; old unchained decisions are sealed, not rewritten.

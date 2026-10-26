@@ -220,7 +220,7 @@ from app.services import db  # noqa: E402
 spaced = storage.create_case("cp.csv", "csv", 1, company_id=co["company_id"])["case_id"]
 con = db.init(spaced)
 con.execute("INSERT INTO raw_events (row_id, srcip, username) VALUES (0, '192.168.10.62', 'Ekkachai Suwan (ekkachai.s) ')")
-con.execute("INSERT INTO findings VALUES (0, 'R3001', 1, 'Large outbound transfer', ['T1041'])")
+con.execute("INSERT INTO findings (row_id, rid, lvl, descr, mitre) VALUES (0, 'R3001', 1, 'Large outbound transfer', ['T1041'])")
 con.close()
 storage.update_case(spaced, status="ready")
 key = "R3001|192.168.10.62|Ekkachai Suwan (ekkachai.s) "

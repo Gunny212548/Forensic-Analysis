@@ -306,7 +306,7 @@ RULES: list[tuple[str, str]] = [
         SELECT r.row_id, 'WIN-BRUTE-1', NULL,
                'Password guessing against ' || g.account || ' from ' || g.source_kind || ' ' || g.source ||
                ' (' || g.n || ' failed sign-ins within an hour; ' || $note || ')',
-               ['T1110.001']
+               ['T1110.001'], g.source, g.account
         FROM (
           WITH f AS (SELECT * FROM win_attempts WHERE outcome = 'fail'),
           w AS (SELECT attempt_id, account, source, ts,
@@ -328,7 +328,7 @@ RULES: list[tuple[str, str]] = [
                'Password spray from ' || a.source_kind || ' ' || a.source || ': TRW decided sprayer after ' ||
                t.n_decided || ' new accounts from ' || strftime(t.episode_start, '%Y-%m-%d %H:%M') ||
                ' (' || t.hosts || ' accounts tried in the evidence)',
-               ['T1110.003']
+               ['T1110.003'], a.source, ''
         FROM win_attempts a
         JOIN trw_win_accounts t ON t.srcip = a.source AND t.decision = 'scanner'
         JOIN win_attempt_rows r USING (attempt_id)
@@ -343,7 +343,7 @@ RULES: list[tuple[str, str]] = [
         SELECT r.row_id, 'WIN-BRUTE-3', NULL,
                'Distributed guessing against ' || g.account || ' from ' || g.n ||
                ' sources within an hour (' || $note || ')',
-               ['T1110.001']
+               ['T1110.001'], '', g.account
         FROM (
           WITH f AS (SELECT * FROM win_attempts WHERE outcome = 'fail' AND NOT account LIKE '%$'),
           w AS (SELECT f.attempt_id, f.account, f.ts,
@@ -377,7 +377,7 @@ RULES: list[tuple[str, str]] = [
                ' - ' || strftime(p.end_ts, '%Y-%m-%d %H:%M') || ' (' || s.n || ' such failures from ' ||
                s.sources || ' sources against ' || s.accounts || ' accounts; this pair never signed in; ' ||
                $note || ')',
-               ['T1110.001']
+               ['T1110.001'], '', p.account
         FROM p JOIN s USING (epoch) JOIN win_attempt_rows r USING (attempt_id)
     """),
     # B4 failures, then a success: an account signed in from a source the rules
@@ -396,7 +396,7 @@ RULES: list[tuple[str, str]] = [
                     THEN ' - this account had signed in from this source before the failures began '
                          || '(likely the owner)'
                     ELSE '' END,
-               ['T1078']
+               ['T1078'], s.source, s.account
         FROM win_attempts s
         JOIN (SELECT a.source, a.account, min(a.ts) AS first_flag,
                      string_agg(DISTINCT f.rid, ', ' ORDER BY f.rid) AS rids,
@@ -542,7 +542,7 @@ RULES += [
                CASE hit.how WHEN 'logon' THEN 'RDP to ' ELSE 'RDP session reconnected on ' END ||
                hit.host || ' as ' || hit.account || ' from ' || hit.source ||
                ' - a pair seen on 1 of the ' || span.days || ' days of the evidence - then ran: ' || hit.progs,
-               ['T1021.001']
+               ['T1021.001'], coalesce(hit.source, ''), hit.account
         FROM hit CROSS JOIN span JOIN r ON r.start_row = hit.row_id
     """),
     # A network logon, then a service or a scheduled task created in that session -
@@ -565,7 +565,8 @@ RULES += [
                                         WHERE sh.logon_row = a.logon_row AND sh.ts <= a.ts), '') ||
                ', then ' || CASE a.event_id WHEN 4697 THEN 'service' ELSE 'scheduled task' END || ' "' ||
                a.what || '" created in that session',
-               ['T1021.002'] || CASE WHEN a.event_id = 4697 THEN ['T1569.002'] ELSE []::VARCHAR[] END
+               ['T1021.002'] || CASE WHEN a.event_id = 4697 THEN ['T1569.002'] ELSE []::VARCHAR[] END,
+               coalesce(a.source, ''), a.account
         FROM a JOIN r ON r.act = a.row_id
     """),
     # A file written into ADMIN$ / C$ over the network, then run on that host - PsExec copies
@@ -603,7 +604,8 @@ RULES += [
                p.path || ' written to ' || p.share || ' on ' || p.host || ' as ' || p.account || ' from ' ||
                coalesce(p.source, '?') || ', then run there as ' ||
                CASE p.event_id WHEN 4697 THEN 'service "' || p.what || '"' ELSE 'process ' || p.what END,
-               ['T1021.002'] || CASE WHEN p.event_id = 4697 THEN ['T1569.002'] ELSE []::VARCHAR[] END
+               ['T1021.002'] || CASE WHEN p.event_id = 4697 THEN ['T1569.002'] ELSE []::VARCHAR[] END,
+               coalesce(p.source, ''), p.account
         FROM pairs p JOIN r ON r.wrow = p.wrow AND r.rrow = p.rrow
         -- One finding per event: the service install named when there is one.
         QUALIFY row_number() OVER (PARTITION BY r.row_id ORDER BY p.event_id <> 4697, p.rrow) = 1
@@ -624,7 +626,7 @@ RULES += [
         SELECT l.row_id, 'WIN-LAT-3', NULL,
                'NTLM network logon to ' || l.host || ' as ' || l.account || ' from ' || l.source ||
                ' - the account uses Kerberos in this evidence, never from this source (possible pass-the-hash)',
-               ['T1550.002']
+               ['T1550.002'], l.source, l.account
         FROM win_logons l JOIN ka USING (account)
         WHERE l.ltype = '3' AND l.pkg = 'NTLM' AND l.source IS NOT NULL
           AND NOT l.account LIKE '%$' AND l.account <> 'anonymous logon'
@@ -644,7 +646,7 @@ RULES += [
           SELECT w.row_id, 'WIN-HOST-1', NULL,
                  'Weak-encryption service tickets for ' || max(h.n) || ' services within an hour, asked by ' ||
                  w.account || ' (possible Kerberoasting; ' || $note || ')',
-                 ['T1558.003']
+                 ['T1558.003'], '', w.account
           FROM weak w JOIN hit h ON h.account = w.account AND w.ts BETWEEN h.ts AND h.ts + INTERVAL 1 HOUR
           GROUP BY w.row_id, w.account)
     """),
@@ -655,7 +657,8 @@ RULES += [
     ("WIN-HOST-2", f"""
         INSERT INTO findings
         WITH acc AS (SELECT e.row_id, e.ts, {HOST} AS host, lower(w.data['SourceProcessGUID']) AS g,
-                            w.data['SourceImage'] AS img, w.data['GrantedAccess'] AS access
+                            w.data['SourceImage'] AS img, w.data['GrantedAccess'] AS access,
+                            {_account("w.data['SourceUser']")} AS account
                      FROM product_events e JOIN win_events w USING (row_id)
                      WHERE w.provider = '{SYSMON}' AND w.event_id = 10
                        AND lower(w.data['TargetImage']) LIKE '%\\lsass.exe'),
@@ -663,13 +666,13 @@ RULES += [
                       w.data['TargetFilename'] AS f
                FROM product_events e JOIN win_events w USING (row_id)
                WHERE w.provider = '{SYSMON}' AND w.event_id = 11),
-        pairs AS (SELECT a.row_id AS arow, wr.row_id AS wrow, a.host, a.img, a.access, wr.f
+        pairs AS (SELECT a.row_id AS arow, wr.row_id AS wrow, a.host, a.img, a.access, a.account, wr.f
                   FROM acc a JOIN wr ON wr.host = a.host AND wr.g = a.g AND wr.ts >= a.ts),
         r AS (SELECT arow AS row_id, arow, wrow FROM pairs UNION ALL SELECT wrow, arow, wrow FROM pairs)
         SELECT DISTINCT r.row_id, 'WIN-HOST-2', NULL,
                'LSASS opened by ' || p.img || ' (access ' || p.access || ') on ' || p.host ||
                ', which then wrote ' || p.f,
-               ['T1003.001']
+               ['T1003.001'], '', coalesce(p.account, '')
         FROM pairs p JOIN r ON r.arow = p.arow AND r.wrow = p.wrow
     """),
 ]
@@ -731,13 +734,18 @@ RULES += [
                'Sign-in ' || CASE a.outcome WHEN 'success' THEN 'succeeded' ELSE 'failed' END || ' for ' ||
                a.account || ' from known-bad indicator ' || a.source ||
                ' [' || i.source || CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
-               CASE WHEN a.outcome = 'success' THEN ['T1078'] ELSE ['T1110'] END
+               CASE WHEN a.outcome = 'success' THEN ['T1078'] ELSE ['T1110'] END, a.source, ''
         FROM win_attempts a JOIN ioc i ON a.source = i.value AND i.type = 'ip'
         JOIN win_attempt_rows r USING (attempt_id)
         WHERE a.source_kind = 'address'
     """),
 ]
 
+# The rules that name their finding's entity - what each decided on (specs/finding_entities.md
+# E-D1): a source, an account, or both; WIN-MAL-1 / WIN-INTEL-1 are one process on one host and
+# keep the row's own.
+ENTITY = ("WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3", "WIN-BRUTE-4", "WIN-AUTH-1", "WIN-LAT-1",
+          "WIN-LAT-2", "WIN-LAT-3", "WIN-LAT-4", "WIN-HOST-1", "WIN-HOST-2", "WIN-INTEL-2")
 # WIN-AUTH-1 reads the attempts the BRUTE rules' preparation built, and their findings.
 # WIN-LAT-2 / -3 read the sessions WIN-LAT-1's preparation built; WIN-BRUTE-4 its own epochs.
 PREPARE = {"WIN-BRUTE-1": prepare_brute_1, "WIN-BRUTE-2": prepare_brute_2,

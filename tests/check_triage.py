@@ -48,7 +48,7 @@ def main() -> int:
     for rid_, src, dst, sent in rows:
         con.execute("INSERT INTO raw_events (row_id, ts, srcip, dstip, verdict, bytes_sent) "
                     "VALUES (?, TIMESTAMP '2026-09-26 02:00:00', ?, ?, 'allow', ?)", [rid_, src, dst, sent])
-        con.execute("INSERT INTO findings VALUES (?, 'R3001', 2, ?, ['T1041'])",
+        con.execute("INSERT INTO findings (row_id, rid, lvl, descr, mitre) VALUES (?, 'R3001', 2, ?, ['T1041'])",
                     [rid_, f"Large outbound transfer ({sent} bytes) {src} -> {dst}"])
     con.close()
     storage.update_case(cid, status="ready")

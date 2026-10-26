@@ -58,7 +58,12 @@ CREATE TABLE IF NOT EXISTS findings (
   rid    VARCHAR,
   lvl    INTEGER,
   descr  VARCHAR,
-  mitre  VARCHAR[]
+  mitre  VARCHAR[],
+  -- Who the finding is about, when its rule names it (specs/finding_entities.md E-D1):
+  -- '' = none on that side; both NULL = the rule names none and the row's own
+  -- srcip / username key it, as before. Read through entity_sql().
+  entity_src  VARCHAR,
+  entity_user VARCHAR
 );
 
 -- Findings raised by an attack-path pattern (severity.py). One
@@ -101,6 +106,19 @@ def connect(case_id: str, read_only: bool = False) -> duckdb.DuckDBPyConnection:
     # timestamp means the same thing wherever it is cast (config.EVENT_TZ_*).
     con.execute(f"SET TimeZone = '{config.EVENT_TZ_NAME}'")
     return con
+
+
+def entity_sql(con, f: str = "f", r: str = "r") -> tuple[str, str]:
+    """The source and account a finding row is keyed on (finding_key): the entity its rule
+    named, else the row's own srcip / username. A case processed before the entity columns
+    existed has only the row's."""
+    has = con.execute("SELECT count(*) FROM duckdb_columns() WHERE table_name = 'findings' "
+                      "AND column_name = 'entity_src'").fetchone()[0]
+    if not has:
+        return f"{r}.srcip", f"{r}.username"
+    named = f"({f}.entity_src IS NOT NULL OR {f}.entity_user IS NOT NULL)"
+    return (f"CASE WHEN {named} THEN nullif({f}.entity_src, '') ELSE {r}.srcip END",
+            f"CASE WHEN {named} THEN nullif({f}.entity_user, '') ELSE {r}.username END")
 
 
 def init(case_id: str) -> duckdb.DuckDBPyConnection:
@@ -160,12 +178,14 @@ def _escalation_map(con: duckdb.DuckDBPyConnection) -> dict[tuple, list[tuple[st
     ).fetchone()[0]
     if not exists:
         return {}
+    src, user = entity_sql(con)
     rows = con.execute(
-        """
-        SELECT e.rid, r.srcip, r.username, list(DISTINCT e.pattern ORDER BY e.pattern)
+        f"""
+        SELECT e.rid, {src}, {user}, list(DISTINCT e.pattern ORDER BY e.pattern)
         FROM escalations e
         JOIN raw_events r USING (row_id)
-        GROUP BY e.rid, r.srcip, r.username
+        JOIN findings f ON f.row_id = e.row_id AND f.rid = e.rid
+        GROUP BY ALL
         """
     ).fetchall()
     # Which rules made up each pattern's path, so the finding can name its
@@ -260,11 +280,12 @@ def finding_rows(case_id: str, key: str, limit: int, offset: int = 0) -> dict:
     rid, src, user = (key.split("|", 2) + ["", ""])[:3]
     if not db_path(case_id).exists():
         return {"total": 0, "rows": []}
-    # finding_key() writes NULL as '', so match on the same spelling.
-    where = (" WHERE f.rid = ? AND coalesce(r.srcip, '') = ?"
-             " AND coalesce(r.username, '') = ?")
     con = connect(case_id, read_only=True)
     try:
+        # finding_key() writes NULL as '', so match on the same spelling.
+        k_src, k_user = entity_sql(con)
+        where = (f" WHERE f.rid = ? AND coalesce({k_src}, '') = ?"
+                 f" AND coalesce({k_user}, '') = ?")
         total = con.execute(
             "SELECT count(*) FROM findings f JOIN raw_events r USING (row_id)" + where,
             [rid, src, user],
@@ -549,13 +570,14 @@ def entity_members(case_id: str, members: list[dict]) -> dict[str, set[int]]:
     which = " ".join(f"WHEN r.row_id BETWEEN {lo} AND {hi} THEN {i}" for i, lo, hi in ranges)
     con = connect(case_id, read_only=True)
     try:
+        src, user = entity_sql(con)
         rows = con.execute(
             f"""
-            SELECT coalesce(r.srcip, r.username) AS entity,
+            SELECT coalesce({src}, {user}) AS entity,
                    list(DISTINCT CASE {which} END) AS members
             FROM findings f
             JOIN raw_events r USING (row_id)
-            WHERE coalesce(r.srcip, r.username) IS NOT NULL
+            WHERE coalesce({src}, {user}) IS NOT NULL
             GROUP BY 1
             HAVING count(DISTINCT CASE {which} END) >= 2
             """
@@ -576,13 +598,14 @@ def finding_edges(case_id: str) -> list[dict]:
         return []
     con = connect(case_id, read_only=True)
     try:
+        src, user = entity_sql(con)
         rows = con.execute(
-            """
-            SELECT f.rid, r.srcip, r.username, max(f.lvl) AS lvl,
+            f"""
+            SELECT f.rid, {src} AS srcip, {user} AS username, max(f.lvl) AS lvl,
                    list(DISTINCT r.dstip) FILTER (WHERE r.dstip IS NOT NULL) AS dstips
             FROM findings f
             JOIN raw_events r USING (row_id)
-            GROUP BY f.rid, r.srcip, r.username
+            GROUP BY ALL
             """
         ).fetchall()
     finally:
@@ -603,10 +626,11 @@ def collapsed_findings(case_id: str) -> list[dict]:
         return []
     con = connect(case_id, read_only=True)
     try:
+        src, user = entity_sql(con)
         rows = con.execute(
             f"""
             WITH grouped AS (
-                SELECT f.rid, r.srcip, r.username,
+                SELECT f.rid, {src} AS srcip, {user} AS username,
                        max(f.lvl)            AS lvl,
                        arg_min(f.descr, r.row_id)    AS descr,
                        arg_min(f.mitre, r.row_id)    AS mitre,
@@ -626,15 +650,15 @@ def collapsed_findings(case_id: str) -> list[dict]:
                        arg_min(r.raw, r.row_id)      AS raw
                 FROM findings f
                 JOIN raw_events r USING (row_id)
-                GROUP BY f.rid, r.srcip, r.username
+                GROUP BY f.rid, {src}, {user}
             ),
             entity_rules AS (
-                SELECT coalesce(r.srcip, r.username)   AS entity,
+                SELECT coalesce({src}, {user})   AS entity,
                        count(DISTINCT f.rid)           AS n_rules,
                        count(DISTINCT {family_sql('f.rid')}) AS n_families
                 FROM findings f
                 JOIN raw_events r USING (row_id)
-                WHERE coalesce(r.srcip, r.username) IS NOT NULL
+                WHERE coalesce({src}, {user}) IS NOT NULL
                 GROUP BY 1
             )
             SELECT g.*, coalesce(e.n_rules, 1) AS entity_rules,
@@ -709,13 +733,14 @@ def top_distinct_findings(case_id: str, limit: int) -> list[dict]:
         return []
     con = connect(case_id, read_only=True)
     try:
+        src, user = entity_sql(con)
         rows = con.execute(
-            """
+            f"""
             SELECT f.rid,
                    max(f.lvl)                AS lvl,
                    arg_min(f.descr, r.row_id)        AS descr,
                    arg_min(f.mitre, r.row_id)        AS mitre,
-                   r.srcip, r.username,
+                   {src} AS srcip, {user} AS username,
                    count(*)                  AS cnt,
                    -- Chronological and zone-stamped, for the same reason as
                    -- collapsed_findings: these strings become the model's
@@ -726,8 +751,8 @@ def top_distinct_findings(case_id: str, limit: int) -> list[dict]:
                    arg_min(r.raw, r.row_id)          AS raw
             FROM findings f
             JOIN raw_events r USING (row_id)
-            GROUP BY f.rid, r.srcip, r.username
-            ORDER BY max(f.lvl) DESC, count(*) DESC, f.rid, r.srcip NULLS LAST, r.username NULLS LAST
+            GROUP BY f.rid, {src}, {user}
+            ORDER BY max(f.lvl) DESC, count(*) DESC, f.rid, {src} NULLS LAST, {user} NULLS LAST
             LIMIT ?
             """,
             [limit],
@@ -954,9 +979,10 @@ def distinct_finding_count(case_id: str) -> int:
         return 0
     con = connect(case_id, read_only=True)
     try:
+        src, user = entity_sql(con)
         return con.execute(
             "SELECT count(*) FROM (SELECT 1 FROM findings f JOIN raw_events r USING (row_id) "
-            "GROUP BY f.rid, r.srcip, r.username)"
+            f"GROUP BY f.rid, {src}, {user})"
         ).fetchone()[0]
     finally:
         con.close()

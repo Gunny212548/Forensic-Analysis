@@ -1,7 +1,10 @@
 # Who a finding is about - entities, account history, IPv4-mapped addresses (design)
 
-Status: **proposed 2026-10-26**, waiting for Q93-Q97. The user asked for it after the synthetic Windows
-quarter was uploaded to 8091 (case-20261026-073956-7449e480, "เช็คผล Finding อันใหม่").
+Status: **approved 2026-10-26** (the user: "Q93-Q97 : yes ทำตาม design เลย"); **built the same day**
+(gotcha #69): the quarter 517 -> 26 suggestions, no `::ffff:` in the timeline, the AI's wrong rejects
+on attack suggestions 8 of 76 -> 2 of 22 (W7's RDP session and W1's WIN-AUTH-1 still). The user asked
+for it after the synthetic Windows quarter was uploaded to 8091 (case-20261026-073956-7449e480,
+"เช็คผล Finding อันใหม่").
 
 ## What the uploaded quarter showed
 

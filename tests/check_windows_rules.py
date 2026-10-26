@@ -16,6 +16,8 @@ Story 5d adds: a refused TGT for an unknown name (4768 0x6) counted, a revoked o
 CUSUM of WIN-BRUTE-4 (lines.py) on a known series; W3 (low-and-slow), W10 (an RDP session taken
 over by a reconnect), W11 (Kerberos user-name enumeration) and W8's ADMIN$ copy on the quarter;
 OTRF's reconnect found through the session's own logon id.
+specs/finding_entities.md adds: one suggestion per behaviour (the entity a rule names), no
+IPv4-mapped address in the timeline column, the account's history among the AI's facts.
 """
 
 import argparse
@@ -238,6 +240,33 @@ def main() -> int:
     share = con.execute("SELECT count(*) FROM findings WHERE rid = 'WIN-LAT-2' AND descr LIKE '%opened%ADMIN$%'"
                         ).fetchone()[0]
     check(share >= 1, f"WIN-LAT-2 names the ADMIN$ opened in W8's session ({share})")
+    # specs/finding_entities.md: a rule names who its finding is about, so one behaviour is one
+    # suggestion (E-D1); a DC's ::ffff: address is IPv4 in the timeline (E-D3); the account's
+    # history is a fact for the AI (E-D2).
+    con.close()
+    from app.services import triage
+    sugg = db.collapsed_findings(cid)
+    per = defaultdict(list)
+    for f in sugg:
+        per[f["rid"]].append(f)
+    check(len(sugg) <= 40, f"the quarter is a few dozen suggestions, not 517 ({len(sugg)})")
+    check(len(per["WIN-BRUTE-2"]) == 2 and all(not f["username"] for f in per["WIN-BRUTE-2"]),
+          f"one WIN-BRUTE-2 suggestion per sprayer ({[f['key'] for f in per['WIN-BRUTE-2']]})")
+    check(len(per["WIN-BRUTE-4"]) == 4 and all(not f["srcip"] for f in per["WIN-BRUTE-4"]),
+          f"one WIN-BRUTE-4 suggestion per account guessed ({[f['key'] for f in per['WIN-BRUTE-4']]})")
+    check(len(per["WIN-BRUTE-3"]) == 1, f"W9's 30 sources are one WIN-BRUTE-3 suggestion ({len(per['WIN-BRUTE-3'])})")
+    w7 = [f for f in per["WIN-LAT-1"] if f["username"] == "adm.backup"]
+    check(len(w7) == 1 and w7[0]["srcip"] == "10.20.10.33",
+          f"W7's RDP session is one WIN-LAT-1 suggestion with its source ({[f['key'] for f in w7]})")
+    con = db.connect(cid, read_only=True)
+    mapped = con.execute("SELECT count(*) FROM raw_events WHERE srcip ILIKE '::ffff:%'").fetchone()[0]
+    check(mapped == 0, f"no IPv4-mapped address left in the timeline column ({mapped})")
+    kept = con.execute("SELECT count(*) FROM win_events WHERE data['IpAddress'] ILIKE '::ffff:%'").fetchone()[0]
+    check(kept > 0, f"win_events keeps what Windows wrote ({kept})")
+    dump = [f for f in per["WIN-HOST-2"] if f["username"] == "adm.backup"]
+    hist = [x for x in triage.facts(con, dump[0])] if dump else []
+    check(any("Other findings of account 'adm.backup'" in x and "WIN-AUTH-1" in x and "before this suggestion" in x
+              for x in hist), "the dump's facts say adm.backup was guessed and signed in before (account history)")
     seq = con.execute("SELECT w.event_id, count(*) FROM findings f JOIN win_events w USING (row_id) "
                       "WHERE f.rid = 'WIN-LAT-1' GROUP BY 1 ORDER BY 1").fetchall()
     check(dict(seq).get(4624) == 1 and dict(seq).get(4688, 0) >= 6,

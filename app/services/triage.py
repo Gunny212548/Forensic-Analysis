@@ -63,7 +63,18 @@ def load(case_id: str) -> dict:
 def _side(ip: str | None) -> str:
     if not ip:
         return "no address"
+    if not _IPV4.fullmatch(ip):
+        # A Windows attempt with no address is sourced by its workstation name or host (rules_windows).
+        return "an IPv6 address" if ":" in ip else "a host name, not an address"
     return "internal" if _INTERNAL.match(ip) else "external"
+
+
+HISTORY = 8   # the account's other findings listed, earliest first
+
+
+def _norm_account(expr: str) -> str:
+    # As the Windows rules compare accounts: lower case, no DOMAIN\, no @realm.
+    return f"lower(regexp_replace(split_part({expr}, '@', 1), '^.*\\\\', ''))"
 
 
 def _field_sql(name: str) -> str:
@@ -75,7 +86,8 @@ def facts(con, f: dict) -> list[str]:
     """The facts of one suggestion (a collapsed finding: rid, srcip, username)."""
     rid, src, user = f["rid"], f.get("srcip"), f.get("username")
     meta = rule_meta.RULE_META.get(rid, {})
-    where = "f.rid = ? AND r.srcip IS NOT DISTINCT FROM ? AND r.username IS NOT DISTINCT FROM ?"
+    k_src, k_user = db.entity_sql(con)
+    where = f"f.rid = ? AND {k_src} IS NOT DISTINCT FROM ? AND {k_user} IS NOT DISTINCT FROM ?"
     args = [rid, src, user]
     out = [
         f"Rule {rid} ({RULE_LABELS.get(rid, rid)}): {meta.get('ads', {}).get('goal', '')} "
@@ -107,12 +119,37 @@ def facts(con, f: dict) -> list[str]:
                    + (f"; application {apps}" if apps else "")
                    + (f"; domain {domains}" if domains else "")
                    + (f"; {int(sent):,} bytes sent" if sent else "") + ".")
-    other = con.execute("""
+    other = con.execute(f"""
         SELECT f.rid, count(*) FROM findings f JOIN raw_events r USING (row_id)
-        WHERE r.srcip IS NOT DISTINCT FROM ? AND f.rid <> ? AND ? IS NOT NULL
+        WHERE {k_src} IS NOT DISTINCT FROM ? AND f.rid <> ? AND ? IS NOT NULL
         GROUP BY f.rid ORDER BY 2 DESC, 1""", [src, rid, src]).fetchall()
     out.append("Other findings of this source: "
                + (", ".join(f"{r} ({RULE_LABELS.get(r, r)}) x{c}" for r, c in other) or "none") + ".")
+    # The account's history, every source (specs/finding_entities.md E-D2): a session or a dump
+    # by an account that was guessed and then signed in is not an administrator's habit, and the
+    # source's own findings cannot say so when the rows have no source.
+    if user:
+        acct = _norm_account(k_user)
+        here = con.execute(f"SELECT min(r.ts) FROM findings f JOIN raw_events r USING (row_id) WHERE {where}",
+                           args).fetchone()[0]
+        hist = con.execute(f"""
+            SELECT f.rid, {k_src} AS s, count(*), min(r.ts), max(r.ts)
+            FROM findings f JOIN raw_events r USING (row_id)
+            WHERE {k_user} IS NOT NULL AND {acct} = {_norm_account('?')}
+              AND NOT (f.rid = ? AND {k_src} IS NOT DISTINCT FROM ? AND {k_user} IS NOT DISTINCT FROM ?)
+            GROUP BY ALL ORDER BY min(r.ts), f.rid, s NULLS FIRST LIMIT {HISTORY}""",
+                           [user, rid, src, user]).fetchall()
+        items = []
+        for r, s_, n, t0, t1 in hist:
+            when = ""
+            if here and t0:
+                days = (here - t0).total_seconds() / 86400
+                when = (f", {abs(days):.0f} days {'before' if days > 0 else 'after'} this suggestion"
+                        if abs(days) >= 1 else ", the same day as this suggestion")
+            items.append(f"{r} ({RULE_LABELS.get(r, r)}) from {s_ or 'no source'}, {n} events "
+                         f"{str(t0)[:19]} - {str(t1)[:19]}{when}")
+        out.append(f"Other findings of account {user!r}, any source, earliest first: "
+                   + ("; ".join(items) or "none") + ".")
     for e in f.get("escalation") or []:
         out.append(f"Level raised: {e.get('reason', '')}")
     return out
