@@ -48,6 +48,7 @@ yet); a sequence across two hosts (AN1468's share access on the target, 5140 /
 """
 
 from . import lines
+from .rules import IPV4_RE, NON_PUBLIC_IPV4_RE
 
 PRODUCT = "windows"
 
@@ -470,23 +471,93 @@ RULES += [
     """),
 ]
 
+# Story 5c: Sysmon's network connections (event 3) - which process on which host
+# talked to which public address. Windows logs no refused connection, so a feed
+# match on a blocked connection (R3005's) has no Windows twin.
+_CONNECTIONS = f"""
+    SELECT row_id, ts, upper(split_part(hostname, '.', 1)) AS host, program, dstip, srcip
+    FROM product_events
+    WHERE action = 'network_connection' AND ts IS NOT NULL AND dstip IS NOT NULL AND program IS NOT NULL
+      AND regexp_matches(dstip, '{IPV4_RE}') AND NOT regexp_matches(dstip, '{NON_PUBLIC_IPV4_RE}')
+"""
+BEACON_MIN_GAPS, BEACON_MAX_CV = 30, 0.6        # R2007's measured method (rules.py)
+BEACON_MIN_S, BEACON_MAX_S = 30, 3600
+
+RULES += [
+    # M1 beaconing, per process (T1071 DET0444): R2007's measured method - regular
+    # intervals, jitter (CV) < 0.6, at least 30 intervals of 30 s - 1 h, public
+    # destinations only - keyed on (host, process, destination). One change,
+    # stated: a silence longer than the method's longest period (1 h) is not an
+    # interval but the host switched off or the channel asleep, and is left out of
+    # the statistics. Over a quarter of working days, a five-minute beacon's
+    # nights and weekends made R2007's jitter far above 0.6 (W4 was missed).
+    ("WIN-MAL-1", f"""
+        INSERT INTO findings
+        WITH c AS ({_CONNECTIONS}),
+        g AS (SELECT *, date_diff('second', lag(ts) OVER (PARTITION BY host, program, dstip ORDER BY ts, row_id),
+                                  ts) AS gap FROM c),
+        b AS (SELECT host, program, dstip, count(*) AS n, avg(gap) AS avg_gap,
+                     stddev_pop(gap) / nullif(avg(gap), 0) AS cv
+              FROM g WHERE gap > 0 AND gap <= {BEACON_MAX_S}
+              GROUP BY host, program, dstip
+              HAVING count(*) >= {BEACON_MIN_GAPS} AND avg(gap) BETWEEN {BEACON_MIN_S} AND {BEACON_MAX_S}
+                 AND stddev_pop(gap) / nullif(avg(gap), 0) < {BEACON_MAX_CV})
+        SELECT c.row_id, 'WIN-MAL-1', NULL,
+               'Beaconing from ' || c.program || ' on ' || c.host || ' to ' || c.dstip || ' (' || b.n ||
+               ' intervals at ~' || cast(round(b.avg_gap) AS INT) || 's, jitter ' ||
+               cast(round(b.cv * 100) AS INT) || '%; silences over an hour left out)',
+               ['T1071']
+        FROM c JOIN b USING (host, program, dstip)
+    """),
+    # T1 a connection to a listed address (R3003's feed match, on Sysmon 3).
+    ("WIN-INTEL-1", """
+        INSERT INTO findings
+        SELECT e.row_id, 'WIN-INTEL-1', NULL,
+               'Connection from ' || coalesce(e.program, '?') || ' on ' ||
+               upper(split_part(coalesce(e.hostname, '?'), '.', 1)) || ' to known-bad indicator ' || e.dstip ||
+               ' [' || i.source || CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
+               ['T1071']
+        FROM product_events e JOIN ioc i ON e.dstip = i.value AND i.type = 'ip'
+        WHERE e.action = 'network_connection'
+    """),
+    # T2 a sign-in attempt from a listed address (R3004's feed match, on the
+    # attempts of the BRUTE rules' preparation - every event of the attempt).
+    ("WIN-INTEL-2", """
+        INSERT INTO findings
+        SELECT r.row_id, 'WIN-INTEL-2', NULL,
+               'Sign-in ' || CASE a.outcome WHEN 'success' THEN 'succeeded' ELSE 'failed' END || ' for ' ||
+               a.account || ' from known-bad indicator ' || a.source ||
+               ' [' || i.source || CASE WHEN i.note <> '' THEN ': ' || i.note ELSE '' END || ']',
+               CASE WHEN a.outcome = 'success' THEN ['T1078'] ELSE ['T1110'] END
+        FROM win_attempts a JOIN ioc i ON a.source = i.value AND i.type = 'ip'
+        JOIN win_attempt_rows r USING (attempt_id)
+        WHERE a.source_kind = 'address'
+    """),
+]
+
 # WIN-AUTH-1 reads the attempts the BRUTE rules' preparation built, and their findings.
 # WIN-LAT-2 / -3 read the sessions WIN-LAT-1's preparation built.
 PREPARE = {"WIN-BRUTE-1": prepare_brute_1, "WIN-BRUTE-2": prepare_brute_2,
            "WIN-BRUTE-3": prepare_brute_3, "WIN-LAT-1": prepare_sessions, "WIN-HOST-1": prepare_host_1}
 LEVEL = {"WIN-BRUTE-1": "medium", "WIN-BRUTE-2": "medium", "WIN-BRUTE-3": "medium",
          "WIN-AUTH-1": "high", "WIN-LAT-1": "medium", "WIN-LAT-2": "medium", "WIN-LAT-3": "high",
-         "WIN-HOST-1": "high", "WIN-HOST-2": "high"}
+         "WIN-HOST-1": "high", "WIN-HOST-2": "high", "WIN-MAL-1": "high", "WIN-INTEL-1": "high",
+         "WIN-INTEL-2": "medium"}
 LABELS = {"WIN-BRUTE-1": "password guessing", "WIN-BRUTE-2": "password spray",
           "WIN-BRUTE-3": "distributed guessing", "WIN-AUTH-1": "login after failures",
           "WIN-LAT-1": "uncommon RDP, then commands", "WIN-LAT-2": "remote service or task",
-          "WIN-LAT-3": "NTLM without Kerberos", "WIN-HOST-1": "Kerberoasting", "WIN-HOST-2": "LSASS dump"}
-# The sign-in rules count in the generic sign-in rules' family; a host behaviour has none to share.
-FAMILY = {r: ("R2" if r.startswith(("WIN-BRUTE", "WIN-AUTH")) else r.split("-")[1]) for r in LEVEL}
+          "WIN-LAT-3": "NTLM without Kerberos", "WIN-HOST-1": "Kerberoasting", "WIN-HOST-2": "LSASS dump",
+          "WIN-MAL-1": "beaconing", "WIN-INTEL-1": "known-bad destination", "WIN-INTEL-2": "known-bad sign-in source"}
+# The sign-in and beaconing rules count in their generic twins' family (R2), the feed matches in R3's;
+# a host behaviour has none to share.
+FAMILY = {r: ("R2" if r.startswith(("WIN-BRUTE", "WIN-AUTH", "WIN-MAL")) else
+              "R3" if r.startswith("WIN-INTEL") else r.split("-")[1]) for r in LEVEL}
 EQUIVALENT = {"WIN-BRUTE-1": "R2000", "WIN-BRUTE-2": "R2009", "WIN-BRUTE-3": "R2005",
-              "WIN-AUTH-1": "R2008"}
+              "WIN-AUTH-1": "R2008", "WIN-MAL-1": "R2007", "WIN-INTEL-1": "R3003", "WIN-INTEL-2": "R3004"}
 # The generic sign-in rules stop on Windows rows. R2006 (one account, many
 # sources succeeding within an hour) goes with them: on Windows it flagged a
-# domain controller's own machine account signing in from its addresses.
-SUPERSEDES = ("R2000", "R2005", "R2006", "R2008", "R2009")
+# domain controller's own machine account signing in from its addresses. So do
+# beaconing and the feed matches (story 5c); R3005 (blocked) has nothing to
+# match on Windows, R3001 / R3002 no bytes or category, and stay generic.
+SUPERSEDES = ("R2000", "R2005", "R2006", "R2008", "R2009", "R2007", "R3003", "R3004", "R3005")
 FROM_GENERIC: tuple = ()

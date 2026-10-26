@@ -24,7 +24,7 @@ AREAS: list[dict] = [
               "CP-SCAN-1", "CP-SCAN-2", "CP-SCAN-3")},
     {"id": "malware-c2", "name": "Malware & C2",
      "about": "Malware-category traffic and regular beaconing to external addresses",
-     "rids": ("R2007", "R3002", "PAN-MAL-1", "PAN-MAL-2", "CP-MAL-1", "CP-MAL-2")},
+     "rids": ("R2007", "R3002", "PAN-MAL-1", "PAN-MAL-2", "CP-MAL-1", "CP-MAL-2", "WIN-MAL-1")},
     {"id": "data-apps", "name": "Data transfer",
      "about": "Large outbound transfers",
      "rids": ("R3001",)},
@@ -38,7 +38,7 @@ AREAS: list[dict] = [
     {"id": "threat-intel", "name": "Threat intelligence",
      "about": "Traffic to or from addresses on the threat-intel feeds",
      "rids": ("R3003", "R3004", "R3005", "PAN-INTEL-1", "PAN-INTEL-2", "PAN-INTEL-3",
-              "CP-INTEL-1", "CP-INTEL-2", "CP-INTEL-3")},
+              "CP-INTEL-1", "CP-INTEL-2", "CP-INTEL-3", "WIN-INTEL-1", "WIN-INTEL-2")},
 ]
 
 AREA_OF: dict[str, str] = {rid: a["id"] for a in AREAS for rid in a["rids"]}

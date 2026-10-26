@@ -64,7 +64,7 @@ finding ใดต้อง <b>เข้า workflow</b>, การวัด <b>M
 ป้ายที่แสดงให้ผู้ใช้เห็นคือชื่อระดับเสมอ</p>
 <div class="note">ไม่มี rule เดี่ยวตัวใดได้ระดับ critical เพราะ Sigma สงวน critical ไว้สำหรับกรณีที่ความน่าจะเป็น "เกือบแน่นอน"
 ซึ่งเหตุการณ์เดียวใน log แทบไม่เคยถึง ระดับ critical จึงมาจากการยกระดับตาม attack path (ข้อ 2.3) เท่านั้น
-ปัจจุบันมี rule ระดับ high 18 ตัว, medium 15 ตัว,
+ปัจจุบันมี rule ระดับ high 20 ตัว, medium 16 ตัว,
 low 6 ตัว, informational 0 ตัว</div>
 
 <h3>2.2 การจำกัดระดับเมื่อ firewall ปฏิเสธ</h3>
@@ -169,8 +169,8 @@ finding ระดับต่ำกว่ายังแสดงในเคส
 <li><b>CISA NCISS:</b> ระบบสอดคล้องกับ attribute "Observed Activity" แต่ไม่ได้คำนวณคะแนน NCISS
 เพราะต้องใช้ข้อมูลผลกระทบและการกู้คืน ซึ่ง log อย่างเดียวให้ไม่ได้</li>
 <li><b>ODNI ↔ ATT&amp;CK:</b> ยังไม่พบเอกสารทางการที่จับคู่ทั้งสองไว้ การจับคู่เป็นของระบบเอง โดยยึดเส้นการบุกรุกที่ ODNI นิยามไว้</li>
-<li><b>ไม่มี rule ใดเป็น <i>stable</i></b> ตามนิยามของ Sigma: ตอนนี้มี 19 ตัวเป็น test
-และ 20 ตัวเป็น experimental เพราะเพิ่งพิสูจน์กับข้อมูลของลูกค้ารายเดียว</li>
+<li><b>ไม่มี rule ใดเป็น <i>stable</i></b> ตามนิยามของ Sigma: ตอนนี้มี 21 ตัวเป็น test
+และ 21 ตัวเป็น experimental เพราะเพิ่งพิสูจน์กับข้อมูลของลูกค้ารายเดียว</li>
 <li>ยังไม่มีรูปแบบ <b>lateral movement</b> เพราะใน corpus ไม่มีข้อมูลที่ใช้ปรับเกณฑ์ได้</li>
 <li>เกณฑ์เข้า workflow (high ขึ้นไป) <b>ต่างจากถ้อยคำใน FR-4.3</b> ("Critical หรือ ≥ 2 family")
 ซึ่งเขียนไว้สำหรับสเกล 0-15 แบบเดิม</li>
@@ -218,6 +218,9 @@ finding ระดับต่ำกว่ายังแสดงในเคส
 <tr><td class='mono'>WIN-LAT-3</td><td>Windows: NTLM network logon without Kerberos</td><td class='lv lv-high'>high</td><td class='mono'>T1550.002</td><td>experimental</td><td>A user reaching a host from a computer outside the domain (NLA from home)</td></tr>
 <tr><td class='mono'>WIN-HOST-1</td><td>Windows: Kerberoasting</td><td class='lv lv-high'>high</td><td class='mono'>T1558.003</td><td>experimental</td><td>A legacy application whose service accounts only support RC4, used by one account for many services</td></tr>
 <tr><td class='mono'>WIN-HOST-2</td><td>Windows: LSASS read, then a file written</td><td class='lv lv-high'>high</td><td class='mono'>T1003.001</td><td>experimental</td><td>Security products that read lsass and write their own files</td></tr>
+<tr><td class='mono'>WIN-MAL-1</td><td>Windows: beaconing from a process</td><td class='lv lv-high'>high</td><td class='mono'>T1071</td><td>experimental</td><td>Update checks, telemetry and keep-alives on a timer under an hour</td></tr>
+<tr><td class='mono'>WIN-INTEL-1</td><td>Windows: connection to a known-bad address</td><td class='lv lv-high'>high</td><td class='mono'>T1071</td><td>test</td><td>A feed listing shared hosting or a CDN address</td></tr>
+<tr><td class='mono'>WIN-INTEL-2</td><td>Windows: sign-in from a known-bad address</td><td class='lv lv-medium'>medium</td><td class='mono'>T1078, T1110</td><td>test</td><td>A feed listing a shared VPN or proxy exit the staff also use</td></tr>
 </table>
 
 <h2>9. แหล่งอ้างอิง</h2>

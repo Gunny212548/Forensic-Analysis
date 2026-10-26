@@ -949,6 +949,70 @@ RULE_META.update({
     },
 })
 
+# Story 5c: Sysmon's network connections (event 3) and the sign-in attempts against the feeds.
+RULE_META.update({
+    "WIN-MAL-1": {
+        "id": "590df77b-1287-4a00-949e-2bbc4b457af0",
+        "title": "Windows: beaconing from a process",
+        "status": "experimental",
+        "techniques": ["T1071"],
+        "category": "network_connection", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["Update checks, telemetry and keep-alives on a timer under an hour"],
+        "ads": {
+            "goal": "Detect one process connecting to one public address at regular intervals (behaviour "
+                    "M1; T1071 DET0444).",
+            "strategy": "R2007's measured method on Sysmon 3, keyed on (host, process, destination): at least "
+                        "30 intervals, mean 30 s - 1 h, jitter (CV) under 0.6. A silence longer than an hour is "
+                        "not an interval (the host off, the channel asleep) and is left out of the statistics.",
+            "technical_context": "Needs Sysmon network connection logging (event 3); public IPv4 destinations "
+                                 "only, as R2007.",
+            "blind_spots": "Beacons slower than an hour; jitter above 0.6; destinations by name only (Sysmon "
+                           "22) or behind a proxy; Sysmon configurations that leave the process out.",
+            "validation": "Synthetic Windows quarter (tests/gen_windows_domain.py): W4's 5-minute beacon, "
+                          "working hours only, Aug 3 - Sep 20 (R2007 missed it: nights and weekends lifted the "
+                          "jitter); OneDrive's two-hourly sync not flagged. tests/check_windows_rules.py.",
+            "response": "High: read what the process is, where it came from (Sysmon 1, 11) and the destination.",
+        },
+    },
+    "WIN-INTEL-1": {
+        "id": "5fb6c871-2e45-4f6b-a109-e5fb12931073",
+        "title": "Windows: connection to a known-bad address",
+        "status": "test",
+        "techniques": ["T1071"],
+        "category": "network_connection", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["A feed listing shared hosting or a CDN address"],
+        "ads": {
+            "goal": "Report a process's connection to an address a threat-intel feed lists (behaviour T1; "
+                    "R3003's feed match on Sysmon 3).",
+            "strategy": "Sysmon 3 destination equal to an IP indicator of the case's feeds (intel.py).",
+            "technical_context": "Offline feeds (gotcha #17); Windows logs no refused connection, so there is "
+                                 "no blocked twin (R3005).",
+            "blind_spots": "Indicators that are names, URLs or hashes; feeds not loaded.",
+            "validation": "tests/check_windows_rules.py (a listed public address).",
+            "response": "High: the feed's note says what the address is; read the process.",
+        },
+    },
+    "WIN-INTEL-2": {
+        "id": "c04e2250-f6b4-433a-b897-4e2bb583523d",
+        "title": "Windows: sign-in from a known-bad address",
+        "status": "test",
+        "techniques": ["T1078", "T1110"],
+        "category": "authentication", "log_sources": WINDOWS_SOURCES,
+        "falsepositives": ["A feed listing a shared VPN or proxy exit the staff also use"],
+        "ads": {
+            "goal": "Report a sign-in attempt from an address a threat-intel feed lists (behaviour T2; "
+                    "R3004's feed match on the sign-in attempts).",
+            "strategy": "A sign-in attempt (rules_windows.py: one attempt per 4625 / 4771 / 4776 / 4624 / "
+                        "4768) whose source address is an IP indicator. A success is T1078, a failure T1110.",
+            "technical_context": _WIN_ATTEMPT,
+            "blind_spots": "Attempts sourced by a workstation name (a lone 4776); feeds not loaded.",
+            "validation": "Synthetic Windows quarter with a test feed: W2's internet brute force. "
+                          "tests/check_windows_rules.py.",
+            "response": "Medium; high if the attempt succeeded - read what the account did next.",
+        },
+    },
+})
+
 
 def tags(rid: str) -> list[str]:
     """Sigma tags: tactic(s) first, then the techniques, lower-case."""

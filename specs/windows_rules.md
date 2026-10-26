@@ -146,7 +146,11 @@ SAMPLES comes back if `D:\logtest\windows` is restored (Q64, paused).
   Synthetic quarter: W5, W7, W8 found, the Zabbix rollout found (btp), 0 plain or look-alike events.
   Real OTRF RDP capture: the outside client's NTLM logon found (WIN-LAT-3); the reconnect (type 7)
   and the dump without a Sysmon 10 missed - blind spots on the rules.
-- **5c - network on the host:** WIN-MAL-1, WIN-INTEL-1..3.
+- **5c - network on the host:** WIN-MAL-1, WIN-INTEL-1..3. **Built 2026-10-26** (gotcha #67) as
+  WIN-MAL-1 and WIN-INTEL-1..2: a blocked twin (INTEL-3) has nothing to match - Windows logs no
+  refused connection. WIN-MAL-1 is R2007's method per (host, process, destination) with silences
+  over an hour left out (R2007 missed W4's working-hours beacon). With 5a-5c every incident of the
+  quarter is found and no plain or look-alike event is flagged.
 - Not in story 5: SigmaHQ's single-event rules - ADR-006's own story.
 
 ## Questions

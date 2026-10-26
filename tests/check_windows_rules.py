@@ -32,14 +32,17 @@ def check(ok: bool, what: str) -> None:
         FAILED.append(what)
 
 
-def event(eid: int, ts: datetime, host: str, items: dict) -> str:
+def event(eid: int, ts: datetime, host: str, items: dict, sysmon: bool = False) -> str:
     data = "".join(f"<Data Name='{k}'>{v}</Data>" for k, v in items.items())
     t = ts.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "0Z"
-    return ("<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System>"
-            "<Provider Name='Microsoft-Windows-Security-Auditing' Guid='{54849625-5478-4994-A5BA-3E3B0328C30D}'/>"
+    provider = ("<Provider Name='Microsoft-Windows-Sysmon' Guid='{5770385F-C22A-43E0-BF4C-06F5698FFBD9}'/>"
+                if sysmon else
+                "<Provider Name='Microsoft-Windows-Security-Auditing' Guid='{54849625-5478-4994-A5BA-3E3B0328C30D}'/>")
+    channel = "Microsoft-Windows-Sysmon/Operational" if sysmon else "Security"
+    return ("<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System>" + provider +
             f"<EventID>{eid}</EventID><Version>0</Version><Level>0</Level><Task>12544</Task><Opcode>0</Opcode>"
             f"<Keywords>0x8010000000000000</Keywords><TimeCreated SystemTime='{t}'/><EventRecordID>{eid}</EventRecordID>"
-            f"<Correlation/><Execution ProcessID='4' ThreadID='8'/><Channel>Security</Channel>"
+            f"<Correlation/><Execution ProcessID='4' ThreadID='8'/><Channel>{channel}</Channel>"
             f"<Computer>{host}</Computer><Security/></System><EventData>{data}</EventData></Event>")
 
 
@@ -61,6 +64,10 @@ def main() -> int:
     from app.services import db, pipeline, storage
 
     co = storage.create_company("Windows rules")["company_id"]
+    # A feed for the feed-match rules (story 5c): one public address for a connection, and the
+    # quarter's internet brute forcer. Documentation ranges (203.0.113.0/24) are refused by intel.py.
+    (scratch / "data" / "intel").mkdir(parents=True, exist_ok=True)
+    (scratch / "data" / "intel" / "test-feed.txt").write_text("185.220.101.5\n45.155.205.99\n", encoding="utf-8")
 
     def run(path: Path, kind: str):
         cid = storage.create_case(path.name, kind, path.stat().st_size, company_id=co)["case_id"]
@@ -119,6 +126,23 @@ def main() -> int:
     check("WIN-BRUTE-3" not in flagged, f"a computer account is left out of WIN-BRUTE-3 ({flagged})")
     con.close()
 
+    print("feed matches on a connection and on a sign-in attempt")
+    intel_file = scratch / "intel.xml"
+    intel_file.write_text("\n".join([
+        event(3, t0, "ws05.corp.local", {"ProcessGuid": "{aa}", "Image": r"C:\Users\x\a.exe", "Initiated": "true",
+                                         "SourceIp": "10.0.0.5", "DestinationIp": "185.220.101.5",
+                                         "DestinationPort": "443"}, sysmon=True),
+        event(3, t0, "ws05.corp.local", {"ProcessGuid": "{ab}", "Image": r"C:\Users\x\b.exe", "Initiated": "true",
+                                         "SourceIp": "10.0.0.5", "DestinationIp": "93.184.216.34",
+                                         "DestinationPort": "443"}, sysmon=True),
+        fail_4625(t0 + timedelta(seconds=5), "rds01.corp.local", "administrator", "45.155.205.99"),
+    ]) + "\n", encoding="utf-8")
+    cid, man, con = run(intel_file, "log")
+    got = dict(con.execute("SELECT rid, count(*) FROM findings GROUP BY rid").fetchall())
+    check(got.get("WIN-INTEL-1") == 1 and got.get("WIN-INTEL-2") == 1 and "R3003" not in got and "R3004" not in got,
+          f"a listed destination is WIN-INTEL-1's, a listed sign-in source WIN-INTEL-2's, not the generic rules' ({got})")
+    con.close()
+
     print("the synthetic Windows quarter, against its ground truth")
     out = scratch / "mekong"
     gen = Path(args.repo) / "tests" / "gen_windows_domain.py"
@@ -142,14 +166,17 @@ def main() -> int:
     expect = {"W1": {"WIN-BRUTE-2", "WIN-AUTH-1"}, "W2": {"WIN-BRUTE-1"}, "W6": {"WIN-BRUTE-1", "WIN-AUTH-1"},
               "W9": {"WIN-BRUTE-3"},
               # story 5b
-              "W5": {"WIN-HOST-1"}, "W7": {"WIN-LAT-1", "WIN-HOST-2"}, "W8": {"WIN-LAT-2", "WIN-LAT-3"}}
+              "W5": {"WIN-HOST-1"}, "W7": {"WIN-LAT-1", "WIN-HOST-2"}, "W8": {"WIN-LAT-2", "WIN-LAT-3"},
+              # story 5c - W2's source is on the test feed
+              "W4": {"WIN-MAL-1"}}
+    expect["W2"] = expect["W2"] | {"WIN-INTEL-2"}
     for inc, rids in expect.items():
         check(rids <= found[inc], f"{inc} found by {sorted(rids)} ({sorted(found[inc])})")
     check(not wrong, f"no plain or look-alike event flagged ({dict(wrong)})")
     check("WIN-BRUTE-1" not in found["W3"], "W3 low-and-slow is not WIN-BRUTE-1's (B5, a known gap)")
     rids = {r[0] for r in con.execute("SELECT DISTINCT rid FROM findings").fetchall()}
-    check(not rids & {"R2000", "R2005", "R2006", "R2008", "R2009"},
-          f"the generic sign-in rules are silent on Windows rows ({sorted(rids)})")
+    check(not rids & {"R2000", "R2005", "R2006", "R2008", "R2009", "R2007", "R3003", "R3004", "R3005"},
+          f"the generic sign-in, beaconing and feed rules are silent on Windows rows ({sorted(rids)})")
     ln = man.get("lines") or {}
     check(ln.get("WIN-BRUTE-1", {}).get("method") == "evidence-line" and ln["WIN-BRUTE-1"]["members"] >= 20,
           f"WIN-BRUTE-1's line measured on the episodes ({ln.get('WIN-BRUTE-1')})")

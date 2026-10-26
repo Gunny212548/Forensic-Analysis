@@ -366,9 +366,10 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+- #67 Windows beaconing and feeds (WIN-MAL-1, WIN-INTEL-1..2): R2007's method per (host, process, destination) with silences over an hour left out - R2007 missed a working-hours beacon; supersede R2007 / R3003-R3005 on Windows rows; documentation ranges never reach a feed.
 - #66 Windows lateral movement / host rules: steps linked by the session (TargetLogonId -> SubjectLogonId, Sysmon ProcessGuid; ASOF to the latest 4624), no window; WIN-LAT-1 = an RDP pair seen on one day of the evidence (the user's choice); WIN-LAT-3 compares an account with its own Kerberos; two areas, eight Overview cards; the OTRF reconnect (4624 type 7) and a dump with no Sysmon 10 are missed.
 - #65 Windows sign-in rules (`rules_windows.py`): one attempt however many events record it - a DC's 4771 / 4776 within 1 s of a host's 4625 joins it, its address kept; 4771 / 4776 counted (Q84 reverses Q41); WIN-BRUTE-1..3 / WIN-AUTH-1 supersede R2000 / R2005 / R2006 / R2008 / R2009 on Windows rows; measured on `tests/gen_windows_domain.py`.
-- #63 Generic rules are superseded per product (`RULE_SUPERSEDED`: not on Palo Alto / Check Point rows, nor the sign-in rules on Windows rows (#65); still on FortiGate, ESXi, sshd, Entra); escalations and VERIS count behaviours via `RULE_EQUIVALENT` / `generic_sql`; baseline re-taken (668 entries).
+- #63 Generic rules are superseded per product (`RULE_SUPERSEDED`: not on Palo Alto / Check Point rows, nor the sign-in, beaconing and feed rules on Windows rows (#65, #67); still on FortiGate, ESXi, sshd, Entra); escalations and VERIS count behaviours via `RULE_EQUIVALENT` / `generic_sql`; baseline re-taken (668 entries).
 - #62 Firewall rules (`rules_firewall.py` shared, `rules_paloalto.py`, `rules_checkpoint.py`): lines from the legitimate members only (TRW-benign sources) or TRW (`lines.py`) - a percentile over everyone is raised by the attackers; rule ids are `RULE_ID_PATTERN`, families `RULE_FAMILY`; both rule sets run until story 4 - do not deploy story 2 alone.
 - #61 Every row carries its product (`products.py`, written after ingest - readers insert positionally); a product rule (`rules.RULE_PRODUCT`) reads `product_events` only; n/a per product and area with its reason; the period each evidence item covers (`period.py`). Story 1 of `specs/per_product_rules.md`.
 - #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; W3 Splunk WinEventLog text: items named from Windows' own message templates (`app/data/windows`, `tools/export_win_templates.ps1`), values as rendered. W4 Winlogbeat / NXLog JSON (`json_shape`): Winlogbeat writes rendered values and leaves out empty items; NXLog's own fields set aside by its documented list, but a template-named item always kept.
@@ -880,7 +881,8 @@ techniques match the SQL - run it with the parity check.
 
 Current set: **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
 CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **Windows** WIN-BRUTE-1..3,
-WIN-AUTH-1 (gotcha #65), WIN-LAT-1..3, WIN-HOST-1..2 (gotcha #66) · **generic** (every other product's rows; superseded on Palo Alto /
+WIN-AUTH-1 (gotcha #65), WIN-LAT-1..3, WIN-HOST-1..2 (gotcha #66), WIN-MAL-1, WIN-INTEL-1..2
+(gotcha #67) · **generic** (every other product's rows; superseded on Palo Alto /
 Check Point rows, and the sign-in ones on Windows rows, gotcha #63): R2000 brute-force burst · R2002
 port scan · R2003 service sweep · R2004 policy gap · R2005 spray (many sources, one account) ·
 R2006 multi-source logins within an hour · R2007 beaconing · R2008 login after brute force ·
