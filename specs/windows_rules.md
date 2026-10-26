@@ -243,7 +243,10 @@ habitual reconnects, software deployment through ADMIN$ (a btp, as the Zabbix ro
 mistyped user name. Scored as before: every incident found, no plain or look-alike row flagged, W3
 by WIN-BRUTE-4 and not by chance; parity and the OTRF capture re-run (the dump expected found).
 
-## Story 5e - two false positives the blind test found (proposed 2026-10-26)
+## Story 5e - two false positives the blind test found (approved and built 2026-10-26)
+
+Q98 yes, Q99 a (the user: "Q98 : yes / Q99 : a ทำตาม design เลย"). Built (gotcha #70): on the
+blind quarter, not-attack rows flagged 43,523 -> 2,567, every incident found as before.
 
 The user's blind test (`D:\logtest\blind-windows`, `gen_windows_blind.py` seed 20260401 - a textile
 company's quarter, incidents K1-K15, an answer key) was uploaded to 8091

@@ -850,11 +850,12 @@ RULE_META.update({
                     "AN1275 / AN1276, AN1522, AN1524).",
             "strategy": "A success (4624 interactive / network / unlock / RDP / cached, 4768 or 4776 status "
                         "0x0) from a source WIN-BRUTE-1..3 flagged, after its first flagged failure: for the "
-                        "same account, or for any account when the source was a sprayer. A pair that signed "
+                        "same account, or for any account but a computer account (...$) when the source was a "
+                        "sprayer - its own machine account signs in from it all day (W-D10). A pair that signed "
                         "in before the failures began is named likely the owner (Javed & Paxson §4.2).",
             "technical_context": _WIN_ATTEMPT,
             "blind_spots": "A success from another source than the failures; failures the BRUTE rules did "
-                           "not flag.",
+                           "not flag; a sprayed computer account that then signs in (left out on purpose).",
             "validation": _WIN_VALIDATION.format(found="W1 (the sprayed account's TGT), W6 (adm.backup), W7 "
                                                        "(adm.backup reused on RDP)"),
             "response": "High: the account is likely in the attacker's hands - read what it did next.",
@@ -1028,14 +1029,21 @@ RULE_META.update({
                     "M1; T1071 DET0444).",
             "strategy": "R2007's measured method on Sysmon 3, keyed on (host, process, destination): at least "
                         "30 intervals, mean 30 s - 1 h, jitter (CV) under 0.6. A silence longer than an hour is "
-                        "not an interval (the host off, the channel asleep) and is left out of the statistics.",
+                        "not an interval (the host off, the channel asleep) and is left out of the statistics. "
+                        "A (process, destination) beaconing on more than half of the hosts with Sysmon network "
+                        "events is the fleet's timer, not a rare destination (AN0076, AN0761), and is left out, "
+                        "named on the line record (W-D11).",
             "technical_context": "Needs Sysmon network connection logging (event 3); public IPv4 destinations "
                                  "only, as R2007.",
             "blind_spots": "Beacons slower than an hour; jitter above 0.6; destinations by name only (Sysmon "
-                           "22) or behind a proxy; Sysmon configurations that leave the process out.",
+                           "22) or behind a proxy; Sysmon configurations that leave the process out; one implant "
+                           "on more than half of the machines calling one address (on the line record, not "
+                           "flagged).",
             "validation": "Synthetic Windows quarter (tests/gen_windows_domain.py): W4's 5-minute beacon, "
                           "working hours only, Aug 3 - Sep 20 (R2007 missed it: nights and weekends lifted the "
-                          "jitter); OneDrive's two-hourly sync not flagged. tests/check_windows_rules.py.",
+                          "jitter); OneDrive's two-hourly sync not flagged. The user's blind quarter: K7 and K15 "
+                          "found, ESET's timer on 40 of 43 hosts left out (after its answer key was read - a "
+                          "measurement of the fix). tests/check_windows_rules.py.",
             "response": "High: read what the process is, where it came from (Sysmon 1, 11) and the destination.",
         },
     },

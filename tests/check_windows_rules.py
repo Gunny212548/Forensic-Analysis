@@ -177,6 +177,36 @@ def main() -> int:
           f"a listed destination is WIN-INTEL-1's, a listed sign-in source WIN-INTEL-2's, not the generic rules' ({got})")
     con.close()
 
+    print("story 5e: a sprayer's own computer account, a beacon the fleet shares")
+    lines5e = []
+    # WEB01 (10.0.5.10) sprays eight accounts, then its own computer account and one sprayed user sign in.
+    for i, name in enumerate(["ann", "bob", "carl", "dave", "eve", "fred", "gina", "hank"]):
+        lines5e.append(fail_4625(t0 + timedelta(seconds=5 * i), "dc01.corp.local", name, "10.0.5.10"))
+    for k, name in enumerate(["web01$", "eve"]):
+        lines5e.append(event(4624, t0 + timedelta(minutes=5 + k), "dc01.corp.local",
+                             {"TargetUserName": name, "TargetLogonId": f"0x{k + 0x900:x}", "LogonType": "3",
+                              "IpAddress": "10.0.5.10", "AuthenticationPackageName": "Kerberos"}))
+    # An agent's timer on 3 of 4 hosts to one address; one host's implant to another.
+    for h, (img, dst, every) in enumerate([("agent.exe", "1.2.3.10", 60)] * 3 + [("implant.exe", "5.6.7.8", 120)]):
+        for n in range(40):
+            lines5e.append(event(3, t0 + timedelta(seconds=every * n + (n % 3)), f"pc{h}.corp.local",
+                                 {"ProcessGuid": f"{{{h:02x}}}", "Image": rf"C:\Program Files\x\{img}",
+                                  "Initiated": "true", "SourceIp": f"10.0.7.{h + 1}", "DestinationIp": dst,
+                                  "DestinationPort": "443"}, sysmon=True))
+    f5e = scratch / "story5e.xml"
+    f5e.write_text("\n".join(lines5e) + "\n", encoding="utf-8")
+    cid, man, con = run(f5e, "log")
+    auth = {r[0] for r in con.execute("SELECT entity_user FROM findings WHERE rid = 'WIN-AUTH-1'").fetchall()}
+    check(auth == {"eve"}, f"the sprayed user's sign-in is WIN-AUTH-1's, the sprayer's own computer account not ({auth})")
+    mal = {r[0] for r in con.execute("SELECT DISTINCT program FROM findings JOIN raw_events USING (row_id) "
+                                     "WHERE rid = 'WIN-MAL-1'").fetchall()}
+    rec = (man.get("lines") or {}).get("WIN-MAL-1", {})
+    check(mal == {"implant.exe"}, f"one host's beacon flagged, the fleet's timer not ({mal})")
+    check(rec.get("method") == "fleet-wide" and [x["process"] for x in rec.get("left_out", [])] == ["agent.exe"]
+          and rec.get("hosts_with_network_events") == 4,
+          f"the fleet's timer is named on the line record ({rec.get('note')})")
+    con.close()
+
     print("the synthetic Windows quarter, against its ground truth")
     out = scratch / "mekong"
     gen = Path(args.repo) / "tests" / "gen_windows_domain.py"

@@ -406,7 +406,10 @@ RULES: list[tuple[str, str]] = [
               JOIN win_attempts a ON a.attempt_id = ar.attempt_id
               WHERE f.rid IN ('WIN-BRUTE-1', 'WIN-BRUTE-2', 'WIN-BRUTE-3')
               GROUP BY a.source, a.account) p
-          ON p.source = s.source AND (p.account = s.account OR p.spray)
+          ON p.source = s.source
+         -- A sprayer's own computer account signs in from its address all day (W-D10, Q98):
+         -- the spray branch leaves out computer accounts ("...$", Microsoft 4769).
+         AND (p.account = s.account OR (p.spray AND NOT s.account LIKE '%$'))
         JOIN win_attempt_rows r ON r.attempt_id = s.attempt_id
         WHERE s.outcome = 'success' AND s.ts > p.first_flag
         QUALIFY row_number() OVER (PARTITION BY r.row_id ORDER BY p.first_flag) = 1
@@ -688,6 +691,43 @@ _CONNECTIONS = f"""
 """
 BEACON_MIN_GAPS, BEACON_MAX_CV = 30, 0.6        # R2007's measured method (rules.py)
 BEACON_MIN_S, BEACON_MAX_S = 30, 3600
+_BEACONS = f"""
+    WITH c AS ({_CONNECTIONS}),
+    g AS (SELECT *, date_diff('second', lag(ts) OVER (PARTITION BY host, program, dstip ORDER BY ts, row_id),
+                              ts) AS gap FROM c)
+    SELECT host, program, dstip, count(*) AS n, avg(gap) AS avg_gap,
+           stddev_pop(gap) / nullif(avg(gap), 0) AS cv
+    FROM g WHERE gap > 0 AND gap <= {BEACON_MAX_S}
+    GROUP BY host, program, dstip
+    HAVING count(*) >= {BEACON_MIN_GAPS} AND avg(gap) BETWEEN {BEACON_MIN_S} AND {BEACON_MAX_S}
+       AND stddev_pop(gap) / nullif(avg(gap), 0) < {BEACON_MAX_CV}
+"""
+
+
+def prepare_mal_1(con):
+    """W-D11 (Q99 a): the analytics ask for beacons to *rare* destinations (AN0076, AN0761 - "rare"
+    undefined). A (process, destination) beaconing on more than half of the hosts with Sysmon
+    network events is the fleet's - an agent's timer - and is left out, named on the line record.
+    Writes TEMP TABLE win_fleet_beacons (program, dstip, hosts)."""
+    total = con.execute("SELECT count(DISTINCT upper(split_part(hostname, '.', 1))) FROM product_events "
+                        "WHERE action = 'network_connection' AND hostname IS NOT NULL").fetchone()[0]
+    con.execute(f"""
+        CREATE OR REPLACE TEMP TABLE win_fleet_beacons AS
+        SELECT program, dstip, count(DISTINCT host) AS hosts FROM ({_BEACONS})
+        GROUP BY program, dstip HAVING count(DISTINCT host) > {total} / 2""")
+    left = con.execute("SELECT program, dstip, hosts FROM win_fleet_beacons ORDER BY hosts DESC, program, dstip"
+                       ).fetchall()
+    note = (f"{len(left)} fleet-wide timer(s) left out" +
+            (": " + "; ".join(f"{p} -> {d} on {h} of {total} hosts" for p, d, h in left) if left else "") +
+            f" - a (process, destination) beaconing on more than half of the {total} hosts with Sysmon "
+            "network events is not a rare destination")
+    return {}, {"method": "fleet-wide", "source": "ATT&CK T1071.001 DET0027 AN0076, T1573 DET0273 AN0761 "
+                                                  "(beacons to rare destinations; rare undefined - more than "
+                                                  "half the hosts, an internal method)",
+                "hosts_with_network_events": total,
+                "left_out": [{"process": p, "destination": d, "hosts": h} for p, d, h in left],
+                "population": "(process, destination) pairs that beacon, by the hosts they beacon on",
+                "note": note}
 
 RULES += [
     # M1 beaconing, per process (T1071 DET0444): R2007's measured method - regular
@@ -697,17 +737,13 @@ RULES += [
     # interval but the host switched off or the channel asleep, and is left out of
     # the statistics. Over a quarter of working days, a five-minute beacon's
     # nights and weekends made R2007's jitter far above 0.6 (W4 was missed).
+    # A beacon the fleet shares (win_fleet_beacons, prepare_mal_1) is left out (W-D11).
     ("WIN-MAL-1", f"""
         INSERT INTO findings
         WITH c AS ({_CONNECTIONS}),
-        g AS (SELECT *, date_diff('second', lag(ts) OVER (PARTITION BY host, program, dstip ORDER BY ts, row_id),
-                                  ts) AS gap FROM c),
-        b AS (SELECT host, program, dstip, count(*) AS n, avg(gap) AS avg_gap,
-                     stddev_pop(gap) / nullif(avg(gap), 0) AS cv
-              FROM g WHERE gap > 0 AND gap <= {BEACON_MAX_S}
-              GROUP BY host, program, dstip
-              HAVING count(*) >= {BEACON_MIN_GAPS} AND avg(gap) BETWEEN {BEACON_MIN_S} AND {BEACON_MAX_S}
-                 AND stddev_pop(gap) / nullif(avg(gap), 0) < {BEACON_MAX_CV})
+        b AS (SELECT * FROM ({_BEACONS}) x
+              WHERE NOT EXISTS (SELECT 1 FROM win_fleet_beacons fb
+                                WHERE fb.program = x.program AND fb.dstip = x.dstip))
         SELECT c.row_id, 'WIN-MAL-1', NULL,
                'Beaconing from ' || c.program || ' on ' || c.host || ' to ' || c.dstip || ' (' || b.n ||
                ' intervals at ~' || cast(round(b.avg_gap) AS INT) || 's, jitter ' ||
@@ -750,7 +786,7 @@ ENTITY = ("WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3", "WIN-BRUTE-4", "WIN-AUTH-
 # WIN-LAT-2 / -3 read the sessions WIN-LAT-1's preparation built; WIN-BRUTE-4 its own epochs.
 PREPARE = {"WIN-BRUTE-1": prepare_brute_1, "WIN-BRUTE-2": prepare_brute_2,
            "WIN-BRUTE-3": prepare_brute_3, "WIN-BRUTE-4": prepare_brute_4, "WIN-LAT-1": prepare_sessions,
-           "WIN-HOST-1": prepare_host_1}
+           "WIN-HOST-1": prepare_host_1, "WIN-MAL-1": prepare_mal_1}
 LEVEL = {"WIN-BRUTE-1": "medium", "WIN-BRUTE-2": "medium", "WIN-BRUTE-3": "medium", "WIN-BRUTE-4": "medium",
          "WIN-AUTH-1": "high", "WIN-LAT-1": "medium", "WIN-LAT-2": "medium", "WIN-LAT-3": "high",
          "WIN-LAT-4": "medium",

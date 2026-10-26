@@ -103,8 +103,16 @@ export function Detection({ detection }) {
   )
 }
 
+const METHOD_NAMES = {
+  trw: 'TRW',
+  'no-line': 'No line',
+  cusum: 'CUSUM over the site',
+  'fleet-wide': 'Fleet-wide timers left out',
+}
+
 /** How each line-drawing rule decided on this evidence (lines.py, D16): TRW's
- *  decisions, or the line measured on the legitimate members, or no line. */
+ *  decisions, the line measured on the legitimate members, no line, the site's
+ *  CUSUM (gotcha #68) or the beacons the whole fleet shares (W-D11). */
 export function Lines({ lines }) {
   const rows = Object.entries(lines || {})
   if (!rows.length) return null
@@ -123,7 +131,7 @@ export function Lines({ lines }) {
             <tr key={rid}>
               <td className="mono">{rid}</td>
               <td>
-                {r.method === 'trw' ? 'TRW' : r.method === 'no-line' ? 'No line' : 'Line from the evidence'}
+                {METHOD_NAMES[r.method] || 'Line from the evidence'}
                 <div className="muted">{r.source}</div>
               </td>
               <td>
