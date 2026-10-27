@@ -163,7 +163,7 @@ GET  /api/overview                           KPIs, MTTC, detection areas, attent
 ```
 
 **The Overview was redesigned on 2026-10-19 (gotcha #50)** - an attention banner,
-a KPI strip, the detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), findings per day, top affected, urgent
+a KPI strip (since 2026-10-27 the summary card's right column, SOCRadar layout), the detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), findings per day, top affected, urgent
 findings and recent activity, in the light palette; the status workflow it needed
 exists since Sprint 3 (gotcha #49). The case table is no longer on it. No figure is a
 placeholder. "Top affected"
@@ -303,9 +303,10 @@ whole UI is in English, as the Figma is (since 2026-10-12, see *Decisions*).
 **The SOCRadar layout, light and dark (2026-10-27, the user's request).** The
 user asked for the whole app to look like SOCRadar's dark-web report and
 approved a mockup (claude.ai artifact "SENTRY-IR redesign"); it is built in
-steps, one branch each: 1 tokens + theme button + menu (done), 2 shared
-summary card / area card / collapsible section, 3 Overview, 4 the case steps,
-5 the other pages. Light stays the default; dark is `[data-theme=dark]` on
+steps: 1 tokens + theme button + menu, 2 shared summary card / area card /
+stat tile / collapsible section (`components/cards.jsx`, icons in `icons.jsx`),
+3 Overview (all three done), 4 the case steps, 5 the other pages. A section
+folds only when the analyst clicks; its head keeps its counts. Light stays the default; dark is `[data-theme=dark]` on
 `<html>`, set by the button beside the brand (`theme.js`) and kept per browser
 in localStorage `fa_theme` - the OS setting is deliberately not followed (no
 look the analyst did not ask for). The action colour is red now (`--accent`,

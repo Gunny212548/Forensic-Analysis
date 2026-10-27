@@ -40,3 +40,13 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   techniques and `recent`; the page ignores the first three and tests use `recent`.
 - `docs/STANDARDS.md` rows 17-19 state the internal methods (ids, related
   findings, areas).
+- **2026-10-27, the SOCRadar layout (the user's request, mockup approved):** the
+  same content rearranged, nothing rejected above brought back. The KPI strip is
+  the summary card's right column (Open findings big, highest open severity,
+  MTTC / open cases / customers under it); last upload, cases processed and
+  areas with open findings are fact tiles beside the per-day chart; an area card
+  is icon + open count + share of the open findings + the open ones by level,
+  greyed when nothing is open (the level chips went into that line); severity is
+  counts plus one split bar; most urgent and recent activity are folding
+  sections. No caption under the KPI numbers (rejected above), the customer line,
+  Refresh and Upload stay.

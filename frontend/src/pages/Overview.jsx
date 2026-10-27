@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getOverview } from '../api.js'
-import { ago, fmtNum } from '../format.js'
+import { ago, fmtNum, fmtTime, shortTs } from '../format.js'
+import {
+  AreaCard, Badge, BigTotal, FactTiles, IconTile, Section, SummaryCard, TotalRow,
+} from '../components/cards.jsx'
 
 const POLL_MS = 15000
 const SEVS = ['critical', 'high', 'medium', 'low']
 const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', none: 'None' }
+const SEV_TONE = { critical: 'danger', high: 'warn', medium: 'info', low: 'muted' }
 const ROLE_EN = { sources: 'source', destinations: 'destination', accounts: 'account' }
+const ROLE_ICON = { sources: 'server', destinations: 'globe', accounts: 'user' }
 
-/** The Overview, redesigned 2026-10-19 at the user's request. It answers three
+/** The Overview, redesigned 2026-10-19 at the user's request and laid out like
+ *  SOCRadar's report since 2026-10-27 (CLAUDE.md). It answers three
  *  questions in this order: what is waiting for me (the attention row), how are
- *  we doing (the four KPIs, the detection areas, findings per day and severity)
+ *  we doing (the summary card, the detection areas, severity, top affected)
  *  and what do I open next (the most urgent findings, recent activity).
  *
  *  Every figure comes from GET /api/overview - never a placeholder - and every
@@ -57,6 +63,11 @@ export default function Overview({ companyId }) {
   // a review backlog alone is only a nudge.
   const bad = t.critical_unassigned > 0 || t.failed_cases > 0 || data.attention.length > 0
   const mttcHours = t.mttc_seconds == null ? null : t.mttc_seconds / 3600
+  const openBy = (s) => data.areas.reduce((n, a) => n + (a.open_by[s] || 0), 0)
+  const highestOpen = SEVS.find((s) => openBy(s) > 0)
+  const areasOpen = data.areas.filter((a) => a.open > 0).length
+  const createdTotal = data.findings_daily.reduce((n, d) => n + (d.critical || 0) + (d.high || 0), 0)
+  const sevAll = SEVS.reduce((n, s) => n + sevTotals[s], 0)
 
   return (
     <section className="page ov">
@@ -130,82 +141,155 @@ export default function Overview({ companyId }) {
         </ul>
       )}
 
-      <div className="stats">
-        <Stat label="Open findings" value={fmtNum(t.open_findings)} tone={t.open_findings ? 'danger' : ''} />
-        <Stat label="Mean time to contain" value={mttcHours == null ? '—' : fmtHours(mttcHours)}
-          tone={mttcHours != null && mttcHours > t.mttc_target_hours ? 'danger' : ''}
-          title={`created → Contained, true positives · target ≤ ${t.mttc_target_hours} h`} />
-        <Stat label="Open cases" value={fmtNum(t.open_cases)} />
-        <Stat label="Customers" value={t.customers} />
-      </div>
-
-      <div>
-        <h2 className="section-h">Detection areas</h2>
-        <div className="area-grid">
-          {data.areas.map((a) => (
-            <AreaCard key={a.id} area={a} days={data.trend_days} scope={scope} />
-          ))}
-        </div>
-      </div>
-
-      <div className="ov-row">
-        <div className="panel ov-chart-panel">
-          <h2>
-            Findings created per day <span className="muted">high and critical, when they entered the workflow</span>
-          </h2>
+      <SummaryCard
+        label="Summary"
+        side={
+          <BigTotal
+            icon="shield-alert"
+            tone={t.open_findings ? SEV_TONE[highestOpen] || 'muted' : 'ok'}
+            label="Open findings"
+            value={fmtNum(t.open_findings)}
+            badge={
+              t.open_findings ? (
+                <Badge tone={SEV_TONE[highestOpen] || 'muted'}>Highest: {SEV_EN[highestOpen] || '—'}</Badge>
+              ) : (
+                <Badge tone="ok">Nothing open</Badge>
+              )
+            }
+          >
+            <TotalRow label="Mean time to contain"
+                      title={`created → Contained, true positives · target ≤ ${t.mttc_target_hours} h`}>
+              <span className={mttcHours != null && mttcHours > t.mttc_target_hours ? 'sev-critical' : ''}>
+                {mttcHours == null ? '—' : fmtHours(mttcHours)}
+              </span>{' '}
+              <span className="muted">/ {t.mttc_target_hours} h</span>
+            </TotalRow>
+            <TotalRow label="Open cases">{fmtNum(t.open_cases)}</TotalRow>
+            <TotalRow label="Customers">{fmtNum(t.customers)}</TotalRow>
+          </BigTotal>
+        }
+      >
+        <FactTiles
+          facts={[
+            { label: 'Last upload', value: <span className="mono">{t.last_upload ? shortTs(fmtTime(t.last_upload)) : '—'}</span>,
+              title: t.last_upload ? fmtTime(t.last_upload) : undefined },
+            { label: 'Cases processed', value: <><strong>{fmtNum(t.ready)}</strong> of {fmtNum(t.cases)}</> },
+            { label: 'Areas with open findings',
+              value: <><strong>{areasOpen}</strong> of {data.areas.length} areas</> },
+          ]}
+        />
+        <div>
+          <div className="ui-kicker">Findings created per day</div>
+          <div className="ui-headline">
+            <strong>{fmtNum(createdTotal)}</strong>
+            high and critical, when they entered the workflow · last {data.findings_daily.length} days
+          </div>
           <DailyChart days={data.findings_daily} unit="findings" keys={['critical', 'high']} />
         </div>
-        <div className="panel ov-side">
-          <h2>Severity distribution</h2>
-          <SeverityBars counts={sevTotals} />
-          <div className="section-label">Top affected hosts &amp; accounts</div>
-          {!data.top_entities.length && <div className="empty">No findings yet</div>}
-          {data.top_entities.map((e) => (
-            <div className="ov-line" key={`${e.customer}|${e.role}|${e.entity}`}>
-              <span>
-                <span className="cust-tag">{e.customer}</span>
-                <span className="mono">{e.entity}</span>{' '}
-                <span className="muted">{ROLE_EN[e.role] || e.role}</span>
-              </span>
-              <span>
-                {e.cases} {e.cases === 1 ? 'case' : 'cases'}
-              </span>
-            </div>
+      </SummaryCard>
+
+      <section aria-label="Detection areas">
+        <div className="area-title">
+          <h2 className="section-h">Detection areas</h2>
+          <span className="muted">open workflow findings · trend of findings first seen per day of event time</span>
+        </div>
+        <div className="ui-area-grid">
+          {data.areas.map((a) => (
+            <OverviewArea key={a.id} area={a} days={data.trend_days} scope={scope} openTotal={t.open_findings} />
           ))}
+        </div>
+      </section>
+
+      <div className="ov-row">
+        <div className="panel ov-panel">
+          <h2>Severity breakdown</h2>
+          <div className="ui-section-sub">{fmtNum(sevAll)} findings by Sigma level, every case in scope</div>
+          <SeverityBreakdown counts={sevTotals} total={sevAll} />
+        </div>
+        <div className="panel ov-panel">
+          <h2>Top affected hosts &amp; accounts</h2>
+          <div className="ui-section-sub">ranked by accumulated risk, per customer</div>
+          {!data.top_entities.length && <div className="empty">No findings yet</div>}
+          <div className="ov-top">
+            {data.top_entities.map((e) => (
+              <div className="ov-top-row" key={`${e.customer}|${e.role}|${e.entity}`}>
+                <IconTile icon={ROLE_ICON[e.role] || 'server'} tone="info" />
+                <div className="ov-top-main">
+                  <div className="mono ov-top-entity" title={e.entity}>{e.entity}</div>
+                  <div className="cell-sub">
+                    {ROLE_EN[e.role] || e.role} <span className="cust-tag cust-tag-after">{e.customer}</span>
+                  </div>
+                </div>
+                <span className="muted">{e.cases} {e.cases === 1 ? 'case' : 'cases'}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="ov-row">
-        <div className="panel">
-          <div className="area-title">
-            <h2>Most urgent findings</h2>
-            <a href={`#/findings${scope ? `/${scope.slice(1)}` : ''}`} className="table-link">
-              All findings →
-            </a>
+      <Section
+        icon="alert"
+        tone={t.open_findings ? 'danger' : 'ok'}
+        title="Most urgent findings"
+        sub="Workflow findings not yet resolved - worst severity first, unassigned before assigned"
+        stats={[
+          { label: 'Open', value: fmtNum(t.open_findings), tone: t.open_findings ? 'danger' : 'text' },
+          { label: 'Critical unassigned', value: fmtNum(t.critical_unassigned),
+            tone: t.critical_unassigned ? 'danger' : 'text' },
+        ]}
+      >
+        {!data.urgent.length ? (
+          <div className="empty">Nothing is open in the workflow</div>
+        ) : (
+          <div className="table-scroll">
+            <table className="ui-rows">
+              <thead>
+                <tr><th>#</th><th>Finding</th><th>Severity</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {data.urgent.map((r, i) => (
+                  <tr key={`${r.case_id}|${r.key}`}>
+                    <td className="ui-n">{i + 1}</td>
+                    <td>
+                      <div className="ui-main">
+                        <a className="table-link mono" href={`#/finding/${r.case_id}/${encodeURIComponent(r.key)}`}>
+                          {r.fd}
+                        </a>{' '}
+                        · {r.name}
+                      </div>
+                      <div className="ui-sub">
+                        <span className="mono">{r.host}</span> · {r.company_name} · {r.log_type}
+                      </div>
+                    </td>
+                    <td><span className={`sev-tag sev-tag-${r.level}`}>{SEV_EN[r.level]}</span></td>
+                    <td>
+                      {r.status}
+                      <div className={r.assignee ? 'ui-sub' : 'ui-sub urgent-unassigned'}>{r.assignee || 'unassigned'}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          {!data.urgent.length && <div className="empty">Nothing is open in the workflow</div>}
-          <ul className="urgent">
-            {data.urgent.map((r) => (
-              <li key={`${r.case_id}|${r.key}`}>
-                <a className="table-link mono" href={`#/finding/${r.case_id}/${encodeURIComponent(r.key)}`}>
-                  {r.fd}
-                </a>
-                <span className={`sev-tag sev-tag-${r.level}`}>{SEV_EN[r.level]}</span>
-                <span className="urgent-main">
-                  {r.name} <span className="mono muted">{r.host}</span>
-                  <span className="cell-sub">
-                    {r.company_name} · {r.log_type} · {r.status}
-                  </span>
-                </span>
-                <span className={r.assignee ? 'muted' : 'urgent-unassigned'}>{r.assignee || 'unassigned'}</span>
-              </li>
-            ))}
-          </ul>
+        )}
+        <div className="ui-section-more">
+          <a href={`#/findings${scope ? `/${scope.slice(1)}` : ''}`} className="table-link">
+            All open findings →
+          </a>
         </div>
-        <div className="panel ov-activity">
-          <h2>Recent activity</h2>
-          {!data.recent.length && <div className="empty">Nothing yet</div>}
-          <ul className="activity">
+      </Section>
+
+      <Section
+        icon="clock"
+        tone="info"
+        title="Recent activity"
+        sub="Uploads, processing and analyst decisions"
+        stats={[{ label: 'Latest', value: data.recent.length ? ago(data.recent[0].ts) : '—' }]}
+      >
+        {!data.recent.length ? (
+          <div className="empty">Nothing yet</div>
+        ) : (
+          <ul className="activity ov-activity-list">
             {data.recent.slice(0, 5).map((r, i) => (
               <li key={i} className={`act-${r.level || 'muted'}`}>
                 <a href={`#/case/${r.case_id}`}>{r.text}</a>
@@ -214,8 +298,8 @@ export default function Overview({ companyId }) {
               </li>
             ))}
           </ul>
-        </div>
-      </div>
+        )}
+      </Section>
     </section>
   )
 }
@@ -225,55 +309,28 @@ function fmtHours(h) {
   return `${h.toFixed(1)} h`
 }
 
-function Stat({ label, value, tone, title }) {
+/** Red while a critical finding is open, amber for high, grey and dimmed when
+ *  nothing is open - decided from the open counts, not from a score. The line
+ *  under the number names the open ones by level, and what the area holds in
+ *  all when none is open. */
+function OverviewArea({ area, days, scope, openTotal }) {
+  const tone = area.open_by.critical ? 'danger' : area.open_by.high ? 'warn' : area.open ? 'info' : 'muted'
+  const open = SEVS.filter((s) => area.open_by[s]).map((s) => `${area.open_by[s]} ${s}`)
+  const all = SEVS.reduce((n, s) => n + (area.total[s] || 0), 0)
+  const share = openTotal ? Math.round((area.open / openTotal) * 100) : 0
   return (
-    <div className="stat" title={title}>
-      <div className={`stat-value${tone ? ` tone-${tone}` : ''}`}>{value}</div>
-      <div className="stat-label">{label}</div>
-    </div>
-  )
-}
-
-const AREA_CHIPS = ['critical', 'high', 'medium', 'low']
-
-function AreaChips({ counts, totals }) {
-  return (
-    <div className="area-row">
-      {AREA_CHIPS.map((c) => (
-        <span
-          key={c}
-          className={`area-chip chip-lvl-${c}${counts[c] ? '' : ' zero'}`}
-          title={`${counts[c]} open of ${totals[c]} ${SEV_EN[c].toLowerCase()}`}
-        >
-          {counts[c]}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-/** Red while a critical finding is open, amber for high, green when nothing is
- *  open - decided from the open counts, not from a score. */
-function areaTone(a) {
-  if (a.open_by.critical) return 'danger'
-  if (a.open_by.high) return 'accent'
-  return 'ok'
-}
-
-function AreaCard({ area, days, scope }) {
-  const tone = areaTone(area)
-  const open = AREA_CHIPS.filter((c) => area.open_by[c]).map((c) => `${area.open_by[c]} ${c}`)
-  return (
-    <a className={`area-card area-${tone}`} href={`#/findings/area=${area.id}&status=open${scope}`} title={area.about}>
-      <div className="area-head">
-        <h3>{area.name}</h3>
-        <span className="area-open" title={open.length ? `Open: ${open.join(', ')}` : 'Nothing open'}>
-          {fmtNum(area.open)}
-        </span>
-      </div>
-      <AreaChips counts={area.open_by} totals={area.total} />
-      <Spark values={area.trend} days={days} />
-    </a>
+    <AreaCard
+      href={`#/findings/area=${area.id}&status=open${scope}`}
+      title={area.about}
+      icon={area.id}
+      tone={tone}
+      value={fmtNum(area.open)}
+      name={area.name}
+      share={area.open ? share : 0}
+      foot={area.open ? `${share}% of open · ${open.join(', ')}` : `Nothing open · ${fmtNum(all)} in all`}
+      extra={<Spark values={area.trend} days={days} />}
+      dim={!area.open}
+    />
   )
 }
 
@@ -310,20 +367,31 @@ function Spark({ values, days }) {
   )
 }
 
-function SeverityBars({ counts }) {
-  const max = Math.max(1, ...SEVS.map((s) => counts[s] || 0))
+/** Each level's count, then one bar split by share - every level that has
+ *  findings keeps at least a sliver, so a lone critical is never invisible. */
+function SeverityBreakdown({ counts, total }) {
+  const pct = (s) => (total ? Math.round(((counts[s] || 0) / total) * 100) : 0)
   return (
-    <div className="sev-bars">
-      {SEVS.map((s) => (
-        <div className="sev-bar-row" key={s}>
-          <span>{SEV_EN[s]}</span>
-          <span className="sev-track">
-            <span className={`sev-fill fill-${s}`} style={{ width: `${((counts[s] || 0) / max) * 100}%` }} />
-          </span>
-          <span className="mono">{counts[s] || 0}</span>
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="ov-sev-counts">
+        {SEVS.map((s) => (
+          <div key={s} className={`tone-${SEV_TONE[s]}`}>
+            <div className="ov-sev-n">{fmtNum(counts[s])}</div>
+            <div className="ov-sev-label"><i className={`fill-${s}`} />{SEV_EN[s]}</div>
+          </div>
+        ))}
+      </div>
+      <div className="ov-sev-bar" role="img"
+           aria-label={SEVS.map((s) => `${counts[s] || 0} ${s}`).join(', ')}>
+        {total === 0 && <span className="fill-pending" style={{ flexGrow: 1 }} />}
+        {SEVS.filter((s) => counts[s]).map((s) => (
+          <span key={s} className={`fill-${s}`} style={{ flexGrow: counts[s], minWidth: 6 }} />
+        ))}
+      </div>
+      <div className="ov-sev-pcts mono">
+        {SEVS.map((s) => <span key={s}>{pct(s)}% {s}</span>)}
+      </div>
+    </>
   )
 }
 
