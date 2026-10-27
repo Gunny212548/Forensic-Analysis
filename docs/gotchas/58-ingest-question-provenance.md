@@ -44,3 +44,10 @@ the "provenance not recorded" warning. `PUT /provenance` still accepts every fie
 already recorded stay on the manifest and in the custody log. ACPO 5.10.3 (provenance) is no longer
 cited by the Ingest step: nothing on it asks how the evidence came to be there. Lost with it: the
 export method that would say a filtered export silenced a rule (gotcha #9) - ask the customer instead.
+
+**Later the same day: the source time left the screen too.** On a case of 191 Windows files every
+item read "N events state their time zone, 0 do not - Nothing declared" - Windows events carry UTC, so
+there was nothing to set, and the user found the section not needed. The Re-process button it held
+moved under "Method of the last run" (`Reprocess.jsx`). What remains: the "GMT+7 was assumed" warning
+per item whose events state no zone; `PUT /provenance` and the re-process that applies a declared
+zone, for a log without one (RFC 3164 syslog, some CSV exports) - set through the API only now.

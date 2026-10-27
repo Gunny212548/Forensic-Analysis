@@ -10,7 +10,7 @@ import AttackGraph from '../components/AttackGraph.jsx'
 import MappingNote from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
 import Question from '../components/Question.jsx'
-import Provenance, { Method } from '../components/Provenance.jsx'
+import Reprocess, { Method } from '../components/Reprocess.jsx'
 import { Detection, Lines, Periods } from '../components/Period.jsx'
 import Veris from '../components/Veris.jsx'
 import DeleteCase from '../components/DeleteCase.jsx'
@@ -273,8 +273,8 @@ export default function CaseFlow({ caseId, stepId }) {
   )
 }
 
-/** Story 3: the investigation's question, the warnings, each evidence item's
- *  source time and the reproducibility record, around the custody block
+/** Story 3: the investigation's question, the warnings and the
+ *  reproducibility record with the Re-process button, around the custody block
  *  (children). Reloaded when the case's status changes, so a re-process that
  *  finishes shows its new record. */
 function IngestRecord({ caseId, status, reload, children }) {
@@ -329,10 +329,9 @@ function IngestRecord({ caseId, status, reload, children }) {
           <Lines lines={data.lines} />
         </>
       )}
-      <div className="section-label">Source time</div>
-      <Provenance caseId={caseId} ingest={data} onSaved={saved} onReprocessed={saved} />
       <div className="section-label">Method of the last run</div>
       <Method method={data.method} />
+      <Reprocess caseId={caseId} ingest={data} onReprocessed={saved} />
     </>
   )
 }

@@ -209,12 +209,6 @@ export async function putQuestion(caseId, body) {
   return putJson(`/api/cases/${encodeURIComponent(caseId)}/question`, body, 'Could not save the question')
 }
 
-/** One evidence item's provenance; `item` names a zip member. */
-export async function putProvenance(caseId, item, body) {
-  const q = item ? `?item=${encodeURIComponent(item)}` : ''
-  return putJson(`/api/cases/${encodeURIComponent(caseId)}/provenance${q}`, body, 'Could not save the provenance')
-}
-
 /** Send the suggestions that have no AI advice yet to the model again (triage.py, C-D4). */
 export async function aiReviewAgain(caseId) {
   const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}/ai-review`, { method: 'POST' })

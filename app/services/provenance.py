@@ -14,9 +14,11 @@ Every change is a custody line with each field's old and new value, so the
 hash-chained custody log (custody.py) is the history and the manifest only the
 current state.
 
-Since 2026-10-27 the screen asks only for the time fields ("Source time"): the
-user found the where-from fields too much. They are still accepted here and
-kept where recorded, and no longer warned about when missing.
+Since 2026-10-27 the screen asks for none of it: the where-from fields went
+first (too much), then the time fields (not needed - most logs state their
+zone; a case of 191 Windows files listed 191 "nothing to set" lines). Every
+field is still accepted by PUT /provenance and kept where recorded, and a
+declared zone or offset is still applied on re-process.
 
 Time (D10). A declared zone replaces the GMT+7 assumption (gotcha #21) for the
 events whose source text states no offset; a declared clock offset shifts every

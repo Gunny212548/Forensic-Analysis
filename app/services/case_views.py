@@ -82,7 +82,7 @@ def ingest_warnings(manifest: dict) -> list[str]:
     for a in manifest.get("time_applied") or []:
         if a.get("rows_without_offset") and not a.get("zone"):
             out.append(f"{a['item']}: {a['rows_without_offset']:,} events state no time zone - "
-                       "GMT+7 was assumed; set the source's time zone under Source time if known")
+                       "GMT+7 was assumed")
     if manifest.get("status") == "ready" and manifest.get("periods") is None:
         out.append("Processed before the period and product of each file were recorded - "
                    "re-process to see them")
