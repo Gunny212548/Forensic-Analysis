@@ -3,12 +3,12 @@ import { getAnalysis, getCase, getFindings, getFlow, getGraph, getIngest, runAna
 import { useAccess } from '../permissions.js'
 import { LEVEL_EN, fmtNum, fmtTime, shortTs, statusOf } from '../format.js'
 import { Empty, SeverityPill } from '../components/common.jsx'
-import { Badge, BigTotal, FactTiles, SummaryCard, TotalRow } from '../components/cards.jsx'
+import { Badge, BigTotal, FactTiles, Section, SummaryCard, TotalRow } from '../components/cards.jsx'
 import StepBar, { stepHref } from '../components/StepBar.jsx'
 import EventsTable from '../components/EventsTable.jsx'
 import ReviewPanel from '../components/ReviewPanel.jsx'
 import AttackGraph from '../components/AttackGraph.jsx'
-import MappingNote from '../components/Mapping.jsx'
+import MappingNote, { filesByLogSource } from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
 import Question from '../components/Question.jsx'
 import Reprocess, { Method } from '../components/Reprocess.jsx'
@@ -250,7 +250,9 @@ export default function CaseFlow({ caseId, stepId }) {
 
       {flow && step && (
         <div className="panel step-panel">
-          <div className={`step-reason step-${step.state}`}>{step.reason}</div>
+          {/* Attack events' reason is "N of M not decided yet" - the summary card's
+              Analyst decided and the step box say it already (the user, 2026-10-27). */}
+          {step.id !== 'attack-events' && <div className={`step-reason step-${step.state}`}>{step.reason}</div>}
           <StepBody step={step} caseId={caseId} manifest={manifest} ready={ready} ai={ai} reload={reload} />
           <div className="step-standards">
             Standards:{' '}
@@ -417,6 +419,12 @@ function IngestRecord({ caseId, status, reload, children }) {
 
   if (error) return <Empty>{error}</Empty>
   if (!data) return <Empty>Loading...</Empty>
+  // The reference tables fold away with their size in the head (the user,
+  // 2026-10-27: too much on Ingest); warnings and what needs the analyst stay open.
+  const periods = data.periods || []
+  const firsts = periods.map((p) => p.first).filter(Boolean).sort()
+  const lasts = periods.map((p) => p.last).filter(Boolean).sort()
+  const lineRules = Object.keys(data.lines || {})
   return (
     <>
       {data.warnings.length > 0 && (
@@ -426,26 +434,45 @@ function IngestRecord({ caseId, status, reload, children }) {
           ))}
         </div>
       )}
-      <div className="section-label">Question</div>
-      <Question caseId={caseId} investigation={data.investigation} onSaved={saved} />
-      <div key={`${version}-${status}`}>{children}</div>
-      <div className="section-label">Period each file covers</div>
-      <Periods periods={data.periods} />
+      <Section icon="findings" tone="info" title="Question" sub="What this investigation asks - kept on the project">
+        <div className="ing-body">
+          <Question caseId={caseId} investigation={data.investigation} onSaved={saved} />
+        </div>
+      </Section>
+      <Section icon="shield-alert" tone="ok" title="Evidence and chain of custody"
+               sub="The file's digest, checked before every run, and every action on it">
+        <div className="ing-body" key={`${version}-${status}`}>{children}</div>
+      </Section>
+      <Section icon="clock" tone="muted" title="Period each file covers" defaultOpen={false}
+               sub="First and last event, gaps and events per day, file by file"
+               stats={[
+                 { label: 'Files', value: fmtNum(periods.length) },
+                 { label: 'From', value: firsts[0]?.slice(0, 10) || '—' },
+                 { label: 'To', value: lasts[lasts.length - 1]?.slice(0, 10) || '—' },
+               ]}>
+        <div className="ing-body"><Periods periods={data.periods} /></div>
+      </Section>
       {data.detection && (
-        <>
-          <div className="section-label">Rules per product and area</div>
-          <Detection detection={data.detection} />
-        </>
+        <Section icon="dashboard" tone="muted" title="Rules per product and area" defaultOpen={false}
+                 sub="Which rules ran on each product's rows, area by area, or why none applies"
+                 stats={[{ label: 'Products', value: fmtNum(data.detection.length) }]}>
+          <div className="ing-body"><Detection detection={data.detection} /></div>
+        </Section>
       )}
-      {data.lines && Object.keys(data.lines).length > 0 && (
-        <>
-          <div className="section-label">How each line was drawn</div>
-          <Lines lines={data.lines} />
-        </>
+      {lineRules.length > 0 && (
+        <Section icon="settings" tone="muted" title="How each line was drawn" defaultOpen={false}
+                 sub="Where each threshold rule took its line from on this evidence"
+                 stats={[{ label: 'Rules', value: fmtNum(lineRules.length) }]}>
+          <div className="ing-body"><Lines lines={data.lines} /></div>
+        </Section>
       )}
-      <div className="section-label">Method of the last run</div>
-      <Method method={data.method} />
-      <Reprocess caseId={caseId} ingest={data} onReprocessed={saved} />
+      <Section icon="upload" tone="muted" title="Method of the last run"
+               sub="Versions and settings, to run it again the same way">
+        <div className="ing-body">
+          <Method method={data.method} />
+          <Reprocess caseId={caseId} ingest={data} onReprocessed={saved} />
+        </div>
+      </Section>
     </>
   )
 }
@@ -460,29 +487,37 @@ function StepBody({ step, caseId, manifest, ready, ai, reload }) {
   }
 
   switch (step.id) {
-    case 'ingest':
+    case 'ingest': {
+      const files = manifest.members?.length || 1
+      const sources = ready ? filesByLogSource(manifest) : []
       return (
-        <>
-          {ready && (
-            <div className="meta-line" style={{ marginTop: 0 }}>
-              <SeverityPill severity={manifest.severity} /> · {fmtNum(manifest.flagged_count)} flagged of{' '}
-              {fmtNum(manifest.total_rows)} events
-            </div>
-          )}
+        <div className="ing-sections">
           {manifest.status === 'failed' && <Empty>Processing failed: {manifest.error || 'unknown cause'}</Empty>}
-          {ready && <MappingNote manifest={manifest} />}
+          {ready && (
+            <Section icon="cases" tone="info" title="Files read"
+                     sub={sources.map(([name, n]) => `${name} ${fmtNum(n)}`).join(' · ')}
+                     stats={[
+                       { label: 'Files', value: fmtNum(files) },
+                       { label: 'Events', value: fmtNum(manifest.total_rows) },
+                       { label: 'Flagged', value: fmtNum(manifest.flagged_count) },
+                     ]}
+                     pill={<SeverityPill severity={manifest.severity} />}>
+              <div className="ing-body"><MappingNote manifest={manifest} /></div>
+            </Section>
+          )}
           <IngestRecord caseId={caseId} status={manifest.status} reload={reload}>
-            <div className="section-label">Evidence and chain of custody</div>
             <Evidence caseId={caseId} />
           </IngestRecord>
           {ready && (
-            <>
-              <div className="section-label">Events, in file order</div>
-              <EventsTable caseId={caseId} />
-            </>
+            <Section icon="dashboard" tone="muted" title="Events, in file order" defaultOpen={false} lazy
+                     sub="Every event as it stands in the files"
+                     stats={[{ label: 'Events', value: fmtNum(manifest.total_rows) }]}>
+              <div className="ing-body"><EventsTable caseId={caseId} /></div>
+            </Section>
           )}
-        </>
+        </div>
       )
+    }
     case 'timeline':
       // Every event by its time. One evidence item for now; across the
       // project's files, with pivots and silent periods, in story 4.

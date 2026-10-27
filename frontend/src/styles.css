@@ -935,3 +935,12 @@ button.ui-stat-btn { text-align: left; font: inherit; color: var(--text); cursor
 button.ui-stat-btn:hover { border-color: var(--tone); }
 button.ui-stat-btn.active { border-color: var(--tone); background: var(--tone-tint); }
 button.ui-stat-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The Ingest step as folding sections (the user, 2026-10-27: too much on it). */
+.ing-sections { display: flex; flex-direction: column; gap: 12px; }
+.ing-sections .ui-section + .ui-section { margin-top: 0; }
+.ing-body { padding: 14px 20px 18px; }
+.ing-body > .map-note:first-child, .ing-body > .section-label:first-child { margin-top: 0; }
+.map-each { margin-top: 10px; }
+.map-each > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); padding: 6px 0; }
+.map-each > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

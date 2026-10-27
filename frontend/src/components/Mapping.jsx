@@ -339,15 +339,53 @@ function One({ mapping, name }) {
   )
 }
 
+/** Whether a file's reading notes hold something the analyst must see: it was
+ *  not analysed, its columns were guessed or are missing, or part of it could
+ *  not be read. Exactly the cases One() draws as a warning. */
+export function needsAttention(m) {
+  if (!m) return false
+  if (m.method !== 'documented' && !m.line_profiles) return true // no reader, unrecognised, guessed
+  if ((m.heuristic_fields || []).length || (m.missing_fields || []).length) return true
+  if (m.json && (m.json.unparseable || m.json.broken_at_byte != null)) return true
+  const w = m.windows
+  if (w && (w.unreadable || w.unreadable_chunks || (w.reader_errors || []).length || w.unmatched_messages)) return true
+  if (m.syslog?.year_inferred) return true
+  return !!(m.coverage && (m.coverage.not_loaded > 0 || m.coverage.time_unparsed > 0))
+}
+
+/** The files of a case by what each was identified as: [[name, count]]. */
+export function filesByLogSource(manifest) {
+  const members = manifest.members?.length ? manifest.members : [{ mapping: manifest.mapping }]
+  const counts = {}
+  for (const m of members) {
+    const name = m.mapping?.logsource?.name || m.mapping?.name || 'not identified'
+    counts[name] = (counts[name] || 0) + 1
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])
+}
+
+/** A zip's reading notes, four or so per file - hundreds for a large
+ *  collection (the user, 2026-10-27: too much on the Ingest step). A file
+ *  whose notes need attention is always shown; the rest fold under one line
+ *  the analyst opens. */
 export default function MappingNote({ manifest }) {
   if (manifest.members?.length) {
-    const any = manifest.members.some((m) => m.mapping)
-    if (!any) return null
+    const read = manifest.members.filter((m) => m.mapping)
+    if (!read.length) return null
+    const problems = read.filter((m) => needsAttention(m.mapping))
+    const fine = read.filter((m) => !needsAttention(m.mapping))
+    const one = (m) => <One key={`${m.name}-${m.row_id_first}`} mapping={m.mapping} name={m.name} />
     return (
       <>
-        {manifest.members.map((m) => (
-          <One key={`${m.name}-${m.row_id_first}`} mapping={m.mapping} name={m.name} />
-        ))}
+        {problems.map(one)}
+        {fine.length > 0 && (
+          <details className="map-each">
+            <summary>
+              {problems.length ? 'The other files' : 'Each file'}: how it was identified and read ({fine.length})
+            </summary>
+            {fine.map(one)}
+          </details>
+        )}
       </>
     )
   }

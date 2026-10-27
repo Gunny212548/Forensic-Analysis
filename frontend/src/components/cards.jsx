@@ -113,9 +113,13 @@ export function StatTile({ icon, tone = 'muted', value, label, title, onClick, a
 /** A panel whose body folds away. The head always shows what is inside -
  *  its counts (`stats`: [{label, value, tone}]) and a status `pill` - so a
  *  folded section still says how much it holds. Open unless told otherwise;
- *  nothing folds by itself. */
-export function Section({ icon, tone = 'muted', title, sub, stats = [], pill, defaultOpen = true, children }) {
+ *  nothing folds by itself. `lazy` leaves the body unrendered until it is first
+ *  opened - for a body that fetches (the events table), so a folded section
+ *  costs nothing. */
+export function Section({ icon, tone = 'muted', title, sub, stats = [], pill, defaultOpen = true, lazy, children }) {
   const [open, setOpen] = useState(defaultOpen)
+  const [seen, setSeen] = useState(defaultOpen)
+  if (open && !seen) setSeen(true)
   const bodyId = useId()
   return (
     <section className="ui-section">
@@ -138,7 +142,7 @@ export function Section({ icon, tone = 'muted', title, sub, stats = [], pill, de
         </button>
       </div>
       <div id={bodyId} className="ui-section-body" hidden={!open}>
-        {children}
+        {(!lazy || seen) && children}
       </div>
     </section>
   )

@@ -106,8 +106,6 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
   if (error && !data) return <Empty>{error}</Empty>
   if (!data) return <Empty>Loading...</Empty>
 
-  const s = data.review_summary || {}
-  const unreviewed = s.Unreviewed || 0
   // Within each review status, work in progress first (Investigating /
   // Contained), then Open, then Resolved, then findings outside the
   // workflow - and a fixed tie-break, so a finding does not jump away from
@@ -136,18 +134,9 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
     <>
       {!single && (
         <>
-      {/* The export gate is stated up front, not discovered at export time:
-          under a deadline an analyst needs to know what is still blocking. */}
-      <div className={`rv-gate ${data.ready_for_report ? 'ok' : 'blocked'}`}>
-        {data.ready_for_report
-          ? 'Every finding has been reviewed - the final report can be issued'
-          : `${unreviewed} finding(s) still unreviewed - the final report cannot be issued yet`}
-        <span className="rv-counts">
-          Accepted {s.Accepted || 0} · Modified {s.Modified || 0} · Rejected {s.Rejected || 0} ·
-          Unreviewed {unreviewed}
-        </span>
-      </div>
-
+      {/* The export gate is no longer repeated here: the case summary above the steps
+          counts what the analyst decided, the step box what is left, and the Report
+          step states the gate (the user, 2026-10-27: said twice already). */}
       {/* The AI explains every suggestion (specs/ai_review_coverage.md): how far it is, and the
           ones without an explanation - a failed call, or advice written before the AI stopped
           suggesting decisions (specs/ai_triage_verdicts.md) - which Review again sends. */}
