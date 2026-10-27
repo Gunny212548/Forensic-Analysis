@@ -419,7 +419,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #41 Login accounts live in `AUTH_DIR`, apart from customer data; docker-compose deliberately does not set it.
 - #47 Sign-in throttled per account (not per address), audit-logged, and bound to the password hash.
 - #48 Work is queued, durable and bounded (`jobs.py`); manifests are written atomically. **One process only.**
-- #58 Ingest: question on the project (hash-chained log), provenance per evidence item (custody lines), declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
+- #58 Ingest: question on the project (hash-chained log), per evidence item only its source time on the screen since 2026-10-27 (the where-from fields were too much; still accepted by the API), declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
 **AI narrative** (`analysis.py`, `llm.py`, `grounding.py`, `veris.py`)
 - #72 The AI explains and never decides (the user, 2026-10-27): no accept / reject / "likely attack" - what happened, why it fired, facts for an attack and for an ordinary cause, what is not shown, check next (Heuer ACH); log values quoted; the review line keeps only model + time; old advice replaced by Review again; batch-wide enums leak (`cited_elsewhere`, `fp_elsewhere`); ~13.6 s a suggestion.

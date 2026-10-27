@@ -3,19 +3,15 @@ import { putProvenance, reprocessCase } from '../api.js'
 import { fmtNum } from '../format.js'
 import { useAccess } from '../permissions.js'
 
-/** Where each evidence item came from, and what its clock said
- *  (app/services/provenance.py). Every field optional (D9). A declared zone
+/** The source's time for each evidence item (app/services/provenance.py): its
+ *  time zone and clock offset, the only provenance the screen asks for since
+ *  2026-10-27 (the user: the where-from fields were too much). A declared zone
  *  or clock offset applies only when the analyst re-processes - nothing
  *  re-processes on its own. */
 
 const LABELS = {
-  source_system: 'Source system',
-  export_method: 'How it was exported (method, query or filter)',
-  exported_by: 'Exported by',
-  exported_at: 'Exported at',
   source_timezone: "Source's time zone (UTC offset, e.g. +00:00)",
   clock_offset_seconds: 'Source clock ahead by (seconds; negative = behind)',
-  note: 'Note',
 }
 
 function ItemCard({ caseId, item, single, onSaved }) {
@@ -48,7 +44,10 @@ function ItemCard({ caseId, item, single, onSaved }) {
     }
   }
 
-  const recorded = Object.keys(LABELS).filter((k) => p[k] !== undefined && p[k] !== '')
+  const declared = [
+    p.source_timezone && `time zone ${p.source_timezone}`,
+    p.clock_offset_seconds && `clock ahead by ${p.clock_offset_seconds} s`,
+  ].filter(Boolean)
   return (
     <div className="ing-item">
       <div className="ing-item-head mono">{item.item || 'uploaded file'}</div>
@@ -66,20 +65,12 @@ function ItemCard({ caseId, item, single, onSaved }) {
           {Object.entries(LABELS).map(([k, label]) => (
             <div key={k}>
               <label htmlFor={`pv-${item.item}-${k}`}>{label}</label>
-              {k === 'export_method' || k === 'note' ? (
-                <textarea
-                  id={`pv-${item.item}-${k}`}
-                  value={draft[k]}
-                  onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
-                />
-              ) : (
-                <input
-                  type="text"
-                  id={`pv-${item.item}-${k}`}
-                  value={draft[k]}
-                  onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
-                />
-              )}
+              <input
+                type="text"
+                id={`pv-${item.item}-${k}`}
+                value={draft[k]}
+                onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
+              />
             </div>
           ))}
           <div className="lc-actions">
@@ -93,32 +84,19 @@ function ItemCard({ caseId, item, single, onSaved }) {
           {error && <div className="lc-error">{error}</div>}
         </form>
       ) : (
-        <>
-          {recorded.length ? (
-            <table className="profile-facts">
-              <tbody>
-                {recorded.map((k) => (
-                  <tr key={k}>
-                    <td>{LABELS[k].split(' (')[0]}</td>
-                    <td>{String(p[k])}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="muted">No provenance recorded.</div>
-          )}
+        <div className="cell-sub">
+          {declared.length ? `Declared: ${declared.join(', ')}` : 'Nothing declared.'}{' '}
           <button
             className="secondary"
             type="button"
             onClick={edit}
-            style={{ marginTop: 6 }}
+            style={{ marginLeft: 6 }}
             disabled={!can('evidence:provenance')}
             title={why('evidence:provenance')}
           >
-            {recorded.length ? 'Edit provenance' : 'Record provenance'}
+            {declared.length ? 'Edit' : 'Set source time'}
           </button>
-        </>
+        </div>
       )}
     </div>
   )

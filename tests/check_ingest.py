@@ -121,7 +121,7 @@ def main() -> int:
         w = ingest(M)["warnings"]
         check(any("No question" in x for x in w), "warning: no question recorded")
         check(any("3 events state no time zone" in x for x in w), "warning: 3 events assumed GMT+7")
-        check(any("provenance not recorded" in x for x in w), "warning: provenance not recorded")
+        check(not any("provenance not recorded" in x for x in w), "no warning for where-from fields left empty")
         fl = c.get(f"/api/cases/{M}/flow").json()
         ing = next(s for s in fl["steps"] if s["id"] == "ingest")
         check(ing["state"] == "done" and ing["warnings"] == w, "the flow's Ingest step is done and carries the warnings")

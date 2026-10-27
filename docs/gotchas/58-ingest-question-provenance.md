@@ -36,3 +36,11 @@ applies only on re-process (story 3, 2026-10-21).** Design: `specs/story3_ingest
 - Parity unchanged with no provenance declared: 67 corpus files + the Check Point benchmark
   exact on 2026-10-21. `nightfall-firewall-nested.jsonl.gz` from `gen_usecase.py` reports a
   new md5 on every generation - its gzip header carries a timestamp; pre-existing, not a drift.
+
+**2026-10-27: the screen keeps only the source time.** The user found the Provenance section
+too complex and cluttered and chose to keep only the time zone and clock offset, as a "Source time"
+line per item. Source system, export method, exported by / at and note left the screen, and so did
+the "provenance not recorded" warning. `PUT /provenance` still accepts every field and values
+already recorded stay on the manifest and in the custody log. ACPO 5.10.3 (provenance) is no longer
+cited by the Ingest step: nothing on it asks how the evidence came to be there. Lost with it: the
+export method that would say a filtered export silenced a rule (gotcha #9) - ask the customer instead.

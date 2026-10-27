@@ -5,7 +5,7 @@ asks "how it came to be there". An exported log answers neither by itself, so
 the analyst records it: the source system, how it was exported (the query or
 filter - gotcha #9: a filtered export silences correlation rules), by whom and
 when, the source's time zone and a known clock offset. Every field is optional
-(D9); a missing one is a warning on the Ingest step, never a block.
+(D9) and never a block.
 
 An evidence item is the uploaded file, or one member of a zip (a zip is one
 case of several items). `manifest["provenance"]` maps item name -> fields; the
@@ -13,6 +13,10 @@ item name is the upload's file name, or the member's name inside the zip.
 Every change is a custody line with each field's old and new value, so the
 hash-chained custody log (custody.py) is the history and the manifest only the
 current state.
+
+Since 2026-10-27 the screen asks only for the time fields ("Source time"): the
+user found the where-from fields too much. They are still accepted here and
+kept where recorded, and no longer warned about when missing.
 
 Time (D10). A declared zone replaces the GMT+7 assumption (gotcha #21) for the
 events whose source text states no offset; a declared clock offset shifts every
@@ -132,14 +136,3 @@ def reprocess_needed(manifest: dict) -> bool:
     return False
 
 
-def missing(manifest: dict) -> dict[str, list[str]]:
-    """item -> where-from fields not recorded. The zone is not among them: it
-    is only missing where events state none, and the Ingest step says that
-    with the count (case_views.ingest_warnings)."""
-    out = {}
-    for item in items(manifest):
-        p = (manifest.get("provenance") or {}).get(item) or {}
-        gaps = [f for f in ("source_system", "export_method", "exported_by", "exported_at") if not p.get(f)]
-        if gaps:
-            out[item] = gaps
-    return out

@@ -82,7 +82,7 @@ def ingest_warnings(manifest: dict) -> list[str]:
     for a in manifest.get("time_applied") or []:
         if a.get("rows_without_offset") and not a.get("zone"):
             out.append(f"{a['item']}: {a['rows_without_offset']:,} events state no time zone - "
-                       "GMT+7 was assumed; record the source's zone in its provenance if known")
+                       "GMT+7 was assumed; set the source's time zone under Source time if known")
     if manifest.get("status") == "ready" and manifest.get("periods") is None:
         out.append("Processed before the period and product of each file were recorded - "
                    "re-process to see them")
@@ -90,8 +90,6 @@ def ingest_warnings(manifest: dict) -> list[str]:
         if p.get("rows_without_time"):
             out.append(f"{p['item']}: {p['rows_without_time']:,} events carry no time - they fall "
                        "on no day and in no rule's window")
-    for item, gaps in provenance.missing(manifest).items():
-        out.append(f"{item}: provenance not recorded - {', '.join(g.replace('_', ' ') for g in gaps)}")
     return out
 
 

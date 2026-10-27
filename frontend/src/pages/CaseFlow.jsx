@@ -274,7 +274,7 @@ export default function CaseFlow({ caseId, stepId }) {
 }
 
 /** Story 3: the investigation's question, the warnings, each evidence item's
- *  provenance and the reproducibility record, around the custody block
+ *  source time and the reproducibility record, around the custody block
  *  (children). Reloaded when the case's status changes, so a re-process that
  *  finishes shows its new record. */
 function IngestRecord({ caseId, status, reload, children }) {
@@ -329,7 +329,7 @@ function IngestRecord({ caseId, status, reload, children }) {
           <Lines lines={data.lines} />
         </>
       )}
-      <div className="section-label">Provenance</div>
+      <div className="section-label">Source time</div>
       <Provenance caseId={caseId} ingest={data} onSaved={saved} onReprocessed={saved} />
       <div className="section-label">Method of the last run</div>
       <Method method={data.method} />

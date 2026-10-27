@@ -27,7 +27,7 @@ STEPS = [
         {"source": "NIST SP 800-86", "ref": "Collection phase, 3.1"},
         {"source": "RFC 3227", "ref": "4.1 chain of custody"},
         {"source": "RFC 3227", "ref": "2, 3.2 time zone and clock drift"},
-        {"source": "ACPO Good Practice Guide", "ref": "principle 3, 5.5 tasking, 5.10.3 provenance"},
+        {"source": "ACPO Good Practice Guide", "ref": "principle 3, 5.5 tasking"},
         {"source": "NIST SP 800-92", "ref": "fn 24 out-of-sync sources"},
         {"source": "Sigma rules specification", "ref": "logsource taxonomy appendix 2.1.0"},
         {"source": "NIST CSWP 29", "ref": "CSF 2.0 RS.AN-07"},
