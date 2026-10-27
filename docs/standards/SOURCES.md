@@ -62,6 +62,22 @@ read in full except where the row says otherwise. Downloaded with `curl --ssl-no
 | Heuer, Psychology of Intelligence Analysis | CIA Center for the Study of Intelligence, 1999 | `files/Heuer-1999-Psychology-of-Intelligence-Analysis.pdf` (`bc703f2140e39e14`) | Chapter 8, Analysis of Competing Hypotheses, p. 95-108 (the closing example on p. 109 not read). Other chapters not read |
 | Gudjonsson, Mastering the Super Timeline With log2timeline | GIAC GCFA paper, SANS 2010 | `files/Gudjonsson-2010-Super-Timeline.pdf` (`ec5a287b91f9e7dd`) | §1.1 background, problems, anti-forensics; §4 timeline analysis (4.2 context, 4.3 temporal proximity, 4.4 frequency). The tool chapters 2-3 not read |
 
+### AI explanation of suggestions (read 2026-10-27, `specs/ai_triage_verdicts.md`)
+
+Research and practitioner write-ups, not standards: cited as evidence for a design choice, never
+at clause level. Read with the web fetcher; no copy kept.
+
+| Document | Version | Where | What was checked |
+|---|---|---|---|
+| Tsegai, Kantchelian, Yao & Gao, *From Investigation Failures to Reliable SOC Agents: Understanding and Improving LLM-Based Alert Triage* | arXiv 2610.10608v1, 7 Oct 2026, preprint | web: arxiv.org/html/2610.10608v1 | §III ALERT-BENCH; §IV Findings 1-5 (Finding 3: empty retrieval used to dismiss attacks; Finding 4: same-context self-review, Self-Refine 16 repaired / 79 broken); §V-A the protocol's asymmetric thresholds; §VI Table II ablations, Table III models (Qwen3.5 9B F1 0.952 on 300 alerts). **Not read verbatim:** Table IV and Appendix B (the prompts) - the fetcher returned summaries |
+| W. Singh, *Private AI SOC Triage Lab: Can a Small Local LLM Triage Alerts Safely?* | dev.to, 10 Oct 2026 | web: dev.to/willeysingh/private-ai-soc-triage-lab-can-a-small-local-llm-triage-alerts-safely-16l7 | The results table (qwen2.5:1.5b, 120 synthetic alerts: LLM alone 7 attacks missed, 10% injection success), the hybrid's rule floor, close veto and injection guard. The code repository not read |
+| Google, `mcp-security` `secops-triage` SKILL.md | GitHub main, Apache-2.0 | web: github.com/google/mcp-security, `extensions/google-secops/skills/triage/SKILL.md` | Whole file: the triage protocol, the FP / BTP / TP / Suspicious table. `TOOL_MAPPING.md` not read |
+| mahipal / mukul975, *performing-alert-triage-with-elastic-siem* SKILL.md (Anthropic-Cybersecurity-Skills) | GitHub HEAD, Apache-2.0 | web: raw.githubusercontent.com/mukul975/Anthropic-Cybersecurity-Skills/HEAD/skills/performing-alert-triage-with-elastic-siem/SKILL.md | Whole file: steps 1-5, the classification table. Its `assets/` and `references/` read only through a wiki mirror - not cited |
+
+Not obtained: Critical Start, *Benign True Positive and False Positive Alert Verdicts* quick card (the
+PDF URL served a resources page); F. Roth, *Why I Built My Own LLM Benchmark for THOR Finding Triage*
+(Medium, 403).
+
 ### Log source documentation (read 2026-10-21, IAI-85)
 
 | Document | Version | Copy (SHA-256, first 16) | What was checked |

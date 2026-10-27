@@ -87,9 +87,10 @@ def current(case_id: str) -> dict[str, dict]:
 
 def record_review(case_id: str, finding_key: str, action: str, actor: str,
                   reason_code: str = "", note: str = "", ai: dict | None = None) -> dict:
-    """`ai`: what the AI advised on this suggestion when the analyst decided
-    (triage.assessment_of, the user's Q80) - kept so the record shows whether
-    the analyst followed or overrode it."""
+    """`ai`: that the AI's explanation of this suggestion was shown when the
+    analyst decided - the model and when (triage.explanation_of, Q109). Lines
+    written before 2026-10-27 also carry the verdict the AI then gave (Q80);
+    they are never rewritten."""
     if action not in ACTIONS:
         raise ValueError(f"unknown action '{action}' (expected one of {sorted(ACTIONS)})")
     if action == "reject" and reason_code not in REASON_CODES:

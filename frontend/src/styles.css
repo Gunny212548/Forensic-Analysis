@@ -798,6 +798,8 @@ button.danger-outline { color: var(--danger); border-color: var(--danger-border)
 .ai-fact { display: inline-block; margin-left: 2px; padding: 0 4px; border-radius: 4px; background: #E3E6EB;
   font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: help; }
 .ai-warn { color: var(--danger); }
+/* Both sides of an explanation side by side, neither coloured as the answer (specs/ai_triage_verdicts.md). */
+.ai-sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 16px; }
 
 /* Attack timeline stages (CaseFlow.jsx AttackTimeline): chevrons, one per ATT&CK tactic reached. */
 .tl-stages { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }

@@ -28,7 +28,7 @@ members only) or TRW - no number set on one customer applied to another. Palo Al
 Point have theirs, Windows its sign-in, lateral-movement, host, beaconing and feed rules (gotchas
 #65-#70, `specs/windows_rules.md` stories 5a-5e); the generic R-rules still run on every other
 product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
-reviews every suggestion itself, no cap** - in the background once the case is ready (gotchas #64,
+explains every suggestion and never decides** (gotcha #72), **no cap** - in the background once the case is ready (gotchas #64,
 #71; the user, 2026-10-26: "ทุก Finding ที่เจอต้องได้รับการ review จาก AI"). **Every step must cite a
 standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
 revisions 1-4 on branch `IAI-92-identify-logsource`; most of what follows still
@@ -422,6 +422,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #58 Ingest: question on the project (hash-chained log), provenance per evidence item (custody lines), declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
 **AI narrative** (`analysis.py`, `llm.py`, `grounding.py`, `veris.py`)
+- #72 The AI explains and never decides (the user, 2026-10-27): no accept / reject / "likely attack" - what happened, why it fired, facts for an attack and for an ordinary cause, what is not shown, check next (Heuer ACH); log values quoted; the review line keeps only model + time; old advice replaced by Review again; batch-wide enums leak (`cited_elsewhere`, `fp_elsewhere`); ~13.6 s a suggestion.
 - #71 Every suggestion is reviewed by the AI itself, no cap (the user's requirement): the case is ready after the rules and the review runs on in the background (`triage.enqueue`, one worker, resumed at start-up), every rule first, a failed batch retried then sent one by one, what is left listed with "Review again" (`POST /ai-review`); batch size measured (`TRIAGE_BATCH`).
 - #64 The AI reviews every suggestion while the case is processed (`triage.py`; since #71 after it is ready): facts computed in SQL (a destination's popularity among internal hosts, the rule's documented false positives), a schema, an address check; advice under each suggestion, kept on the review line; the Upload page counts the suggestions reviewed; `TRIAGE_ENABLED=0` in every rule check and in dev.
 - #5 Groq's output-token limits and the measured sweeps (events 15, max_tokens 950); schema key order is the priority list. Groq only - not the local model.
