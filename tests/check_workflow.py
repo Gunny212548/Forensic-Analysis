@@ -430,6 +430,22 @@ def main() -> int:
         check(scoped["totals"]["open_findings"] == c.get("/api/findings", params={"company_id": OTHER}).json()["open_count"],
               "scoped to one customer, the cards follow it")
 
+        print("Overview: top affected accounts name their computers")
+        from app.services import db as db_mod
+        tops = c.get("/api/overview").json()["top_entities"]
+        accts = [e for e in tops if e["role"] == "accounts"]
+        check(all(e["hosts"] == [] for e in tops if e["role"] != "accounts"), "an address carries no computer list")
+        check(all([n for _, n in e["hosts"]] == sorted((n for _, n in e["hosts"]), reverse=True) for e in accts),
+              "an account's computers come most flagged events first")
+        expect = {}
+        for cid in (A, F, Z, O):
+            for user, hs in db_mod.account_hosts(cid, [e["entity"] for e in accts]).items():
+                for h, n in hs:
+                    expect.setdefault(user, {}).setdefault(h, 0)
+                    expect[user][h] += n
+        check(all(dict(map(tuple, e["hosts"])) == expect.get(e["entity"], {}) for e in accts),
+              "and add up each case's computers for that account")
+
         print("Overview: attention, KPIs, urgent findings")
         from app.services import custody as custody_mod
         ov = c.get("/api/overview").json()

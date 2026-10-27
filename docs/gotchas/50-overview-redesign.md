@@ -65,3 +65,10 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   says it. The workflow's own figures (open 7, critical unassigned, MTTC, open
   cases) stay on the urgent list, the Findings page and the menu badge.
   `check_workflow.py` asserts `undecided`, `case_id` and the whole-span trend.
+- **2026-10-27: an account on Top affected names its computers** (the user: "NT AUTHORITY\SYSTEM,
+  Administrator - say where they come from"). SYSTEM or a local Administrator is a different account
+  on every computer; the row now says "on app01 (5,436) · jump01 (95) · dc1 (91) +3 more" - the
+  computers whose logs hold its flagged events (`hostname`, the machine that wrote the event), most
+  events first, every full name on hover; "computer not recorded" when the log has none (sshd /
+  ESXi lines, gotcha #3). `db.account_hosts()` is its own query: `risk_scores()` feeds the
+  narrative's prompt (analysis_jobs), which must not move.

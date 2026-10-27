@@ -210,6 +210,7 @@ export default function Overview({ companyId }) {
                   <div className="cell-sub">
                     {ROLE_EN[e.role] || e.role} <span className="cust-tag cust-tag-after">{e.customer}</span>
                   </div>
+                  {e.role === 'accounts' && <SeenOn hosts={e.hosts || []} />}
                 </div>
                 <span className="muted">{e.cases} {e.cases === 1 ? 'case' : 'cases'}</span>
               </div>
@@ -382,6 +383,27 @@ function Spark({ values, days }) {
       <polygon className="spark-fill" points={`0,${H} ${line} ${W},${H}`} />
       <polyline className="spark-line" points={line} />
     </svg>
+  )
+}
+
+/** The computers an account was seen on, most flagged events first - SYSTEM or a
+ *  local Administrator is a different account on each one (the user, 2026-10-27).
+ *  Three by their short name, the rest counted; every full name on hover. */
+function SeenOn({ hosts }) {
+  if (!hosts.length) return <div className="cell-sub">computer not recorded in its events</div>
+  const short = (h) => h.split('.')[0]
+  const all = hosts.map(([h, n]) => `${h} (${fmtNum(n)} events)`).join('\n')
+  return (
+    <div className="cell-sub ov-seen-on" title={all}>
+      on{' '}
+      {hosts.slice(0, 3).map(([h, n], i) => (
+        <span key={h}>
+          {i > 0 && ' · '}
+          <span className="mono">{short(h)}</span> ({fmtNum(n)})
+        </span>
+      ))}
+      {hosts.length > 3 && ` +${hosts.length - 3} more`}
+    </div>
   )
 }
 

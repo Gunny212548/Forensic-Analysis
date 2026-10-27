@@ -925,3 +925,5 @@ button.ui-stat-btn:focus-visible { outline: 2px solid var(--accent); outline-off
 .map-each { margin-top: 10px; }
 .map-each > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); padding: 6px 0; }
 .map-each > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ov-seen-on { margin-top: 2px; }
+.ov-seen-on .mono { color: var(--text-2); }
