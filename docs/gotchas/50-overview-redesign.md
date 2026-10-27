@@ -70,5 +70,6 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   on every computer; the row now says "on app01 (5,436) · jump01 (95) · dc1 (91) +3 more" - the
   computers whose logs hold its flagged events (`hostname`, the machine that wrote the event), most
   events first, every full name on hover; "computer not recorded" when the log has none (sshd /
-  ESXi lines, gotcha #3). `db.account_hosts()` is its own query: `risk_scores()` feeds the
-  narrative's prompt (analysis_jobs), which must not move.
+  ESXi lines, gotcha #3). A second line, asked for the same day, names the addresses it came from
+  (`srcip`: "from 198.51.100.149 (138) · ..."). `db.account_origins()` is its own query:
+  `risk_scores()` feeds the narrative's prompt (analysis_jobs), which must not move.

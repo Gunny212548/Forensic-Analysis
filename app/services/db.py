@@ -924,33 +924,36 @@ def risk_scores(case_id: str, limit: int = 8) -> dict:
     return out
 
 
-def account_hosts(case_id: str, accounts: list[str]) -> dict[str, list[list]]:
-    """Where each account was seen: the computers whose logs hold its flagged
-    events (`hostname` - the machine that wrote the event), most events first,
-    as [[host, events], ...]. "NT AUTHORITY\\SYSTEM" or a local "Administrator"
-    is a different account on every computer, so a ranking that names one must
-    say which computers it means (the user, 2026-10-27). Its own query, not part
-    of risk_scores(): that one feeds the narrative's prompt, which must not move."""
+def account_origins(case_id: str, accounts: list[str]) -> dict[str, dict[str, list[list]]]:
+    """Where each account was seen, over its flagged events: `hosts` - the
+    computers whose logs hold them (`hostname`, the machine that wrote the
+    event) - and `sources` - the addresses they came from (`srcip`), each as
+    [[value, events], ...], most events first. "NT AUTHORITY\\SYSTEM" or a local
+    "Administrator" is a different account on every computer, so a ranking that
+    names one must say which computers it means and from where (the user,
+    2026-10-27). Its own query, not part of risk_scores(): that one feeds the
+    narrative's prompt, which must not move."""
     if not accounts or not db_path(case_id).exists():
         return {}
     con = connect(case_id, read_only=True)
+    out: dict[str, dict[str, list[list]]] = {}
     try:
-        rows = con.execute(
-            """
-            SELECT r.username, r.hostname, count(DISTINCT r.row_id) AS n
-            FROM findings f
-            JOIN raw_events r USING (row_id)
-            WHERE r.username IN (SELECT unnest(?)) AND r.hostname IS NOT NULL AND r.hostname <> ''
-            GROUP BY r.username, r.hostname
-            ORDER BY r.username, n DESC, r.hostname
-            """,
-            [accounts],
-        ).fetchall()
+        for key, column in (("hosts", "hostname"), ("sources", "srcip")):
+            rows = con.execute(
+                f"""
+                SELECT r.username, r.{column}, count(DISTINCT r.row_id) AS n
+                FROM findings f
+                JOIN raw_events r USING (row_id)
+                WHERE r.username IN (SELECT unnest(?)) AND r.{column} IS NOT NULL AND r.{column} <> ''
+                GROUP BY r.username, r.{column}
+                ORDER BY r.username, n DESC, r.{column}
+                """,
+                [accounts],
+            ).fetchall()
+            for user, value, n in rows:
+                out.setdefault(user, {"hosts": [], "sources": []})[key].append([value, n])
     finally:
         con.close()
-    out: dict[str, list[list]] = {}
-    for user, host, n in rows:
-        out.setdefault(user, []).append([host, n])
     return out
 
 

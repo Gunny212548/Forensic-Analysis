@@ -103,13 +103,15 @@ def _case_facts(case_id: str) -> dict:
 
     entities = []
     ranked = db.risk_scores(case_id, limit=5)
-    # An account is named with the computers it was seen on (db.account_hosts).
-    hosts = db.account_hosts(case_id, [r["entity"] for r in ranked.get("accounts", [])])
+    # An account is named with the computers it was seen on and the addresses it
+    # came from (db.account_origins).
+    origins = db.account_origins(case_id, [r["entity"] for r in ranked.get("accounts", [])])
     for role, rows in ranked.items():
         for r in rows:
+            seen = origins.get(r["entity"], {}) if role == "accounts" else {}
             entities.append({"entity": r["entity"], "role": role,
                              "score": r["score"], "max_lvl": r["max_lvl"],
-                             "hosts": hosts.get(r["entity"], []) if role == "accounts" else []})
+                             "hosts": seen.get("hosts", []), "sources": seen.get("sources", [])})
 
     # Per detection area (areas.py): findings by level - all of them, and the
     # ones still Open in the workflow - how many are not Resolved, how many the
@@ -285,10 +287,12 @@ def build(company_id: str | None = None) -> dict:
             # different hosts, and must not add up into one row.
             k = (m.get("company_id"), e["role"], e["entity"])
             agg = entity_agg.setdefault(k, {"entity": e["entity"], "role": e["role"], "customer": customer,
-                                            "cases": 0, "score": 0.0, "max_lvl": 0, "hosts": Counter()})
+                                            "cases": 0, "score": 0.0, "max_lvl": 0, "hosts": Counter(),
+                                            "sources": Counter()})
             agg["cases"] += 1
-            for host, n in e["hosts"]:
-                agg["hosts"][host] += n
+            for key in ("hosts", "sources"):
+                for value, n in e[key]:
+                    agg[key][value] += n
             agg["score"] += e["score"] or 0
             agg["max_lvl"] = max(agg["max_lvl"], e["max_lvl"] or 0)
 
@@ -317,9 +321,11 @@ def build(company_id: str | None = None) -> dict:
     top_entities = sorted(entity_agg.values(), key=lambda e: (-e["score"], -e["cases"]))[:5]
     for e in top_entities:
         e["score"] = round(e["score"], 1)
-        # The computers an account was seen on, most flagged events first (ties by
-        # name, so the list does not reorder between loads); [] for an address.
-        e["hosts"] = [[h, n] for h, n in sorted(e["hosts"].items(), key=lambda x: (-x[1], x[0]))]
+        # The computers an account was seen on and the addresses it came from, most
+        # flagged events first (ties by name, so a list does not reorder between
+        # loads); [] for an address.
+        for key in ("hosts", "sources"):
+            e[key] = [[v, n] for v, n in sorted(e[key].items(), key=lambda x: (-x[1], x[0]))]
 
     # One date axis for every card, so their trends can be compared: every day of
     # event time from the first finding's first event to the last, empty days as 0.

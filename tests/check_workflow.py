@@ -430,21 +430,24 @@ def main() -> int:
         check(scoped["totals"]["open_findings"] == c.get("/api/findings", params={"company_id": OTHER}).json()["open_count"],
               "scoped to one customer, the cards follow it")
 
-        print("Overview: top affected accounts name their computers")
+        print("Overview: top affected accounts name their computers and sources")
         from app.services import db as db_mod
         tops = c.get("/api/overview").json()["top_entities"]
         accts = [e for e in tops if e["role"] == "accounts"]
-        check(all(e["hosts"] == [] for e in tops if e["role"] != "accounts"), "an address carries no computer list")
-        check(all([n for _, n in e["hosts"]] == sorted((n for _, n in e["hosts"]), reverse=True) for e in accts),
-              "an account's computers come most flagged events first")
-        expect = {}
-        for cid in (A, F, Z, O):
-            for user, hs in db_mod.account_hosts(cid, [e["entity"] for e in accts]).items():
-                for h, n in hs:
-                    expect.setdefault(user, {}).setdefault(h, 0)
-                    expect[user][h] += n
-        check(all(dict(map(tuple, e["hosts"])) == expect.get(e["entity"], {}) for e in accts),
-              "and add up each case's computers for that account")
+        check(all(e["hosts"] == [] and e["sources"] == [] for e in tops if e["role"] != "accounts"),
+              "an address carries no computer or source list")
+        for key in ("hosts", "sources"):
+            check(all([n for _, n in e[key]] == sorted((n for _, n in e[key]), reverse=True) for e in accts),
+                  f"an account's {key} come most flagged events first")
+            expect = {}
+            for cid in (A, F, Z, O):
+                for user, seen in db_mod.account_origins(cid, [e["entity"] for e in accts]).items():
+                    for v, n in seen[key]:
+                        expect.setdefault(user, {}).setdefault(v, 0)
+                        expect[user][v] += n
+            check(all(dict(map(tuple, e[key])) == expect.get(e["entity"], {}) for e in accts),
+                  f"and add up each case's {key} for that account")
+        check(any(e["sources"] for e in accts), "(the usecase's accounts came from a recorded address)")
 
         print("Overview: attention, KPIs, urgent findings")
         from app.services import custody as custody_mod

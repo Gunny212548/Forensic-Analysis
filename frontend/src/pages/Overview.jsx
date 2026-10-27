@@ -210,7 +210,13 @@ export default function Overview({ companyId }) {
                   <div className="cell-sub">
                     {ROLE_EN[e.role] || e.role} <span className="cust-tag cust-tag-after">{e.customer}</span>
                   </div>
-                  {e.role === 'accounts' && <SeenOn hosts={e.hosts || []} />}
+                  {e.role === 'accounts' && (
+                    <>
+                      <SeenOn label="on" items={e.hosts || []} short={(h) => h.split('.')[0]}
+                              empty="computer not recorded in its events" />
+                      <SeenOn label="from" items={e.sources || []} empty="source address not recorded in its events" />
+                    </>
+                  )}
                 </div>
                 <span className="muted">{e.cases} {e.cases === 1 ? 'case' : 'cases'}</span>
               </div>
@@ -386,23 +392,24 @@ function Spark({ values, days }) {
   )
 }
 
-/** The computers an account was seen on, most flagged events first - SYSTEM or a
- *  local Administrator is a different account on each one (the user, 2026-10-27).
- *  Three by their short name, the rest counted; every full name on hover. */
-function SeenOn({ hosts }) {
-  if (!hosts.length) return <div className="cell-sub">computer not recorded in its events</div>
-  const short = (h) => h.split('.')[0]
-  const all = hosts.map(([h, n]) => `${h} (${fmtNum(n)} events)`).join('\n')
+/** Where an account was seen, one line each (the user, 2026-10-27: SYSTEM or a local
+ *  Administrator is a different account on each computer): "on" the computers whose
+ *  logs hold its flagged events, "from" the addresses they came from - most events
+ *  first, three shown (a computer by its short name), the rest counted, every full
+ *  value on hover. */
+function SeenOn({ label, items, empty, short = (v) => v }) {
+  if (!items.length) return <div className="cell-sub ov-seen-on">{empty}</div>
+  const all = items.map(([v, n]) => `${v} (${fmtNum(n)} events)`).join('\n')
   return (
     <div className="cell-sub ov-seen-on" title={all}>
-      on{' '}
-      {hosts.slice(0, 3).map(([h, n], i) => (
-        <span key={h}>
+      {label}{' '}
+      {items.slice(0, 3).map(([v, n], i) => (
+        <span key={v}>
           {i > 0 && ' · '}
-          <span className="mono">{short(h)}</span> ({fmtNum(n)})
+          <span className="mono">{short(v)}</span> ({fmtNum(n)})
         </span>
       ))}
-      {hosts.length > 3 && ` +${hosts.length - 3} more`}
+      {items.length > 3 && ` +${items.length - 3} more`}
     </div>
   )
 }
