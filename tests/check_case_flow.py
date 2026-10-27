@@ -88,7 +88,7 @@ def main() -> int:
     from fastapi.testclient import TestClient
 
     from app.main import app
-    from app.services import custody, jobs
+    from app.services import areas, custody, jobs
 
     c = TestClient(app)
     with c:
@@ -126,6 +126,11 @@ def main() -> int:
         check(bool(fs) and ae["state"] == "active" and ae["remaining"] == len(fs) == ae["total"],
               f"Attack events waits on every suggestion ({ae['remaining']} of {ae['total']})")
         check(fl["recommended"] == "attack-events", "the recommended step is Attack events")
+        body = c.get(f"/api/cases/{Z}/findings").json()
+        area_ids = [a["id"] for a in body.get("areas", [])]
+        check(area_ids == list(areas.AREA_IDS), "/findings lists the detection areas in areas.py's order")
+        check(all(f.get("area") == areas.AREA_OF.get(f["rid"]) and f["area"] in area_ids for f in fs),
+              "every suggestion names its rule's area - Attack events groups by it")
         check(step(fl, "attack-timeline")["state"] == "not_started",
               "Attack timeline waits for a confirmed event")
         check(step(fl, "attack-path")["state"] == "not_started",

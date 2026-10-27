@@ -707,18 +707,19 @@
   /* The case's six steps (StepBar.jsx). One row of equal steps joined by a
      line; the state is in the number's colour and in words, never colour alone. */
   .stepbar { display: flex; flex-direction: column; gap: 10px; }
-  .stepbar ol { list-style: none; margin: 0; padding: 0; display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--panel);
-    border: 1px solid var(--panel-border); border-radius: 4px; }
-  .stepbar .step + .step { border-left: 1px solid var(--line); }
-  .stepbar .step a { display: flex; gap: 10px; align-items: center; padding: 12px 14px;
-    color: var(--text); text-decoration: none; min-width: 0; }
-  .stepbar .step a:hover { background: var(--subtle); }
-  .stepbar .step a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .stepbar .step.current a { background: var(--subtle); box-shadow: inset 0 -3px 0 var(--accent); }
-  .step-n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  /* Six boxes in a row (the SOCRadar layout, 2026-10-27): the current one in the
+     action colour, a done one's number on green. */
+  .stepbar ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px;
+    grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .stepbar .step a { display: flex; gap: 10px; align-items: center; padding: 10px 12px; height: 100%;
+    color: var(--text); text-decoration: none; min-width: 0; background: var(--panel);
+    border: 1px solid var(--panel-border); border-radius: 12px; }
+  .stepbar .step a:hover { border-color: var(--muted); }
+  .stepbar .step a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .stepbar .step.current a { background: var(--accent-tint); border-color: var(--accent); }
+  .step-n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
     font: 600 12px/1 var(--mono); border: 1.5px solid var(--muted); color: var(--text-2); }
-  .step-done .step-n { background: var(--ok); border-color: var(--ok); color: var(--panel); }
+  .step-done .step-n { background: var(--ok-tint); border-color: var(--ok-tint); color: var(--ok); }
   .step-active .step-n { border-color: var(--accent); color: var(--accent); }
   .step-blocked .step-n { border-color: var(--danger); color: var(--danger); }
   .step-text { display: flex; flex-direction: column; min-width: 0; }
@@ -736,13 +737,10 @@
 
   @media (max-width: 1100px) {
     .stepbar ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .stepbar .step:nth-child(4) { border-left: none; }
-    .stepbar .step:nth-child(n+4) { border-top: 1px solid var(--line); }
   }
 
   @media (max-width: 760px) {
     .stepbar ol { grid-template-columns: minmax(0, 1fr); }
-    .stepbar .step + .step { border-left: none; border-top: 1px solid var(--line); }
     .step-next { align-self: stretch; text-align: center; }
     .layout { padding: 20px 16px 60px; }
     .ws { flex-direction: column; }
@@ -918,3 +916,15 @@ button.ui-chevron:focus-visible { outline: 2px solid var(--accent); outline-offs
 .ov-top-main { flex: 1 1 auto; min-width: 0; }
 .ov-top-entity { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-activity-list { padding: 14px 20px 2px; }
+
+/* The case page in the SOCRadar layout (pages/CaseFlow.jsx CaseSummary,
+   components/ReviewPanel.jsx ByArea). */
+.case-firstseen { display: block; width: 100%; height: 110px; margin-top: 12px; color: var(--accent); }
+.case-firstseen polygon { fill: currentColor; opacity: .16; }
+.case-firstseen polyline { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round;
+  vector-effect: non-scaling-stroke; }
+.case-firstseen-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10.5px; color: var(--muted); }
+.ui-section + .ui-section { margin-top: 12px; }
+.rv-area-body { padding: 4px 20px 12px; }
+.rv-rule-chip { padding: 12px 0 8px; }
+.rv-area-body .rv-item { border-radius: 0 8px 8px 0; }

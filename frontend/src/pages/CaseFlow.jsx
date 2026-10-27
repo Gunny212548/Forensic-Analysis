@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getAnalysis, getCase, getFindings, getFlow, getGraph, getIngest, runAnalysis } from '../api.js'
 import { useAccess } from '../permissions.js'
-import { LEVEL_EN, fmtNum, fmtTime, statusOf } from '../format.js'
+import { LEVEL_EN, fmtNum, fmtTime, shortTs, statusOf } from '../format.js'
 import { Empty, SeverityPill } from '../components/common.jsx'
+import { Badge, BigTotal, FactTiles, SummaryCard, TotalRow } from '../components/cards.jsx'
 import StepBar, { stepHref } from '../components/StepBar.jsx'
 import EventsTable from '../components/EventsTable.jsx'
 import ReviewPanel from '../components/ReviewPanel.jsx'
@@ -244,6 +245,7 @@ export default function CaseFlow({ caseId, stepId }) {
 
       {error && <div className="panel"><Empty>Could not load: {error}</Empty></div>}
       {!error && !flow && <div className="panel"><Empty>Loading...</Empty></div>}
+      {ready && flow && <CaseSummary caseId={caseId} manifest={manifest} flow={flow} />}
       {flow && <StepBar caseId={caseId} flow={flow} current={stepId} />}
 
       {flow && step && (
@@ -270,6 +272,118 @@ export default function CaseFlow({ caseId, stepId }) {
         </div>
       )}
     </section>
+  )
+}
+
+const LEVELS = ['critical', 'high', 'medium', 'low', 'informational']
+const LEVEL_TONE = { critical: 'danger', high: 'warn', medium: 'info' }
+
+/** The case at a glance, above its steps (the SOCRadar layout, 2026-10-27):
+ *  what was uploaded and how much it holds, the suggestions by the day their
+ *  first event happened, and on the right how many there are and how far the
+ *  AI and the analyst are through them. Read again with the step bar (`flow`
+ *  changes on every reload), so a decision taken below shows here. */
+function CaseSummary({ caseId, manifest, flow }) {
+  const [data, setData] = useState(null)
+  useEffect(() => {
+    let alive = true
+    getFindings(caseId)
+      .then((d) => alive && setData(d))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [caseId, flow])
+  if (!data) return null
+
+  const fs = data.findings || []
+  const top = LEVELS.find((l) => fs.some((f) => f.level === l))
+  const tone = LEVEL_TONE[top] || (fs.length ? 'muted' : 'ok')
+  const byLevel = LEVELS.filter((l) => l !== 'informational')
+    .map((l) => [l, fs.filter((f) => f.level === l).length])
+    .filter(([, n]) => n)
+  const explained = fs.filter((f) => f.ai_review?.what_happened).length
+  const undecided = data.review_summary?.Unreviewed || 0
+  const areasHit = new Set(fs.map((f) => f.area).filter(Boolean)).size
+  const files = manifest.members?.length || 1
+  return (
+    <SummaryCard
+      label="Case summary"
+      side={
+        <BigTotal
+          icon="shield-alert"
+          tone={tone}
+          label="Suggestions"
+          value={fmtNum(fs.length)}
+          badge={
+            fs.length ? (
+              <Badge tone={tone}>{byLevel.map(([l, n]) => `${n} ${l}`).join(' · ')}</Badge>
+            ) : (
+              <Badge tone="ok">Nothing suggested</Badge>
+            )
+          }
+        >
+          <TotalRow label="AI explained">{fmtNum(explained)} / {fmtNum(fs.length)}</TotalRow>
+          <TotalRow label="Analyst decided">{fmtNum(fs.length - undecided)} / {fmtNum(fs.length)}</TotalRow>
+          <TotalRow label="Flagged events">{fmtNum(manifest.flagged_count)}</TotalRow>
+        </BigTotal>
+      }
+    >
+      <FactTiles
+        facts={[
+          { label: 'Uploaded', value: <span className="mono">{shortTs(fmtTime(manifest.uploaded_at))}</span>,
+            title: fmtTime(manifest.uploaded_at) },
+          { label: 'Highest severity', value: <SeverityPill severity={manifest.severity} /> },
+          { label: 'Areas', value: <><strong>{areasHit}</strong> of {(data.areas || []).length} areas</> },
+          { label: 'Evidence',
+            value: <><strong>{fmtNum(files)}</strong> {files === 1 ? 'file' : 'files'} · <strong>{fmtNum(manifest.total_rows)}</strong> events</> },
+        ]}
+      />
+      <FirstSeen findings={fs} />
+    </SummaryCard>
+  )
+}
+
+/** Suggestions by the day their first event happened, as an area under a line
+ *  - a count anyone can check against the list, nothing estimated. Plain SVG
+ *  (nothing fetched). A day with no suggestion is 0, so a quiet stretch shows. */
+function FirstSeen({ findings }) {
+  const counts = {}
+  for (const f of findings) {
+    const d = (f.ts_first || '').slice(0, 10)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) counts[d] = (counts[d] || 0) + 1
+  }
+  const known = Object.keys(counts).sort()
+  if (!known.length) return null
+  const days = []
+  for (let t = Date.parse(`${known[0]}T00:00:00Z`); t <= Date.parse(`${known[known.length - 1]}T00:00:00Z`); t += 86400e3) {
+    days.push(new Date(t).toISOString().slice(0, 10))
+  }
+  const W = 900
+  const H = 110
+  const v = days.map((d) => counts[d] || 0)
+  const peak = Math.max(...v)
+  const x = (i) => (days.length === 1 ? W / 2 : (i * W) / (days.length - 1))
+  const line = v.map((n, i) => `${x(i).toFixed(1)},${(H - 4 - (n / peak) * (H - 12)).toFixed(1)}`).join(' ')
+  const at = v.indexOf(peak)
+  return (
+    <div>
+      <div className="ui-kicker">Suggestions by the day their first event happened</div>
+      <div className="ui-headline">
+        <strong>{fmtNum(findings.length)}</strong>
+        from {days[0]} to {days[days.length - 1]} · most on {days[at]} ({peak})
+      </div>
+      <svg className="case-firstseen" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
+           aria-label={`Suggestions per day of first event, most on ${days[at]} with ${peak}`}>
+        <polygon points={`${x(0)},${H} ${line} ${x(days.length - 1)},${H}`} />
+        <polyline points={line} />
+      </svg>
+      <div className="case-firstseen-axis mono">
+        <span>{days[0]}</span>
+        {days.length > 2 && <span>{days[Math.floor(days.length / 2)]}</span>}
+        {days.length > 1 && <span>{days[days.length - 1]}</span>}
+      </div>
+    </div>
   )
 }
 

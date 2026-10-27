@@ -115,7 +115,8 @@ GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
 GET  /api/cases/{id}/findings                collapsed findings + computed
                                              confidence + review status + FD id +
                                              related findings (gotcha #49) + the
-                                             AI's advice + ATT&CK tactics
+                                             AI's advice + ATT&CK tactics + detection
+                                             area (the area list in its order too)
 DELETE /api/cases/{id}                       admin / manager: every file of the
                                              case, recorded in the customer's
                                              deleted/log.jsonl (specs/case_delete.md)
@@ -305,8 +306,12 @@ user asked for the whole app to look like SOCRadar's dark-web report and
 approved a mockup (claude.ai artifact "SENTRY-IR redesign"); it is built in
 steps: 1 tokens + theme button + menu, 2 shared summary card / area card /
 stat tile / collapsible section (`components/cards.jsx`, icons in `icons.jsx`),
-3 Overview (all three done), 4 the case steps, 5 the other pages. A section
-folds only when the analyst clicks; its head keeps its counts. Light stays the default; dark is `[data-theme=dark]` on
+3 Overview, 4 the case page (all four done: a summary card above the steps -
+suggestions by the day their first event happened, how many the AI explained
+and the analyst decided - the steps as six boxes, and Attack events as one
+folding section per detection area with a block per rule, each suggestion
+keeping its whole card), 5 the other pages. A section folds only when the
+analyst clicks; its head keeps its counts. Light stays the default; dark is `[data-theme=dark]` on
 `<html>`, set by the button beside the brand (`theme.js`) and kept per browser
 in localStorage `fa_theme` - the OS setting is deliberately not followed (no
 look the analyst did not ask for). The action colour is red now (`--accent`,

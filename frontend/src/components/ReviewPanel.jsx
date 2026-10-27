@@ -6,6 +6,7 @@ import FindingEvents from './FindingEvents.jsx'
 import RuleCard from './RuleCard.jsx'
 import { useAccess } from '../permissions.js'
 import AiReview from './AiReview.jsx'
+import { Section } from './cards.jsx'
 
 // Unreviewed first, whatever its confidence: a high-confidence finding
 // nobody has looked at must never sit above a reviewed one (NFR-9).
@@ -69,16 +70,14 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
   // Bring one finding of this case into view and mark it briefly - also for a
   // chip that names a related finding.
   const reveal = useCallback((key) => {
-    const el = document.getElementById(`rv-${key}`)
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    scrollToItem(key)
     setFlash(key)
     setTimeout(() => setFlash(''), 2500)
   }, [])
   useEffect(() => {
     if (!focus || !data) return undefined
     const raf = requestAnimationFrame(() => {
-      const el = document.getElementById(`rv-${focus.key}`)
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      scrollToItem(focus.key)
       setFlash(focus.key)
     })
     const t = setTimeout(() => setFlash(''), 2500)
@@ -210,229 +209,296 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
 
       {error && <Empty>{error}</Empty>}
 
-      {shown.map((f) => {
-        const st = f.review.status
-        const busy = busyKey === f.key
-        return (
-          <div
-            className={`rv-item ${REVIEW_CLASS[st] || ''} ${flash === f.key ? 'rv-flash' : ''}`}
-            id={`rv-${f.key}`}
-            key={f.key}
-          >
-            <div className="rv-head">
-              {f.fd && (
-                <span className="rv-fd" title="Finding id (FD-year-number, numbered per customer)">
-                  {f.fd}
-                </span>
-              )}
-              {f.level && (
-                <span
-                  className={`sev-tag sev-tag-${f.level}`}
-                  title={f.base_level && f.base_level !== f.level ? `Rule level: ${LEVEL_EN[f.base_level]}` : undefined}
-                >
-                  {LEVEL_EN[f.level]}
-                </span>
-              )}
-              <span className="rv-status">{st}</span>
-              <span className={`rv-conf rv-conf-${f.confidence}`}>confidence: {f.confidence}</span>
-              {/* Admiralty Code (confidence.py): letter = how far the log
-                  source as read can be trusted, number = how well-supported
-                  the finding is. The reasons are on hover - one sentence
-                  each, so the grade can be checked rather than believed. */}
-              {f.admiralty && (
-                <span
-                  className="rv-admiralty"
-                  title={
-                    `${f.admiralty.reliability.grade} - ${f.admiralty.reliability.name}: ` +
-                    `${f.admiralty.reliability.why.join('; ')}\n` +
-                    `${f.admiralty.credibility.grade} - ${f.admiralty.credibility.name}: ` +
-                    `${f.admiralty.credibility.why.join('; ')}\n(Admiralty Code / NATO 6x6)`
-                  }
-                >
-                  {f.admiralty.code}
-                </span>
-              )}
-              {(f.flags || []).map((x) => (
-                <span className="rv-flag" key={x}>
-                  {x}
-                </span>
-              ))}
-              <button
-                type="button"
-                className="rv-rid rv-rid-btn"
-                title="What this rule detects, its false positives and blind spots"
-                aria-expanded={openRule === f.key}
-                onClick={() => setOpenRule(openRule === f.key ? '' : f.key)}
-              >
-                {f.rid} {openRule === f.key ? '▴' : '▾'}
-              </button>
-              <span className="rv-n">{fmtNum(f.cnt)} events</span>
-            </div>
-            <div className="rv-desc">
-              {f.descr || ''} <MitreTags list={f.mitre} />
-            </div>
-            {openRule === f.key && <RuleCard rid={f.rid} />}
-            <AiReview r={f.ai_review} state={f.ai_state} error={f.ai_error} />
-            {/* Where the finding comes from (FR-4.1): the events behind it with
-                their source file, and the other findings of the same attack
-                chain (related.py: linked through pivot hosts, never through a
-                shared final target). */}
-            <div className="rv-trace">
-              <button
-                type="button"
-                className="rv-rid rv-rid-btn"
-                title="The events this finding stands for, and the file each came from"
-                aria-expanded={openEvents === f.key}
-                onClick={() => setOpenEvents(openEvents === f.key ? '' : f.key)}
-              >
-                Source events ({fmtNum(f.cnt)}) {openEvents === f.key ? '▴' : '▾'}
-              </button>
-              {f.related_count > 0 && (
-                <span className="rv-related">
-                  Same attack chain ({f.related_count}):
-                  {f.related.map((r) => (
-                    relatedHref ? (
-                      <a
-                        className="rv-chip"
-                        key={r.key}
-                        href={relatedHref(r.key)}
-                        title={`Open ${r.rid} ${r.srcip || r.username || ''}`}
-                      >
-                        {r.rid} {r.srcip || r.username}
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        className="rv-chip"
-                        key={r.key}
-                        title={`Go to ${r.rid} ${r.srcip || r.username || ''}`}
-                        onClick={() => reveal(r.key)}
-                      >
-                        {r.rid} {r.srcip || r.username}
-                      </button>
-                    )
-                  ))}
-                  {f.related_count > f.related.length && ` +${f.related_count - f.related.length} more`}
-                </span>
-              )}
-            </div>
-            {openEvents === f.key && <FindingEvents caseId={caseId} findingKey={f.key} />}
-            {/* Why the level is above what the rule says on its own - an
-                attack-path pattern (severity.py) - so the analyst can check
-                the escalation instead of taking it on trust. */}
-            {(f.escalation || []).map((e) => (
-              <div className="rv-escalation" key={e.pattern}>
-                Raised to {LEVEL_EN[e.level]}: {e.reason}
-                {e.evidence?.length > 0 && (
-                  <>
-                    {' '}
-                    - {f.srcip ? `${f.srcip}: ` : ''}
-                    {e.evidence.map((r) => `${r.label} (${r.rid})`).join(' + ')}
-                  </>
-                )}
-              </div>
-            ))}
-            <div className="rv-meta">
-              {f.ts_first || ''}
-              {f.ts_last && f.ts_last !== f.ts_first ? ` → ${f.ts_last}` : ''}
-            </div>
-            {f.review.actor && (
-              <div className="rv-who">
-                {f.review.actor} · {shortTs(f.review.ts)}
-                {f.review.reason_code ? ` · ${f.review.reason_code}` : ''}
-              </div>
-            )}
-
-            {/* No status workflow or assignee here since story 1: Respond was
-                removed (case_flow_design.md revision 3) and the owner of a
-                decision is the signed-in account (revision 2). The lifecycle
-                log stays on disk as an audit record. */}
-
-            {rejecting === f.key ? (
-              // FR-4.6: a rejection carries a structured reason, so mapping
-              // quality can be measured later instead of guessed at. The API
-              // returns 400 without one, so it is collected here rather than
-              // discovered at submit time.
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  if (!reasonCode) return
-                  submit(f.key, 'reject', { reason_code: reasonCode, note: reasonNote })
-                }}
-              >
-                <label htmlFor={`reason-${f.key}`}>Reason for rejecting (required)</label>
-                <select
-                  id={`reason-${f.key}`}
-                  value={reasonCode}
-                  onChange={(e) => setReasonCode(e.target.value)}
-                >
-                  <option value="">- choose a reason -</option>
-                  {Object.entries(reasonCodes).map(([code, label]) => (
-                    <option value={code} key={code}>
-                      {label} ({code})
-                    </option>
-                  ))}
-                </select>
-                <textarea
-                  placeholder="Note (optional)"
-                  value={reasonNote}
-                  onChange={(e) => setReasonNote(e.target.value)}
-                />
-                <div className="rv-actions">
-                  <button className="rv-btn rv-reject" type="submit" disabled={!reasonCode || busy}>
-                    Confirm rejection
-                  </button>
-                  <button
-                    className="rv-btn"
-                    type="button"
-                    onClick={() => {
-                      setRejecting(null)
-                      setReasonCode('')
-                      setReasonNote('')
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="rv-actions" title={why('finding:review')}>
-                <button
-                  className="rv-btn rv-accept"
-                  disabled={busy || !mayReview}
-                  onClick={() => submit(f.key, 'accept')}
-                >
-                  Accept
-                </button>
-                <button
-                  className="rv-btn rv-modify"
-                  disabled={busy || !mayReview}
-                  onClick={() => submit(f.key, 'modify')}
-                >
-                  Modified
-                </button>
-                <button
-                  className="rv-btn rv-reject"
-                  disabled={busy || !mayReview}
-                  onClick={() => setRejecting(f.key)}
-                >
-                  Reject
-                </button>
-                {st !== 'Unreviewed' && (
-                  <button
-                    className="rv-btn rv-undo"
-                    disabled={busy || !mayReview}
-                    onClick={() => submit(f.key, 'unreview')}
-                  >
-                    Undo
-                  </button>
-                )}
-                {!mayReview && <span className="cell-sub">{why('finding:review')}</span>}
-              </div>
-            )}
-          </div>
-        )
-      })}
+      {single ? shown.map(item) : <ByArea findings={shown} areas={data.areas || []} item={item} />}
     </>
   )
+
+  function item(f) {
+    const st = f.review.status
+    const busy = busyKey === f.key
+    return (
+      <div
+        className={`rv-item ${REVIEW_CLASS[st] || ''} ${flash === f.key ? 'rv-flash' : ''}`}
+        id={`rv-${f.key}`}
+        key={f.key}
+      >
+        <div className="rv-head">
+          {f.fd && (
+            <span className="rv-fd" title="Finding id (FD-year-number, numbered per customer)">
+              {f.fd}
+            </span>
+          )}
+          {f.level && (
+            <span
+              className={`sev-tag sev-tag-${f.level}`}
+              title={f.base_level && f.base_level !== f.level ? `Rule level: ${LEVEL_EN[f.base_level]}` : undefined}
+            >
+              {LEVEL_EN[f.level]}
+            </span>
+          )}
+          <span className="rv-status">{st}</span>
+          <span className={`rv-conf rv-conf-${f.confidence}`}>confidence: {f.confidence}</span>
+          {/* Admiralty Code (confidence.py): letter = how far the log
+              source as read can be trusted, number = how well-supported
+              the finding is. The reasons are on hover - one sentence
+              each, so the grade can be checked rather than believed. */}
+          {f.admiralty && (
+            <span
+              className="rv-admiralty"
+              title={
+                `${f.admiralty.reliability.grade} - ${f.admiralty.reliability.name}: ` +
+                `${f.admiralty.reliability.why.join('; ')}\n` +
+                `${f.admiralty.credibility.grade} - ${f.admiralty.credibility.name}: ` +
+                `${f.admiralty.credibility.why.join('; ')}\n(Admiralty Code / NATO 6x6)`
+              }
+            >
+              {f.admiralty.code}
+            </span>
+          )}
+          {(f.flags || []).map((x) => (
+            <span className="rv-flag" key={x}>
+              {x}
+            </span>
+          ))}
+          <button
+            type="button"
+            className="rv-rid rv-rid-btn"
+            title="What this rule detects, its false positives and blind spots"
+            aria-expanded={openRule === f.key}
+            onClick={() => setOpenRule(openRule === f.key ? '' : f.key)}
+          >
+            {f.rid} {openRule === f.key ? '▴' : '▾'}
+          </button>
+          <span className="rv-n">{fmtNum(f.cnt)} events</span>
+        </div>
+        <div className="rv-desc">
+          {f.descr || ''} <MitreTags list={f.mitre} />
+        </div>
+        {openRule === f.key && <RuleCard rid={f.rid} />}
+        <AiReview r={f.ai_review} state={f.ai_state} error={f.ai_error} />
+        {/* Where the finding comes from (FR-4.1): the events behind it with
+            their source file, and the other findings of the same attack
+            chain (related.py: linked through pivot hosts, never through a
+            shared final target). */}
+        <div className="rv-trace">
+          <button
+            type="button"
+            className="rv-rid rv-rid-btn"
+            title="The events this finding stands for, and the file each came from"
+            aria-expanded={openEvents === f.key}
+            onClick={() => setOpenEvents(openEvents === f.key ? '' : f.key)}
+          >
+            Source events ({fmtNum(f.cnt)}) {openEvents === f.key ? '▴' : '▾'}
+          </button>
+          {f.related_count > 0 && (
+            <span className="rv-related">
+              Same attack chain ({f.related_count}):
+              {f.related.map((r) => (
+                relatedHref ? (
+                  <a
+                    className="rv-chip"
+                    key={r.key}
+                    href={relatedHref(r.key)}
+                    title={`Open ${r.rid} ${r.srcip || r.username || ''}`}
+                  >
+                    {r.rid} {r.srcip || r.username}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    className="rv-chip"
+                    key={r.key}
+                    title={`Go to ${r.rid} ${r.srcip || r.username || ''}`}
+                    onClick={() => reveal(r.key)}
+                  >
+                    {r.rid} {r.srcip || r.username}
+                  </button>
+                )
+              ))}
+              {f.related_count > f.related.length && ` +${f.related_count - f.related.length} more`}
+            </span>
+          )}
+        </div>
+        {openEvents === f.key && <FindingEvents caseId={caseId} findingKey={f.key} />}
+        {/* Why the level is above what the rule says on its own - an
+            attack-path pattern (severity.py) - so the analyst can check
+            the escalation instead of taking it on trust. */}
+        {(f.escalation || []).map((e) => (
+          <div className="rv-escalation" key={e.pattern}>
+            Raised to {LEVEL_EN[e.level]}: {e.reason}
+            {e.evidence?.length > 0 && (
+              <>
+                {' '}
+                - {f.srcip ? `${f.srcip}: ` : ''}
+                {e.evidence.map((r) => `${r.label} (${r.rid})`).join(' + ')}
+              </>
+            )}
+          </div>
+        ))}
+        <div className="rv-meta">
+          {f.ts_first || ''}
+          {f.ts_last && f.ts_last !== f.ts_first ? ` → ${f.ts_last}` : ''}
+        </div>
+        {f.review.actor && (
+          <div className="rv-who">
+            {f.review.actor} · {shortTs(f.review.ts)}
+            {f.review.reason_code ? ` · ${f.review.reason_code}` : ''}
+          </div>
+        )}
+
+        {/* No status workflow or assignee here since story 1: Respond was
+            removed (case_flow_design.md revision 3) and the owner of a
+            decision is the signed-in account (revision 2). The lifecycle
+            log stays on disk as an audit record. */}
+
+        {rejecting === f.key ? (
+          // FR-4.6: a rejection carries a structured reason, so mapping
+          // quality can be measured later instead of guessed at. The API
+          // returns 400 without one, so it is collected here rather than
+          // discovered at submit time.
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!reasonCode) return
+              submit(f.key, 'reject', { reason_code: reasonCode, note: reasonNote })
+            }}
+          >
+            <label htmlFor={`reason-${f.key}`}>Reason for rejecting (required)</label>
+            <select
+              id={`reason-${f.key}`}
+              value={reasonCode}
+              onChange={(e) => setReasonCode(e.target.value)}
+            >
+              <option value="">- choose a reason -</option>
+              {Object.entries(reasonCodes).map(([code, label]) => (
+                <option value={code} key={code}>
+                  {label} ({code})
+                </option>
+              ))}
+            </select>
+            <textarea
+              placeholder="Note (optional)"
+              value={reasonNote}
+              onChange={(e) => setReasonNote(e.target.value)}
+            />
+            <div className="rv-actions">
+              <button className="rv-btn rv-reject" type="submit" disabled={!reasonCode || busy}>
+                Confirm rejection
+              </button>
+              <button
+                className="rv-btn"
+                type="button"
+                onClick={() => {
+                  setRejecting(null)
+                  setReasonCode('')
+                  setReasonNote('')
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="rv-actions" title={why('finding:review')}>
+            <button
+              className="rv-btn rv-accept"
+              disabled={busy || !mayReview}
+              onClick={() => submit(f.key, 'accept')}
+            >
+              Accept
+            </button>
+            <button
+              className="rv-btn rv-modify"
+              disabled={busy || !mayReview}
+              onClick={() => submit(f.key, 'modify')}
+            >
+              Modified
+            </button>
+            <button
+              className="rv-btn rv-reject"
+              disabled={busy || !mayReview}
+              onClick={() => setRejecting(f.key)}
+            >
+              Reject
+            </button>
+            {st !== 'Unreviewed' && (
+              <button
+                className="rv-btn rv-undo"
+                disabled={busy || !mayReview}
+                onClick={() => submit(f.key, 'unreview')}
+              >
+                Undo
+              </button>
+            )}
+            {!mayReview && <span className="cell-sub">{why('finding:review')}</span>}
+          </div>
+        )}
+      </div>
+    )
+  }
+}
+
+/** Scroll one suggestion into view - unfolding its area's section first if the
+ *  analyst folded it, since a hidden card cannot be scrolled to. */
+function scrollToItem(key) {
+  const el = document.getElementById(`rv-${key}`)
+  if (!el) return
+  const body = el.closest('.ui-section-body')
+  if (body?.hidden) body.parentElement.querySelector('.ui-chevron')?.click()
+  requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+}
+
+const LEVEL_TONE = { critical: 'danger', high: 'warn', medium: 'info' }
+const LEVEL_RANK = ['critical', 'high', 'medium', 'low', 'informational']
+
+/** Attack events grouped as the user approved (2026-10-27): one folding
+ *  section per detection area, in areas.py's order, and inside it one block per
+ *  rule, in the order of the list's own sort - so the rule with undecided
+ *  suggestions comes first. Each suggestion keeps its whole card (the AI's
+ *  explanation and the decision buttons): a section folds, a suggestion never
+ *  hides behind a click. A rule outside every area goes under "Other rules". */
+function ByArea({ findings, areas, item }) {
+  const order = [...areas, { id: null, name: 'Other rules', about: 'Rules that belong to no detection area' }]
+  return order.map((a) => {
+    const fs = findings.filter((f) => (f.area ?? null) === a.id)
+    if (!fs.length) return null
+    const rules = []
+    for (const f of fs) {
+      const r = rules.find((x) => x.rid === f.rid)
+      if (r) r.items.push(f)
+      else rules.push({ rid: f.rid, items: [f] })
+    }
+    const top = LEVEL_RANK.find((l) => fs.some((f) => f.level === l))
+    const decided = fs.filter((f) => f.review.status !== 'Unreviewed').length
+    const explained = fs.filter((f) => f.ai_review?.what_happened).length
+    const latest = fs.map((f) => (f.ts_last || f.ts_first || '').slice(0, 10)).sort().pop()
+    return (
+      <Section
+        key={a.id || 'other'}
+        icon={a.id || 'findings'}
+        tone={LEVEL_TONE[top] || 'muted'}
+        title={a.name}
+        sub={a.about}
+        stats={[
+          { label: 'Suggestions', value: fmtNum(fs.length), tone: LEVEL_TONE[top] || 'text' },
+          { label: 'Decided', value: `${fmtNum(decided)} / ${fmtNum(fs.length)}` },
+          { label: 'Latest', value: latest || '—' },
+        ]}
+        pill={<span className="ui-pill tone-info">AI explained {fmtNum(explained)} / {fmtNum(fs.length)}</span>}
+      >
+        <div className="rv-area-body">
+          {rules.map((r) => (
+            <div key={r.rid}>
+              <div className="rv-rule-chip">
+                <span className={`ui-badge tone-${LEVEL_TONE[LEVEL_RANK.find((l) => r.items.some((f) => f.level === l))] || 'muted'}`}>
+                  {r.rid} · {r.items.length}
+                </span>
+              </div>
+              {r.items.map(item)}
+            </div>
+          ))}
+        </div>
+      </Section>
+    )
+  })
 }

@@ -9,7 +9,7 @@ from .. import config
 from ..services import (analysis, analysis_jobs, attack_layer, auth, case_delete, case_flow, case_views, custody,
                         db, authz, investigation, jobs, lifecycle, merge, profiles, provenance, review,
                         stix_export, storage, triage, veris)
-from ..services import rule_meta
+from ..services import areas, rule_meta
 from ..services.rules import RULE_ID_PATTERN
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -390,6 +390,8 @@ async def get_case_findings(case_id: str):
         "reason_codes": review.REASON_CODES,
         # The Attack timeline's stages: ATT&CK's Enterprise tactics, in its order.
         "tactic_order": [{"id": t, "ta": ta, "name": n} for t, ta, n in rule_meta.TACTIC_ORDER],
+        # The detection areas in their order (areas.py), each finding's `area` names one.
+        "areas": [{"id": a["id"], "name": a["name"], "about": a["about"]} for a in areas.AREAS],
         # Whether the decision history behind these statuses is untampered.
         "review_chain": review.verify(case_id),
     }
