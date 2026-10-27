@@ -1,6 +1,6 @@
 # Gotcha #72
 
-**72. The AI explains each suggestion and never decides - and the batch-wide enums leak**
+**72. The AI explains each suggestion and never decides - one schema per suggestion, an attack side never empty**
 
 `specs/ai_triage_verdicts.md` (2026-10-27). The user: the model does not tell the analyst to accept or
 reject; it explains, from the logged events, what happened and why the system found it, so the analyst
@@ -57,6 +57,26 @@ not in git; the old advice as the reference - on the Check Point quarter it agre
   questions in `not_shown` ("Whether adm.it is a legitimate account"). A soft judgment does slip through
   now and then ("unlikely given the context").
 
-Open: a schema per suggestion (`anyOf`, each with its own fact and false-positive enums) to stop the
-leak at its source; the finding / feed match as an attack-side fact and the published-server fact, one
-change at a time. Check: `tests/check_triage.py`.
+**Fixed, one change at a time, both cases re-run each time** (greedy decoding with a fixed seed, so a
+difference between rounds is the change, not chance):
+
+| round | change | another rule's FP | another's fact cited | attacks with no attack-side fact | s / suggestion (CP, Mekong) |
+|---|---|---|---|---|---|
+| 1 | (the schema above, one enum for the batch) | 13 | 6 | 9 of 94 | 13.7, 13.5 |
+| 2 | `reviews` an object, one property per suggestion with only its own fact ids and its own rule's false positives (`_item`) | 0 | 0 | **16 of 94** | 17.1, 12.4 |
+| 3 | `points_to_attack` `minItems: 1` | 0 | 0 | **0 of 94** | 13.8, 15.7 |
+
+- Round 2 stopped the leak but emptied more attack sides (CP-MAL-2's Critical CVE-2024-24919 exploit
+  came back with only "protection matching benign traffic"): an optional list is the cheapest thing a
+  grammar lets the model write. The attack side cannot honestly be empty - the rule fired because the
+  behaviour matched the attack it describes - so round 3 requires one.
+- Round 3, read by hand: the 16 Check Point non-attacks still carry their ordinary cause (zabbix-trapper,
+  OneDrive reached by 131 hosts); their attack side mostly restates the rule ("large outbound transfers
+  can indicate exfiltration") - consistent with both hypotheses, so of no diagnostic value (Heuer p. 102),
+  not invented - and twice it put the OneDrive false positive on the attack side. The Tor-exit feed
+  matches now cite the feed on the attack side and say the evidence does not show a corporate exit.
+- Time moves 12-17 s a suggestion between cases and rounds with no pattern; ~14 s is the planning figure
+  (kinnaree's 567: ~130 minutes).
+- Still seen: `check_next` sometimes lists fact ids ("S27.f2 and S27.f4") instead of a place to look.
+
+Check: `tests/check_triage.py`.

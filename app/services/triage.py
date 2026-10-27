@@ -189,39 +189,42 @@ SYSTEM = (
 
 def _schema(batch: list[tuple[str, list[str], list[str]]]) -> dict:
     ids = [sid for sid, _, _ in batch]
-    fact_ids = [f"{sid}.f{i + 1}" for sid, fs, _ in batch for i in range(len(fs))]
-    fps = sorted({fp for _, _, fpl in batch for fp in fpl} | {"none"})
+    # One property per suggestion, each with only its own fact ids and its own rule's false
+    # positives: one enum for the whole batch let a suggestion cite another's fact or name another
+    # rule's false positive - 11 of 52 on the Check Point quarter (gotcha #72).
+    return {"type": "object", "properties": {"reviews": {
+        "type": "object", "properties": {sid: _item(sid, fs, fpl) for sid, fs, fpl in batch},
+        "required": ids}}, "required": ["reviews"]}
+
+
+def _item(sid: str, fs: list[str], fpl: list[str]) -> dict:
     cited = {"type": "object",
              "properties": {"text": {"type": "string"},
                             "facts": {"type": "array", "minItems": 1,
-                                      "items": {"type": "string", "enum": fact_ids}}},
+                                      "items": {"type": "string",
+                                                "enum": [f"{sid}.f{i + 1}" for i in range(len(fs))]}}},
              "required": ["text", "facts"]}
     # The order an analyst checks it in (X-D2) - and the model's priority order (gotcha #5).
-    item = {
-        "type": "object",
-        "properties": {
-            "suggestion": {"type": "string", "enum": ids},
-            "what_happened": cited,
-            "why_it_fired": cited,
-            "points_to_attack": {"type": "array", "maxItems": 4, "items": cited},
-            "points_to_ordinary_cause": {"type": "array", "maxItems": 4, "items": cited},
-            "resembles_false_positive": {"type": "string", "enum": fps},
-            "not_shown": {"type": "array", "maxItems": 3, "items": {"type": "string"}},
-            "check_next": {"type": "string"},
-        },
-        "required": ["suggestion", "what_happened", "why_it_fired", "points_to_attack",
-                     "points_to_ordinary_cause", "resembles_false_positive", "not_shown", "check_next"],
+    props = {
+        "what_happened": cited,
+        "why_it_fired": cited,
+        # Never empty: the rule fired because the behaviour matched the attack it describes. Left
+        # optional, 16 of 94 attacks came back with nothing on this side (gotcha #72).
+        "points_to_attack": {"type": "array", "minItems": 1, "maxItems": 4, "items": cited},
+        "points_to_ordinary_cause": {"type": "array", "maxItems": 4, "items": cited},
+        "resembles_false_positive": {"type": "string", "enum": list(fpl) + ["none"]},
+        "not_shown": {"type": "array", "maxItems": 3, "items": {"type": "string"}},
+        "check_next": {"type": "string"},
     }
-    return {"type": "object", "properties": {"reviews": {
-        "type": "array", "minItems": len(batch), "maxItems": len(batch), "items": item}},
-        "required": ["reviews"]}
+    return {"type": "object", "properties": props, "required": list(props)}
 
 
 def _prompt(batch: list[tuple[str, list[str], list[str]]]) -> str:
     parts = []
     for sid, fs, _ in batch:
         parts.append(f"Suggestion {sid}:\n" + "\n".join(f"  {sid}.f{i + 1}: {t}" for i, t in enumerate(fs)))
-    return "/no_think\nExplain each suggestion below, one entry per suggestion.\n\n" + "\n\n".join(parts)
+    return ("/no_think\nExplain each suggestion below, one entry per suggestion, under its id.\n\n"
+            + "\n\n".join(parts))
 
 
 def is_explanation(review: dict) -> bool:
@@ -252,7 +255,11 @@ async def _review_batch(client, batch) -> list[dict]:
     }
     body = await llm._chat(client, payload)
     content, finish = llm._content_of(body)
-    out = json.loads(content).get("reviews") or []
+    out = json.loads(content).get("reviews") or {}
+    # Keyed by suggestion id (one schema each); a list is what a model not held to the schema
+    # may still write.
+    if isinstance(out, dict):
+        return [{**v, "suggestion": sid} for sid, v in out.items() if isinstance(v, dict)]
     return out
 
 

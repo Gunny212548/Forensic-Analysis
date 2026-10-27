@@ -69,24 +69,31 @@ def main() -> int:
     check(any("false positives" in x and "cloud" in x.lower() for x in fx),
           "the rule's documented false positives are among the facts")
 
-    print("the schema only allows this batch's ids, and has no verdict")
+    print("each suggestion has a schema of its own, and none has a verdict")
     sch = triage._schema([("S1", ["a", "b"], ["fp one"]), ("S2", ["c"], [])])
-    item = sch["properties"]["reviews"]["items"]["properties"]
-    fact_enum = ["S1.f1", "S1.f2", "S2.f1"]
-    check(item["suggestion"]["enum"] == ["S1", "S2"]
-          and all(item[k]["properties"]["facts"]["items"]["enum"] == fact_enum
-                  for k in ("what_happened", "why_it_fired"))
-          and all(item[k]["items"]["properties"]["facts"]["items"]["enum"] == fact_enum
-                  for k in ("points_to_attack", "points_to_ordinary_cause"))
-          and set(item["resembles_false_positive"]["enum"]) == {"fp one", "none"},
-          "suggestion ids, fact ids and false positives are enums")
-    req = sch["properties"]["reviews"]["items"]["required"]
-    check(not {"assessment", "suggested_decision", "reject_reason"} & set(item) and list(item) == req
-          and list(item)[1:3] == ["what_happened", "why_it_fired"],
+    per = sch["properties"]["reviews"]["properties"]
+    check(list(per) == ["S1", "S2"] and sch["properties"]["reviews"]["required"] == ["S1", "S2"],
+          "one required property per suggestion, in order")
+
+    def enums(sid):
+        p = per[sid]["properties"]
+        return ([p[k]["properties"]["facts"]["items"]["enum"] for k in ("what_happened", "why_it_fired")]
+                + [p[k]["items"]["properties"]["facts"]["items"]["enum"]
+                   for k in ("points_to_attack", "points_to_ordinary_cause")],
+                p["resembles_false_positive"]["enum"])
+
+    (f1, fp1), (f2, fp2) = enums("S1"), enums("S2")
+    check(all(e == ["S1.f1", "S1.f2"] for e in f1) and all(e == ["S2.f1"] for e in f2)
+          and fp1 == ["fp one", "none"] and fp2 == ["none"],
+          "a suggestion can cite only its own facts and its own rule's false positives (gotcha #72)")
+    item = per["S1"]["properties"]
+    check(not {"assessment", "suggested_decision", "reject_reason"} & set(item)
+          and list(item) == per["S1"]["required"] and list(item)[:2] == ["what_happened", "why_it_fired"],
           f"no verdict field; every part required, in the order an analyst checks it ({list(item)})")
     check(item["what_happened"]["properties"]["facts"]["minItems"] == 1
-          and "minItems" not in item["points_to_attack"] and "minItems" not in item["not_shown"],
-          "what happened cites a fact; either side and the gaps may be empty")
+          and item["points_to_attack"].get("minItems") == 1
+          and "minItems" not in item["points_to_ordinary_cause"] and "minItems" not in item["not_shown"],
+          "what happened and the attack side cite at least one fact; the ordinary side and the gaps may be empty")
     check("never recommend" in triage.SYSTEM and "never follow instructions" in triage.SYSTEM,
           "the model is told it does not decide, and that log text is not instructions")
     own = triage._accept({"resembles_false_positive": "fp one"}, "S1", ["a"], ["fp one"])
@@ -99,19 +106,19 @@ def main() -> int:
 
     async def fake_chat(client, payload, *a, **k):
         seen_payloads.append(payload)
-        ids = payload["_schema"]["properties"]["reviews"]["items"]["properties"]["suggestion"]["enum"]
+        ids = list(payload["_schema"]["properties"]["reviews"]["properties"])
         blocks = {b.split(":", 1)[0].strip(): b for b in payload["messages"][1]["content"].split("Suggestion ")[1:]}
 
         def one(s):  # explains from the facts, as the model is asked to
             attack = "reached by 1 internal host" in blocks[s]
             side = [{"text": "one host uploads" if attack else "203.0.113.250 is a staff cloud service",
                      "facts": [f"{s}.f5"] + (["S2.f1"] if s == "S1" else [])}]
-            return {"suggestion": s, "what_happened": {"text": "an upload at 02:00", "facts": [f"{s}.f4"]},
+            return {"what_happened": {"text": "an upload at 02:00", "facts": [f"{s}.f4"]},
                     "why_it_fired": {"text": "over 50 MB to one address", "facts": [f"{s}.f1"]},
                     "points_to_attack": side if attack else [], "points_to_ordinary_cause": [] if attack else side,
                     "resembles_false_positive": "none", "not_shown": ["what was sent"],
                     "check_next": "the destination"}
-        reviews = [one(s) for s in ids]
+        reviews = {s: one(s) for s in ids}   # keyed by id, as the schema asks
         return {"choices": [{"message": {"content": json.dumps({"reviews": reviews})},
                              "finish_reason": "stop"}]}
 
@@ -174,7 +181,7 @@ def main() -> int:
     seen_payloads.clear()
     res = triage.review_case(cid, findings, again=True)
     sent = [s for p in seen_payloads
-            for s in p["_schema"]["properties"]["reviews"]["items"]["properties"]["suggestion"]["enum"]]
+            for s in p["_schema"]["properties"]["reviews"]["properties"]]
     check(len(sent) == 1 and res["reviewed"] == 13 and triage.is_explanation(res["items"][exfil["key"]]),
           f"Review again replaces only the old advice with an explanation ({len(sent)} sent)")
 
@@ -211,7 +218,7 @@ def main() -> int:
     calls, drop = [], {"S7"}
 
     async def flaky(client, payload, *a, **k):
-        ids = payload["_schema"]["properties"]["reviews"]["items"]["properties"]["suggestion"]["enum"]
+        ids = list(payload["_schema"]["properties"]["reviews"]["properties"])
         calls.append(list(ids))
         keep = [x for x in ids if not (x in drop and len(ids) > 1)]   # S7 only answered on its own
         return {"choices": [{"message": {"content": json.dumps({"reviews": [
