@@ -155,20 +155,29 @@ MCP (stdio, read-only)                       app/mcp_server.py - 19 tools over t
                                              same views; every call hash-chain
                                              logged to mcp/access.jsonl (#38);
                                              never assigns FD ids (#51)
-GET  /api/overview                           KPIs, MTTC, detection areas, attention,
-                                             findings per day, top entities,
-                                             urgent findings, activity (services/
-                                             overview.py; per-case facts cached
-                                             on a fingerprint of DuckDB, review
+GET  /api/overview                           KPIs, detection areas (every suggestion,
+                                             undecided, the case holding most),
+                                             attention, suggestions by first-event
+                                             day, top entities (an account with its
+                                             computers and source addresses), urgent
+                                             findings (high / critical not decided),
+                                             activity; MTTC still returned, not shown
+                                             (services/overview.py; per-case facts
+                                             cached on a fingerprint of DuckDB, review
                                              log, custody log and id registry;
-                                             gotchas #50, #51)
+                                             gotchas #50, #51, #73)
 ```
 
 **The Overview was redesigned on 2026-10-19 (gotcha #50)** - an attention banner,
-a KPI strip (since 2026-10-27 the summary card's right column, SOCRadar layout; it and the area cards count suggestions as the case page does, the workflow's figures only on the urgent list - gotcha #50), the detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), findings per day, top affected, urgent
-findings and recent activity, in the light palette; the status workflow it needed
-exists since Sprint 3 (gotcha #49). The case table is no longer on it. No figure is a
-placeholder. "Top affected"
+a KPI strip (since 2026-10-27 the summary card's right column, SOCRadar layout), the
+detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), a per-day
+chart, top affected, urgent findings and recent activity. **Since 2026-10-27 it counts
+as the case page counts** (the user: the dashboard must match what a case shows):
+the big total is the suggestions not decided, an area card every suggestion in the
+area (and how many are not decided) and opens the case holding most of them, the
+chart suggestions by the day their first event happened over the whole span, the
+urgent list the high / critical findings not decided; no MTTC (gotchas #50, #73). The
+case table is no longer on it. No figure is a placeholder. "Top affected"
 ranks by accumulated risk score, not by case count: ranked by count, the
 benign admin account seen in every seeded case came out first (gotcha #16
 again). **The page always says whose data it shows (2026-10-15, the
@@ -177,7 +186,11 @@ when unscoped; each top-affected row and activity line carries its
 customer; and top-affected is aggregated *per customer* - the same address
 in two customers' cases is two hosts, and used to add up into one row.
 A technique card stays *one* card and lists every customer it was seen in:
-the same technique is the same behaviour whoever it happened to.
+the same technique is the same behaviour whoever it happened to. **An account on
+Top affected names where it was seen** (2026-10-27): "on" the computers whose logs
+hold its flagged events and "from" the source addresses - `NT AUTHORITY\SYSTEM` or a
+local `Administrator` is a different account on every computer (`db.account_origins`,
+a query of its own because `risk_scores()` feeds the narrative's prompt).
 
 Storage layout under `DATA_DIR` (`/data`) - **one store per customer**
 since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything
@@ -254,18 +267,24 @@ frontend/src/
                        lands on the Overview (the user's call, 2026-10-16)
   api.js               every call the UI makes, and nothing else
   format.js            fmtBytes/fmtTime/shortTs + the status & severity maps
-  pages/               Overview (#/dashboard) · Upload · Findings · FindingDetail
-                       · CaseView (Reports / Attack Graph / Timeline of one case)
-                       · Customers · CustomerDetail · Login · Placeholder
-                       (menu pages whose story is not built yet)
-  components/          Sidebar (app shell, FR-0) · Workspace (case tabs)
-                       CasePicker (a case page opened from the menu)
-                       EventsTable · ReviewPanel · Lifecycle (status workflow)
-                       RuleCard (Sigma/ADS) · Evidence (custody tab)
-                       Mapping (log source note) · Veris
-                       AttackGraph · analysis.jsx (chain/timeline/risk/meta,
-                       grounding warnings)
-                       common.jsx (severity pill, status badge, MITRE tags)
+  theme.js             light / dark, kept per browser in localStorage fa_theme
+  pages/               Overview (#/dashboard) · Upload · Cases · CaseFlow (one
+                       case as six steps, #/case/<id>/<step>, gotcha #52) ·
+                       Findings · FindingDetail · Customers · CustomerDetail ·
+                       Users (the Settings menu item, admin) · Login ·
+                       Placeholder (a menu page not built yet - none today)
+  components/          Sidebar (app shell, FR-0, theme button) · StepBar
+                       cards.jsx (summary card, area card, stat tile, folding
+                       section) · icons.jsx (stroke icons, inline SVG)
+                       EventsTable · ReviewPanel (Attack events, by area and
+                       rule) · AiReview · FindingEvents · RuleCard (Sigma/ADS)
+                       Evidence (custody) · Mapping (how each file was read) ·
+                       Period · Question · Reprocess · ProfilePanel · Veris ·
+                       DeleteCase · AttackGraph · analysis.jsx (chain/timeline/
+                       risk/meta, grounding warnings) · common.jsx (severity
+                       pill, status badge, MITRE tags). Workspace.jsx is left
+                       over from #/result and nothing imports it; Lifecycle.jsx
+                       went with the status workflow's buttons (gotcha #73)
 ```
 
 It replaced a hand-written 1,212-line `static/index.html`, whose URLs were
@@ -440,10 +459,11 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #20 Confidence counts rule *families*, not ids; `timezone-unconfirmed` is tested on the source text, never on `ts`.
 - #30 Confidence is an Admiralty grade (reliability letter + credibility number).
 - #31 The review log is hash-chained; old unchained decisions are sealed, not rewritten.
-- #33 Finding lifecycle Open -> Investigating -> Contained -> Resolved; only Sigma high/critical enter it.
+- #33 Finding lifecycle Open -> Investigating -> Contained -> Resolved; only Sigma high/critical enter it. Off the screens since #73.
 - #49 FD ids per customer per year, written before `ready`; source events; related findings via pivot hosts; the Findings page.
 - #50 The Overview redesign, and the designs the user rejected - **do not re-propose them**.
 - #51 `#/result` retired (Reports / Attack Graph / Timeline / finding page); Sprint 3 review fixes; ADR-3/4; branches and worktrees; testing in a container; scripted-edit traps.
+- #73 The analyst's decision replaced the status workflow on screen (the user, 2026-10-27): its buttons left with Respond, so every status stayed Open; Findings filters and counts by decision (badge = high / critical not decided), no assignee, no MTTC on the Overview; a case is open while a suggestion is not decided (the report gate). `lifecycle.py` and its API stay for the audit trail.
 - #52 The case page is six steps at `#/case/<id>/<step>` (IAI-89); `GET /flow` computes each step's state on the server and names its standards; old case links redirect. `sprint/4` merges Sprint 3's two branches.
 
 **Evidence, storage, jobs and access** (`custody.py`, `storage.py`, `jobs.py`, `auth.py`, `mcp_server.py`)
@@ -456,7 +476,6 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #58 Ingest: question on the project (hash-chained log), provenance / declared time off the screen since 2026-10-27 (the user: too much, then not needed; `PUT /provenance` still takes them), a declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
 **AI narrative** (`analysis.py`, `llm.py`, `grounding.py`, `veris.py`)
-- #73 The analyst's decision replaced the status workflow on screen (the user, 2026-10-27): its buttons left with Respond, so every status stayed Open; Findings filters and counts by decision (badge = high / critical not decided), no assignee, no MTTC on the Overview; a case is open while a suggestion is not decided (the report gate). `lifecycle.py` and its API stay for the audit trail.
 - #72 The AI explains and never decides (the user, 2026-10-27): no accept / reject / "likely attack" - what happened, why it fired, facts for an attack and for an ordinary cause, what is not shown, check next (Heuer ACH); log values quoted; the review line keeps only model + time; old advice replaced by Review again; one schema per suggestion (a batch-wide enum let 13 of 113 name another rule's false positive), the attack side `minItems: 1` (optional, 16 of 94 attacks came back empty); ~14 s a suggestion.
 - #71 Every suggestion is reviewed by the AI itself, no cap (the user's requirement): the case is ready after the rules and the review runs on in the background (`triage.enqueue`, one worker, resumed at start-up), every rule first, a failed batch retried then sent one by one, what is left listed with "Review again" (`POST /ai-review`); batch size measured (`TRIAGE_BATCH`).
 - #64 The AI reviews every suggestion while the case is processed (`triage.py`; since #71 after it is ready): facts computed in SQL (a destination's popularity among internal hosts, the rule's documented false positives), a schema, an address check; advice under each suggestion, kept on the review line; the Upload page counts the suggestions reviewed; `TRIAGE_ENABLED=0` in every rule check and in dev.
@@ -549,7 +568,8 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
 Pages whose story has not come up render `pages/Placeholder.jsx` and appear
 dimmed in the menu (`ready: false` in `components/Sidebar.jsx`). Flip the flag
 when a page is built. Timeline, Attack Graph and Reports were flipped when `#/result`
-was retired (gotcha #51); ATT&CK Map and Settings are still placeholders.
+was retired (gotcha #51) and are steps of a case now; Settings is the Users page
+(IAI-14). No menu item is a placeholder today.
 
 Decisions the user made, which the Figma does not show:
 - **There is no "incident" - the finding is the only unit (2026-10-05).**
@@ -586,7 +606,10 @@ Decisions the user made, which the Figma does not show:
   browser's own zone. Code comments were always English.
 - Findings: created by the rule engine, related and admitted to the
   workflow per gotcha #24, no time window (the whole case).
-- **Finding lifecycle (FR-4.1, 4.5, 4.7, 4.8).** The Figma has status only
+- **Finding lifecycle (FR-4.1, 4.5, 4.7, 4.8)** - the rules below still hold in
+  `lifecycle.py` and its API, but **no screen moves a status or sets an assignee
+  since the Respond step went**; the pages follow the analyst's decision instead
+  (2026-10-27, gotcha #73). The Figma has status only
   (Open → Investigating → Contained → Resolved) and nothing stopped an analyst
   closing a finding without looking at it. The spec now requires:
   - A new finding starts **Open with no assignee** - the system created it.
@@ -612,7 +635,9 @@ What the data forced onto the Figma, measured on the same corpus:
   (`rule_meta.TACTIC_ORDER`, `tactics_of`), each filtering the time-ordered list.
 - **Timeline "last 24h" is always empty:** uploaded events are months old
   (Dec 2025 - Jun 2026 in the corpus). Timelines use the case's event-time
-  range; MTTC and the per-day charts use finding *creation* time.
+  range. The Overview's chart counts suggestions by the day their first event
+  happened, over the whole span, as the case page does (2026-10-27; it was
+  findings by *creation* time, high / critical only).
 - **No asset inventory exists**, so "affected segments" and node roles such
   as "domain controller" become risk-ranked hosts/accounts (`risk_scores()`)
   and internal / external / IOC labels.
@@ -784,9 +809,13 @@ Two more checks, each for its own layer:
 - **Job queue and manifests** - `tests/check_jobs.py` (45 checks, no DuckDB) and
   `tests/check_manifest_atomic.py` (gotcha #48); run in the container or on the host.
 - **Finding workflow and Overview** - `tests/check_workflow.py <scratch> --repo /app`
-  (~100 checks: threshold, ids, source events, related findings, the Findings page,
-  every refusal and both close paths, Customers, the Overview figures, a forged
-  custody log); needs the container (`static/`). Gotcha #49 / #50.
+  (~110 checks: threshold, ids, source events, related findings, the Findings page
+  and its decision filter, every refusal and both close paths of the lifecycle API,
+  Customers - open while a suggestion is not decided -, the Overview figures against
+  the cases (undecided, the case a card opens, the whole-span trend, an account's
+  computers and sources), a forged custody log); needs the container (`static/`).
+  Run it in a throwaway container with `AUTH_DIR` on a scratch path - in the live
+  one its test accounts land in the real `users.json`. Gotchas #49 / #50 / #73.
 - **Authorisation** - `tests/check_authz.py [repo]` (ADR-3, gotcha #51, IAI-14): the permission
   table per role, every case route answering 403 exactly where `authz.can` says no, the Users
   routes, wrong-typed account changes refused.
