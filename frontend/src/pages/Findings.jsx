@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listCompanies, listFindings } from '../api.js'
 import { LEVEL_EN, fmtNum, shortTs } from '../format.js'
+import { StatTile } from '../components/cards.jsx'
 
 const STATUSES = ['Open', 'Investigating', 'Contained', 'Resolved']
 const SEVERITIES = ['critical', 'high']
+const SEV_TONE = { critical: 'danger', high: 'warn' }
 const PAGE = 50
 
 /** figma-export/Incidents.svg, which the console calls Findings (FR-4.4): every
@@ -96,25 +98,29 @@ export default function Findings({ param }) {
         </div>
       </div>
 
-      <div className="fd-counts" aria-label="Findings per severity">
+      {/* The two levels are filters as well as counts: a tile switches its level on and off. */}
+      <div className="ui-stat-grid" aria-label="Findings per severity">
+        <StatTile icon="findings" tone={data.open_count ? 'danger' : 'ok'} value={fmtNum(data.open_count)}
+                  label="Not resolved" />
         {SEVERITIES.map((s) => (
-          <button
-            type="button"
+          <StatTile
             key={s}
-            className={`fd-count${severity === s ? ' active' : ''}`}
+            icon="shield-alert"
+            tone={SEV_TONE[s]}
+            value={fmtNum(data.by_severity[s] || 0)}
+            label={LEVEL_EN[s]}
+            active={severity === s}
+            title={severity === s ? 'Show all severities' : `Show only ${LEVEL_EN[s]} findings`}
             onClick={() => {
               setSeverity(severity === s ? '' : s)
               setOffset(0)
             }}
-            title={severity === s ? 'Show all severities' : `Show only ${LEVEL_EN[s]} findings`}
-          >
-            <span className={`sev-tag sev-tag-${s}`}>{LEVEL_EN[s]}</span>
-            <strong>{fmtNum(data.by_severity[s] || 0)}</strong>
-          </button>
+          />
         ))}
-        <span className="fd-status-counts muted">
-          {STATUSES.map((s) => `${s} ${fmtNum(data.by_status[s] || 0)}`).join(' · ')}
-        </span>
+        <StatTile icon="cases" tone="info" value={fmtNum(data.scope_total)} label="In the workflow" />
+      </div>
+      <div className="fd-status-counts muted">
+        {STATUSES.map((s) => `${s} ${fmtNum(data.by_status[s] || 0)}`).join(' · ')}
       </div>
 
       <div className="panel">

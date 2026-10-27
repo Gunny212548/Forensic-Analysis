@@ -91,7 +91,7 @@
   .panel {
     background: var(--panel);
     border: 1px solid var(--panel-border);
-    border-radius: 4px;
+    border-radius: 14px;
     padding: 20px 24px;
   }
   .panel h2 { font-size: 14px; font-weight: 600; margin: 0 0 16px; color: var(--text); }
@@ -692,12 +692,7 @@
   .fe-raw { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fe-foot { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 8px; font-size: 12px;
     color: var(--text-2); border-top: 1px solid var(--panel-border); }
-  .fd-counts { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin: 0 0 14px; }
-  .fd-count { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font: inherit;
-    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 6px 12px; }
-  .fd-count strong { font-family: var(--mono); font-size: 16px; }
-  .fd-count.active, .fd-count:hover { border-color: var(--accent); }
-  .fd-status-counts { font-size: 12px; }
+  .fd-status-counts { font-size: 12px; margin-top: -8px; }
   .fd-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
   .fd-search { width: 320px; max-width: 100%; }
   .fd-table td { padding: 12px 8px; vertical-align: top; }
@@ -930,3 +925,13 @@ button.ui-chevron:focus-visible { outline: 2px solid var(--accent); outline-offs
 .rv-area-body { padding: 4px 20px 12px; }
 .rv-rule-chip { padding: 12px 0 8px; }
 .rv-area-body .rv-item { border-radius: 0 8px 8px 0; }
+
+/* Step 5 (2026-10-27): the list pages' tables head on a tinted row, like the
+   sections' tables; a stat tile that filters is a toggle button. */
+.ov-table th { background: var(--subtle); font-weight: 700; font-size: 10.5px; letter-spacing: .08em; padding: 9px 8px; }
+.ov-table th:first-child { border-top-left-radius: 8px; }
+.ov-table th:last-child { border-top-right-radius: 8px; }
+button.ui-stat-btn { text-align: left; font: inherit; color: var(--text); cursor: pointer; align-self: stretch; padding: 16px 18px; }
+button.ui-stat-btn:hover { border-color: var(--tone); }
+button.ui-stat-btn.active { border-color: var(--tone); background: var(--tone-tint); }
+button.ui-stat-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getFlow, listCases, listCompanies } from '../api.js'
-import { fmtTime } from '../format.js'
+import { fmtNum, fmtTime } from '../format.js'
 import { Empty, StatusBadge } from '../components/common.jsx'
+import { StatTile } from '../components/cards.jsx'
 import { stepHref } from '../components/StepBar.jsx'
 import DeleteCase from '../components/DeleteCase.jsx'
 
@@ -50,8 +51,13 @@ export default function Cases() {
     }
   }, [companyId])
 
+  const count = (...st) => (cases || []).filter((m) => st.includes(m.status)).length
+  const ready = count('ready')
+  const failed = count('failed')
+  const busy = (cases || []).length - ready - failed
+
   return (
-    <section className="page">
+    <section className="page ov">
       <div className="top-bar">
         <div>
           <h1>Cases</h1>
@@ -62,6 +68,15 @@ export default function Cases() {
         </div>
         <a className="btn-primary" href="#/upload">Upload a log</a>
       </div>
+
+      {cases && cases.length > 0 && (
+        <div className="ui-stat-grid" aria-label="Cases by status">
+          <StatTile icon="cases" tone="info" value={fmtNum(cases.length)} label="Cases" />
+          <StatTile icon="check" tone={ready ? 'ok' : 'muted'} value={fmtNum(ready)} label="Ready" />
+          <StatTile icon="clock" tone={busy ? 'warn' : 'muted'} value={fmtNum(busy)} label="Queued or processing" />
+          <StatTile icon="alert" tone={failed ? 'danger' : 'muted'} value={fmtNum(failed)} label="Failed" />
+        </div>
+      )}
 
       <div className="panel">
         <div className="filter-bar">

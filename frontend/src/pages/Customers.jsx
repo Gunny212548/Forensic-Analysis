@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getCustomerSummary } from '../api.js'
-import { ago } from '../format.js'
+import { ago, fmtNum } from '../format.js'
+import { StatTile } from '../components/cards.jsx'
 
 const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', informational: 'Info' }
 
@@ -33,6 +34,9 @@ export default function Customers() {
 
   if (error && !data) return <div className="panel empty">Could not load customers: {error}</div>
   if (!data) return <div className="empty">Loading...</div>
+  // The same open / closed the table shows per customer, added up.
+  const open = data.customers.reduce((n, c) => n + (c.open || 0), 0)
+  const closed = data.customers.reduce((n, c) => n + (c.closed || 0), 0)
 
   return (
     <section className="page ov">
@@ -49,6 +53,13 @@ export default function Customers() {
             Refresh
           </button>
         </div>
+      </div>
+
+      <div className="ui-stat-grid" aria-label="Case load">
+        <StatTile icon="customers" tone="info" value={fmtNum(data.accounts)} label="Customers" />
+        <StatTile icon="cases" tone="muted" value={fmtNum(data.total_cases)} label="Cases" />
+        <StatTile icon="findings" tone={open ? 'danger' : 'ok'} value={fmtNum(open)} label="Open cases" />
+        <StatTile icon="check" tone="ok" value={fmtNum(closed)} label="Closed cases" />
       </div>
 
       <div className="panel">

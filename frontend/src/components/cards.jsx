@@ -89,16 +89,24 @@ export function AreaCard({ href, icon, tone = 'muted', value, name, share, foot,
   )
 }
 
-/** A KPI on its own: icon tile, number, label. */
-export function StatTile({ icon, tone = 'muted', value, label, title }) {
-  return (
-    <div className="ui-stat" title={title}>
+/** A KPI on its own: icon tile, number, label. With `onClick` it is a toggle
+ *  button (a filter), `active` while it is on. */
+export function StatTile({ icon, tone = 'muted', value, label, title, onClick, active }) {
+  const body = (
+    <>
       <IconTile icon={icon} tone={tone} />
       <div>
         <div className="ui-stat-value">{value}</div>
         <div className="ui-stat-label">{label}</div>
       </div>
-    </div>
+    </>
+  )
+  if (!onClick) return <div className="ui-stat" title={title}>{body}</div>
+  return (
+    <button type="button" className={`ui-stat ui-stat-btn tone-${tone}${active ? ' active' : ''}`}
+            aria-pressed={!!active} title={title} onClick={onClick}>
+      {body}
+    </button>
   )
 }
 
