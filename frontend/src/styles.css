@@ -919,6 +919,8 @@ button.ui-chevron:focus-visible { outline: 2px solid var(--accent); outline-offs
 
 /* The case page in the SOCRadar layout (pages/CaseFlow.jsx CaseSummary,
    components/ReviewPanel.jsx ByArea). */
+/* Header, summary card, steps and the step's panel, each with room around it. */
+.case-page { display: flex; flex-direction: column; gap: 16px; }
 .case-firstseen { display: block; width: 100%; height: 110px; margin-top: 12px; color: var(--accent); }
 .case-firstseen polygon { fill: currentColor; opacity: .16; }
 .case-firstseen polyline { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round;

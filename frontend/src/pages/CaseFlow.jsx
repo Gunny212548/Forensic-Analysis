@@ -206,7 +206,7 @@ export default function CaseFlow({ caseId, stepId }) {
   const [statusLabel] = statusOf(manifest?.status)
 
   return (
-    <section className="page">
+    <section className="page case-page">
       <div className="top-bar">
         <div>
           {/* Where the case sits: customer, then project, both one click away. */}
