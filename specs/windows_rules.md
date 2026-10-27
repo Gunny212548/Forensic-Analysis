@@ -285,6 +285,12 @@ stated, not a measured threshold (D16 has nothing to measure "rare" on: the evid
 legitimate beacons to draw a line over). Measured: blind quarter 40,725 -> 0, K7 and K15 kept; Mekong
 unchanged.
 
+**Q105 (code review, 2026-10-27; the user chose the floor):** "more than half" had no floor, so on one
+host's evidence - the commonest forensic case - every beacon was "more than half" of one host and
+WIN-MAL-1 could never fire. The fleet test now applies only from **20 hosts with Sysmon network events**
+(`lines.MIN_LEGIT`, as Q67 / gotcha #57's MIN_CROWD); under that every beacon is flagged and the line
+record says why. The blind quarter (43 hosts) and Mekong are unchanged.
+
 **The risk, said plainly:** an implant on more than half of the machines, all calling the same address,
 would be left out - and listed on the line record. Under half, it is flagged as today. The other choice
 (Q99 b) keeps them flagged at level low: no beacon hidden, but the 40,725 rows stay false positives and

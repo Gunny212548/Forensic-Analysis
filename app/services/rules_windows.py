@@ -708,19 +708,26 @@ def prepare_mal_1(con):
     """W-D11 (Q99 a): the analytics ask for beacons to *rare* destinations (AN0076, AN0761 - "rare"
     undefined). A (process, destination) beaconing on more than half of the hosts with Sysmon
     network events is the fleet's - an agent's timer - and is left out, named on the line record.
+    Under lines.MIN_LEGIT hosts there is no fleet to call a destination common in (Q105, as Q67):
+    one host's evidence is "more than half" of itself, so every beacon is flagged instead.
     Writes TEMP TABLE win_fleet_beacons (program, dstip, hosts)."""
     total = con.execute("SELECT count(DISTINCT upper(split_part(hostname, '.', 1))) FROM product_events "
                         "WHERE action = 'network_connection' AND hostname IS NOT NULL").fetchone()[0]
+    floor = "" if total >= lines.MIN_LEGIT else "AND false"
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE win_fleet_beacons AS
         SELECT program, dstip, count(DISTINCT host) AS hosts FROM ({_BEACONS})
-        GROUP BY program, dstip HAVING count(DISTINCT host) > {total} / 2""")
+        GROUP BY program, dstip HAVING count(DISTINCT host) > {total} / 2 {floor}""")
     left = con.execute("SELECT program, dstip, hosts FROM win_fleet_beacons ORDER BY hosts DESC, program, dstip"
                        ).fetchall()
-    note = (f"{len(left)} fleet-wide timer(s) left out" +
-            (": " + "; ".join(f"{p} -> {d} on {h} of {total} hosts" for p, d, h in left) if left else "") +
-            f" - a (process, destination) beaconing on more than half of the {total} hosts with Sysmon "
-            "network events is not a rare destination")
+    if total < lines.MIN_LEGIT:
+        note = (f"{total} hosts with Sysmon network events - under {lines.MIN_LEGIT}, no beacon can be called "
+                "the fleet's; every beacon is flagged")
+    else:
+        note = (f"{len(left)} fleet-wide timer(s) left out" +
+                (": " + "; ".join(f"{p} -> {d} on {h} of {total} hosts" for p, d, h in left) if left else "") +
+                f" - a (process, destination) beaconing on more than half of the {total} hosts with Sysmon "
+                "network events is not a rare destination")
     return {}, {"method": "fleet-wide", "source": "ATT&CK T1071.001 DET0027 AN0076, T1573 DET0273 AN0761 "
                                                   "(beacons to rare destinations; rare undefined - more than "
                                                   "half the hosts, an internal method)",

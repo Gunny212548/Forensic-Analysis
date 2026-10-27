@@ -40,4 +40,11 @@ baseline; its `.xml` evidence is not a parity suffix).
 
 The case page's line table names the methods it now has: CUSUM over the site, fleet-wide timers.
 
-Check: `tests/check_windows_rules.py` (story 5e capture).
+**The fleet test needs a fleet (Q105, found in code review 2026-10-27).** "More than half the hosts"
+had no floor: on one host's evidence every beacon is more than half of one host, so WIN-MAL-1 could
+never fire on a single machine's logs - the commonest forensic case - and the 4-host test capture
+passed without showing it. The test now applies only from `lines.MIN_LEGIT` (20) hosts with Sysmon
+network events; under that every beacon is flagged and the line record says so. Blind quarter (43 hosts)
+and Mekong unchanged.
+
+Check: `tests/check_windows_rules.py` (story 5e capture - 20 of 21 hosts left out, 3 of 4 flagged).

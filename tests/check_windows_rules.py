@@ -186,25 +186,43 @@ def main() -> int:
         lines5e.append(event(4624, t0 + timedelta(minutes=5 + k), "dc01.corp.local",
                              {"TargetUserName": name, "TargetLogonId": f"0x{k + 0x900:x}", "LogonType": "3",
                               "IpAddress": "10.0.5.10", "AuthenticationPackageName": "Kerberos"}))
-    # An agent's timer on 3 of 4 hosts to one address; one host's implant to another.
-    for h, (img, dst, every) in enumerate([("agent.exe", "1.2.3.10", 60)] * 3 + [("implant.exe", "5.6.7.8", 120)]):
-        for n in range(40):
-            lines5e.append(event(3, t0 + timedelta(seconds=every * n + (n % 3)), f"pc{h}.corp.local",
+    def beacons(agents):
+        # An agent's timer on `agents` hosts to one address; one more host's implant to another.
+        out = []
+        for h, (img, dst, every) in enumerate([("agent.exe", "1.2.3.10", 60)] * agents
+                                              + [("implant.exe", "5.6.7.8", 120)]):
+            for n in range(40):
+                out.append(event(3, t0 + timedelta(seconds=every * n + (n % 3)), f"pc{h}.corp.local",
                                  {"ProcessGuid": f"{{{h:02x}}}", "Image": rf"C:\Program Files\x\{img}",
                                   "Initiated": "true", "SourceIp": f"10.0.7.{h + 1}", "DestinationIp": dst,
                                   "DestinationPort": "443"}, sysmon=True))
+        return out
+
+    def mal_of(con):
+        return {r[0] for r in con.execute("SELECT DISTINCT program FROM findings JOIN raw_events USING (row_id) "
+                                          "WHERE rid = 'WIN-MAL-1'").fetchall()}
+
+    # 20 of 21 hosts: the fleet's timer.
     f5e = scratch / "story5e.xml"
-    f5e.write_text("\n".join(lines5e) + "\n", encoding="utf-8")
+    f5e.write_text("\n".join(lines5e + beacons(20)) + "\n", encoding="utf-8")
     cid, man, con = run(f5e, "log")
     auth = {r[0] for r in con.execute("SELECT entity_user FROM findings WHERE rid = 'WIN-AUTH-1'").fetchall()}
     check(auth == {"eve"}, f"the sprayed user's sign-in is WIN-AUTH-1's, the sprayer's own computer account not ({auth})")
-    mal = {r[0] for r in con.execute("SELECT DISTINCT program FROM findings JOIN raw_events USING (row_id) "
-                                     "WHERE rid = 'WIN-MAL-1'").fetchall()}
+    mal = mal_of(con)
     rec = (man.get("lines") or {}).get("WIN-MAL-1", {})
     check(mal == {"implant.exe"}, f"one host's beacon flagged, the fleet's timer not ({mal})")
     check(rec.get("method") == "fleet-wide" and [x["process"] for x in rec.get("left_out", [])] == ["agent.exe"]
-          and rec.get("hosts_with_network_events") == 4,
+          and rec.get("hosts_with_network_events") == 21,
           f"the fleet's timer is named on the line record ({rec.get('note')})")
+    con.close()
+    # 3 of 4 hosts: under 20 hosts there is no fleet (Q105) - both beacons flagged, and said why.
+    f5f = scratch / "story5e-small.xml"
+    f5f.write_text("\n".join(beacons(3)) + "\n", encoding="utf-8")
+    cid, man, con = run(f5f, "log")
+    rec = (man.get("lines") or {}).get("WIN-MAL-1", {})
+    check(mal_of(con) == {"agent.exe", "implant.exe"} and not rec.get("left_out")
+          and "under 20" in (rec.get("note") or ""),
+          f"under 20 hosts every beacon is flagged ({mal_of(con)}, {rec.get('note')})")
     con.close()
 
     print("the synthetic Windows quarter, against its ground truth")

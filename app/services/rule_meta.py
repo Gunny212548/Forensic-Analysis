@@ -1032,7 +1032,8 @@ RULE_META.update({
                         "not an interval (the host off, the channel asleep) and is left out of the statistics. "
                         "A (process, destination) beaconing on more than half of the hosts with Sysmon network "
                         "events is the fleet's timer, not a rare destination (AN0076, AN0761), and is left out, "
-                        "named on the line record (W-D11).",
+                        "named on the line record (W-D11) - only from 20 such hosts up: under that there is no "
+                        "fleet to call a destination common in, and every beacon is flagged (Q105).",
             "technical_context": "Needs Sysmon network connection logging (event 3); public IPv4 destinations "
                                  "only, as R2007.",
             "blind_spots": "Beacons slower than an hour; jitter above 0.6; destinations by name only (Sysmon "
