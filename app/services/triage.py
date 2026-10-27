@@ -347,7 +347,11 @@ def review_case(case_id: str, findings: list[dict], on_progress=None, again: boo
                 "reviewed": len(items), "items": items,
                 "failed": {k: v for k, v in failed.items() if k not in items}, "errors": notes}
 
+    # The advice so far, so that a failure after some batches keeps what they wrote.
+    so_far = {"items": done, "failed": {}, "notes": []}
+
     def on_batch(items, failed, notes):
+        so_far.update(items=dict(items), failed=dict(failed), notes=list(notes))
         # Checked before writing: a case deleted under the review must not get its file back.
         if should_continue and not should_continue():
             return False
@@ -360,7 +364,8 @@ def review_case(case_id: str, findings: list[dict], on_progress=None, again: boo
         result = snapshot(out["items"], out["failed"], out["errors"], "done")
     except Exception as exc:  # noqa: BLE001
         log.warning("case %s: AI review failed", case_id, exc_info=True)
-        result = {**snapshot(done, {}, [], "failed"), "error": f"{type(exc).__name__}: {exc}"[:500]}
+        result = {**snapshot(so_far["items"], so_far["failed"], so_far["notes"], "failed"),
+                  "error": f"{type(exc).__name__}: {exc}"[:500]}
     if should_continue is None or should_continue():
         _write(case_id, result)
     return result
@@ -368,16 +373,19 @@ def review_case(case_id: str, findings: list[dict], on_progress=None, again: boo
 
 # --- in the background (C-D2, Q101): the case is ready after the rules; the review runs on ------
 
-_queue: "queue.Queue[tuple[str, bool]]" = queue.Queue()
+_queue: "queue.Queue[tuple[str, str]]" = queue.Queue()   # (case_id, run)
 _worker: threading.Thread | None = None
 _guard = threading.Lock()
 
 
 def _set(case_id: str, **fields) -> None:
-    m = storage.load_manifest(case_id)
-    if m is None:
-        return
-    storage.update_case(case_id, ai_review={**(m.get("ai_review") or {}), **fields})
+    # Read and written under the case's lock: the worker's count and a request's enqueue
+    # both merge into `ai_review`, and the last writer would drop the other's `run`.
+    with storage._case_lock(case_id):
+        m = storage.load_manifest(case_id)
+        if m is None:
+            return
+        storage.update_case(case_id, ai_review={**(m.get("ai_review") or {}), **fields})
 
 
 def enqueue(case_id: str, again: bool = False) -> None:

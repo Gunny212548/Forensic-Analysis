@@ -151,9 +151,12 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
 
       {/* The AI reviews every suggestion (specs/ai_review_coverage.md): how far it is, and the
           ones a failed call left without advice, which Review again sends once more. */}
-      {data.ai_review && data.ai_review.status !== 'off' && (() => {
-        const a = data.ai_review
+      {(() => {
         const missing = (data.findings || []).filter((f) => !f.ai_review).length
+        // A case processed before the review ran in the background has no `ai_review`: shown
+        // as stopped when suggestions lack advice, so Review again is offered for it too.
+        const a = data.ai_review || (missing ? { status: 'failed', total: (data.findings || []).length } : null)
+        if (!a || a.status === 'off') return null
         return (
           <div className={`rv-chain ${a.status === 'done' && !missing ? 'ev-ok' : 'rv-chain-warn'}`}>
             {a.status === 'queued' && 'AI review queued - it starts when the model is free.'}

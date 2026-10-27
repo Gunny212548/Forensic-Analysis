@@ -165,6 +165,17 @@ def main() -> int:
     saved = triage.load(cid2)
     check(saved.get("status") == "done" and saved.get("reviewed") == 90, "the file says done, with every one")
 
+    # A failure outside a batch, after two batches, keeps the advice those batches wrote.
+    def stop_after_two(done, total, failed):
+        if done >= 10:
+            raise OSError("disk full")
+
+    res = triage.review_case(cid2, many, on_progress=stop_after_two)
+    saved = triage.load(cid2)
+    check(res.get("status") == "failed" and res["reviewed"] == 10 and saved.get("reviewed") == 10
+          and "disk full" in (res.get("error") or ""),
+          f"a failure after two batches keeps their advice ({res.get('reviewed')}, {saved.get('reviewed')})")
+
     # One suggestion that always fails, then Review again sends only it.
     bad = triage._order(many)[11]
     bad_key = bad["key"]

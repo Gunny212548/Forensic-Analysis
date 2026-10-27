@@ -409,7 +409,7 @@ RULES: list[tuple[str, str]] = [
           ON p.source = s.source
          -- A sprayer's own computer account signs in from its address all day (W-D10, Q98):
          -- the spray branch leaves out computer accounts ("...$", Microsoft 4769).
-         AND (p.account = s.account OR (p.spray AND NOT s.account LIKE '%$'))
+         AND (p.account = s.account OR (p.spray AND coalesce(s.account, '') NOT LIKE '%$'))
         JOIN win_attempt_rows r ON r.attempt_id = s.attempt_id
         WHERE s.outcome = 'success' AND s.ts > p.first_flag
         QUALIFY row_number() OVER (PARTITION BY r.row_id ORDER BY p.first_flag) = 1
