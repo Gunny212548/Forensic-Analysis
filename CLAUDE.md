@@ -124,7 +124,8 @@ GET  /api/cases/{id}/findings/events?key=    the events behind one finding, each
                                              with its source file (gotcha #49)
 GET  /api/findings                           the Findings page: workflow findings
                                              across cases, counts, open_count;
-                                             status=open = not Resolved (#51)
+                                             decision= / undecided_count (the badge,
+                                             #73); status=open = not Resolved (#51)
 POST /api/cases/{id}/review                  one analyst decision (appended)
 GET  /api/cases/{id}/review-log              full decision history
 GET  /api/cases/{id}/custody                 evidence digest + chain of custody,
@@ -455,6 +456,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #58 Ingest: question on the project (hash-chained log), provenance / declared time off the screen since 2026-10-27 (the user: too much, then not needed; `PUT /provenance` still takes them), a declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
 **AI narrative** (`analysis.py`, `llm.py`, `grounding.py`, `veris.py`)
+- #73 The analyst's decision replaced the status workflow on screen (the user, 2026-10-27): its buttons left with Respond, so every status stayed Open; Findings filters and counts by decision (badge = high / critical not decided), no assignee, no MTTC on the Overview; a case is open while a suggestion is not decided (the report gate). `lifecycle.py` and its API stay for the audit trail.
 - #72 The AI explains and never decides (the user, 2026-10-27): no accept / reject / "likely attack" - what happened, why it fired, facts for an attack and for an ordinary cause, what is not shown, check next (Heuer ACH); log values quoted; the review line keeps only model + time; old advice replaced by Review again; one schema per suggestion (a batch-wide enum let 13 of 113 name another rule's false positive), the attack side `minItems: 1` (optional, 16 of 94 attacks came back empty); ~14 s a suggestion.
 - #71 Every suggestion is reviewed by the AI itself, no cap (the user's requirement): the case is ready after the rules and the review runs on in the background (`triage.enqueue`, one worker, resumed at start-up), every rule first, a failed batch retried then sent one by one, what is left listed with "Review again" (`POST /ai-review`); batch size measured (`TRIAGE_BATCH`).
 - #64 The AI reviews every suggestion while the case is processed (`triage.py`; since #71 after it is ready): facts computed in SQL (a destination's popularity among internal hosts, the rule's documented false positives), a schema, an address check; advice under each suggestion, kept on the review line; the Upload page counts the suggestions reviewed; `TRIAGE_ENABLED=0` in every rule check and in dev.
@@ -513,9 +515,9 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
 - **IAI-18/19 Customers** - a customer is added on the Upload page only
   (see *Decisions*); the Customers page is read-only and shows, per
   customer, open cases of total / closed /
-  highest open severity / last activity. FR-6.1 defines "open" by finding
-  status: since Sprint 3 (IAI-79, gotcha #49) a case is open while a high or
-  critical finding in it is not Resolved. Cases without a customer (pre-FR-2.1) are a "No customer" row
+  highest open severity / last activity. FR-6.1 defines "open": since
+  2026-10-27 a case is open while a suggestion in it is not decided (gotcha #73;
+  from Sprint 3 it was "a high or critical finding not Resolved", IAI-79). Cases without a customer (pre-FR-2.1) are a "No customer" row
   so the totals add up. A customer's name opens its **profile page**
   (`#/customers/<id>`, `CustomerDetail.jsx`, 2026-10-15 at the user's
   request, no story; laid out as a customer profile - header card, Profile

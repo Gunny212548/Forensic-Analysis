@@ -23,6 +23,11 @@ _lock = threading.Lock()
 
 STATUS_RANK = {lifecycle.OPEN: 0, lifecycle.INVESTIGATING: 1, lifecycle.CONTAINED: 2,
                lifecycle.RESOLVED: 3}
+# The analyst's decision (review.py) is what the page filters and counts since
+# 2026-10-27: the status workflow lost its buttons with the Respond step (gotcha
+# #54), so every status stayed Open. Not decided first, as on Attack events.
+DECISIONS = (review.UNREVIEWED, review.ACCEPTED, review.MODIFIED, review.REJECTED)
+DECISION_RANK = {review.UNREVIEWED: 0, review.MODIFIED: 1, review.ACCEPTED: 2, review.REJECTED: 3}
 SEVERITIES = tuple(WEIGHT)
 # A status filter that is not one status: every finding not yet Resolved - what
 # the Overview's area cards and the menu badge count.
@@ -93,7 +98,7 @@ def _matches(row: dict, q: str) -> bool:
 
 def listing(company_id: str | None = None, status: str | None = None, severity: str | None = None,
             q: str | None = None, limit: int = 100, offset: int = 0,
-            area: str | None = None, unassigned: bool = False) -> dict:
+            area: str | None = None, unassigned: bool = False, decision: str | None = None) -> dict:
     """Workflow findings for one customer, or for every customer. The counts in
     the header describe the customer scope, before the status / severity / text
     filters narrow the table."""
@@ -104,9 +109,11 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
 
     by_severity = {s: 0 for s in SEVERITIES if WEIGHT[s] >= lifecycle.ADMIT_LEVEL}
     by_status = {s: 0 for s in lifecycle.STATES}
+    by_decision = {d: 0 for d in DECISIONS}
     for r in rows:
         by_severity[r["level"]] = by_severity.get(r["level"], 0) + 1
         by_status[r["status"]] += 1
+        by_decision[r["review"]] += 1
     open_count = sum(n for s, n in by_status.items() if s != lifecycle.RESOLVED)
 
     shown = [r for r in rows
@@ -115,10 +122,11 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
              and (not severity or r["level"] == severity)
              and (not area or r["area"] == area)
              and (not unassigned or not r["assignee"])
+             and (not decision or r["review"] == decision)
              and (not q or _matches(r, q))]
     shown.sort(key=lambda r: (r["company_name"] or "", r["fd"] or ""))
     shown.sort(key=lambda r: r["detected_ts"], reverse=True)
-    shown.sort(key=lambda r: (-r["lvl"], STATUS_RANK[r["status"]]))
+    shown.sort(key=lambda r: (-r["lvl"], DECISION_RANK[r["review"]]))
 
     return {
         "total": len(shown),
@@ -126,6 +134,9 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
         "open_count": open_count,
         "by_severity": by_severity,
         "by_status": by_status,
+        # The menu badge and the page's "Not decided" (2026-10-27).
+        "by_decision": by_decision,
+        "undecided_count": by_decision[review.UNREVIEWED],
         "areas": [{"id": a["id"], "name": a["name"]} for a in areas.AREAS],
         "limit": limit,
         "offset": offset,

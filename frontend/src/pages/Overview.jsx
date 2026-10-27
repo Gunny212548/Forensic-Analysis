@@ -52,19 +52,17 @@ export default function Overview({ companyId }) {
   // Drill-downs keep the customer this page is scoped to.
   const scope = data.company_id ? `&company_id=${encodeURIComponent(data.company_id)}` : ''
   const todo = [
-    { n: t.critical_unassigned, label: 'critical findings unassigned',
-      href: `#/findings/severity=critical&unassigned=1${scope}` },
+    { n: t.critical_undecided, label: 'critical findings not decided',
+      href: `#/findings/severity=critical&decision=Unreviewed${scope}` },
     { n: t.failed_cases, label: 'cases failed', href: data.failed_case ? `#/case/${data.failed_case}/ingest` : '#/cases' },
     { n: data.attention.length, label: 'evidence problems',
       href: data.attention.length ? `#/case/${data.attention[0].case_id}/ingest` : '#/cases' },
   ].filter((x) => x.n > 0)
-  // Red when it is a critical finding nobody owns, a failed case or tampered evidence;
-  // a review backlog alone is only a nudge.
-  const bad = t.critical_unassigned > 0 || t.failed_cases > 0 || data.attention.length > 0
-  const mttcHours = t.mttc_seconds == null ? null : t.mttc_seconds / 3600
+  // Red when it is a critical finding nobody has decided, a failed case or tampered evidence.
+  const bad = t.critical_undecided > 0 || t.failed_cases > 0 || data.attention.length > 0
   // Counted as the case page counts (the user, 2026-10-27: the Overview must match
   // what a case shows): every suggestion, and the ones the analyst has not decided.
-  // The high / critical workflow keeps its own figures, on the urgent list below.
+  // The high / critical findings (FD ids) are listed on their own below, most urgent first.
   const sevAll = SEVS.reduce((n, s) => n + sevTotals[s], 0)
   const highest = SEVS.find((s) => sevTotals[s] > 0)
   const areasHit = data.areas.filter((a) => SEVS.some((s) => a.total[s])).length
@@ -161,14 +159,10 @@ export default function Overview({ companyId }) {
             <TotalRow label="Analyst decided">
               {fmtNum(t.reviewable - t.unreviewed)} / {fmtNum(t.reviewable)}
             </TotalRow>
-            <TotalRow label="Mean time to contain"
-                      title={`created → Contained, true positives · target ≤ ${t.mttc_target_hours} h`}>
-              <span className={mttcHours != null && mttcHours > t.mttc_target_hours ? 'sev-critical' : ''}>
-                {mttcHours == null ? '—' : fmtHours(mttcHours)}
-              </span>{' '}
-              <span className="muted">/ {t.mttc_target_hours} h</span>
-            </TotalRow>
-            <TotalRow label="Open cases">{fmtNum(t.open_cases)}</TotalRow>
+            {/* No mean time to contain since 2026-10-27: nothing on screen contains a
+                finding any more (the Respond step went, gotcha #54). A case is open while a
+                suggestion in it is not decided. */}
+            <TotalRow label="Open cases" title="cases with a suggestion not decided yet">{fmtNum(t.open_cases)}</TotalRow>
             <TotalRow label="Customers">{fmtNum(t.customers)}</TotalRow>
           </BigTotal>
         }
@@ -226,22 +220,22 @@ export default function Overview({ companyId }) {
 
       <Section
         icon="alert"
-        tone={t.open_findings ? 'danger' : 'ok'}
+        tone={t.awaiting_review ? 'danger' : 'ok'}
         title="Most urgent findings"
-        sub="High and critical findings in the status workflow, not yet resolved - worst first, unassigned before assigned"
+        sub="High and critical findings not decided yet - worst first, then the one waiting longest"
         stats={[
-          { label: 'Open', value: fmtNum(t.open_findings), tone: t.open_findings ? 'danger' : 'text' },
-          { label: 'Critical unassigned', value: fmtNum(t.critical_unassigned),
-            tone: t.critical_unassigned ? 'danger' : 'text' },
+          { label: 'Not decided', value: fmtNum(t.awaiting_review), tone: t.awaiting_review ? 'danger' : 'text' },
+          { label: 'Critical not decided', value: fmtNum(t.critical_undecided),
+            tone: t.critical_undecided ? 'danger' : 'text' },
         ]}
       >
         {!data.urgent.length ? (
-          <div className="empty">Nothing is open in the workflow</div>
+          <div className="empty">Every high and critical finding is decided</div>
         ) : (
           <div className="table-scroll">
             <table className="ui-rows">
               <thead>
-                <tr><th>#</th><th>Finding</th><th>Severity</th><th>Status</th></tr>
+                <tr><th>#</th><th>Finding</th><th>Severity</th><th>First event</th></tr>
               </thead>
               <tbody>
                 {data.urgent.map((r, i) => (
@@ -259,10 +253,7 @@ export default function Overview({ companyId }) {
                       </div>
                     </td>
                     <td><span className={`sev-tag sev-tag-${r.level}`}>{SEV_EN[r.level]}</span></td>
-                    <td>
-                      {r.status}
-                      <div className={r.assignee ? 'ui-sub' : 'ui-sub urgent-unassigned'}>{r.assignee || 'unassigned'}</div>
-                    </td>
+                    <td className="mono muted">{shortTs(r.detected)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -270,8 +261,8 @@ export default function Overview({ companyId }) {
           </div>
         )}
         <div className="ui-section-more">
-          <a href={`#/findings${scope ? `/${scope.slice(1)}` : ''}`} className="table-link">
-            All open findings →
+          <a href={`#/findings/decision=Unreviewed${scope}`} className="table-link">
+            All findings not decided →
           </a>
         </div>
       </Section>
@@ -301,14 +292,9 @@ export default function Overview({ companyId }) {
   )
 }
 
-function fmtHours(h) {
-  if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`
-  return `${h.toFixed(1)} h`
-}
-
 /** Every suggestion in the area, as the case page's Attack events counts it: the
- *  number is all of them, the line under it how many the analyst has not decided
- *  and how many are high or critical and still open in the workflow. Coloured by
+ *  number is all of them, the line under it their levels and how many the analyst
+ *  has not decided. Coloured by
  *  the worst level the area holds, grey and dimmed when it holds nothing. It
  *  opens the case holding most of them, on Attack events. */
 function OverviewArea({ area, days, all }) {
@@ -317,8 +303,7 @@ function OverviewArea({ area, days, all }) {
   const levels = SEVS.filter((s) => area.total[s]).map((s) => `${fmtNum(area.total[s])} ${s}`)
   const foot = !n
     ? 'Nothing suggested'
-    : [levels.join(', '), area.undecided ? `${fmtNum(area.undecided)} not decided` : 'all decided',
-       area.open ? `${fmtNum(area.open)} open in the workflow` : ''].filter(Boolean).join(' · ')
+    : `${levels.join(', ')} · ${area.undecided ? `${fmtNum(area.undecided)} not decided` : 'all decided'}`
   return (
     <AreaCard
       href={area.case_id ? `#/case/${area.case_id}/attack-events` : undefined}

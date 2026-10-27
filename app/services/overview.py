@@ -205,7 +205,7 @@ def build(company_id: str | None = None) -> dict:
     attention: list[dict] = []             # cases with a custody / audit-log problem
     review_case = None                     # the case with the most workflow findings awaiting review
     failed_case = None                     # the newest failed case, for the banner's link
-    urgent_rows: list[dict] = []           # workflow findings not yet Resolved
+    urgent_rows: list[dict] = []           # workflow findings the analyst has not decided
     open_cases = 0
     recent = []
 
@@ -260,9 +260,13 @@ def build(company_id: str | None = None) -> dict:
                                   "customer": customer, "reason": reason})
         if facts["wf_unreviewed"] and (review_case is None or facts["wf_unreviewed"] > review_case[1]):
             review_case = (m["case_id"], facts["wf_unreviewed"])
-        if facts["wf_open"]:
+        # A case is open while any suggestion in it is not decided - the report
+        # gate (2026-10-27; it was "while a workflow finding is not Resolved", but
+        # nothing on screen moves a status since the Respond step went).
+        if facts["unreviewed"]:
             open_cases += 1
-            urgent_rows += [r for r in findings_index.case_rows(m) if r["status"] != lifecycle.RESOLVED]
+        if facts["wf_unreviewed"]:
+            urgent_rows += [r for r in findings_index.case_rows(m) if r["review"] == review.UNREVIEWED]
         for aid, a in facts["areas"].items():
             agg = area_agg[aid]
             agg["total"].update(a["total"])
@@ -344,10 +348,10 @@ def build(company_id: str | None = None) -> dict:
                       for d in days14]
     last7 = sum(r["critical"] + r["high"] for r in findings_daily[7:])
     prev7 = sum(r["critical"] + r["high"] for r in findings_daily[:7])
-    # Critical first, unassigned first, then the one that has waited longest.
+    # Critical first, then the one that has waited longest.
     urgent_rows.sort(key=lambda r: r["detected_ts"])
-    urgent_rows.sort(key=lambda r: (-r["lvl"], bool(r["assignee"])))
-    critical_unassigned = sum(1 for r in urgent_rows if r["level"] == "critical" and not r["assignee"])
+    urgent_rows.sort(key=lambda r: -r["lvl"])
+    critical_undecided = sum(1 for r in urgent_rows if r["level"] == "critical")
     last_upload = max((m.get("uploaded_at") for m in manifests if m.get("uploaded_at")), default=None)
     new_findings = sum(sum(a["new"].values()) for a in area_cards)
 
@@ -371,7 +375,7 @@ def build(company_id: str | None = None) -> dict:
             "created_last7": last7, "created_prev7": prev7,
             "mttc_seconds": (mttc_total / mttc_n) if mttc_n else None, "mttc_n": mttc_n,
             "mttc_target_hours": config.MTTC_TARGET_HOURS,
-            "critical_unassigned": critical_unassigned,
+            "critical_undecided": critical_undecided,
             "failed_cases": totals["failed"],
             "awaiting_review": totals["awaiting_review"],
         },
@@ -409,11 +413,12 @@ def lvl_bucket(lvl: int | None) -> str | None:
 def customers() -> dict:
     """The Customers page (FR-6.1): case load per customer.
 
-    FR-6.1: a case is **open** while at least one finding in the status
-    workflow is not Resolved, and **closed** when every one is Resolved - or
-    none entered the workflow (only high and critical findings do). The highest
-    open severity is the worst finding still not Resolved. Cases still
-    processing or failed are neither: they count only towards the total.
+    FR-6.1: a case is **open** while the analyst has not decided at least one
+    of its suggestions, and **closed** when every one is decided - the report
+    gate (2026-10-27; it used to follow the status workflow, whose buttons left
+    with the Respond step). The highest open severity is the worst suggestion
+    still not decided. Cases still processing or failed are neither: they count
+    only towards the total.
     """
     manifests = storage.list_manifests()
     rows: dict = {}
@@ -433,9 +438,9 @@ def customers() -> dict:
         stamps = [m.get("uploaded_at")]
         if case_views.holds_findings(m):
             facts = _case_facts(m["case_id"])
-            if facts["wf_open"]:
+            if facts["unreviewed"]:
                 r["open"] += 1
-                lvl = facts["wf_open_max_lvl"]
+                lvl = facts["open_max_lvl"]
                 if lvl is not None and (r["open_max_lvl"] is None or lvl > r["open_max_lvl"]):
                     r["open_max_lvl"] = lvl
             else:

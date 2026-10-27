@@ -78,17 +78,18 @@ function useSession() {
   return [user, setUser]
 }
 
-/** The count beside the Findings menu item (FR-0.2): findings in the status
- *  workflow that are not Resolved. null - no badge at all - until the server has
- *  answered, so an unknown count is never shown as 0. It is asked again when the
- *  page changes, because a status change on a case page changes it. */
+/** The count beside the Findings menu item (FR-0.2): high and critical findings
+ *  the analyst has not decided (since 2026-10-27; it was the status workflow's
+ *  not-Resolved, which nothing on screen moves any more). null - no badge at all -
+ *  until the server has answered, so an unknown count is never shown as 0. It is
+ *  asked again when the page changes, because a decision on a case page changes it. */
 function useOpenFindings(user, page, param) {
   const [open, setOpen] = useState(null)
   useEffect(() => {
     if (!user) return undefined
     let dead = false
     listFindings({ limit: 1 })
-      .then((r) => !dead && setOpen(r.open_count))
+      .then((r) => !dead && setOpen(r.undecided_count))
       .catch(() => !dead && setOpen(null))
     return () => {
       dead = true

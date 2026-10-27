@@ -11,8 +11,9 @@ const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low
  *  data enters the system (decided 2026-10-05), so this page has no "Add
  *  customer" button although the Figma shows one.
  *
- *  "Open" follows the finding status workflow (IAI-79): a case is open while a
- *  high or critical finding is not yet Resolved. The footnote states the rule,
+ *  "Open" follows the analyst's decisions since 2026-10-27 (it followed the
+ *  status workflow, IAI-79, until nothing on screen could move a status): a case
+ *  is open while a suggestion in it is not decided. The footnote states the rule,
  *  because a number that silently means something else is worse than one that
  *  is labelled. */
 export default function Customers() {
@@ -118,9 +119,9 @@ export default function Customers() {
           </table>
         </div>
         <div className="field-hint cust-note">
-          A case is open while any high or critical finding in it is not yet Resolved, and closed once every
-          one is - or none entered the workflow. Cases still processing or failed count only towards the
-          total. Last activity is the latest upload or review decision.
+          A case is open while any suggestion in it is not decided yet, and closed once the analyst has
+          decided every one - when its report can be issued. Highest open severity is the worst suggestion
+          not decided. Cases still processing or failed count only towards the total. Last activity is the latest upload or review decision.
         </div>
       </div>
     </section>

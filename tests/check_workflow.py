@@ -363,29 +363,28 @@ def main() -> int:
         check({x["key"]: x["fd"] for x in tracked(F)} == ids_before, "same ids")
         check({x["key"]: x["lifecycle"]["status"] for x in tracked(F)} == st_before, "same statuses")
 
-        print("Customers: open while a workflow finding is not Resolved (IAI-79)")
+        print("Customers: open while a suggestion is not decided (the report gate, 2026-10-27)")
 
         def row(company_id: str) -> dict:
             return next(x for x in c.get("/api/companies/summary").json()["customers"] if x["company_id"] == company_id)
 
         r0 = row(OTHER)
-        check(r0["open"] == 1 and r0["closed"] == 0 and r0["open_severity"] in ("high", "critical"),
-              f"a case with open workflow findings is open ({r0['open']} open, {r0['open_severity']})")
-        top = max(x["lvl"] for x in tracked(O))
-        for x in tracked(O):
-            lc(O, x, "assign", assignee=B_EMAIL)
-            lc(O, x, "investigate")
-            c.post(f"/api/cases/{O}/review", json={"finding_key": x["key"], "action": "accept"})
-            lc(O, x, "resolve", classification="false_positive", summary="test close")
+        all_o = findings(O)
+        top_level = max(all_o, key=lambda x: x["lvl"] or 0)["level"]
+        check(r0["open"] == 1 and r0["closed"] == 0 and r0["open_severity"] == top_level,
+              f"a case with undecided suggestions is open at the worst one ({r0['open_severity']})")
+        for x in all_o:
+            if x["review"]["status"] == "Unreviewed":
+                c.post(f"/api/cases/{O}/review", json={"finding_key": x["key"], "action": "accept"})
         r1 = row(OTHER)
-        unrev = c.get(f"/api/cases/{O}/findings").json()["review_summary"].get("Unreviewed", 0)
+        check(c.get(f"/api/cases/{O}/findings").json()["ready_for_report"], "(every suggestion of the case decided)")
         check(r1["open"] == 0 and r1["closed"] == 1 and r1["open_severity"] is None,
-              f"closed once every workflow finding is Resolved ({unrev} lower findings are still unreviewed)")
-        keep = tracked(O)[0]
-        lc(O, keep, "reopen", note="again")
+              "closed once every suggestion is decided - whatever the status workflow says")
+        keep = min(all_o, key=lambda x: x["lvl"] or 0)
+        c.post(f"/api/cases/{O}/review", json={"finding_key": keep["key"], "action": "unreview"})
         r2 = row(OTHER)
-        check(r2["open"] == 1 and r2["open_severity"] == keep["level"], "reopening makes it open again at that finding's severity")
-        check(top >= keep["lvl"], "(sanity: the open severity is the reopened finding's)")
+        check(r2["open"] == 1 and r2["open_severity"] == keep["level"],
+              f"undoing one decision opens it again, at that suggestion's level ({keep['level']})")
         auth_row = row(W)
         check(auth_row["open"] >= 1, "the other customer is untouched")
 
@@ -438,15 +437,21 @@ def main() -> int:
         check(t0["last_upload"] is not None and t0["ready"] == 4, "last upload and processed files are reported")
         check(t0["open_cases"] == sum(x["open"] for x in c.get("/api/companies/summary").json()["customers"]),
               "open cases follow the same rule as the Customers page")
-        un = c.get("/api/findings", params={"unassigned": "true", "severity": "critical"}).json()
-        check(t0["critical_unassigned"] == un["total"] and all(not x["assignee"] for x in un["rows"]),
-              f"critical, unassigned = what that Findings filter lists ({un['total']})")
+        cu = c.get("/api/findings", params={"decision": "Unreviewed", "severity": "critical"}).json()
+        check(t0["critical_undecided"] == cu["total"],
+              f"critical, not decided = what that Findings filter lists ({cu['total']})")
         check(t0["failed_cases"] == 0 and ov["review_case"] in (A, F, Z, O), "no failed cases; the review backlog names a case")
         check(ov["attention"] == [], "no evidence or audit-log problem yet")
         wf_unrev = sum(1 for cid in (A, F, Z, O) for x in findings(cid)
                        if x["lifecycle"]["tracked"] and x["review"]["status"] == "Unreviewed")
         check(t0["awaiting_review"] == wf_unrev and t0["awaiting_review"] <= t0["unreviewed"],
               f"'awaiting review' counts workflow findings only ({wf_unrev}, of {t0['unreviewed']} unreviewed in all)")
+        dec = c.get("/api/findings", params={"decision": "Unreviewed", "limit": 500}).json()
+        check(dec["total"] == dec["undecided_count"] == t0["awaiting_review"]
+              and all(x["review"] == "Unreviewed" for x in dec["rows"]),
+              f"decision=Unreviewed lists what the menu badge counts ({dec['undecided_count']})")
+        check(sum(dec["by_decision"].values()) == dec["scope_total"], "decisions add up to the workflow")
+        check(c.get("/api/findings", params={"decision": "Maybe"}).status_code == 400, "an unknown decision is refused")
         op = c.get("/api/findings", params={"status": "open"}).json()
         check(op["total"] == op["open_count"] and all(x["status"] != "Resolved" for x in op["rows"]),
               "status=open lists what the badge and the area cards count (not Resolved)")
@@ -459,9 +464,14 @@ def main() -> int:
               f"findings created per day: 14 days, all {tracked_total} workflow findings counted")
         check(t0["created_last7"] == tracked_total and t0["created_prev7"] == 0, "7 days against the 7 before")
         ur = ov["urgent"]
-        check(0 < len(ur) <= 5 and all(x["status"] != "Resolved" for x in ur), "the urgent list: at most 5, none Resolved")
-        order = [(-{"critical": 5, "high": 4}[x["level"]], bool(x["assignee"])) for x in ur]
-        check(order == sorted(order), "critical first, unassigned before assigned")
+        check(0 < len(ur) <= 5, "the urgent list: at most 5")
+        undecided_keys = {x["key"] for cid in (A, F, Z, O) for x in findings(cid) if x["review"]["status"] == "Unreviewed"}
+        check(all(x["key"] in undecided_keys for x in ur), "every one on it still not decided")
+        order = [-{"critical": 5, "high": 4}[x["level"]] for x in ur]
+        check(order == sorted(order), "critical first")
+        check(t0["critical_undecided"] == sum(1 for cid in (A, F, Z, O) for x in tracked(cid)
+                                              if x["level"] == "critical" and x["review"]["status"] == "Unreviewed"),
+              "critical not decided is counted for the banner")
         check(t0["mttc_seconds"] is None and t0["mttc_target_hours"] == 4.0, "no contained true positive yet: MTTC unknown, target 4 h")
         z1 = tracked(Z)[0]
         lc(Z, z1, "assign", assignee=B_EMAIL)

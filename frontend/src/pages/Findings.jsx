@@ -3,24 +3,30 @@ import { listCompanies, listFindings } from '../api.js'
 import { LEVEL_EN, fmtNum, shortTs } from '../format.js'
 import { StatTile } from '../components/cards.jsx'
 
-const STATUSES = ['Open', 'Investigating', 'Contained', 'Resolved']
+// The analyst's decision (review.py), as the case's Attack events shows it. It
+// replaced the status workflow's filter on 2026-10-27: Respond left (gotcha #54),
+// nothing on screen moves a status or sets an assignee, so every finding stayed
+// Open and unassigned.
+const DECISIONS = [['Unreviewed', 'Not decided'], ['Accepted', 'Accepted'], ['Modified', 'Modified'], ['Rejected', 'Rejected']]
+const DECISION_EN = Object.fromEntries(DECISIONS)
+const DECISION_TONE = { Unreviewed: 'warn', Accepted: 'ok', Modified: 'info', Rejected: 'muted' }
 const SEVERITIES = ['critical', 'high']
 const SEV_TONE = { critical: 'danger', high: 'warn' }
 const PAGE = 50
 
 /** figma-export/Incidents.svg, which the console calls Findings (FR-4.4): every
- *  finding that entered the status workflow, across cases. Only high and
- *  critical findings enter it (lifecycle.py); the rest stay on their case page,
- *  and the footnote says so rather than letting the table read as "all of them".
+ *  high and critical finding (each has an FD id), across cases, with the
+ *  analyst's decision on it. The rest stay on their case page, and the footnote
+ *  says so rather than letting the table read as "all of them".
  *
  *  A row opens its case on the Review tab, scrolled to the finding. */
-/** `param` is an area id, or a query string - severity, status, area, unassigned. */
+/** `param` is an area id, or a query string - severity, decision, area. */
 function initialFilters(param) {
   if (!param) return {}
   if (!param.includes('=')) return { area: param }
   const q = new URLSearchParams(param)
-  return { area: q.get('area') || '', severity: q.get('severity') || '', status: q.get('status') || '',
-    unassigned: q.get('unassigned') === '1', companyId: q.get('company_id') || '' }
+  return { area: q.get('area') || '', severity: q.get('severity') || '', decision: q.get('decision') || '',
+    companyId: q.get('company_id') || '' }
 }
 
 export default function Findings({ param }) {
@@ -29,10 +35,9 @@ export default function Findings({ param }) {
   // A link from a customer-scoped Overview carries the customer, so the list
   // opens on the findings the number that was clicked counted.
   const [companyId, setCompanyId] = useState(init.companyId || '')
-  const [status, setStatus] = useState(init.status || '')
+  const [decision, setDecision] = useState(init.decision || '')
   const [severity, setSeverity] = useState(init.severity || '')
   const [area, setArea] = useState(init.area || '')
-  const [unassigned, setUnassigned] = useState(Boolean(init.unassigned))
   const [text, setText] = useState('')
   const [q, setQ] = useState('')
   const [offset, setOffset] = useState(0)
@@ -56,12 +61,12 @@ export default function Findings({ param }) {
 
   const load = useCallback(async () => {
     try {
-      setData(await listFindings({ companyId, status, severity, area, unassigned, q, limit: PAGE, offset }))
+      setData(await listFindings({ companyId, decision, severity, area, q, limit: PAGE, offset }))
       setError('')
     } catch (err) {
       setError(err.message)
     }
-  }, [companyId, status, severity, area, unassigned, q, offset])
+  }, [companyId, decision, severity, area, q, offset])
 
   useEffect(() => {
     load()
@@ -87,8 +92,8 @@ export default function Findings({ param }) {
         <div>
           <h1>Findings</h1>
           <div className="subtitle">
-            <span className="live-dot" /> {fmtNum(data.open_count)} open of {fmtNum(data.scope_total)} in the
-            workflow{scope ? ` - ${scope.name}` : ' - all customers'}
+            <span className="live-dot" /> {fmtNum(data.undecided_count)} not decided of {fmtNum(data.scope_total)} high
+            and critical findings{scope ? ` - ${scope.name}` : ' - all customers'}
           </div>
         </div>
         <div className="actions">
@@ -100,8 +105,13 @@ export default function Findings({ param }) {
 
       {/* The two levels are filters as well as counts: a tile switches its level on and off. */}
       <div className="ui-stat-grid" aria-label="Findings per severity">
-        <StatTile icon="findings" tone={data.open_count ? 'danger' : 'ok'} value={fmtNum(data.open_count)}
-                  label="Not resolved" />
+        <StatTile icon="findings" tone={data.undecided_count ? 'warn' : 'ok'} value={fmtNum(data.undecided_count)}
+                  label="Not decided" active={decision === 'Unreviewed'}
+                  title={decision === 'Unreviewed' ? 'Show every decision' : 'Show only the findings not decided'}
+                  onClick={() => {
+                    setDecision(decision === 'Unreviewed' ? '' : 'Unreviewed')
+                    setOffset(0)
+                  }} />
         {SEVERITIES.map((s) => (
           <StatTile
             key={s}
@@ -117,10 +127,10 @@ export default function Findings({ param }) {
             }}
           />
         ))}
-        <StatTile icon="cases" tone="info" value={fmtNum(data.scope_total)} label="In the workflow" />
+        <StatTile icon="cases" tone="info" value={fmtNum(data.scope_total)} label="High and critical" />
       </div>
       <div className="fd-status-counts muted">
-        {STATUSES.map((s) => `${s} ${fmtNum(data.by_status[s] || 0)}`).join(' · ')}
+        {DECISIONS.map(([d, label]) => `${label} ${fmtNum(data.by_decision[d] || 0)}`).join(' · ')}
       </div>
 
       <div className="panel">
@@ -133,12 +143,11 @@ export default function Findings({ param }) {
               </option>
             ))}
           </select>
-          <select value={status} onChange={pick(setStatus)} aria-label="Status">
-            <option value="">Any status</option>
-            <option value="open">Not resolved</option>
-            {STATUSES.map((s) => (
-              <option value={s} key={s}>
-                {s}
+          <select value={decision} onChange={pick(setDecision)} aria-label="Decision">
+            <option value="">Any decision</option>
+            {DECISIONS.map(([d, label]) => (
+              <option value={d} key={d}>
+                {label}
               </option>
             ))}
           </select>
@@ -149,17 +158,6 @@ export default function Findings({ param }) {
                 {a.name}
               </option>
             ))}
-          </select>
-          <select
-            value={unassigned ? 'none' : ''}
-            onChange={(e) => {
-              setUnassigned(e.target.value === 'none')
-              setOffset(0)
-            }}
-            aria-label="Assignee"
-          >
-            <option value="">Any assignee</option>
-            <option value="none">Unassigned</option>
           </select>
           <select value={severity} onChange={pick(setSeverity)} aria-label="Severity">
             <option value="">Any severity</option>
@@ -172,7 +170,7 @@ export default function Findings({ param }) {
           <input
             type="text"
             className="fd-search"
-            placeholder="Search id, host, rule, file, assignee..."
+            placeholder="Search id, host, rule, file..."
             aria-label="Search findings"
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -187,20 +185,19 @@ export default function Findings({ param }) {
                 <th>Finding</th>
                 <th>Customer</th>
                 <th>Severity</th>
-                <th>Status</th>
+                <th>Decision</th>
                 <th>Log type</th>
                 <th>Source file</th>
-                <th>Assignee</th>
                 <th>Detected</th>
               </tr>
             </thead>
             <tbody>
               {!data.rows.length && (
                 <tr>
-                  <td colSpan={9} className="empty">
+                  <td colSpan={8} className="empty">
                     {data.scope_total
                       ? 'No finding matches these filters'
-                      : 'No finding has entered the workflow yet - upload a log and process it'}
+                      : 'No high or critical finding yet - upload a log and process it'}
                   </td>
                 </tr>
               )}
@@ -232,13 +229,12 @@ export default function Findings({ param }) {
                     <span className={`sev-tag sev-tag-${r.level}`}>{LEVEL_EN[r.level]}</span>
                   </td>
                   <td>
-                    <span className={`lc-${r.status.toLowerCase()}`}>
-                      <span className="lc-status">{r.status}</span>
+                    <span className={`ui-badge tone-${DECISION_TONE[r.review] || 'muted'}`}>
+                      {DECISION_EN[r.review] || r.review}
                     </span>
                   </td>
                   <td>{r.log_type}</td>
                   <td className="mono">{r.source_file}</td>
-                  <td>{r.assignee ? r.assignee : <span className="muted">unassigned</span>}</td>
                   <td className="mono muted">{shortTs(r.detected)}</td>
                 </tr>
               ))}
@@ -268,9 +264,9 @@ export default function Findings({ param }) {
           </button>
         </div>
         <div className="field-hint cust-note">
-          Only high and critical findings enter the status workflow; lower ones stay on their case page. The
-          counts above describe the selected customer, before the status, severity and search filters. Times
-          are GMT+7.
+          Only high and critical findings get an FD id and are listed here; lower ones stay on their case page.
+          A decision is taken on the case&apos;s Attack events. The counts above describe the selected customer,
+          before the decision, severity and search filters. Times are GMT+7.
         </div>
       </div>
     </section>
