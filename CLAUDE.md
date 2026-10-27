@@ -319,8 +319,11 @@ sections: Files read (a file whose reading needs attention - not analysed,
 columns guessed or missing, rows not loaded, time unreadable - is always shown,
 `Mapping.needsAttention`; the others fold under one line), question, custody and
 method open; periods, rules per product, lines and the events table folded
-(`lazy`: not fetched until opened). Attack events dropped its "N not decided" and
-"final report cannot be issued" lines - the summary card and step box say it. Light stays the default; dark is `[data-theme=dark]` on
+(`lazy`: not fetched until opened). Attack events dropped its "N not decided",
+"final report cannot be issued" and "AI explaining N of M" lines, Ingest its
+"events read, digest verified" line - the summary card (polled while the AI
+runs) and the step box say it; the AI line returns only when explanations are
+missing, with Review again. **Say a figure once on a page** (the user). Light stays the default; dark is `[data-theme=dark]` on
 `<html>`, set by the button beside the brand (`theme.js`) and kept per browser
 in localStorage `fa_theme` - the OS setting is deliberately not followed (no
 look the analyst did not ask for). The action colour is red now (`--accent`,

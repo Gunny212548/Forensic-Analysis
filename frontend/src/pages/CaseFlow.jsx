@@ -250,9 +250,12 @@ export default function CaseFlow({ caseId, stepId }) {
 
       {flow && step && (
         <div className="panel step-panel">
-          {/* Attack events' reason is "N of M not decided yet" - the summary card's
-              Analyst decided and the step box say it already (the user, 2026-10-27). */}
-          {step.id !== 'attack-events' && <div className={`step-reason step-${step.state}`}>{step.reason}</div>}
+          {/* Said already once the case is ready (the user, 2026-10-27): Attack events'
+              "N of M not decided yet" by the summary card's Analyst decided and the step
+              box, Ingest's "events read, digest verified" by its Files read and custody. */}
+          {!(ready && ['ingest', 'attack-events'].includes(step.id)) && (
+            <div className={`step-reason step-${step.state}`}>{step.reason}</div>
+          )}
           <StepBody step={step} caseId={caseId} manifest={manifest} ready={ready} ai={ai} reload={reload} />
           <div className="step-standards">
             Standards:{' '}
@@ -296,6 +299,16 @@ function CaseSummary({ caseId, manifest, flow }) {
       alive = false
     }
   }, [caseId, flow])
+  // While the AI is still explaining, its count here is the only progress on the page:
+  // read again every 20 s, as the Attack events list does, until it is done.
+  const aiRunning = ['queued', 'running'].includes(data?.ai_review?.status)
+  useEffect(() => {
+    if (!aiRunning) return undefined
+    const t = setInterval(() => {
+      getFindings(caseId).then(setData).catch(() => {})
+    }, 20000)
+    return () => clearInterval(t)
+  }, [aiRunning, caseId])
   if (!data) return null
 
   const fs = data.findings || []

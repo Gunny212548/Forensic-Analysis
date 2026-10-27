@@ -137,22 +137,19 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
       {/* The export gate is no longer repeated here: the case summary above the steps
           counts what the analyst decided, the step box what is left, and the Report
           step states the gate (the user, 2026-10-27: said twice already). */}
-      {/* The AI explains every suggestion (specs/ai_review_coverage.md): how far it is, and the
-          ones without an explanation - a failed call, or advice written before the AI stopped
-          suggesting decisions (specs/ai_triage_verdicts.md) - which Review again sends. */}
+      {/* The AI explains every suggestion (specs/ai_review_coverage.md). How far it is
+          stands in the case summary's "AI explained" (the user, 2026-10-27: no second
+          count here); this line is only for the ones without an explanation - a failed
+          call, or advice written before the AI stopped suggesting decisions
+          (specs/ai_triage_verdicts.md) - and the Review again that sends them. */}
       {(() => {
         const missing = (data.findings || []).filter((f) => !f.ai_review?.what_happened).length
         // A case processed before the review ran in the background has no `ai_review`: shown
         // as stopped when suggestions lack advice, so Review again is offered for it too.
         const a = data.ai_review || (missing ? { status: 'failed', total: (data.findings || []).length } : null)
-        if (!a || a.status === 'off') return null
+        if (!a || !(a.status === 'failed' || (a.status === 'done' && missing > 0))) return null
         return (
-          <div className={`rv-chain ${a.status === 'done' && !missing ? 'ev-ok' : 'rv-chain-warn'}`}>
-            {a.status === 'queued' && 'AI review queued - it starts when the model is free.'}
-            {a.status === 'running' &&
-              `AI explaining every suggestion: ${a.done ?? 0} of ${a.total ?? '?'} done${a.model ? ` (${a.model})` : ''}` +
-                (a.failed ? `, ${a.failed} failed so far` : '') + ' - explanations appear as they arrive.'}
-            {a.status === 'done' && !missing && `AI explained all ${a.total} suggestions${a.model ? ` (${a.model})` : ''}.`}
+          <div className="rv-chain rv-chain-warn">
             {(a.status === 'failed' || (a.status === 'done' && missing > 0)) &&
               `AI explanation on ${(a.total ?? 0) - missing} of ${a.total ?? '?'} suggestions; ${missing} without one` +
                 (a.error ? ` (${a.error})` : '') + '.'}
