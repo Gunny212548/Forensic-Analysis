@@ -54,7 +54,6 @@ export default function Overview({ companyId }) {
   const todo = [
     { n: t.critical_unassigned, label: 'critical findings unassigned',
       href: `#/findings/severity=critical&unassigned=1${scope}` },
-    { n: t.awaiting_review, label: 'awaiting review', href: data.review_case ? `#/case/${data.review_case}/attack-events` : '#/cases' },
     { n: t.failed_cases, label: 'cases failed', href: data.failed_case ? `#/case/${data.failed_case}/ingest` : '#/cases' },
     { n: data.attention.length, label: 'evidence problems',
       href: data.attention.length ? `#/case/${data.attention[0].case_id}/ingest` : '#/cases' },
@@ -63,11 +62,13 @@ export default function Overview({ companyId }) {
   // a review backlog alone is only a nudge.
   const bad = t.critical_unassigned > 0 || t.failed_cases > 0 || data.attention.length > 0
   const mttcHours = t.mttc_seconds == null ? null : t.mttc_seconds / 3600
-  const openBy = (s) => data.areas.reduce((n, a) => n + (a.open_by[s] || 0), 0)
-  const highestOpen = SEVS.find((s) => openBy(s) > 0)
-  const areasOpen = data.areas.filter((a) => a.open > 0).length
-  const createdTotal = data.findings_daily.reduce((n, d) => n + (d.critical || 0) + (d.high || 0), 0)
+  // Counted as the case page counts (the user, 2026-10-27: the Overview must match
+  // what a case shows): every suggestion, and the ones the analyst has not decided.
+  // The high / critical workflow keeps its own figures, on the urgent list below.
   const sevAll = SEVS.reduce((n, s) => n + sevTotals[s], 0)
+  const highest = SEVS.find((s) => sevTotals[s] > 0)
+  const areasHit = data.areas.filter((a) => SEVS.some((s) => a.total[s])).length
+  const firstSeen = data.trend_days.map((d, i) => data.areas.reduce((n, a) => n + (a.trend[i] || 0), 0))
 
   return (
     <section className="page ov">
@@ -146,17 +147,20 @@ export default function Overview({ companyId }) {
         side={
           <BigTotal
             icon="shield-alert"
-            tone={t.open_findings ? SEV_TONE[highestOpen] || 'muted' : 'ok'}
-            label="Open findings"
-            value={fmtNum(t.open_findings)}
+            tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
+            label="Suggestions not decided"
+            value={fmtNum(t.unreviewed)}
             badge={
-              t.open_findings ? (
-                <Badge tone={SEV_TONE[highestOpen] || 'muted'}>Highest: {SEV_EN[highestOpen] || '—'}</Badge>
+              t.unreviewed ? (
+                <Badge tone={SEV_TONE[highest] || 'muted'}>Highest: {SEV_EN[highest] || '—'}</Badge>
               ) : (
-                <Badge tone="ok">Nothing open</Badge>
+                <Badge tone="ok">{t.reviewable ? 'All decided' : 'Nothing suggested'}</Badge>
               )
             }
           >
+            <TotalRow label="Analyst decided">
+              {fmtNum(t.reviewable - t.unreviewed)} / {fmtNum(t.reviewable)}
+            </TotalRow>
             <TotalRow label="Mean time to contain"
                       title={`created → Contained, true positives · target ≤ ${t.mttc_target_hours} h`}>
               <span className={mttcHours != null && mttcHours > t.mttc_target_hours ? 'sev-critical' : ''}>
@@ -174,28 +178,21 @@ export default function Overview({ companyId }) {
             { label: 'Last upload', value: <span className="mono">{t.last_upload ? shortTs(fmtTime(t.last_upload)) : '—'}</span>,
               title: t.last_upload ? fmtTime(t.last_upload) : undefined },
             { label: 'Cases processed', value: <><strong>{fmtNum(t.ready)}</strong> of {fmtNum(t.cases)}</> },
-            { label: 'Areas with open findings',
-              value: <><strong>{areasOpen}</strong> of {data.areas.length} areas</> },
+            { label: 'Areas with suggestions',
+              value: <><strong>{areasHit}</strong> of {data.areas.length} areas</> },
           ]}
         />
-        <div>
-          <div className="ui-kicker">Findings created per day</div>
-          <div className="ui-headline">
-            <strong>{fmtNum(createdTotal)}</strong>
-            high and critical, when they entered the workflow · last {data.findings_daily.length} days
-          </div>
-          <DailyChart days={data.findings_daily} unit="findings" keys={['critical', 'high']} />
-        </div>
+        <FirstSeen days={data.trend_days} values={firstSeen} />
       </SummaryCard>
 
       <section aria-label="Detection areas">
         <div className="area-title">
           <h2 className="section-h">Detection areas</h2>
-          <span className="muted">open workflow findings · trend of findings first seen per day of event time</span>
+          <span className="muted">every suggestion, as each case counts it · trend of suggestions first seen per day of event time</span>
         </div>
         <div className="ui-area-grid">
           {data.areas.map((a) => (
-            <OverviewArea key={a.id} area={a} days={data.trend_days} scope={scope} openTotal={t.open_findings} />
+            <OverviewArea key={a.id} area={a} days={data.trend_days} all={sevAll} />
           ))}
         </div>
       </section>
@@ -231,7 +228,7 @@ export default function Overview({ companyId }) {
         icon="alert"
         tone={t.open_findings ? 'danger' : 'ok'}
         title="Most urgent findings"
-        sub="Workflow findings not yet resolved - worst severity first, unassigned before assigned"
+        sub="High and critical findings in the status workflow, not yet resolved - worst first, unassigned before assigned"
         stats={[
           { label: 'Open', value: fmtNum(t.open_findings), tone: t.open_findings ? 'danger' : 'text' },
           { label: 'Critical unassigned', value: fmtNum(t.critical_unassigned),
@@ -309,28 +306,64 @@ function fmtHours(h) {
   return `${h.toFixed(1)} h`
 }
 
-/** Red while a critical finding is open, amber for high, grey and dimmed when
- *  nothing is open - decided from the open counts, not from a score. The line
- *  under the number names the open ones by level, and what the area holds in
- *  all when none is open. */
-function OverviewArea({ area, days, scope, openTotal }) {
-  const tone = area.open_by.critical ? 'danger' : area.open_by.high ? 'warn' : area.open ? 'info' : 'muted'
-  const open = SEVS.filter((s) => area.open_by[s]).map((s) => `${area.open_by[s]} ${s}`)
-  const all = SEVS.reduce((n, s) => n + (area.total[s] || 0), 0)
-  const share = openTotal ? Math.round((area.open / openTotal) * 100) : 0
+/** Every suggestion in the area, as the case page's Attack events counts it: the
+ *  number is all of them, the line under it how many the analyst has not decided
+ *  and how many are high or critical and still open in the workflow. Coloured by
+ *  the worst level the area holds, grey and dimmed when it holds nothing. It
+ *  opens the case holding most of them, on Attack events. */
+function OverviewArea({ area, days, all }) {
+  const n = SEVS.reduce((k, s) => k + (area.total[s] || 0), 0)
+  const worst = SEVS.find((s) => area.total[s])
+  const levels = SEVS.filter((s) => area.total[s]).map((s) => `${fmtNum(area.total[s])} ${s}`)
+  const foot = !n
+    ? 'Nothing suggested'
+    : [levels.join(', '), area.undecided ? `${fmtNum(area.undecided)} not decided` : 'all decided',
+       area.open ? `${fmtNum(area.open)} open in the workflow` : ''].filter(Boolean).join(' · ')
   return (
     <AreaCard
-      href={`#/findings/area=${area.id}&status=open${scope}`}
-      title={area.about}
+      href={area.case_id ? `#/case/${area.case_id}/attack-events` : undefined}
+      title={area.cases > 1 ? `${area.about} - in ${area.cases} cases; opens the one with the most` : area.about}
       icon={area.id}
-      tone={tone}
-      value={fmtNum(area.open)}
+      tone={SEV_TONE[worst] || 'muted'}
+      value={fmtNum(n)}
       name={area.name}
-      share={area.open ? share : 0}
-      foot={area.open ? `${share}% of open · ${open.join(', ')}` : `Nothing open · ${fmtNum(all)} in all`}
+      share={all ? Math.round((n / all) * 100) : 0}
+      foot={foot}
       extra={<Spark values={area.trend} days={days} />}
-      dim={!area.open}
+      dim={!n}
     />
+  )
+}
+
+/** Suggestions by the day their first event happened, every area added up -
+ *  the same measure and span as the case page's chart, on the area cards'
+ *  shared axis. Plain SVG (nothing fetched). */
+function FirstSeen({ days, values }) {
+  if (!days.length) return null
+  const W = 900
+  const H = 110
+  const peak = Math.max(1, ...values)
+  const x = (i) => (days.length === 1 ? W / 2 : (i * W) / (days.length - 1))
+  const line = values.map((v, i) => `${x(i).toFixed(1)},${(H - 4 - (v / peak) * (H - 12)).toFixed(1)}`).join(' ')
+  const at = values.indexOf(Math.max(...values))
+  return (
+    <div>
+      <div className="ui-kicker">Suggestions by the day their first event happened</div>
+      <div className="ui-headline">
+        <strong>{fmtNum(values.reduce((a, b) => a + b, 0))}</strong>
+        from {days[0]} to {days[days.length - 1]} · most on {days[at]} ({values[at]})
+      </div>
+      <svg className="case-firstseen" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
+           aria-label={`Suggestions per day of first event, most on ${days[at]} with ${values[at]}`}>
+        <polygon points={`${x(0)},${H} ${line} ${x(days.length - 1)},${H}`} />
+        <polyline points={line} />
+      </svg>
+      <div className="case-firstseen-axis mono">
+        <span>{days[0]}</span>
+        {days.length > 2 && <span>{days[Math.floor(days.length / 2)]}</span>}
+        {days.length > 1 && <span>{days[days.length - 1]}</span>}
+      </div>
+    </div>
   )
 }
 
@@ -390,38 +423,6 @@ function SeverityBreakdown({ counts, total }) {
       </div>
       <div className="ov-sev-pcts mono">
         {SEVS.map((s) => <span key={s}>{pct(s)}% {s}</span>)}
-      </div>
-    </>
-  )
-}
-
-/** Stacked by severity. Plain divs, no chart library - the same rule as the
- *  attack graph: nothing fetched, nothing to load. */
-function DailyChart({ days, unit, keys }) {
-  const total = (d) => keys.reduce((n, k) => n + (d[k] || 0), 0)
-  const max = Math.max(1, ...days.map(total))
-  return (
-    <>
-      <div className="chart">
-        {days.map((d) => (
-          <div className="chart-col" key={d.date} title={`${d.date}: ${total(d)} ${unit}`}>
-            <div className="chart-stack">
-              {keys.map((k) =>
-                d[k] ? (
-                  <span key={k} className={`fill-${k}`} style={{ height: `${(d[k] / max) * 100}%` }} />
-                ) : null,
-              )}
-            </div>
-            <div className="chart-label mono">{Number(d.date.slice(8))}</div>
-          </div>
-        ))}
-      </div>
-      <div className="chart-legend">
-        {keys.map((s) => (
-          <span key={s}>
-            <i className={`fill-${s}`} /> {SEV_EN[s]}
-          </span>
-        ))}
       </div>
     </>
   )

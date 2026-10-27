@@ -164,7 +164,7 @@ GET  /api/overview                           KPIs, MTTC, detection areas, attent
 ```
 
 **The Overview was redesigned on 2026-10-19 (gotcha #50)** - an attention banner,
-a KPI strip (since 2026-10-27 the summary card's right column, SOCRadar layout), the detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), findings per day, top affected, urgent
+a KPI strip (since 2026-10-27 the summary card's right column, SOCRadar layout; it and the area cards count suggestions as the case page does, the workflow's figures only on the urgent list - gotcha #50), the detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), findings per day, top affected, urgent
 findings and recent activity, in the light palette; the status workflow it needed
 exists since Sprint 3 (gotcha #49). The case table is no longer on it. No figure is a
 placeholder. "Top affected"

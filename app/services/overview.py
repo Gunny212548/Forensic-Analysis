@@ -108,16 +108,19 @@ def _case_facts(case_id: str) -> dict:
                              "score": r["score"], "max_lvl": r["max_lvl"]})
 
     # Per detection area (areas.py): findings by level - all of them, and the
-    # ones still Open in the workflow - how many are not Resolved, and when each
-    # was first seen, for the card's trend.
+    # ones still Open in the workflow - how many are not Resolved, how many the
+    # analyst has not decided, and when each was first seen, for the card's trend.
     area_facts: dict = {}
     for f in collapsed:
         aid = areas.AREA_OF.get(f["rid"])
         if aid is None:
             continue
-        a = area_facts.setdefault(aid, {"total": {}, "new": {}, "open": 0, "open_lv": {}, "days": {}})
+        a = area_facts.setdefault(aid, {"total": {}, "new": {}, "open": 0, "open_lv": {}, "days": {},
+                                        "undecided": 0})
         c = areas.chip(f["level"])
         a["total"][c] = a["total"].get(c, 0) + 1
+        if state.get(f["key"], {}).get("status", review.UNREVIEWED) == review.UNREVIEWED:
+            a["undecided"] += 1
         if lifecycle.tracked(f):
             status = flow.get(f["key"], {}).get("status", lifecycle.OPEN)
             if status == lifecycle.OPEN:
@@ -195,7 +198,7 @@ def build(company_id: str | None = None) -> dict:
     tech_customers: dict[str, set] = {}
     entity_agg: dict[tuple, dict] = {}
     area_agg = {aid: {"total": Counter(), "new": Counter(), "open": 0, "open_lv": Counter(),
-                      "days": Counter()}
+                      "days": Counter(), "undecided": 0, "cases": Counter()}
                 for aid in areas.AREA_IDS}
     created_days: Counter = Counter()      # (date, level) -> workflow findings created
     mttc_total, mttc_n = 0.0, 0
@@ -267,6 +270,8 @@ def build(company_id: str | None = None) -> dict:
             agg["open"] += a["open"]
             agg["open_lv"].update(a["open_lv"])
             agg["days"].update(a["days"])
+            agg["undecided"] += a["undecided"]
+            agg["cases"][m["case_id"]] += sum(a["total"].values())
         for e in facts["entities"]:
             # Per customer: the same address in two customers' cases is two
             # different hosts, and must not add up into one row.
@@ -303,13 +308,14 @@ def build(company_id: str | None = None) -> dict:
     for e in top_entities:
         e["score"] = round(e["score"], 1)
 
-    # One date axis for every card, so their trends can be compared: the last 30
-    # days of event time that any finding was first seen on, with empty days as 0.
+    # One date axis for every card, so their trends can be compared: every day of
+    # event time from the first finding's first event to the last, empty days as 0.
+    # The whole span, not the last 30 days (2026-10-27): cut to 30, the Overview's
+    # chart counted 110 where the case page's counted 526 of the same suggestions.
     seen = sorted({d for a in area_agg.values() for d in a["days"]})
     trend_days: list[str] = []
     if seen:
-        last = datetime.fromisoformat(seen[-1]).date()
-        first = max(datetime.fromisoformat(seen[0]).date(), last - timedelta(days=29))
+        first, last = datetime.fromisoformat(seen[0]).date(), datetime.fromisoformat(seen[-1]).date()
         trend_days = [(first + timedelta(days=i)).isoformat() for i in range((last - first).days + 1)]
     area_cards = []
     for a in areas.AREAS:
@@ -321,6 +327,12 @@ def build(company_id: str | None = None) -> dict:
             "open_by": {c: agg["open_lv"].get(c, 0) for c in areas.CHIPS},
             "new": {c: agg["new"].get(c, 0) for c in areas.CHIPS},
             "total": {c: agg["total"].get(c, 0) for c in areas.CHIPS},
+            # Every suggestion the analyst has not decided - what the case page's
+            # Attack events counts - and the case holding most of the area's, which
+            # the card opens (the user, 2026-10-27: the Overview must match the case).
+            "undecided": agg["undecided"],
+            "case_id": agg["cases"].most_common(1)[0][0] if agg["cases"] else None,
+            "cases": len(agg["cases"]),
             "trend": trend,
         })
     open_findings = sum(a["open"] for a in area_cards)

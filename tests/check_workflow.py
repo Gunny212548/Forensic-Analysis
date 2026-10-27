@@ -406,10 +406,20 @@ def main() -> int:
         open_new = sum(1 for x in every_case if x["lifecycle"]["tracked"] and x["lifecycle"]["status"] == "Open")
         check(sum(sum(a["new"].values()) for a in ar) == open_new == ov["totals"]["new_findings"],
               f"New counts the findings still Open ({open_new})")
-        check(all(len(a["trend"]) == len(ov["trend_days"]) for a in ar) and 0 < len(ov["trend_days"]) <= 30,
-              "every card has one trend value per day on a shared axis (at most 30 days)")
-        check(sum(sum(a["trend"]) for a in ar) <= len(every_case) and sum(sum(a["trend"]) for a in ar) > 0,
-              "the trend counts findings first seen per day")
+        undecided = sum(1 for x in every_case if x.get("area") and x["review"]["status"] == "Unreviewed")
+        check(sum(a["undecided"] for a in ar) == undecided,
+              f"Undecided counts what the cases' Attack events have not decided ({undecided})")
+        per_case = {cid: findings(cid) for cid in (A, F, Z, O)}
+        check(all(a["case_id"] is None if not sum(a["total"].values()) else
+                  sum(1 for x in per_case[a["case_id"]] if x.get("area") == a["id"])
+                  == max(sum(1 for x in fs if x.get("area") == a["id"]) for fs in per_case.values())
+                  for a in ar),
+              "a card opens the case holding most of its area's suggestions")
+        check(all(len(a["trend"]) == len(ov["trend_days"]) for a in ar) and len(ov["trend_days"]) > 0,
+              "every card has one trend value per day on a shared axis")
+        dated = sum(1 for x in every_case if x.get("area") and x.get("ts_first"))
+        check(sum(sum(a["trend"]) for a in ar) == dated,
+              f"the trend counts every finding first seen per day, the whole span ({dated}) - as the case page")
         by_area = c.get("/api/findings", params={"area": "malware-c2"}).json()
         check(by_area["total"] > 0 and all(x["area"] == "malware-c2" for x in by_area["rows"]),
               "a card opens the Findings page on its area")

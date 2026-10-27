@@ -50,3 +50,18 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   counts plus one split bar; most urgent and recent activity are folding
   sections. No caption under the KPI numbers (rejected above), the customer line,
   Refresh and Upload stay.
+- **2026-10-27, later: the Overview counts as the case counts (the user: "the
+  dashboard does not match the case - the case has lateral movement, the
+  Overview shows no number").** Every Lateral movement suggestion was medium, so
+  the card - which counted only high / critical findings open in the workflow -
+  said 0 beside a case listing 8. Now: an area card's number is every suggestion
+  in the area (the line under it: by level, how many not decided, how many open
+  in the workflow), and it opens the case holding most of them on Attack events
+  (`case_id`; the Findings page lists the workflow only, so it could not show
+  them); the big total is suggestions not decided, with Analyst decided under it;
+  the chart is suggestions by the day their first event happened over the whole
+  span, as on the case page (cut to 30 days it said 110 where the case said 526);
+  "areas with suggestions". The banner's "awaiting review" went - the big total
+  says it. The workflow's own figures (open 7, critical unassigned, MTTC, open
+  cases) stay on the urgent list, the Findings page and the menu badge.
+  `check_workflow.py` asserts `undecided`, `case_id` and the whole-span trend.
