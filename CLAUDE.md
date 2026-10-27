@@ -290,7 +290,7 @@ in-image build produced a byte-identical bundle hash to the host build.
 
 **Look and feel follow the SENTRY-IR Figma (since 2026-09-29).** The palette
 in `styles.css` `:root` was sampled from the rendered frames (light
-`#EEF0F3` page, white panels, amber `#B36B00` as the only action colour), and
+`#EEF0F3` page, white panels, amber `#B36B00` as the only action colour - red since 2026-10-27, below), and
 the type is IBM Plex Sans / Plex Sans Thai / Plex Mono, bundled via
 `@fontsource` so the nothing-fetched-at-runtime rule above still holds.
 Plex Sans has no Thai glyphs, and most UI text is Thai, which is why the Thai
@@ -299,6 +299,21 @@ and were only re-mapped onto the Figma tokens. Exception: the attack graph
 keeps a dark canvas (`--graph-bg`), because the colours in `AttackGraph.jsx`
 are drawn for it; it gets the Figma treatment in its own story (IAI-61). The
 whole UI is in English, as the Figma is (since 2026-10-12, see *Decisions*).
+
+**The SOCRadar layout, light and dark (2026-10-27, the user's request).** The
+user asked for the whole app to look like SOCRadar's dark-web report and
+approved a mockup (claude.ai artifact "SENTRY-IR redesign"); it is built in
+steps, one branch each: 1 tokens + theme button + menu (done), 2 shared
+summary card / area card / collapsible section, 3 Overview, 4 the case steps,
+5 the other pages. Light stays the default; dark is `[data-theme=dark]` on
+`<html>`, set by the button beside the brand (`theme.js`) and kept per browser
+in localStorage `fa_theme` - the OS setting is deliberately not followed (no
+look the analyst did not ask for). The action colour is red now (`--accent`,
+the user's choice over blue, knowing it sits near critical), so **`--accent`
+means "act here" only**: amber high severity and warnings, which used to share
+it, are `--warn` - give any new severity or warning colour `--warn`, never
+`--accent`, or every high reads as a button. A colour belongs in a token with a
+value under both themes; a literal hex in a rule is wrong in one of them.
 
 The attack graph is still a **static SVG** with no library
 (`components/AttackGraph.jsx`), and its geometry is deliberately the same
