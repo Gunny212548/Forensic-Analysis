@@ -110,7 +110,17 @@ GET/POST /api/companies                      customers (FR-2.1 requires one)
 GET  /api/companies/summary                  Customers page: open/closed cases,
                                              highest open severity, last
                                              activity (overview.customers())
-GET  /api/companies/{id}/projects            the customer's projects (storage.py)
+GET  /api/companies/{id}/projects            the customer's projects with status and
+                                             what each holds, Open first (projects.py)
+POST .../projects/{pj}/close | reopen        manager / admin; close only when every
+                                             case is processed and every suggestion
+                                             decided (gotcha #75)
+PUT  .../projects/{pj}                       rename (on the project and every case)
+POST .../projects/{pj}/cases {case_id}       move a case into this project
+GET  .../projects/{pj}/deletion, DELETE ...  delete the project with its cases
+GET  .../projects/{pj}/timeline | graph      the investigation across its cases:
+                                             confirmed groups in time order; the
+                                             cases' graphs and risk joined (P4)
 GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
 GET  /api/cases/{id}/findings                collapsed findings + computed
                                              confidence + review status + FD id +
@@ -126,7 +136,7 @@ DELETE /api/companies/{id}                   customer removes, then the customer
                                              deleted/customers.jsonl (gotcha #74)
 GET  /api/cases/{id}/findings/events?key=    the events behind one finding, each
                                              with its source file (gotcha #49)
-GET  /api/findings                           the Findings page: workflow findings
+GET  /api/findings[?company_id=[&project_id=]] the Findings page: workflow findings
                                              across cases, counts, open_count;
                                              decision= / undecided_count (the badge,
                                              #73); status=open = not Resolved (#51)
@@ -166,18 +176,31 @@ GET  /api/overview[?company_id=[&project_id=]] one customer, one project of it (
                                              day, top entities (an account with its
                                              computers and source addresses), urgent
                                              findings (high / critical not decided),
-                                             activity, by_customer (each customer's
-                                             own figures - the section shown only
-                                             unscoped), coverage + attention_files,
-                                             tactics (all 15), top_rules (10, with
-                                             decisions); MTTC still returned, not shown
+                                             activity, by_customer / by_project (each
+                                             one's own figures, areas and evidence),
+                                             coverage + attention_files, tactics (all
+                                             15), top_rules (10, with decisions);
+                                             MTTC still returned, not shown
                                              (services/overview.py; per-case facts
                                              cached on a fingerprint of DuckDB, review
                                              log, custody log and id registry;
                                              gotchas #50, #51, #73)
 ```
 
-**The Overview was redesigned on 2026-10-19 (gotcha #50)** - an attention banner,
+**The Overview has three levels since 2026-10-28 (the user, gotchas #50, #75)** -
+`#/dashboard` (every customer), `#/dashboard/<co>` (one customer), `#/dashboard/<co>/<pj>`
+(one project). The first two are **overviews and nothing more**: three tiles (open cases of
+N, to review, customers - or the customer's open projects of N), the attention banner when
+something waits, and one table - **By customer**, or the customer's **Projects** - a row each
+with its suggestions per area, not decided of all, the worst not decided, (open) cases and an
+Evidence column (log source and period, days without events); a row opens the level below.
+Only a project's Overview has the details: the summary card, Evidence coverage, the
+detection areas, ATT&CK tactics reached (all 15), severity, top affected, Top rules (with the
+analysts' decisions), urgent findings, activity - the SIEM-style sections the user chose on
+2026-10-28; EPS, MTTx, a geo map and compliance were left out on purpose (gotcha #50). Cases
+in "No project" have no detail page: move them into one. What follows is the detail level:
+
+The Overview was redesigned on 2026-10-19 (gotcha #50) - an attention banner,
 a KPI strip (since 2026-10-27 the summary card's right column, SOCRadar layout), the
 detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), a per-day
 chart, top affected, urgent findings and recent activity. **Since 2026-10-27 it counts
@@ -204,10 +227,10 @@ a query of its own because `risk_scores()` feeds the narrative's prompt).
 Storage layout under `DATA_DIR` (`/data`) - **one store per customer**
 since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything
 of that customer and nothing of anyone else's: `customer.json` the customer
-record · `projects/` its projects, one JSON each · `cases/` manifests (small JSON) · `db/` per-case DuckDB · `raw/`
+record · `projects/` its projects, one JSON each and its hash-chained `.log.jsonl` (question, status, renames, moves) · `cases/` manifests (small JSON) · `db/` per-case DuckDB · `raw/`
 original uploaded files, compressed ones kept compressed (audit trail) ·
 `analysis/` cached AI output and the AI's review of the suggestions (`<case>.triage.json`) ·
-`deleted/log.jsonl` hash-chained record of every case deleted · `jobs/` one file per unfinished case (gotcha #48) ·
+`deleted/log.jsonl` hash-chained record of every case and project deleted · `jobs/` one file per unfinished case (gotcha #48) ·
 `findings/ids.jsonl` the hash-chained FD-id registry (gotcha #49) · `review/` append-only analyst decision logs,
 one JSONL per case (see gotcha #19) · `custody/` hash-chained
 chain-of-custody logs, one JSONL per case (gotcha #28). Where older gotchas
@@ -246,7 +269,9 @@ anything. The page and its bundle stay public; they hold no data.
   Failed sign-ins are throttled and every sign-in event is audit-logged (gotcha #47).
 - **Roles since IAI-14 (2026-10-22, `specs/IAI-14_rbac.md`):** admin (everything the others may, plus
   accounts - Q56's "accounts + read only" superseded by the user the same day),
-  manager (case work + customers, merge, assign, close / reopen), analyst (case work). One table,
+  manager (case work + customers and projects - create, close / reopen, rename, move a case -,
+  merge, assign, close / reopen findings, delete a case, a project or a customer), analyst (case
+  work, uploading into an existing project). One table,
   `authz.PERMISSIONS`; deny by default; a route asks `authz.require`, the UI reads the same table
   through `/api/auth/me` (`frontend/src/permissions.js`) but the server is the gate. Accounts are
   managed on the Users page (admin only, `routers/users.py`), every change hash-chained to
@@ -279,9 +304,12 @@ frontend/src/
   api.js               every call the UI makes, and nothing else
   format.js            fmtBytes/fmtTime/shortTs + the status & severity maps
   theme.js             light / dark, kept per browser in localStorage fa_theme
-  pages/               Overview (#/dashboard) · Upload · Cases · CaseFlow (one
+  pages/               Overview (#/dashboard[/<co>[/<pj>]], three levels) ·
+                       Upload · Cases · CaseFlow (one
                        case as six steps, #/case/<id>/<step>, gotcha #52) ·
-                       Findings · FindingDetail · Customers · CustomerDetail ·
+                       Findings · FindingDetail · Customers (Delete per row) ·
+                       CustomerDetail (also a project's page: close / reopen,
+                       rename, delete, move a case, timeline and path) ·
                        Users (the Settings menu item, admin) · Login ·
                        Placeholder (a menu page not built yet - none today)
   components/          Sidebar (app shell, FR-0, theme button) · StepBar
@@ -291,7 +319,8 @@ frontend/src/
                        rule) · AiReview · FindingEvents · RuleCard (Sigma/ADS)
                        Evidence (custody) · Mapping (how each file was read) ·
                        Period · Question · Reprocess · ProfilePanel · Veris ·
-                       DeleteCase · AttackGraph · analysis.jsx (chain/timeline/
+                       DeleteCase · DeleteCustomer · AttackGraph ·
+                       AttackTimelineView (a case's and a project's) · analysis.jsx (chain/timeline/
                        risk/meta, grounding warnings) · common.jsx (severity
                        pill, status badge, MITRE tags). Workspace.jsx is left
                        over from #/result and nothing imports it; Lifecycle.jsx
@@ -837,7 +866,11 @@ Two more checks, each for its own layer:
   one its test accounts land in the real `users.json`. Gotchas #49 / #50 / #73.
 - **Authorisation** - `tests/check_authz.py [repo]` (ADR-3, gotcha #51, IAI-14): the permission
   table per role, every case route answering 403 exactly where `authz.can` says no, the Users
-  routes, wrong-typed account changes refused.
+  routes, wrong-typed account changes refused; deleting a case and a customer (gotcha #74).
+- **Projects** - `tests/check_projects.py [repo] [--scratch DIR]` (gotcha #75): a project required
+  on upload, close / reopen and its gate, a Closed project refused for upload and merge, the
+  Overview and Findings per project, the customer's project rows against each project's own
+  Overview, rename / move / delete, the timeline and the joined graph across cases.
 - **Customer isolation** - `tests/check_customer_isolation.py <scratch>
   --repo /app` (31 checks, gotchas #40/#41, and projects); run it in the container the same
   way as check_mcp. Run it after touching `storage.py`, any path helper or
