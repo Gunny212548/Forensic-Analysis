@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getOverview } from '../api.js'
-import { ago, fmtNum, fmtTime, shortTs } from '../format.js'
+import { ago, fmtNum, shortTs } from '../format.js'
 import {
-  AreaCard, Badge, BigTotal, FactTiles, IconTile, Section, StatTile, SummaryCard, TotalRow,
+  AreaCard, Badge, BigTotal, IconTile, Section, StatTile, SummaryCard, TotalRow,
 } from '../components/cards.jsx'
 
 const POLL_MS = 15000
@@ -65,7 +65,6 @@ export default function Overview({ companyId }) {
   // The high / critical findings (FD ids) are listed on their own below, most urgent first.
   const sevAll = SEVS.reduce((n, s) => n + sevTotals[s], 0)
   const highest = SEVS.find((s) => sevTotals[s] > 0)
-  const areasHit = data.areas.filter((a) => SEVS.some((s) => a.total[s])).length
   const firstSeen = data.trend_days.map((d, i) => data.areas.reduce((n, a) => n + (a.trend[i] || 0), 0))
   const decided = t.reviewable - t.unreviewed
   const sevBadge = t.unreviewed ? (
@@ -194,15 +193,9 @@ export default function Overview({ companyId }) {
           )
         }
       >
-        <FactTiles
-          facts={[
-            { label: 'Last upload', value: <span className="mono">{t.last_upload ? shortTs(fmtTime(t.last_upload)) : '—'}</span>,
-              title: t.last_upload ? fmtTime(t.last_upload) : undefined },
-            { label: 'Cases processed', value: <><strong>{fmtNum(t.ready)}</strong> of {fmtNum(t.cases)}</> },
-            { label: 'Areas with suggestions',
-              value: <><strong>{areasHit}</strong> of {data.areas.length} areas</> },
-          ]}
-        />
+        {/* No fact tiles (the user, 2026-10-28): the last upload and the files processed
+            are on the line under the title, and the area cards say which areas hold
+            suggestions. */}
         <FirstSeen days={data.trend_days} values={firstSeen} />
       </SummaryCard>
 

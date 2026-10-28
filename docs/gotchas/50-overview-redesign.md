@@ -84,4 +84,6 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   the open cases, how much is to review, how many customers). Open cases of N / To review /
   Customers, under the header; they leave the summary card there, whose side becomes "Analyst
   decided 22 / 543" - each figure said once. Scoped to one customer, nothing changes (the card
-  keeps "Suggestions not decided" with Open cases and Customers under it).
+  keeps "Suggestions not decided" with Open cases and Customers under it). The fact tiles beside
+  the chart (last upload, cases processed, areas with suggestions) went the same day at the
+  user's word, on both views: the line under the title and the area cards already say them.
