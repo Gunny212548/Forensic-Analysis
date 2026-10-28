@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { getCustomerSummary } from '../api.js'
 import { ago, fmtNum } from '../format.js'
 import { StatTile } from '../components/cards.jsx'
+import DeleteCustomer from '../components/DeleteCustomer.jsx'
+import { useAccess } from '../permissions.js'
 
 const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', informational: 'Info' }
 
 /** figma-export/Customers.svg: case load per customer (FR-6.1).
  *
- *  Read-only on purpose: a customer is added only on the Upload page, where
- *  data enters the system (decided 2026-10-05), so this page has no "Add
- *  customer" button although the Figma shows one.
+ *  A customer is added only on the Upload page, where data enters the system
+ *  (decided 2026-10-05), so this page has no "Add customer" button although the
+ *  Figma shows one. Its one action is deleting a customer with every case it
+ *  holds (admin, manager - specs/customer_delete.md), confirmed in a row under it.
  *
  *  "Open" follows the analyst's decisions since 2026-10-27 (it followed the
  *  status workflow, IAI-79, until nothing on screen could move a status): a case
@@ -17,8 +20,10 @@ const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low
  *  because a number that silently means something else is worse than one that
  *  is labelled. */
 export default function Customers() {
+  const { can, why } = useAccess()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [deleting, setDeleting] = useState(null) // the company_id whose confirmation is open
 
   const load = useCallback(async () => {
     try {
@@ -79,41 +84,60 @@ export default function Customers() {
                 <th>Closed</th>
                 <th>Highest open severity</th>
                 <th>Last activity</th>
+                <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
               {!data.customers.length && (
                 <tr>
-                  <td colSpan={5} className="empty">
+                  <td colSpan={6} className="empty">
                     No customers yet - add one when you <a href="#/upload">upload</a> a log
                   </td>
                 </tr>
               )}
               {data.customers.map((c) => (
-                <tr key={c.company_id || 'none'}>
-                  <td className={c.company_id ? 'cust-name' : 'cust-name muted'}>
-                    {c.company_id ? (
-                      <a href={`#/customers/${c.company_id}`} title="Open this customer's details">
-                        {c.name}
-                      </a>
-                    ) : (
-                      c.name
-                    )}
-                  </td>
-                  <td>
-                    <span className={`cust-open${c.open ? ` tone-${c.open_severity || 'low'}` : ''}`}>{c.open}</span>{' '}
-                    <span className="cell-sub">of {c.cases}</span>
-                  </td>
-                  <td className="mono muted">{c.closed}</td>
-                  <td>
-                    {c.open_severity ? (
-                      <span className={`sev-tag sev-tag-${c.open_severity}`}>{SEV_EN[c.open_severity]}</span>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td className="mono muted">{ago(c.last_activity)}</td>
-                </tr>
+                <Fragment key={c.company_id || 'none'}>
+                  <tr>
+                    <td className={c.company_id ? 'cust-name' : 'cust-name muted'}>
+                      {c.company_id ? (
+                        <a href={`#/customers/${c.company_id}`} title="Open this customer's details">
+                          {c.name}
+                        </a>
+                      ) : (
+                        c.name
+                      )}
+                    </td>
+                    <td>
+                      <span className={`cust-open${c.open ? ` tone-${c.open_severity || 'low'}` : ''}`}>{c.open}</span>{' '}
+                      <span className="cell-sub">of {c.cases}</span>
+                    </td>
+                    <td className="mono muted">{c.closed}</td>
+                    <td>
+                      {c.open_severity ? (
+                        <span className={`sev-tag sev-tag-${c.open_severity}`}>{SEV_EN[c.open_severity]}</span>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td className="mono muted">{ago(c.last_activity)}</td>
+                    <td className="cust-actions">
+                      {/* The "No customer" row is cases from before a customer was required:
+                          no store of its own to delete. */}
+                      {c.company_id && (
+                        <button type="button" className="secondary danger-outline" disabled={!can('customer:delete')}
+                                title={why('customer:delete') || `Delete ${c.name} and every case it holds`}
+                                aria-expanded={deleting === c.company_id}
+                                onClick={() => setDeleting(deleting === c.company_id ? null : c.company_id)}>
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                  {deleting === c.company_id && (
+                    <DeleteCustomer companyId={c.company_id} colSpan={6}
+                                    onDone={(deleted) => { setDeleting(null); if (deleted) load() }} />
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

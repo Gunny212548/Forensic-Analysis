@@ -33,6 +33,7 @@ VERIFY = "evidence:verify"
 REPROCESS = "case:reprocess"
 MERGE = "case:merge"
 DELETE_CASE = "case:delete"         # the case and its evidence, for good (specs/case_delete.md)
+DELETE_CUSTOMER = "customer:delete"  # the customer and every case of it (specs/customer_delete.md)
 ANALYZE = "case:analyze"
 REVIEW = "finding:review"
 ASSIGN = "finding:assign"          # to anyone; an analyst may take an unassigned finding
@@ -48,9 +49,9 @@ _CASE_WORK = {READ, UPLOAD, PROVENANCE, VERIFY, REPROCESS, ANALYZE, REVIEW, LIFE
 PERMISSIONS = {
     ANALYST: frozenset(_CASE_WORK),
     MANAGER: frozenset(_CASE_WORK | {CUSTOMERS, QUESTION, MERGE, ASSIGN, WORK, CLOSE, REOPEN,
-                                     DELETE_CASE}),
+                                     DELETE_CASE, DELETE_CUSTOMER}),
     ADMIN: frozenset(_CASE_WORK | {CUSTOMERS, QUESTION, MERGE, ASSIGN, WORK, CLOSE, REOPEN,
-                                   DELETE_CASE, ACCOUNTS}),
+                                   DELETE_CASE, DELETE_CUSTOMER, ACCOUNTS}),
 }
 # What a role that lacks an action is told it needs - the page shows it beside
 # the disabled control.

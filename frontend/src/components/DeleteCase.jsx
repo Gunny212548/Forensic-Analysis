@@ -46,7 +46,7 @@ export default function DeleteCase({ manifest, onDeleted }) {
         review log and the chain of custody. Who deleted it and when is recorded for the customer.
       </div>
       <label>
-        Type <code>{manifest.case_id}</code> to confirm
+        <span>Type <code>{manifest.case_id}</code> to confirm</span>
         <input value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus spellCheck={false} />
       </label>
       <div className="delete-actions">

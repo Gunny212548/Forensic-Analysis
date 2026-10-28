@@ -768,6 +768,10 @@ button.danger-outline { color: var(--danger); border-color: var(--danger-border)
 .delete-case label { display: grid; gap: 4px; text-transform: none; letter-spacing: normal; }
 .delete-case input { font-family: 'IBM Plex Mono', monospace; }
 .delete-actions { display: flex; gap: 8px; }
+/* Deleting a customer: the button at the row's end, the confirmation in a row under it. */
+.cust-actions { text-align: right; width: 1%; }
+.cust-delete-row td { padding-top: 0; }
+.cust-delete-row .delete-case { max-width: 640px; }
 
 /* The AI's advice on a suggestion (AiReview.jsx). */
 .ai-review { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--panel-border); border-left: 3px solid var(--info);

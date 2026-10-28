@@ -220,6 +220,22 @@ export async function deleteCase(caseId) {
   )
 }
 
+/** What deleting the customer would remove, and the cases that block it now. */
+export async function getCustomerDeletion(companyId) {
+  return jsonOrThrow(
+    await fetch(`/api/companies/${encodeURIComponent(companyId)}/deletion`),
+    'Could not read what the deletion would remove',
+  )
+}
+
+/** Delete the customer with every case it holds, for good (admin, manager). */
+export async function deleteCustomer(companyId) {
+  return jsonOrThrow(
+    await fetch(`/api/companies/${encodeURIComponent(companyId)}`, { method: 'DELETE' }),
+    'Could not delete the customer',
+  )
+}
+
 export async function verifyEvidence(caseId) {
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/verify`, { method: 'POST' }),

@@ -46,7 +46,7 @@ TABLE = {
     authz.PROVENANCE: {A, M, N}, authz.VERIFY: {A, M, N}, authz.REPROCESS: {A, M, N},
     authz.MERGE: {A, M}, authz.ANALYZE: {A, M, N}, authz.REVIEW: {A, M, N}, authz.ASSIGN: {A, M},
     authz.WORK: {A, M}, authz.CLOSE: {A, M}, authz.REOPEN: {A, M}, authz.ACCOUNTS: {A},
-    authz.LIFECYCLE: {A, M, N}, authz.DELETE_CASE: {A, M},
+    authz.LIFECYCLE: {A, M, N}, authz.DELETE_CASE: {A, M}, authz.DELETE_CUSTOMER: {A, M},
 }
 wrong = [(action, role) for action, roles in TABLE.items() for role in authz.ROLES
          if authz.can({"role": role}, action) != (role in roles)]
@@ -264,6 +264,71 @@ check("each deletion is recorded outside the case: who, what, its files",
 check("the deletion log is hash-chained and intact",
       hashchain.verify(case_delete.log_path(co["company_id"])).get("intact"))
 check("a deleted case cannot be deleted twice (404)", manager.delete(f"/api/cases/{gone}").status_code == 404)
+
+print("deleting a customer (specs/customer_delete.md)")
+from app.services import customer_delete, finding_ids  # noqa: E402
+
+doomed = storage.create_company("Doomed Co")
+did = doomed["company_id"]
+proj = storage.create_project(did, "Q3 investigation", "check")
+c1 = storage.create_case("one.log", "log", 1, company_id=did, project=proj)["case_id"]
+storage.update_case(c1, status="ready", evidence={"sha256": "ab" * 32})
+storage.raw_path(c1, "log").write_text("evidence one\n", encoding="utf-8")
+con = db.init(c1)
+con.execute("INSERT INTO raw_events (row_id, srcip, username) VALUES (0, '10.0.0.9', 'eve')")
+con.execute("INSERT INTO findings (row_id, rid, lvl, descr, mitre) VALUES (0, 'R3001', 5, 'Large outbound transfer', ['T1041'])")
+con.close()
+fd_key = "R3001|10.0.0.9|eve"
+finding_ids.ensure(c1)
+admin.post(f"/api/cases/{c1}/review", json={"finding_key": fd_key, "action": "accept"})
+c2 = storage.create_case("two.log", "log", 1, company_id=did)["case_id"]
+storage.update_case(c2, status="processing")
+old = storage.create_case("old.log", "log", 1, company_id=did)["case_id"]
+storage.update_case(old, status="ready")
+check("a case of it deleted earlier", admin.delete(f"/api/cases/{old}").status_code == 200)
+
+check("an analyst may not see what deleting a customer removes, nor delete one",
+      analyst.get(f"/api/companies/{did}/deletion").status_code == 403
+      and analyst.delete(f"/api/companies/{did}").status_code == 403)
+pre = manager.get(f"/api/companies/{did}/deletion").json()
+check(f"the preview counts what goes and names the case that blocks it {pre}",
+      pre["cases"] == 2 and pre["projects"] == 1 and pre["suggestions"] == 1 and pre["decisions"] == 1
+      and [b["case_id"] for b in pre["busy"]] == [c2])
+check("a customer with a case being processed is not deleted (409), and nothing of it goes",
+      manager.delete(f"/api/companies/{did}").status_code == 409
+      and storage.load_company(did) is not None and storage.load_manifest(c1) is not None)
+storage.update_case(c2, status="ready")
+r = manager.delete(f"/api/companies/{did}")
+check("a manager deletes the customer", r.status_code == 200 and r.json()["deleted"] == did)
+check("its store is gone, nothing left beside the customers",
+      not storage.customer_dir(did).exists()
+      and not [p.name for p in storage.customers_dir().iterdir() if p.name.startswith(".deleting")])
+check("it leaves every list: customers, summary, cases, overview",
+      did not in {x["company_id"] for x in admin.get("/api/companies").json()}
+      and did not in {x["company_id"] for x in admin.get("/api/companies/summary").json()["customers"]}
+      and not {c1, c2} & {x["case_id"] for x in admin.get("/api/cases").json()}
+      and did not in {x["company_id"] for x in admin.get("/api/overview").json()["by_customer"]})
+check("its cases answer 404, and the customer does",
+      admin.get(f"/api/cases/{c1}").status_code == 404
+      and admin.get(f"/api/companies/{did}/projects").status_code == 404
+      and admin.delete(f"/api/companies/{did}").status_code == 404)
+check("an upload naming it is refused, and creates nothing",
+      upload(admin, company_id=did) in (400, 404) and not storage.customer_dir(did).exists())
+check("the other customer is untouched", storage.load_company(co["company_id"]) is not None
+      and storage.load_manifest(keep) is not None)
+rec = customer_delete.records()
+last = rec[-1] if rec else {}
+check("the deletion is recorded outside every store: who, the customer, each case's evidence digest",
+      last.get("actor") == "manager3@x.test" and last.get("company_name") == "Doomed Co"
+      and {c["case_id"] for c in last.get("cases", [])} == {c1, c2}
+      and next(c for c in last["cases"] if c["case_id"] == c1)["evidence_sha256"] == "ab" * 32
+      and [p["name"] for p in last.get("projects", [])] == ["Q3 investigation"])
+check("with the case deleted from it before, carried over",
+      [e["case_id"] for e in last.get("case_deletions_before", [])] == [old])
+check("the customer deletion log is hash-chained and intact",
+      hashchain.verify(customer_delete.log_path()).get("intact"))
+check("a customer with that name later is a new customer",
+      admin.post("/api/companies", json={"name": "Doomed Co"}).json()["company_id"] != did)
 
 print("\nAUTHZ OK" if not failures else f"\n{failures} FAILED")
 sys.exit(1 if failures else 0)

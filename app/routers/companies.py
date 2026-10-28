@@ -1,7 +1,9 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..services import authz, overview, storage
+from ..services import authz, customer_delete, overview, storage
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
 
@@ -38,6 +40,39 @@ async def create_company(payload: CompanyIn, request: Request):
     except authz.Forbidden as exc:
         raise HTTPException(403, str(exc))
     return storage.create_company(name)
+
+
+def _may_delete(request: Request, company_id: str) -> None:
+    try:
+        authz.require(request.state.user, authz.DELETE_CUSTOMER, company_id)
+    except authz.Forbidden as exc:
+        raise HTTPException(403, str(exc))
+
+
+# What deleting the customer would remove, for the confirmation, and the cases
+# that block it now (specs/customer_delete.md D1). Sync: it opens case DuckDBs.
+@router.get("/{company_id}/deletion")
+def deletion_preview(company_id: str, request: Request):
+    _may_delete(request, company_id)
+    try:
+        return customer_delete.preview(company_id)
+    except LookupError:
+        raise HTTPException(404, "Company not found")
+
+
+@router.delete("/{company_id}")
+async def delete_company(company_id: str, request: Request):
+    """Delete the customer with every case it holds, for good (specs/customer_delete.md):
+    admin and manager; refused while one of its cases is processed or analysed. The
+    deletion is recorded, hash-chained, in DATA_DIR/deleted/customers.jsonl."""
+    _may_delete(request, company_id)
+    try:
+        record = await asyncio.to_thread(customer_delete.delete, company_id, request.state.user["email"])
+    except customer_delete.Busy as exc:
+        raise HTTPException(409, str(exc))
+    except LookupError:
+        raise HTTPException(404, "Company not found")
+    return {"deleted": company_id, "record": record}
 
 
 @router.get("/{company_id}/projects")

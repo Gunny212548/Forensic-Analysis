@@ -120,6 +120,10 @@ GET  /api/cases/{id}/findings                collapsed findings + computed
 DELETE /api/cases/{id}                       admin / manager: every file of the
                                              case, recorded in the customer's
                                              deleted/log.jsonl (specs/case_delete.md)
+GET  /api/companies/{id}/deletion            admin / manager: what deleting the
+DELETE /api/companies/{id}                   customer removes, then the customer with
+                                             every case, recorded in the shared
+                                             deleted/customers.jsonl (gotcha #74)
 GET  /api/cases/{id}/findings/events?key=    the events behind one finding, each
                                              with its source file (gotcha #49)
 GET  /api/findings                           the Findings page: workflow findings
@@ -209,7 +213,9 @@ chain-of-custody logs, one JSONL per case (gotcha #28). Where older gotchas
 say `review/{case_id}.jsonl`, `raw/<case_id>.csv` and so on, read them as
 inside the case's customer store. Shared, because none of it is customer
 data: `intel/` threat-intel feed files (see gotcha #17) · `tmp/` staging ·
-`mcp/access.jsonl` hash-chained log of every MCP tool call (gotcha #38).
+`mcp/access.jsonl` hash-chained log of every MCP tool call (gotcha #38) ·
+`deleted/customers.jsonl` hash-chained record of every customer deleted - metadata only,
+because the customer's own store went with it (gotcha #74).
 **Login accounts are not in `DATA_DIR` at all** (gotcha #41): `users.json` +
 `session_secret` live in `AUTH_DIR` (`/auth`, its own Docker volume
 `forensic-auth`; see *Login* below).
@@ -468,6 +474,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #50 The Overview redesign, and the designs the user rejected - **do not re-propose them**.
 - #51 `#/result` retired (Reports / Attack Graph / Timeline / finding page); Sprint 3 review fixes; ADR-3/4; branches and worktrees; testing in a container; scripted-edit traps.
 - #73 The analyst's decision replaced the status workflow on screen (the user, 2026-10-27): its buttons left with Respond, so every status stayed Open; Findings filters and counts by decision (badge = high / critical not decided), no assignee, no MTTC on the Overview; a case is open while a suggestion is not decided (the report gate). `lifecycle.py` and its API stay for the audit trail.
+- #74 A customer is deleted with every case (admin / manager, the Customers page, specs/customer_delete.md): its store is renamed out of `customers/` in one step, then removed; the record goes to the shared hash-chained `deleted/customers.jsonl`, carrying its earlier case deletions; refused while a case is busy. A case without a `product` column must not break the Overview.
 - #52 The case page is six steps at `#/case/<id>/<step>` (IAI-89); `GET /flow` computes each step's state on the server and names its standards; old case links redirect. `sprint/4` merges Sprint 3's two branches.
 
 **Evidence, storage, jobs and access** (`custody.py`, `storage.py`, `jobs.py`, `auth.py`, `mcp_server.py`)
@@ -536,7 +543,8 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
   no case table (gotcha #50) and cases are reached from Customers or Findings. The Jira
   story still says Overview.
 - **IAI-18/19 Customers** - a customer is added on the Upload page only
-  (see *Decisions*); the Customers page is read-only and shows, per
+  (see *Decisions*); the Customers page's one action is deleting a customer
+  (admin / manager, gotcha #74) and it shows, per
   customer, open cases of total / closed /
   highest open severity / last activity. FR-6.1 defines "open": since
   2026-10-27 a case is open while a suggestion in it is not decided (gotcha #73;
@@ -590,7 +598,8 @@ Decisions the user made, which the Figma does not show:
   source column (CrowdStrike, Splunk, Proofpoint...) becomes the log type.
 - **A customer is added only on the Upload page (2026-10-05)** - the
   "+ Add new customer..." option of its customer select. The Customers page
-  is read-only, although the Figma gives it an "Add customer" button. The
+  has no "Add customer" button, although the Figma gives it one (its only
+  action is Delete, 2026-10-28). The
   `POST /api/companies` route predates Sprint 1 and is kept; no page calls it.
 - Uploads up to **10 GB per file, measured after decompression**, with `.gz`
   and `.zip` (a multi-file zip becomes one case, even with mixed formats),
