@@ -73,3 +73,10 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   ESXi lines, gotcha #3). A second line, asked for the same day, names the addresses it came from
   (`srcip`: "from 198.51.100.149 (138) · ..."). `db.account_origins()` is its own query:
   `risk_scores()` feeds the narrative's prompt (analysis_jobs), which must not move.
+- **2026-10-28: "By customer" on the unscoped Overview** (the user: with All customers, show what
+  each customer holds; chosen over splitting every section by customer and over one mini-board per
+  customer). One row per customer under the summary card - suggestions not decided of all, the
+  worst not decided, open cases of its cases, every suggestion per area - in the Customers page's
+  order; a row opens that customer's Overview, where the section is not shown. `by_customer` in
+  `overview.build`; `check_workflow.py` asserts the rows add up to the totals and match each
+  customer's own Overview. A customer with no case still has a row ("No case uploaded").

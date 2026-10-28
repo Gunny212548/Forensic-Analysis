@@ -7,7 +7,7 @@ import {
 
 const POLL_MS = 15000
 const SEVS = ['critical', 'high', 'medium', 'low']
-const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', none: 'None' }
+const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', informational: 'Informational', none: 'None' }
 const SEV_TONE = { critical: 'danger', high: 'warn', medium: 'info', low: 'muted' }
 const ROLE_EN = { sources: 'source', destinations: 'destination', accounts: 'account' }
 const ROLE_ICON = { sources: 'server', destinations: 'globe', accounts: 'user' }
@@ -179,6 +179,10 @@ export default function Overview({ companyId }) {
         <FirstSeen days={data.trend_days} values={firstSeen} />
       </SummaryCard>
 
+      {/* Unscoped, every figure above is all customers added up; this says what each
+          one holds (the user, 2026-10-28). Scoped, the page is that customer's already. */}
+      {!data.company_id && <ByCustomer rows={data.by_customer || []} areas={data.areas} />}
+
       <section aria-label="Detection areas">
         <div className="area-title">
           <h2 className="section-h">Detection areas</h2>
@@ -296,6 +300,66 @@ export default function Overview({ companyId }) {
         )}
       </Section>
     </section>
+  )
+}
+
+/** One row per customer, counted as the summary card and the area cards count:
+ *  suggestions not decided of all of them, the worst one not decided, cases open
+ *  (a suggestion not decided) of the customer's cases, and every suggestion per
+ *  detection area. Worst first, as on the Customers page; a row opens that
+ *  customer's own Overview. */
+function ByCustomer({ rows, areas }) {
+  const areaName = Object.fromEntries(areas.map((a) => [a.id, a.name]))
+  return (
+    <Section icon="customers" tone="info" title="By customer"
+             sub="Each customer's own suggestions - open one for its whole Overview">
+      {!rows.length ? (
+        <div className="empty">No customer yet</div>
+      ) : (
+        <div className="table-scroll">
+          <table className="ui-rows">
+            <thead>
+              <tr><th>#</th><th>Customer</th><th>Not decided</th><th>Highest not decided</th><th>Open cases</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const parts = Object.entries(r.areas).map(([id, n]) => `${areaName[id] || id} ${fmtNum(n)}`)
+                return (
+                  <tr key={r.company_id || 'none'}>
+                    <td className="ui-n">{i + 1}</td>
+                    <td>
+                      <div className="ui-main">
+                        {r.company_id ? (
+                          <a className="table-link" href={`#/dashboard/${encodeURIComponent(r.company_id)}`}>{r.name}</a>
+                        ) : (
+                          r.name
+                        )}
+                      </div>
+                      <div className="ui-sub">
+                        {parts.length ? parts.join(' · ') : r.cases ? 'Nothing suggested' : 'No case uploaded'}
+                      </div>
+                    </td>
+                    <td className="ui-count">
+                      <strong>{fmtNum(r.unreviewed)}</strong> / {fmtNum(r.reviewable)}
+                    </td>
+                    <td>
+                      {r.highest ? (
+                        <span className={`sev-tag sev-tag-${r.highest}`}>{SEV_EN[r.highest] || r.highest}</span>
+                      ) : (
+                        <span className="muted">{r.reviewable ? 'All decided' : '—'}</span>
+                      )}
+                    </td>
+                    <td className="ui-count">
+                      {fmtNum(r.open_cases)} / {fmtNum(r.cases)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
   )
 }
 

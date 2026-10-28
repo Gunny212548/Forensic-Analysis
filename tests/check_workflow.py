@@ -430,6 +430,23 @@ def main() -> int:
         check(scoped["totals"]["open_findings"] == c.get("/api/findings", params={"company_id": OTHER}).json()["open_count"],
               "scoped to one customer, the cards follow it")
 
+        print("Overview: by customer")
+        bc = ov["by_customer"]
+        check({r["company_id"] for r in bc} >= {W, OTHER}, "every customer has a row")
+        for key in ("cases", "unreviewed", "reviewable", "open_cases"):
+            check(sum(r[key] for r in bc) == ov["totals"][key],
+                  f"the rows' {key} add up to the page's total ({ov['totals'][key]})")
+        for cid in (W, OTHER):
+            one = c.get("/api/overview", params={"company_id": cid}).json()
+            r = next(x for x in bc if x["company_id"] == cid)
+            check(r["unreviewed"] == one["totals"]["unreviewed"] and r["open_cases"] == one["totals"]["open_cases"]
+                  and r["areas"] == {a["id"]: sum(a["total"].values()) for a in one["areas"] if sum(a["total"].values())},
+                  f"{r['name']}'s row says what its own Overview says")
+            check([x["company_id"] for x in one["by_customer"]] == [cid], "scoped, only that customer's row")
+        lv = {"critical": 5, "high": 4, "medium": 3, "low": 2, "informational": 1, None: 0}
+        check([-lv[r["highest"]] for r in bc] == sorted(-lv[r["highest"]] for r in bc),
+              "worst suggestion not decided first")
+
         print("Overview: top affected accounts name their computers and sources")
         from app.services import db as db_mod
         tops = c.get("/api/overview").json()["top_entities"]

@@ -214,11 +214,28 @@ def build(company_id: str | None = None) -> dict:
     urgent_rows: list[dict] = []           # workflow findings the analyst has not decided
     open_cases = 0
     recent = []
+    # Each customer's own figures, counted as the page's totals count them (the
+    # user, 2026-10-28: unscoped, the page must say what each customer holds).
+    # Every customer is listed, one with no case too; cases from before FR-2.1
+    # made a customer mandatory are one "No customer" row, so the rows add up.
+    by_customer: dict = {}
+
+    def customer_row(cid, name):
+        return by_customer.setdefault(cid, {"company_id": cid, "name": name, "cases": 0, "ready": 0,
+                                            "unreviewed": 0, "reviewable": 0, "open_cases": 0,
+                                            "open_max_lvl": None, "areas": Counter()})
+
+    for c in companies:
+        customer_row(c["company_id"], c["name"])
 
     for m in manifests:
         # Every listed item names its customer, so an unscoped page never
         # leaves the reader guessing whose data a line is.
         customer = m.get("company_name") or "No customer"
+        crow = customer_row(m.get("company_id"), customer)
+        crow["cases"] += 1
+        if m.get("status") == "ready":
+            crow["ready"] += 1
         totals["cases"] += 1
         totals[m.get("status") or "unknown"] += 1
         sev = m.get("severity") or {}
@@ -271,6 +288,15 @@ def build(company_id: str | None = None) -> dict:
         # nothing on screen moves a status since the Respond step went).
         if facts["unreviewed"]:
             open_cases += 1
+        crow["unreviewed"] += facts["unreviewed"]
+        crow["reviewable"] += facts["findings"]
+        if facts["unreviewed"]:
+            crow["open_cases"] += 1
+            lvl = facts["open_max_lvl"]
+            if lvl is not None and (crow["open_max_lvl"] is None or lvl > crow["open_max_lvl"]):
+                crow["open_max_lvl"] = lvl
+        for aid, a in facts["areas"].items():
+            crow["areas"][aid] += sum(a["total"].values())
         if facts["wf_unreviewed"]:
             urgent_rows += [r for r in findings_index.case_rows(m) if r["review"] == review.UNREVIEWED]
         for aid, a in facts["areas"].items():
@@ -371,6 +397,15 @@ def build(company_id: str | None = None) -> dict:
     new_findings = sum(sum(a["new"].values()) for a in area_cards)
 
     used_companies = {m.get("company_id") for m in manifests if m.get("company_id")}
+    # Worst suggestion not decided first, then the most not decided, then by name -
+    # the Customers page's order; "No customer" last unless something in it waits.
+    customer_rows = sorted(by_customer.values(), key=lambda r: (
+        -(r["open_max_lvl"] if r["open_max_lvl"] is not None else -1),
+        r["company_id"] is None, -r["unreviewed"], (r["name"] or "").lower()))
+    for r in customer_rows:
+        r["highest"] = level_of(r.pop("open_max_lvl"))
+        # Every suggestion per area, as the area cards count them; areas in their order.
+        r["areas"] = {aid: r["areas"][aid] for aid in areas.AREA_IDS if r["areas"][aid]}
     return {
         "generated_at": now.isoformat(),
         # What the page is scoped to, and what it can be scoped to.
@@ -407,6 +442,7 @@ def build(company_id: str | None = None) -> dict:
         "daily": [{"date": d.isoformat(), **{k: c[k] for k in ("critical", "high", "medium", "low", "none", "pending")}}
                   for d, c in daily.items()],
         "top_entities": top_entities,
+        "by_customer": customer_rows,
         # One technique is the same behaviour in every customer, so it stays
         # one card - naming each customer it was seen in.
         "techniques": [{"id": t, "name": TECHNIQUE_NAMES.get(t, ""), "cases": n, "findings": tech_findings[t],
