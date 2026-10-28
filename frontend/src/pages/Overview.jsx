@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getOverview } from '../api.js'
 import { ago, fmtNum, fmtTime, shortTs } from '../format.js'
 import {
-  AreaCard, Badge, BigTotal, FactTiles, IconTile, Section, SummaryCard, TotalRow,
+  AreaCard, Badge, BigTotal, FactTiles, IconTile, Section, StatTile, SummaryCard, TotalRow,
 } from '../components/cards.jsx'
 
 const POLL_MS = 15000
@@ -67,6 +67,12 @@ export default function Overview({ companyId }) {
   const highest = SEVS.find((s) => sevTotals[s] > 0)
   const areasHit = data.areas.filter((a) => SEVS.some((s) => a.total[s])).length
   const firstSeen = data.trend_days.map((d, i) => data.areas.reduce((n, a) => n + (a.trend[i] || 0), 0))
+  const decided = t.reviewable - t.unreviewed
+  const sevBadge = t.unreviewed ? (
+    <Badge tone={SEV_TONE[highest] || 'muted'}>Highest: {SEV_EN[highest] || '—'}</Badge>
+  ) : (
+    <Badge tone="ok">{t.reviewable ? 'All decided' : 'Nothing suggested'}</Badge>
+  )
 
   return (
     <section className="page ov">
@@ -119,6 +125,21 @@ export default function Overview({ companyId }) {
         </div>
       </div>
 
+      {/* Every customer at once: the three figures the user asked to see first (2026-10-28) -
+          cases open, suggestions to review, customers. They leave the summary card here, so
+          each is said once; scoped to one customer the card keeps them. */}
+      {!data.company_id && (
+        <div className="ui-stat-grid ov-stats">
+          <StatTile icon="cases" tone={t.open_cases ? 'danger' : 'ok'} value={fmtNum(t.open_cases)}
+                    label={`Open cases of ${fmtNum(t.cases)}`}
+                    title="Cases with a suggestion the analyst has not decided yet" />
+          <StatTile icon="shield-alert" tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
+                    value={fmtNum(t.unreviewed)} label="To review"
+                    title="Suggestions the analyst has not decided yet, in every case" />
+          <StatTile icon="customers" tone="info" value={fmtNum(t.customers)} label="Customers" />
+        </div>
+      )}
+
       {/* Only when something is waiting: a thin banner of links, and nothing at all
           when there is nothing to do. */}
       {todo.length > 0 && (
@@ -143,28 +164,34 @@ export default function Overview({ companyId }) {
       <SummaryCard
         label="Summary"
         side={
-          <BigTotal
-            icon="shield-alert"
-            tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
-            label="Suggestions not decided"
-            value={fmtNum(t.unreviewed)}
-            badge={
-              t.unreviewed ? (
-                <Badge tone={SEV_TONE[highest] || 'muted'}>Highest: {SEV_EN[highest] || '—'}</Badge>
-              ) : (
-                <Badge tone="ok">{t.reviewable ? 'All decided' : 'Nothing suggested'}</Badge>
-              )
-            }
-          >
-            <TotalRow label="Analyst decided">
-              {fmtNum(t.reviewable - t.unreviewed)} / {fmtNum(t.reviewable)}
-            </TotalRow>
-            {/* No mean time to contain since 2026-10-27: nothing on screen contains a
-                finding any more (the Respond step went, gotcha #54). A case is open while a
-                suggestion in it is not decided. */}
-            <TotalRow label="Open cases" title="cases with a suggestion not decided yet">{fmtNum(t.open_cases)}</TotalRow>
-            <TotalRow label="Customers">{fmtNum(t.customers)}</TotalRow>
-          </BigTotal>
+          data.company_id ? (
+            <BigTotal
+              icon="shield-alert"
+              tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
+              label="Suggestions not decided"
+              value={fmtNum(t.unreviewed)}
+              badge={sevBadge}
+            >
+              <TotalRow label="Analyst decided">
+                {fmtNum(decided)} / {fmtNum(t.reviewable)}
+              </TotalRow>
+              {/* No mean time to contain since 2026-10-27: nothing on screen contains a
+                  finding any more (the Respond step went, gotcha #54). A case is open while a
+                  suggestion in it is not decided. */}
+              <TotalRow label="Open cases" title="cases with a suggestion not decided yet">{fmtNum(t.open_cases)}</TotalRow>
+              <TotalRow label="Customers">{fmtNum(t.customers)}</TotalRow>
+            </BigTotal>
+          ) : (
+            // The tiles above say how many are left to review; the card says how far
+            // the analysts have got.
+            <BigTotal
+              icon="check"
+              tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
+              label="Analyst decided"
+              value={<>{fmtNum(decided)}<span className="ov-total-of">/ {fmtNum(t.reviewable)}</span></>}
+              badge={sevBadge}
+            />
+          )
         }
       >
         <FactTiles

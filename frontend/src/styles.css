@@ -125,6 +125,7 @@
   .chip-danger { background: var(--danger-tint); color: var(--danger); }
   .chip-ok { background: var(--ok-tint); color: var(--ok); }
   .ov-row { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 16px; }
+  .ov-total-of { font-size: 24px; color: var(--muted); margin-left: 6px; }
   .fill-critical { background: var(--danger); }
   .fill-high { background: var(--warn); }
   .fill-medium { background: var(--info); }

@@ -80,3 +80,8 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   order; a row opens that customer's Overview, where the section is not shown. `by_customer` in
   `overview.build`; `check_workflow.py` asserts the rows add up to the totals and match each
   customer's own Overview. A customer with no case still has a row ("No case uploaded").
+- **2026-10-28, later: three tiles on the unscoped Overview** (the user: with All customers, show
+  the open cases, how much is to review, how many customers). Open cases of N / To review /
+  Customers, under the header; they leave the summary card there, whose side becomes "Analyst
+  decided 22 / 543" - each figure said once. Scoped to one customer, nothing changes (the card
+  keeps "Suggestions not decided" with Open cases and Customers under it).
