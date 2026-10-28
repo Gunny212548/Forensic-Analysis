@@ -262,19 +262,33 @@ def tool_get_source_profiles(args: dict) -> dict:
     return {"case_id": m["case_id"], "profiles": db.source_profiles(m["case_id"], ips, limit=50)}
 
 
+def _attack_path(case_id: str) -> dict:
+    # The view the Attack path step draws (case_views.attack_path): the confirmed
+    # groups only, and nothing while a suggestion is not decided (the user, 2026-10-28).
+    p = case_views.attack_path(case_id)
+    return {"confirmed": p["confirmed"], "undecided": p["undecided"],
+            "scope": ("empty: suggestions are still undecided - the path waits for every decision"
+                      if p["undecided"] else "the finding groups the analyst confirmed (Accepted / Modified)"),
+            "graph": p["graph"], "ranking": p["risk"]}
+
+
 def tool_get_risk_ranking(args: dict) -> dict:
     m = _case(args.get("case_id"))
     _ready(m)
+    p = _attack_path(m["case_id"])
     return {"case_id": m["case_id"], "method": "sum over rules of level weight x (1 + ln rows); "
             "an ordering, not a probability (docs/STANDARDS.md)",
-            "ranking": db.risk_scores(m["case_id"])}
+            "confirmed": p["confirmed"], "undecided": p["undecided"], "scope": p["scope"],
+            "ranking": p["ranking"]}
 
 
 def tool_get_attack_graph(args: dict) -> dict:
     m = _case(args.get("case_id"))
     _ready(m)
+    p = _attack_path(m["case_id"])
     return {"case_id": m["case_id"], "source": "derived in SQL from findings, not by a model",
-            "graph": db.build_graph(m["case_id"])}
+            "confirmed": p["confirmed"], "undecided": p["undecided"], "scope": p["scope"],
+            "graph": p["graph"]}
 
 
 def tool_get_escalations(args: dict) -> dict:
@@ -539,10 +553,14 @@ TOOLS = {
                             _schema({**_CASE_PROP, "ips": {"type": "array", "items": {"type": "string"},
                                                            "maxItems": 50}}, ["case_id", "ips"])),
     "get_risk_ranking": (tool_get_risk_ranking, "Risk ranking",
-                         "Sources, destinations and accounts ranked by accumulated finding severity.",
+                         "Sources, destinations and accounts ranked by accumulated finding severity - "
+                         "over the finding groups the analyst confirmed, and empty while any suggestion "
+                         "is undecided (as the Attack path step).",
                          _schema(_CASE_PROP, ["case_id"])),
     "get_attack_graph": (tool_get_attack_graph, "Attack graph",
-                         "Source -> target edges derived in SQL from the findings, with rules and ATT&CK ids.",
+                         "Source -> target edges derived in SQL from the finding groups the analyst "
+                         "confirmed, with rules and ATT&CK ids; empty while any suggestion is undecided "
+                         "(as the Attack path step).",
                          _schema(_CASE_PROP, ["case_id"])),
     "get_escalations": (tool_get_escalations, "Attack-path escalations",
                         "Each credential-compromise / compromised-host pattern that fired, with its "

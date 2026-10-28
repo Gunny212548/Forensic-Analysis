@@ -143,7 +143,8 @@ def main() -> int:
     check(r["status"] == "ready" and r["members"] and len(r["members"]) == 2, "get_case: ready, 2 zip members")
 
     err, r = c.call("list_findings", case_id=case_id, limit=200)
-    check(not err and r["total"] > 0, f"list_findings: {r.get('total')} findings")
+    check(not err and r["total"] > 0 and r["total"] == len(r["findings"]),
+          f"list_findings: {r.get('total')} findings, all on one page")
     findings = r["findings"]
     lvls = [f["level"] for f in findings]
     check(lvls == sorted(lvls, key=lambda x: -["informational", "low", "medium", "high", "critical"].index(x)),
@@ -167,9 +168,11 @@ def main() -> int:
     err, r = c.call("get_source_profiles", case_id=case_id, ips=["10.20.30.40"])
     check(not err and r["profiles"] and r["profiles"][0]["srcip"] == "10.20.30.40", "get_source_profiles")
     err, r = c.call("get_risk_ranking", case_id=case_id)
-    check(not err and any(r["ranking"].values()), "get_risk_ranking")
+    check(not err and not any(r["ranking"].values()) and r["undecided"] == len(findings),
+          "get_risk_ranking: empty while every suggestion is undecided")
     err, r = c.call("get_attack_graph", case_id=case_id)
-    check(not err and r["graph"]["edges"], "get_attack_graph has edges")
+    check(not err and not r["graph"]["edges"] and r["undecided"] == len(findings),
+          "get_attack_graph: empty while every suggestion is undecided")
     err, r = c.call("get_escalations", case_id=case_id)
     check(not err and any(x["pattern"] == "credential-compromise" and x["srcip"] == "10.20.30.40"
                           and x["username"] == "root" for x in r["escalations"]),
@@ -266,6 +269,26 @@ def main() -> int:
         check(not err and [x["finding_key"] for x in conf] == [login["finding_key"]]
               and conf[0]["decision"]["actor"] == EMAIL and conf[0]["decision"]["status"] == "Accepted",
               "list_confirmed: the analyst's confirmation, with who decided")
+        err, r = c.call("get_attack_graph", case_id=case_id)
+        check(not err and not r["graph"]["edges"] and r["undecided"] == len(findings) - 1,
+              "get_attack_graph: still empty with one suggestion confirmed and the rest undecided")
+        # Reject every other suggestion: the path is then the confirmed login alone.
+        rest = [f["finding_key"] for f in findings if f["finding_key"] != login["finding_key"]]
+        subprocess.run([sys.executable, "-c",
+                        "import sys; sys.path.insert(0, sys.argv[1]); from app.services import review\n"
+                        "for k in sys.argv[4:]:\n"
+                        "    review.record_review(sys.argv[2], k, 'reject', sys.argv[3],"
+                        " reason_code='insufficient_evidence')",
+                        str(repo), case_id, EMAIL, *rest], env=env, check=True)
+        err, r = c.call("get_attack_graph", case_id=case_id)
+        edges = r.get("graph", {}).get("edges") or []
+        check(not err and r["undecided"] == 0 and r["confirmed"] == 1 and edges
+              and {x for e in edges for x in e["rules"]} == {"R2008"},
+              f"get_attack_graph: every suggestion decided - the confirmed login's edges only ({len(edges)})")
+        err, r = c.call("get_risk_ranking", case_id=case_id)
+        check(not err and r["undecided"] == 0
+              and [x["entity"] for x in r["ranking"]["sources"]] == [login["srcip"]],
+              "get_risk_ranking: every suggestion decided - only the confirmed group's source ranked")
 
     print("refusals")
     for label, args in [("path traversal", {"case_id": "../users"}),
