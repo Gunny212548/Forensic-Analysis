@@ -28,8 +28,9 @@ product has its own rules over six areas, every rule names its behaviour and the
 saying why it is a finding, and its line comes from the case's own evidence (legitimate
 members only) or TRW - no number set on one customer applied to another. Palo Alto and Check
 Point have theirs, Windows its sign-in, lateral-movement, host, beaconing and feed rules (gotchas
-#65-#70, `specs/windows_rules.md` stories 5a-5e); the generic R-rules still run on every other
-product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
+#65-#70, `specs/windows_rules.md` stories 5a-5e) and Microsoft Defender's own verdicts (gotcha #76,
+`specs/windows_defender_rules.md` story 5f - a product's verdict is an in-house rule, any other single
+event waits for SigmaHQ); the generic R-rules still run on every other product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
 explains every suggestion and never decides** (gotcha #72), **no cap** - in the background once the case is ready (gotchas #64,
 #71; the user, 2026-10-26: "ทุก Finding ที่เจอต้องได้รับการ review จาก AI"). **Every step must cite a
 standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
@@ -474,6 +475,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+- #76 Defender's own verdicts (story 5f, `specs/windows_defender_rules.md`): a product's verdict is an in-house rule (Q114, beside W-D1); WIN-MAL-2 one detection per host + Detection ID, medium when remediated, no technique, no generic twin (R3002 would make it a Downloader); WIN-HOST-3 turned off / tampered (T1685); item names differ per event - read the provider's templates; a rule may write a *lower* `lvl` (`least`).
 - #70 The user's blind Windows quarter (`D:\logtest\blind-windows`, now read - no longer blind): WIN-AUTH-1's spray branch leaves out computer accounts (the sprayer's own `web01$`), WIN-MAL-1 leaves out a (process, destination) beaconing on more than half the Sysmon hosts, named on the line record (ESET's timer, 40,725 rows) - only from 20 hosts up, else one host's evidence hid every beacon (Q105); not-attack rows 43,523 -> 2,567; K1 / K6 / K8 / K9 / K11 still missed.
 - #68 Windows story 5d: WIN-BRUTE-4 (B5) is Javed & Paxson's CUSUM and saw nothing until the normal was cleaned as the paper cleans it (pointwise brute-forcers out, §5's automation test) and Z counted in quarter failures (`lines.CUSUM_SCALE`) - W3 156 of 246; 4768 0x6 a failed attempt; a 4778 reconnect carries the session's own id (WIN-LAT-1, OTRF found); ADMIN$ / C$ in WIN-LAT-2, WIN-LAT-4 file copied then run; 7045 untyped.
 - #67 Windows beaconing and feeds (WIN-MAL-1, WIN-INTEL-1..2): R2007's method per (host, process, destination) with silences over an hour left out - R2007 missed a working-hours beacon; supersede R2007 / R3003-R3005 on Windows rows; documentation ranges never reach a feed.
@@ -484,7 +486,6 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #61 Every row carries its product (`products.py`, written after ingest - readers insert positionally); a product rule (`rules.RULE_PRODUCT`) reads `product_events` only; n/a per product and area with its reason; the period each evidence item covers (`period.py`). Story 1 of `specs/per_product_rules.md`.
 - #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; W3 Splunk WinEventLog text: items named from Windows' own message templates (`app/data/windows`, `tools/export_win_templates.ps1`), values as rendered. W4 Winlogbeat / NXLog JSON (`json_shape`): Winlogbeat writes rendered values and leaves out empty items; NXLog's own fields set aside by its documented list, but a template-named item always kept.
 - #59 Check Point Log Exporter records inside a ManageEngine EventLog Analyzer search export (`checkpoint_le.py`): record documented, wrapper observed; fields via `regexp_extract_all`; update logs sharing a `loguid` are `log_update` rows with no verdict; epoch `time` states its zone.
-- #76 Defender's own verdicts (story 5f, `specs/windows_defender_rules.md`): a product's verdict is an in-house rule (Q114, beside W-D1); WIN-MAL-2 one detection per host + Detection ID, medium when remediated, no technique, no generic twin (R3002 would make it a Downloader); WIN-HOST-3 turned off / tampered (T1685); item names differ per event - read the provider's templates; a rule may write a *lower* `lvl` (`least`).
 - #53 Every file is identified before it is read, in Sigma logsource terms (`identify.py`); no column is guessed; a format without a reader, or none, is kept as evidence and not analysed. A file's name proves nothing - JSON-lines arrive as `.log`, exports start with a blank line.
 
 **Time**
@@ -910,7 +911,10 @@ Two more checks, each for its own layer:
   flagged - and the real PurpleSharp spray; the lateral-movement and host rules (gotcha #66) on the same
   quarter and the real OTRF RDP / LSASS capture; story 5d (gotcha #68): W3 / W10 / W11, the CUSUM on a
   known series, 4768 0x6, the OTRF reconnect; one suggestion per behaviour (gotcha #69); story 5e
-  (gotcha #70): a sprayer's own `...$`, a fleet-wide beacon.
+  (gotcha #70): a sprayer's own `...$`, a fleet-wide beacon; story 5f (gotcha #76): Defender detections
+  and their outcome (medium only when remediated), a lone 1011, turned off / back on, tamper protection,
+  exclusions vs a routine 5007 - and with `--winevents "D:/logtest/window test/WinEvents.log"` the
+  user's file (3 suggestions, nothing else).
 - **The user's blind Windows quarter** - `D:\logtest\blind-windows` (`gen_windows_blind.py`, seed
   20260401, Kinnaree Textiles, K1-K15, `out/answer_key/`). **Its key has been read** (gotcha #70): it
   measures fixes now, not the rule set; a fair blind test needs another seed whose key nobody reads.
@@ -1022,7 +1026,10 @@ The generic rules live in `rules.py` as `(rule_id, SQL)` pairs — each is one
 against a `GROUP BY ... HAVING` subquery. Conventions: `R1xxx` single-event
 host/auth, `R2xxx` correlation, `R3xxx` network/firewall. Insert `lvl` as
 `NULL`, declare the rule's Sigma level in `RULE_LEVEL` (gotcha #26), and
-always populate `mitre`.
+always populate `mitre`. Two exceptions: a rule may write a *lower* weight when the
+event itself says so (`apply_rules` keeps `least(written, declared)` - WIN-MAL-2 when
+Defender remediated, WIN-HOST-3's blocked change; gotcha #76), and a product's own verdict
+that names no attacker behaviour carries no technique (CP-MAL-2's Anti-Virus, WIN-MAL-2).
 
 Adding a rule needs no engine changes — append to `RULES` and it runs. Add a
 `RULE_LEVEL` entry (a rule without one defaults to `low`) and a
