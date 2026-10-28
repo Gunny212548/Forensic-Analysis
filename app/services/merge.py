@@ -128,9 +128,16 @@ async def merge_cases(body: dict, actor: str) -> dict:
     if company is None:
         raise MergeRefused(404, "Company not found")
     company_name = company["name"]
-    # Sources from one project stay in it; mixed ones give a case in none.
+    # Sources from one project stay in it. Since every new case is in a project
+    # (specs/projects.md P1), sources from different projects are refused rather than
+    # giving a case in none; old cases all in no project still merge into none.
     project_ids = {m.get("project_id") for m in sources}
-    project = storage.load_project(company_id, project_ids.pop()) if len(project_ids) == 1 else None
+    if len(project_ids) != 1:
+        raise MergeRefused(409, "Cases of different projects cannot be merged - move them into one project first")
+    project_id = project_ids.pop()
+    project = storage.load_project(company_id, project_id) if project_id else None
+    if project is not None and storage.project_status(project) == storage.PROJECT_CLOSED:
+        raise MergeRefused(409, f"Project \"{project['name']}\" is closed - reopen it to add a merged case")
 
     names = [m.get("original_filename") or m["case_id"] for _, _, m in ordered]
     manifest = storage.create_case(

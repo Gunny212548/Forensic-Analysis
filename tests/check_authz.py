@@ -103,6 +103,7 @@ users["norole@x.test"] = {"email": "norole@x.test", "name": "", "role": "viewer"
                           "password": auth.hash_password(PW)}
 auth.save_users(users)
 co = storage.create_company("Existing customer")
+storage.create_project(co["company_id"], "Existing project", "check")
 
 from app.main import app  # noqa: E402
 
@@ -128,6 +129,8 @@ check("a new customer: admin and manager 200, analyst 403",
 
 
 def upload(c: TestClient, **form) -> int:
+    if "project_id" not in form:  # every case is in a project (specs/projects.md P1)
+        form.setdefault("project_name", "Existing project")
     return c.post("/api/upload", data=form,
                   files={"file": ("t.log", io.BytesIO(b"Oct 1 00:00:00 h sshd[1]: x\n"), "text/plain")}).status_code
 

@@ -3,7 +3,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..services import authz, customer_delete, overview, storage
+from ..services import authz, customer_delete, overview, projects, storage
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
 
@@ -75,8 +75,29 @@ async def delete_company(company_id: str, request: Request):
     return {"deleted": company_id, "record": record}
 
 
+# Each project with its status and what its cases hold (specs/projects.md P1), Open
+# first. Sync: it reads case DuckDBs (cached, overview._case_facts).
 @router.get("/{company_id}/projects")
-async def list_projects(company_id: str):
+def list_projects(company_id: str):
     if storage.load_company(company_id) is None:
         raise HTTPException(404, "Company not found")
-    return storage.list_projects(company_id)
+    return projects.summary(company_id)
+
+
+@router.post("/{company_id}/projects/{project_id}/{action}")
+async def change_project(company_id: str, project_id: str, action: str, request: Request):
+    """Close or reopen a project (specs/projects.md P1, Q110 / Q113): manager and admin;
+    closing is refused while a case of it is not processed or a suggestion not decided."""
+    change = {"close": projects.close, "reopen": projects.reopen}.get(action)
+    if change is None:
+        raise HTTPException(404, "Not found")
+    try:
+        authz.require(request.state.user, authz.CUSTOMERS, company_id)
+    except authz.Forbidden as exc:
+        raise HTTPException(403, str(exc))
+    try:
+        return await asyncio.to_thread(change, company_id, project_id, request.state.user["email"])
+    except projects.Refused as exc:
+        raise HTTPException(409, str(exc))
+    except LookupError:
+        raise HTTPException(404, "Project not found")

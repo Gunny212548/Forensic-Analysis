@@ -13,7 +13,6 @@ one-item investigation, so its question lives on its manifest and its changes
 on its custody log. `get` / `save` hide which of the two it is.
 """
 
-import threading
 from datetime import datetime
 
 from . import custody, hashchain, storage
@@ -25,8 +24,9 @@ MAX_LEADS = 100
 MAX_LEAD = 256
 
 # One question is read, changed and written back; two saves at once must not
-# drop either change (the app runs one process - gotcha #48).
-_lock = threading.Lock()
+# drop either change (the app runs one process - gotcha #48). The project's status
+# is written back the same way (projects.py), so both hold the one project lock.
+_lock = storage.PROJECT_LOCK
 
 
 def _clean(fields: dict) -> dict:

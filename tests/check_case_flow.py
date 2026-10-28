@@ -97,7 +97,7 @@ def main() -> int:
         def upload(path: Path) -> dict:
             with open(path, "rb") as fh:
                 return c.post("/api/upload", files={"file": (path.name, fh)},
-                              data={"company_name": "Flow Co"}).json()
+                              data={"company_name": "Flow Co", "project_name": "Flow"}).json()
 
         Z = upload(uc / "nightfall.zip")["case_id"]
         F = upload(uc / "nightfall-firewall.csv")["case_id"]

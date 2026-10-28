@@ -45,6 +45,7 @@ def _is_log(p: Path) -> bool:
     return p.suffix.lower() in LOG_SUFFIXES
 DEFAULT_URL = "http://localhost:8091"
 PARITY_CUSTOMER = "Parity check"
+PARITY_PROJECT = "Parity check"
 
 
 def _post_file(url: str, path: Path) -> dict:
@@ -56,6 +57,10 @@ def _post_file(url: str, path: Path) -> dict:
         f"--{boundary}\r\n".encode(),
         b'Content-Disposition: form-data; name="company_name"\r\n\r\n',
         f"{PARITY_CUSTOMER}\r\n".encode(),
+        # And a project (specs/projects.md P1), likewise one fixed name.
+        f"--{boundary}\r\n".encode(),
+        b'Content-Disposition: form-data; name="project_name"\r\n\r\n',
+        f"{PARITY_PROJECT}\r\n".encode(),
         f"--{boundary}\r\n".encode(),
         f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'.encode(),
         b"Content-Type: application/octet-stream\r\n\r\n",

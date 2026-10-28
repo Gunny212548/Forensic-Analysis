@@ -100,7 +100,9 @@ def main() -> int:
 
         M = upload(scratch / "mixed.log", "Ingest Co", "Night shift")["case_id"]
         A = upload(uc / "nightfall-auth.log", "Ingest Co", "Night shift")["case_id"]
-        L = upload(uc / "nightfall-firewall.csv", "Ingest Co")["case_id"]  # no project
+        L = upload(uc / "nightfall-firewall.csv", "Ingest Co", "Firewall")["case_id"]
+        # A case from before a project was required (specs/projects.md Q112): no project.
+        storage.update_case(L, project_id=None, project_name=None)
         jobs.wait_idle(180)
         first = times(M)
         mm = storage.load_manifest(M)
@@ -221,9 +223,9 @@ def main() -> int:
             check(after.get(key) == "Accepted", f"the decision is still there ({after.get(key)})")
 
         print("duplicates")
-        D = upload(scratch / "mixed.log", "Ingest Co")
+        D = upload(scratch / "mixed.log", "Ingest Co", "Night shift")
         check([d["case_id"] for d in D.get("duplicate_of") or []] == [M], "same customer: the earlier case is named")
-        X = upload(scratch / "mixed.log", "Other Co")
+        X = upload(scratch / "mixed.log", "Other Co", "Other")
         check(not X.get("duplicate_of"), "another customer: nothing named - stores never meet")
         jobs.wait_idle(120)
         check(any(M in x for x in ingest(D["case_id"])["warnings"]), "the duplicate is a warning on its Ingest step")

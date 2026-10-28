@@ -74,6 +74,10 @@ async def upload_log(
     filename = file.filename or "upload"
     # FR-2.3: "fw.csv.gz" is a gzip'd CSV, a .zip is a bundle of logs.
     kind, compression = archive.detect(filename)
+    # Asked before anything is created: a new customer must not be left behind by
+    # an upload refused for want of a project.
+    if not (project_id or project_name.strip()):
+        raise HTTPException(400, "A project is required - every case belongs to one investigation of its customer")
 
     # FR-2.1: every case belongs to exactly one customer, so an upload without
     # one is refused here and not only greyed out in the UI - the API is also
@@ -92,9 +96,10 @@ async def upload_log(
     else:
         raise HTTPException(400, "A customer is required - every case belongs to exactly one customer")
 
-    # Optional. A project is one of the chosen customer's - an id from any
+    # Every new case is in a project - one investigation of the customer
+    # (specs/projects.md P1) - refused here as the customer is, because scripts
+    # call this too. A project is one of the chosen customer's - an id from any
     # other customer is refused, never filed under this one.
-    project = None
     if project_id:
         project = storage.load_project(company["company_id"], project_id)
         if project is None:
@@ -105,6 +110,9 @@ async def upload_log(
         if project is None:
             _authorize(user, authz.CUSTOMERS)  # so is a new project
             project = storage.create_project(company["company_id"], project_name, user["email"])
+    # A closed investigation stays as it was reported (Q111): reopen it first.
+    if storage.project_status(project) == storage.PROJECT_CLOSED:
+        raise HTTPException(409, f"Project \"{project['name']}\" is closed - reopen it to add evidence")
 
     manifest = storage.create_case(
         original_filename=filename,

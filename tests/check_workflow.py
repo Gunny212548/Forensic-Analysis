@@ -170,7 +170,7 @@ def main() -> int:
         def upload(path: Path, company: str) -> dict:
             with open(path, "rb") as fh:
                 return c.post("/api/upload", files={"file": (path.name, fh)},
-                              data={"company_name": company}).json()
+                              data={"company_name": company, "project_name": company}).json()
 
         a = upload(uc / "nightfall-auth.log", "Workflow Co")
         f = upload(uc / "nightfall-firewall.csv", "Workflow Co")

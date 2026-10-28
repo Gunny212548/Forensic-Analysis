@@ -226,6 +226,8 @@
   .cp-head { display: flex; align-items: center; gap: 18px; }
   .cp-head h1 { margin: 0; }
   .cp-title { flex: 1 1 auto; min-width: 0; }
+  .cp-head h1 .ui-badge { vertical-align: middle; margin-left: 6px; }
+  .cp-project-action { display: grid; justify-items: end; gap: 4px; max-width: 360px; text-align: right; }
   .cp-avatar {
     width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
     background: var(--info-tint); color: var(--info);

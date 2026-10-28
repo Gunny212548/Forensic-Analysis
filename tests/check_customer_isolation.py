@@ -82,7 +82,7 @@ def main() -> int:
             for name in ("nightfall-auth.log", "nightfall-firewall.csv"):
                 with open(uc / name, "rb") as fh:
                     m = c.post("/api/upload", files={"file": (name, fh)},
-                               data={"company_id": co["company_id"]}).json()
+                               data={"company_id": co["company_id"], "project_name": "Isolation"}).json()
                 cases[co["company_id"]].append(m["case_id"])
         # Uploads are queued (services/jobs.py): wait for the pipeline.
         check(jobs.wait_idle(120), "the job queue drained")
@@ -136,7 +136,7 @@ def main() -> int:
         # Within one customer: two log cases of A (upload the auth log again).
         with open(uc / "nightfall-auth.log", "rb") as fh:
             again = c.post("/api/upload", files={"file": ("again.log", fh)},
-                           data={"company_id": a["company_id"]}).json()["case_id"]
+                           data={"company_id": a["company_id"], "project_name": "Isolation"}).json()["case_id"]
         jobs.wait_idle(120)
         r = c.post("/api/cases/merge", json={"case_ids": [auth_a, again]})
         merged = r.json().get("case_id") if r.status_code == 200 else None
@@ -158,9 +158,9 @@ def main() -> int:
         p2 = upload_a({"company_id": a["company_id"], "project_name": "investigation 1 "}).json()
         check(p2.get("project_id") == pid, "a project name is reused, not forked")
         listed = c.get(f"/api/companies/{a['company_id']}/projects").json()
-        check([p["project_id"] for p in listed] == [pid], "the customer's project list has it")
-        check(c.get(f"/api/companies/{b['company_id']}/projects").json() == [],
-              "the other customer has no projects")
+        check(pid in [p["project_id"] for p in listed], "the customer's project list has it")
+        check(pid not in [p["project_id"] for p in c.get(f"/api/companies/{b['company_id']}/projects").json()],
+              "the other customer does not list it")
         before = len(c.get(f"/api/cases?company_id={b['company_id']}").json())
         with open(uc / "nightfall-auth.log", "rb") as fh:
             r = c.post("/api/upload", files={"file": ("x.log", fh)},
@@ -174,10 +174,10 @@ def main() -> int:
         r = c.post("/api/cases/merge", json={"case_ids": [p1["case_id"], p2["case_id"]]})
         m = c.get(f"/api/cases/{r.json().get('case_id')}").json() if r.status_code == 200 else {}
         check(m.get("project_id") == pid, f"a merge of one project's cases stays in it ({r.status_code})")
+        # Every new case is in one project (specs/projects.md P1): a merge across
+        # projects is refused rather than giving a case in none.
         r = c.post("/api/cases/merge", json={"case_ids": [p1["case_id"], auth_a]})
-        m = c.get(f"/api/cases/{r.json().get('case_id')}").json() if r.status_code == 200 else {}
-        check(r.status_code == 200 and not m.get("project_id"),
-              f"a merge across projects is in no project ({r.status_code})")
+        check(r.status_code == 409, f"a merge across projects is refused ({r.status_code})")
 
         jobs.wait_idle(120)  # the merged cases are processed too
 

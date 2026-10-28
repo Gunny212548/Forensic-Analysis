@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
-import { getOverview, listCases, listCompanies, listProjects } from '../api.js'
+import { changeProject, getOverview, listCases, listCompanies, listProjects } from '../api.js'
 import { ago, fmtNum, fmtTime, severityBucket } from '../format.js'
 import { SeverityPill, StatusBadge } from '../components/common.jsx'
+import { Badge } from '../components/cards.jsx'
+import { useAccess } from '../permissions.js'
 
 const SEVS = ['critical', 'high', 'medium', 'low']
 const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' }
 
 /** One customer's profile, opened from the Customers list: who they are,
  *  since when, what they sent, their projects and every case - or, with
- *  `projectId`, one of those projects. Read-only, like the list. */
+ *  `projectId`, one of those projects - an investigation, Open or Closed
+ *  (specs/projects.md P1), which a manager closes and reopens here. */
 export default function CustomerDetail({ companyId, projectId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [version, setVersion] = useState(0) // bumped to read everything again after a change
 
   useEffect(() => {
     let alive = true
@@ -26,7 +30,7 @@ export default function CustomerDetail({ companyId, projectId }) {
     return () => {
       alive = false
     }
-  }, [companyId])
+  }, [companyId, version])
 
   if (error) return <div className="panel empty">Could not load the customer: {error}</div>
   if (!data) return <div className="empty">Loading...</div>
@@ -39,6 +43,7 @@ export default function CustomerDetail({ companyId, projectId }) {
         customer={data.customer}
         project={project}
         cases={data.cases.filter((m) => m.project_id === projectId)}
+        onChange={() => setVersion((v) => v + 1)}
       />
     )
   }
@@ -138,7 +143,7 @@ export default function CustomerDetail({ companyId, projectId }) {
 }
 
 /** One investigation of the customer and the cases uploaded for it. */
-function ProjectView({ customer, project, cases }) {
+function ProjectView({ customer, project, cases, onChange }) {
   const ready = cases.filter((m) => m.status === 'ready')
   const highest = highestOf(cases)
   const flagged = ready.reduce((n, m) => n + (m.flagged_count || 0), 0)
@@ -153,12 +158,16 @@ function ProjectView({ customer, project, cases }) {
 
       <div className="panel cp-head">
         <div className="cp-title">
-          <h1>{project.name}</h1>
+          <h1>
+            {project.name} <ProjectStatus project={project} />
+          </h1>
           <div className="subtitle">
-            Project of {customer.name} · created {fmtTime(project.created_at).slice(0, 10)} · last activity{' '}
-            {ago(last)}
+            Project of {customer.name} · opened {fmtTime(project.created_at).slice(0, 10)}
+            {project.closed_at ? ` · closed ${fmtTime(project.closed_at).slice(0, 10)} by ${project.closed_by}` : ''}
+            {' '}· last activity {ago(last)}
           </div>
         </div>
+        <ProjectAction project={project} onChange={onChange} />
       </div>
 
       <div className="cp-grid">
@@ -198,6 +207,45 @@ function ProjectView({ customer, project, cases }) {
   )
 }
 
+function ProjectStatus({ project }) {
+  return project.status === 'closed' ? <Badge tone="ok">Closed</Badge> : <Badge tone="info">Open</Badge>
+}
+
+/** Close an Open project - only once every suggestion of its cases is decided and
+ *  every case is processed (Q110); the server says what still stands in the way -
+ *  or reopen a Closed one. Manager and admin (Q113). */
+function ProjectAction({ project, onChange }) {
+  const { can, why } = useAccess()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const closing = project.status !== 'closed'
+  const blocked = closing && !project.can_close
+  const run = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      await changeProject(project.company_id, project.project_id, closing ? 'close' : 'reopen')
+      onChange()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="cp-project-action">
+      <button type="button" className={closing ? 'btn-primary' : 'secondary'}
+              disabled={busy || blocked || !can('customer:manage')}
+              title={why('customer:manage') || (blocked ? `Cannot close yet: ${project.close_blocker}` : '')}
+              onClick={run}>
+        {busy ? '...' : closing ? 'Close project' : 'Reopen project'}
+      </button>
+      {blocked && <div className="cell-sub">Cannot close yet: {project.close_blocker}</div>}
+      {error && <div className="lc-error">{error}</div>}
+    </div>
+  )
+}
+
 function ProjectsPanel({ companyId, projects, cases }) {
   const unfiled = cases.filter((m) => !m.project_id).length
   return (
@@ -210,42 +258,48 @@ function ProjectsPanel({ companyId, projects, cases }) {
           <thead>
             <tr>
               <th>Project</th>
-              <th>Created</th>
+              <th>Status</th>
+              <th>Opened</th>
+              <th>Closed</th>
               <th className="num">Cases</th>
-              <th>Highest severity</th>
+              <th className="num">Not decided</th>
+              <th>Highest not decided</th>
               <th>Last activity</th>
             </tr>
           </thead>
           <tbody>
             {!projects.length && (
               <tr>
-                <td colSpan={5} className="empty">
+                <td colSpan={8} className="empty">
                   No projects yet - choose or add one when uploading
                 </td>
               </tr>
             )}
+            {/* Open first, then the newest (projects.summary). */}
             {projects.map((p) => {
               const own = cases.filter((m) => m.project_id === p.project_id)
-              const highest = highestOf(own)
               return (
                 <tr key={p.project_id}>
                   <td>
                     <a href={`#/customers/${companyId}/projects/${p.project_id}`}>{p.name}</a>
                   </td>
+                  <td><ProjectStatus project={p} /></td>
                   <td className="mono muted">{fmtTime(p.created_at).slice(0, 10)}</td>
-                  <td className="num mono">{own.length}</td>
-                  <td>{highest ? <span className={`sev-tag sev-tag-${highest}`}>{SEV_EN[highest]}</span> : '—'}</td>
+                  <td className="mono muted">{p.closed_at ? fmtTime(p.closed_at).slice(0, 10) : '—'}</td>
+                  <td className="num mono">{p.cases}</td>
+                  <td className="num mono">{fmtNum(p.unreviewed)} <span className="cell-sub">of {fmtNum(p.reviewable)}</span></td>
+                  <td>{p.highest ? <span className={`sev-tag sev-tag-${p.highest}`}>{SEV_EN[p.highest] || p.highest}</span> : '—'}</td>
                   <td className="mono muted">{ago(own[0]?.uploaded_at || p.created_at)}</td>
                 </tr>
               )
             })}
-            {projects.length > 0 && unfiled > 0 && (
+            {/* Cases from before a project was required (Q112): movable into one (P3). */}
+            {unfiled > 0 && (
               <tr>
                 <td className="muted">No project</td>
-                <td />
+                <td colSpan={3} className="cell-sub">uploaded before a project was required</td>
                 <td className="num mono">{unfiled}</td>
-                <td />
-                <td />
+                <td colSpan={3} />
               </tr>
             )}
           </tbody>

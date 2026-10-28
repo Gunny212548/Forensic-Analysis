@@ -475,6 +475,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #51 `#/result` retired (Reports / Attack Graph / Timeline / finding page); Sprint 3 review fixes; ADR-3/4; branches and worktrees; testing in a container; scripted-edit traps.
 - #73 The analyst's decision replaced the status workflow on screen (the user, 2026-10-27): its buttons left with Respond, so every status stayed Open; Findings filters and counts by decision (badge = high / critical not decided), no assignee, no MTTC on the Overview; a case is open while a suggestion is not decided (the report gate). `lifecycle.py` and its API stay for the audit trail.
 - #74 A customer is deleted with every case (admin / manager, the Customers page, specs/customer_delete.md): its store is renamed out of `customers/` in one step, then removed; the record goes to the shared hash-chained `deleted/customers.jsonl`, carrying its earlier case deletions; refused while a case is busy. A case without a `product` column must not break the Overview.
+- #75 A project is one investigation (specs/projects.md, Q110-Q113): every new case is in one (the API refuses none - check_parity, check_authz and every upload script name one); Open / Closed, closing gated on every case processed and every suggestion decided, a Closed project refused for upload and merge; status changes in the project's hash-chained log, written under `storage.PROJECT_LOCK` with its question; a merge across projects is refused. `tests/check_projects.py`.
 - #52 The case page is six steps at `#/case/<id>/<step>` (IAI-89); `GET /flow` computes each step's state on the server and names its standards; old case links redirect. `sprint/4` merges Sprint 3's two branches.
 
 **Evidence, storage, jobs and access** (`custody.py`, `storage.py`, `jobs.py`, `auth.py`, `mcp_server.py`)
@@ -563,16 +564,19 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
   investigation of one customer, grouping the cases uploaded for it
   (customer -> project -> case). Chosen on the Upload page under the
   customer ("+ Add new project..." creates one, idempotent by name within
-  the customer, like customers); **optional** - old cases, scripts and
-  uploads without one are "No project". Stored in the customer's own store
+  the customer, like customers); **required since 2026-10-28** (gotcha #75,
+  specs/projects.md P1 - the API refuses an upload naming none, so every
+  script names one); cases from before stay "No project". Stored in the customer's own store
   (`customers/<id>/projects/<pj-id>.json`), so a project can only hold that
   customer's cases: an upload naming another customer's project id is 409
-  and creates nothing. A merge keeps the project only if every source is
-  in it. Shown on the customer profile (Projects panel + a Project column),
+  and creates nothing. A merge keeps the project; sources of different
+  projects are refused. **Open / Closed** (P1): closes only when every case is
+  processed and every suggestion decided, reopens at any time (manager, admin),
+  takes no new case while Closed. Shown on the customer profile (Projects panel + a Project column),
   on its own page `#/customers/<id>/projects/<pj-id>`, on the case header
-  and under the customer in the Overview / recent-uploads tables. Not yet:
-  moving a case between projects, renaming / deleting a project, a project
-  status.
+  and under the customer in the Overview / recent-uploads tables. Coming
+  (specs/projects.md): a dashboard per project (P2), rename / move a case /
+  delete (P3), timeline and attack path across its cases (P4).
 - Not yet: **IAI-24 resumable chunked
   upload** (Sprint 6). The upload is one request, so a dropped connection
   restarts a 10 GB file from zero.

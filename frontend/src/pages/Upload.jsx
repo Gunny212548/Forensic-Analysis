@@ -170,8 +170,12 @@ export default function Upload({ user }) {
       setStatus({ msg: 'Select a customer first', cls: 'err' })
       return
     }
+    if (!projectId) {
+      setStatus({ msg: 'Select a project - every case belongs to one investigation', cls: 'err' })
+      return
+    }
     if (projectId === '__new__' && !newProject.trim()) {
-      setStatus({ msg: 'Name the new project, or choose No project', cls: 'err' })
+      setStatus({ msg: 'Name the new project', cls: 'err' })
       return
     }
     if (!file) {
@@ -278,21 +282,26 @@ export default function Upload({ user }) {
           <div className="customer-row">
             <select
               id="project-select"
+              required
               value={projectId}
               disabled={!companyId}
               onChange={(e) => setProjectId(e.target.value)}
             >
-              <option value="">No project</option>
+              <option value="" disabled>
+                Select a project
+              </option>
+              {/* A closed investigation takes no new evidence (specs/projects.md Q111):
+                  listed so it is not mistaken for missing, but not selectable. */}
               {projects.map((p) => (
-                <option value={p.project_id} key={p.project_id}>
-                  {p.name}
+                <option value={p.project_id} key={p.project_id} disabled={p.status === 'closed'}>
+                  {p.name}{p.status === 'closed' ? ' (closed - reopen it to add evidence)' : ''}
                 </option>
               ))}
               <option value="__new__" disabled={!mayCreate}>
                 + Add new project...{mayCreate ? '' : ' (Manager)'}
               </option>
             </select>
-            <span className="field-hint">optional — one investigation of this customer</span>
+            <span className="field-hint">required — one investigation of this customer</span>
           </div>
           {projectId === '__new__' && (
             <input

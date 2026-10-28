@@ -72,11 +72,21 @@ export async function listCompanies() {
   return jsonOrThrow(await fetch('/api/companies'), 'Could not load the customer list')
 }
 
-/** One customer's projects (storage.py), newest first. */
+/** One customer's projects with their status and what their cases hold
+ *  (projects.py), Open first, then the newest. */
 export async function listProjects(companyId) {
   return jsonOrThrow(
     await fetch(`/api/companies/${encodeURIComponent(companyId)}/projects`),
     'Could not load the project list',
+  )
+}
+
+/** Close or reopen a project (`action` 'close' | 'reopen'; manager, admin). */
+export async function changeProject(companyId, projectId, action) {
+  return jsonOrThrow(
+    await fetch(`/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/${action}`,
+                { method: 'POST' }),
+    `Could not ${action} the project`,
   )
 }
 

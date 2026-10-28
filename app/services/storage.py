@@ -362,7 +362,21 @@ def find_company_by_name(name: str) -> dict | None:
 # ----------------------------------------------------------------- projects
 # A project is one investigation for one customer, grouping the cases
 # uploaded for it. It is kept in that customer's store, so it can never
-# hold another customer's case. Optional: a case without one is "No project".
+# hold another customer's case. Required for a new case since 2026-10-28
+# (specs/projects.md P1); one from before may still be in "No project".
+
+# A project is Open until it is closed, and may be reopened (projects.py). One
+# written before statuses existed has none, and is Open.
+PROJECT_OPEN, PROJECT_CLOSED = "open", "closed"
+
+# One project is read, changed and written back by its question (investigation.py)
+# and its status (projects.py); both hold this, so neither drops the other's change.
+PROJECT_LOCK = threading.Lock()
+
+
+def project_status(project: dict) -> str:
+    return project.get("status") or PROJECT_OPEN
+
 
 def valid_project_id(project_id: str) -> bool:
     return bool(_PROJECT_ID_RE.match(project_id or ""))
@@ -376,7 +390,7 @@ def project_path(company_id: str, project_id: str) -> Path:
 
 def project_log_path(company_id: str, project_id: str) -> Path:
     """The project's own hash-chained log - its question's history
-    (investigation.py)."""
+    (investigation.py) and every status change (projects.py)."""
     return project_path(company_id, project_id).with_suffix(".log.jsonl")
 
 
@@ -401,6 +415,7 @@ def create_project(company_id: str, name: str, created_by: str) -> dict:
         "name": name.strip()[:200],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": created_by,
+        "status": PROJECT_OPEN,
     }
     path = project_path(company_id, project["project_id"])
     path.parent.mkdir(parents=True, exist_ok=True)
