@@ -160,171 +160,166 @@ export default function Overview({ companyId }) {
         </ul>
       )}
 
-      <SummaryCard
-        label="Summary"
-        side={
-          data.company_id ? (
-            <BigTotal
-              icon="shield-alert"
-              tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
-              label="Suggestions not decided"
-              value={fmtNum(t.unreviewed)}
-              badge={sevBadge}
-            >
-              <TotalRow label="Analyst decided">
-                {fmtNum(decided)} / {fmtNum(t.reviewable)}
-              </TotalRow>
-              {/* No mean time to contain since 2026-10-27: nothing on screen contains a
-                  finding any more (the Respond step went, gotcha #54). A case is open while a
-                  suggestion in it is not decided. */}
-              <TotalRow label="Open cases" title="cases with a suggestion not decided yet">{fmtNum(t.open_cases)}</TotalRow>
-              <TotalRow label="Customers">{fmtNum(t.customers)}</TotalRow>
-            </BigTotal>
-          ) : (
-            // The tiles above say how many are left to review; the card says how far
-            // the analysts have got.
-            <BigTotal
-              icon="check"
-              tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
-              label="Analyst decided"
-              value={<>{fmtNum(decided)}<span className="ov-total-of">/ {fmtNum(t.reviewable)}</span></>}
-              badge={sevBadge}
-            />
-          )
-        }
-      >
-        {/* No fact tiles (the user, 2026-10-28): the last upload and the files processed
-            are on the line under the title, and the area cards say which areas hold
-            suggestions. */}
-        <FirstSeen days={data.trend_days} values={firstSeen} />
-      </SummaryCard>
+      {/* All customers: each customer's overview and nothing more (the user, 2026-10-28:
+          "ภาพรวมของแต่ละ Customer ไม่ต้องแสดงรายละเอียดต่างๆ"). Every detail below is on the
+          customer's own Overview, which a row opens. */}
+      {!data.company_id && (
+        <ByCustomer rows={data.by_customer || []} areas={data.areas} coverage={data.coverage || []} />
+      )}
 
-      {/* Unscoped, every figure above is all customers added up; this says what each
-          one holds (the user, 2026-10-28). Scoped, the page is that customer's already. */}
-      {!data.company_id && <ByCustomer rows={data.by_customer || []} areas={data.areas} />}
+      {data.company_id && (
+        <>
+          <SummaryCard
+            label="Summary"
+            side={
+              <BigTotal
+                icon="shield-alert"
+                tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
+                label="Suggestions not decided"
+                value={fmtNum(t.unreviewed)}
+                badge={sevBadge}
+              >
+                <TotalRow label="Analyst decided">
+                  {fmtNum(decided)} / {fmtNum(t.reviewable)}
+                </TotalRow>
+                {/* No mean time to contain since 2026-10-27: nothing on screen contains a
+                    finding any more (the Respond step went, gotcha #54). A case is open while a
+                    suggestion in it is not decided. */}
+                <TotalRow label="Open cases" title="cases with a suggestion not decided yet">{fmtNum(t.open_cases)}</TotalRow>
+                <TotalRow label="Customers">{fmtNum(t.customers)}</TotalRow>
+              </BigTotal>
+            }
+          >
+            {/* No fact tiles (the user, 2026-10-28): the last upload and the files processed
+                are on the line under the title, and the area cards say which areas hold
+                suggestions. */}
+            <FirstSeen days={data.trend_days} values={firstSeen} />
+          </SummaryCard>
 
-      <Coverage rows={data.coverage || []} attention={data.attention_files || []} />
+          <Coverage rows={data.coverage || []} attention={data.attention_files || []} />
 
-      <section aria-label="Detection areas">
-        <div className="area-title">
-          <h2 className="section-h">Detection areas</h2>
-          <span className="muted">every suggestion, as each case counts it · trend of suggestions first seen per day of event time</span>
-        </div>
-        <div className="ui-area-grid">
-          {data.areas.map((a) => (
-            <OverviewArea key={a.id} area={a} days={data.trend_days} all={sevAll} />
-          ))}
-        </div>
-      </section>
+          <section aria-label="Detection areas">
+            <div className="area-title">
+              <h2 className="section-h">Detection areas</h2>
+              <span className="muted">every suggestion, as each case counts it · trend of suggestions first seen per day of event time</span>
+            </div>
+            <div className="ui-area-grid">
+              {data.areas.map((a) => (
+                <OverviewArea key={a.id} area={a} days={data.trend_days} all={sevAll} />
+              ))}
+            </div>
+          </section>
 
-      <Tactics tactics={data.tactics || []} />
+          <Tactics tactics={data.tactics || []} />
 
-      <div className="ov-row">
-        <div className="panel ov-panel">
-          <h2>Severity breakdown</h2>
-          <div className="ui-section-sub">{fmtNum(sevAll)} findings by Sigma level, every case in scope</div>
-          <SeverityBreakdown counts={sevTotals} total={sevAll} />
-        </div>
-        <div className="panel ov-panel">
-          <h2>Top affected hosts &amp; accounts</h2>
-          <div className="ui-section-sub">ranked by accumulated risk, per customer</div>
-          {!data.top_entities.length && <div className="empty">No findings yet</div>}
-          <div className="ov-top">
-            {data.top_entities.map((e) => (
-              <div className="ov-top-row" key={`${e.customer}|${e.role}|${e.entity}`}>
-                <IconTile icon={ROLE_ICON[e.role] || 'server'} tone="info" />
-                <div className="ov-top-main">
-                  <div className="mono ov-top-entity" title={e.entity}>{e.entity}</div>
-                  <div className="cell-sub">
-                    {ROLE_EN[e.role] || e.role} <span className="cust-tag cust-tag-after">{e.customer}</span>
+          <div className="ov-row">
+            <div className="panel ov-panel">
+              <h2>Severity breakdown</h2>
+              <div className="ui-section-sub">{fmtNum(sevAll)} findings by Sigma level, every case in scope</div>
+              <SeverityBreakdown counts={sevTotals} total={sevAll} />
+            </div>
+            <div className="panel ov-panel">
+              <h2>Top affected hosts &amp; accounts</h2>
+              <div className="ui-section-sub">ranked by accumulated risk, per customer</div>
+              {!data.top_entities.length && <div className="empty">No findings yet</div>}
+              <div className="ov-top">
+                {data.top_entities.map((e) => (
+                  <div className="ov-top-row" key={`${e.customer}|${e.role}|${e.entity}`}>
+                    <IconTile icon={ROLE_ICON[e.role] || 'server'} tone="info" />
+                    <div className="ov-top-main">
+                      <div className="mono ov-top-entity" title={e.entity}>{e.entity}</div>
+                      <div className="cell-sub">
+                        {ROLE_EN[e.role] || e.role} <span className="cust-tag cust-tag-after">{e.customer}</span>
+                      </div>
+                      {e.role === 'accounts' && (
+                        <>
+                          <SeenOn label="on" items={e.hosts || []} short={(h) => h.split('.')[0]}
+                                  empty="computer not recorded in its events" />
+                          <SeenOn label="from" items={e.sources || []} empty="source address not recorded in its events" />
+                        </>
+                      )}
+                    </div>
+                    <span className="muted">{e.cases} {e.cases === 1 ? 'case' : 'cases'}</span>
                   </div>
-                  {e.role === 'accounts' && (
-                    <>
-                      <SeenOn label="on" items={e.hosts || []} short={(h) => h.split('.')[0]}
-                              empty="computer not recorded in its events" />
-                      <SeenOn label="from" items={e.sources || []} empty="source address not recorded in its events" />
-                    </>
-                  )}
-                </div>
-                <span className="muted">{e.cases} {e.cases === 1 ? 'case' : 'cases'}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <TopRules rules={data.top_rules || []} />
-
-      <Section
-        icon="alert"
-        tone={t.awaiting_review ? 'danger' : 'ok'}
-        title="Most urgent findings"
-        sub="High and critical findings not decided yet - worst first, then the one waiting longest"
-        stats={[
-          { label: 'Not decided', value: fmtNum(t.awaiting_review), tone: t.awaiting_review ? 'danger' : 'text' },
-          { label: 'Critical not decided', value: fmtNum(t.critical_undecided),
-            tone: t.critical_undecided ? 'danger' : 'text' },
-        ]}
-      >
-        {!data.urgent.length ? (
-          <div className="empty">Every high and critical finding is decided</div>
-        ) : (
-          <div className="table-scroll">
-            <table className="ui-rows">
-              <thead>
-                <tr><th>#</th><th>Finding</th><th>Severity</th><th>First event</th></tr>
-              </thead>
-              <tbody>
-                {data.urgent.map((r, i) => (
-                  <tr key={`${r.case_id}|${r.key}`}>
-                    <td className="ui-n">{i + 1}</td>
-                    <td>
-                      <div className="ui-main">
-                        <a className="table-link mono" href={`#/finding/${r.case_id}/${encodeURIComponent(r.key)}`}>
-                          {r.fd}
-                        </a>{' '}
-                        · {r.name}
-                      </div>
-                      <div className="ui-sub">
-                        <span className="mono">{r.host}</span> · {r.company_name} · {r.log_type}
-                      </div>
-                    </td>
-                    <td><span className={`sev-tag sev-tag-${r.level}`}>{SEV_EN[r.level]}</span></td>
-                    <td className="mono muted">{shortTs(r.detected)}</td>
-                  </tr>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
-        )}
-        <div className="ui-section-more">
-          <a href={`#/findings/decision=Unreviewed${scope}`} className="table-link">
-            All findings not decided →
-          </a>
-        </div>
-      </Section>
 
-      <Section
-        icon="clock"
-        tone="info"
-        title="Recent activity"
-        sub="Uploads, processing and analyst decisions"
-        stats={[{ label: 'Latest', value: data.recent.length ? ago(data.recent[0].ts) : '—' }]}
-      >
-        {!data.recent.length ? (
-          <div className="empty">Nothing yet</div>
-        ) : (
-          <ul className="activity ov-activity-list">
-            {data.recent.slice(0, 5).map((r, i) => (
-              <li key={i} className={`act-${r.level || 'muted'}`}>
-                <a href={`#/case/${r.case_id}`}>{r.text}</a>
-                {r.customer && <span className="cust-tag cust-tag-after">{r.customer}</span>}
-                <div className="mono muted">{ago(r.ts)}</div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
+          <TopRules rules={data.top_rules || []} />
+
+          <Section
+            icon="alert"
+            tone={t.awaiting_review ? 'danger' : 'ok'}
+            title="Most urgent findings"
+            sub="High and critical findings not decided yet - worst first, then the one waiting longest"
+            stats={[
+              { label: 'Not decided', value: fmtNum(t.awaiting_review), tone: t.awaiting_review ? 'danger' : 'text' },
+              { label: 'Critical not decided', value: fmtNum(t.critical_undecided),
+                tone: t.critical_undecided ? 'danger' : 'text' },
+            ]}
+          >
+            {!data.urgent.length ? (
+              <div className="empty">Every high and critical finding is decided</div>
+            ) : (
+              <div className="table-scroll">
+                <table className="ui-rows">
+                  <thead>
+                    <tr><th>#</th><th>Finding</th><th>Severity</th><th>First event</th></tr>
+                  </thead>
+                  <tbody>
+                    {data.urgent.map((r, i) => (
+                      <tr key={`${r.case_id}|${r.key}`}>
+                        <td className="ui-n">{i + 1}</td>
+                        <td>
+                          <div className="ui-main">
+                            <a className="table-link mono" href={`#/finding/${r.case_id}/${encodeURIComponent(r.key)}`}>
+                              {r.fd}
+                            </a>{' '}
+                            · {r.name}
+                          </div>
+                          <div className="ui-sub">
+                            <span className="mono">{r.host}</span> · {r.company_name} · {r.log_type}
+                          </div>
+                        </td>
+                        <td><span className={`sev-tag sev-tag-${r.level}`}>{SEV_EN[r.level]}</span></td>
+                        <td className="mono muted">{shortTs(r.detected)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="ui-section-more">
+              <a href={`#/findings/decision=Unreviewed${scope}`} className="table-link">
+                All findings not decided →
+              </a>
+            </div>
+          </Section>
+
+          <Section
+            icon="clock"
+            tone="info"
+            title="Recent activity"
+            sub="Uploads, processing and analyst decisions"
+            stats={[{ label: 'Latest', value: data.recent.length ? ago(data.recent[0].ts) : '—' }]}
+          >
+            {!data.recent.length ? (
+              <div className="empty">Nothing yet</div>
+            ) : (
+              <ul className="activity ov-activity-list">
+                {data.recent.slice(0, 5).map((r, i) => (
+                  <li key={i} className={`act-${r.level || 'muted'}`}>
+                    <a href={`#/case/${r.case_id}`}>{r.text}</a>
+                    {r.customer && <span className="cust-tag cust-tag-after">{r.customer}</span>}
+                    <div className="mono muted">{ago(r.ts)}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </>
+      )}
     </section>
   )
 }
@@ -332,9 +327,10 @@ export default function Overview({ companyId }) {
 /** One row per customer, counted as the summary card and the area cards count:
  *  suggestions not decided of all of them, the worst one not decided, cases open
  *  (a suggestion not decided) of the customer's cases, and every suggestion per
- *  detection area. Worst first, as on the Customers page; a row opens that
- *  customer's own Overview. */
-function ByCustomer({ rows, areas }) {
+ *  detection area, then the evidence it rests on: each log source and the period
+ *  it covers, and the days without an event when there are any. Worst first, as on
+ *  the Customers page; a row opens that customer's own Overview. */
+function ByCustomer({ rows, areas, coverage }) {
   const areaName = Object.fromEntries(areas.map((a) => [a.id, a.name]))
   return (
     <Section icon="customers" tone="info" title="By customer"
@@ -345,11 +341,13 @@ function ByCustomer({ rows, areas }) {
         <div className="table-scroll">
           <table className="ui-rows">
             <thead>
-              <tr><th>#</th><th>Customer</th><th>Not decided</th><th>Highest not decided</th><th>Open cases</th></tr>
+              <tr><th>#</th><th>Customer</th><th>Not decided</th><th>Highest not decided</th><th>Open cases</th>
+                <th>Evidence</th></tr>
             </thead>
             <tbody>
               {rows.map((r, i) => {
                 const parts = Object.entries(r.areas).map(([id, n]) => `${areaName[id] || id} ${fmtNum(n)}`)
+                const sources = coverage.filter((c) => c.company_id === r.company_id && c.product !== null)
                 return (
                   <tr key={r.company_id || 'none'}>
                     <td className="ui-n">{i + 1}</td>
@@ -378,6 +376,23 @@ function ByCustomer({ rows, areas }) {
                     <td className="ui-count">
                       {fmtNum(r.open_cases)} / {fmtNum(r.cases)}
                     </td>
+                    <td>
+                      {sources.length ? (
+                        sources.map((c) => (
+                          <div key={c.product} className="ov-evidence">
+                            <div>{c.product_name}</div>
+                            <div className="ui-sub mono">{coveragePeriod(c)}</div>
+                            {c.gap_days > 0 && (
+                              <div className="ui-sub tone-warn ov-gap">
+                                {fmtNum(c.gap_days)} {c.gap_days === 1 ? 'day' : 'days'} without events
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
                   </tr>
                 )
               })}
@@ -389,16 +404,18 @@ function ByCustomer({ rows, areas }) {
   )
 }
 
+/** A log source's period: first to last day, or the times within one day. */
+function coveragePeriod(r) {
+  const [d0, t0] = r.first.split(' ')
+  const [d1, t1] = r.last.split(' ')
+  return d0 === d1 ? `${d0} ${t0.slice(0, 5)} → ${t1.slice(0, 5)}` : `${d0} → ${d1}`
+}
+
 /** What each customer's evidence covers, per log source: its files, the first and
  *  last event, how many days between them hold an event and the gaps - a quiet day
  *  can be a log not collected (NIST SP 800-92 §2.3), so it is read before trusting
  *  one. Under it, every file whose reading needs attention (the Ingest step's test). */
 function Coverage({ rows, attention }) {
-  const period = (r) => {
-    const [d0, t0] = r.first.split(' ')
-    const [d1, t1] = r.last.split(' ')
-    return d0 === d1 ? `${d0} ${t0.slice(0, 5)} → ${t1.slice(0, 5)}` : `${d0} → ${d1}`
-  }
   const gaps = (r) => {
     if (!r.gap_days) return 'none'
     const g = r.longest_gap
@@ -433,7 +450,7 @@ function Coverage({ rows, attention }) {
                     <>
                       <td>{r.product_name}</td>
                       <td className="ui-count">{fmtNum(r.files)}</td>
-                      <td className="ui-count">{period(r)}</td>
+                      <td className="ui-count">{coveragePeriod(r)}</td>
                       <td className="ui-count">{fmtNum(r.days)} of {fmtNum(r.span_days)}</td>
                       <td className={r.gap_days ? 'tone-warn ov-gap' : 'muted'}>{gaps(r)}</td>
                     </>

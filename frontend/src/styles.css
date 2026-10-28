@@ -125,8 +125,8 @@
   .chip-danger { background: var(--danger-tint); color: var(--danger); }
   .chip-ok { background: var(--ok-tint); color: var(--ok); }
   .ov-row { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 16px; }
-  .ov-total-of { font-size: 24px; color: var(--muted); margin-left: 6px; }
   .ov-gap { color: var(--tone); }
+  .ov-evidence + .ov-evidence { margin-top: 8px; }
   .ov-attn-files { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
   /* ATT&CK tactics on the Overview: every tactic as a chevron, the ones reached in
      the danger tint - tokens only, so both themes hold. */

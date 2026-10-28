@@ -99,3 +99,11 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   opens the case holding most of its suggestions on Attack events (there is no rule page). Left
   out on purpose: EPS / licence, MTTx (no status moves since Respond went), a geo map (nothing
   fetched at runtime), compliance. `check_workflow.py` checks each against the cases.
+- **2026-10-28, last: the unscoped Overview is each customer's overview and nothing more** (the
+  user: "ภาพรวมของแต่ละ Customer ไม่ต้องแสดงรายละเอียดต่างๆ"; the table chosen over a card per
+  customer). With All customers the page is the header, the three tiles, the attention banner
+  when something waits, and By customer - which gained an Evidence column (each log source, its
+  period, days without events when there are any). The summary card, evidence coverage, areas,
+  tactics, severity, top affected, top rules, urgent findings and activity show only once a
+  customer is chosen. Not the cut-down page rejected above: that cut the one Overview there was;
+  every detail is still a click away, on the customer's own Overview.
