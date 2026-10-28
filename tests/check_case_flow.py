@@ -139,6 +139,9 @@ def main() -> int:
         print("one suggestion confirmed, the rest undecided")
         c.post(f"/api/cases/{Z}/review", json={"finding_key": fs[0]["key"], "action": "accept"})
         fl = flow(Z)
+        at = step(fl, "attack-timeline")
+        check(at["state"] == "not_started" and "every suggestion is decided" in at["reason"],
+              f"Attack timeline waits for every decision ({at['reason']})")
         ap = step(fl, "attack-path")
         check(ap["state"] == "not_started" and ap["total"] == 1 and "every suggestion is decided" in ap["reason"],
               f"Attack path waits for every decision ({ap['reason']})")

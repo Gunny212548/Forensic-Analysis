@@ -574,6 +574,15 @@ function AttackTimeline({ caseId }) {
 
   if (error) return <Empty>{error}</Empty>
   if (!data) return <Empty>Loading...</Empty>
+  // Built once every suggestion is decided - one not decided is not proven
+  // either way (the user, 2026-10-28), as on the Attack path step.
+  if (data.findings.some((f) => (f.review?.status || 'Unreviewed') === 'Unreviewed')) {
+    return (
+      <Empty>
+        Decide the remaining suggestions in <a href={stepHref(caseId, 'attack-events')}>Attack events</a> first.
+      </Empty>
+    )
+  }
   // ts_first is the zone-stamped "YYYY-MM-DD HH:MM:SS+07:00" text, so it sorts
   // as written; a group whose time did not parse goes last.
   const rows = data.findings
@@ -582,7 +591,7 @@ function AttackTimeline({ caseId }) {
   if (!rows.length) {
     return (
       <Empty>
-        No attack event confirmed yet. <a href={stepHref(caseId, 'attack-events')}>Decide them in Attack events</a>.
+        No attack event was confirmed - every suggestion was rejected.
       </Empty>
     )
   }

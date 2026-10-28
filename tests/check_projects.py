@@ -274,20 +274,23 @@ for cid in (firewall, hosts):
         if f["rid"] != "R2007":  # left undecided
             manager.post(f"/api/cases/{cid}/review", json={"finding_key": f["key"], "action": "accept"})
 tl = analyst.get(f"/api/companies/{CO}/projects/{IV}/timeline").json()
-check("the project timeline holds the confirmed groups of both cases, and every role reads it",
-      {f["case_id"] for f in tl["findings"]} == {firewall, hosts} and len(tl["findings"]) == 2)
-check("in the order their first event happened, across cases",
-      [f["case_id"] for f in tl["findings"]] == [hosts, firewall]
-      and [f["ts_first"][:10] for f in tl["findings"]] == ["2026-05-01", "2026-05-02"])
-check("a group not decided is left out and counted", tl["undecided"] == 1)
-check("each names its file, and the stages are ATT&CK's",
-      all(f["case_file"] for f in tl["findings"]) and tl["tactic_order"][0]["id"] == "reconnaissance")
+check("the project timeline is empty while a suggestion of any of its cases is not decided",
+      tl["findings"] == [] and tl["undecided"] == 1)
 gr = analyst.get(f"/api/companies/{CO}/projects/{IV}/graph").json()
-check("the project's path is empty while a suggestion of any of its cases is not decided",
+check("...and so is its path",
       not gr["graph"]["edges"] and not gr["risk"] and gr["undecided"] == 1 and gr["confirmed"] == 2)
 beacon = next(f for f in db.collapsed_findings(hosts) if f["rid"] == "R2007")
 manager.post(f"/api/cases/{hosts}/review",
              json={"finding_key": beacon["key"], "action": "reject", "reason_code": "misinterpretation"})
+tl = analyst.get(f"/api/companies/{CO}/projects/{IV}/timeline").json()
+check("once all are decided the timeline holds the confirmed groups of both cases, and every role reads it",
+      {f["case_id"] for f in tl["findings"]} == {firewall, hosts} and len(tl["findings"]) == 2
+      and tl["undecided"] == 0)
+check("in the order their first event happened, across cases, the rejected group left out",
+      [f["case_id"] for f in tl["findings"]] == [hosts, firewall]
+      and [f["ts_first"][:10] for f in tl["findings"]] == ["2026-05-01", "2026-05-02"])
+check("each names its file, and the stages are ATT&CK's",
+      all(f["case_file"] for f in tl["findings"]) and tl["tactic_order"][0]["id"] == "reconnaissance")
 gr = analyst.get(f"/api/companies/{CO}/projects/{IV}/graph").json()
 check("once every suggestion is decided it is drawn from the confirmed groups only",
       gr["undecided"] == 0 and gr["graph"]["edges"]

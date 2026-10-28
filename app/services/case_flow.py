@@ -155,13 +155,15 @@ def _attack_events(findings: list[dict], unreviewed: list[dict], step: dict) -> 
 
 def _attack_timeline(findings: list[dict], unreviewed: list[dict], confirmed: list[dict],
                      step: dict) -> None:
+    """Built from the confirmed groups once every suggestion is decided - a
+    suggestion not decided is not proven either way (the user, 2026-10-28)."""
     step.update(total=len(confirmed))
-    if confirmed:
-        state = ACTIVE if unreviewed else DONE
-        step.update(state=state, reason=f"{_plural(len(confirmed), 'confirmed group')} in time order - "
-                                        "gaps and hypotheses come in story 6")
-    elif findings and unreviewed:
-        step.update(state=NOT_STARTED, reason="Nothing confirmed yet - decide the attack events first")
+    if unreviewed:
+        # How many are left is the summary card's figure (said once on a page).
+        step.update(state=NOT_STARTED, reason="Built once every suggestion is decided")
+    elif confirmed:
+        step.update(state=DONE, reason=f"{_plural(len(confirmed), 'confirmed group')} in time order - "
+                                       "gaps and hypotheses come in story 6")
     else:
         step.update(state=DONE, reason="No attack event was confirmed")
 

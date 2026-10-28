@@ -246,7 +246,8 @@ def _analysed(company_id: str, project_id: str) -> list[dict]:
 def timeline(company_id: str, project_id: str) -> dict:
     """Every confirmed group (accepted or modified) of every case of the project, in the
     order its first event happened, each naming its case - the case page's Attack
-    timeline, project-wide - and how many suggestions are still not decided."""
+    timeline, project-wide - and how many suggestions are still not decided. Empty while
+    any is: a suggestion not decided is not proven either way (the user, 2026-10-28)."""
     rows, undecided, cases = [], 0, []
     for m in _analysed(company_id, project_id):
         found = case_views.findings_view(m["case_id"], m, assign_ids=False)
@@ -255,6 +256,8 @@ def timeline(company_id: str, project_id: str) -> dict:
                 for f in found if f["review"]["status"] in CONFIRMED]
         cases.append({"case_id": m["case_id"], "file": m.get("original_filename"), "confirmed": len(mine)})
         rows += mine
+    if undecided:
+        rows = []
     # ts_first is zone-stamped text, so it sorts as written; a group with no time goes last.
     rows.sort(key=lambda f: (f.get("ts_first") or "\uffff", f["case_id"], f["key"]))
     return {"findings": rows, "undecided": undecided, "cases": cases,

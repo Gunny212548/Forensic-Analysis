@@ -240,15 +240,18 @@ function ProjectTimeline({ project }) {
   const n = data?.findings.length || 0
   return (
     <Section icon="clock" tone={n ? 'danger' : 'muted'} title="Attack timeline of the project"
-             sub={data ? `${fmtNum(n)} confirmed ${n === 1 ? 'group' : 'groups'} across ${fmtNum(data.cases.length)} `
-               + `${data.cases.length === 1 ? 'case' : 'cases'}`
-               + (data.undecided ? ` - ${fmtNum(data.undecided)} suggestions not decided yet` : '') : ''}>
+             sub={!data ? '' : data.undecided
+               ? `Built once every suggestion of its cases is decided - ${fmtNum(data.undecided)} not decided yet`
+               : `${fmtNum(n)} confirmed ${n === 1 ? 'group' : 'groups'} across ${fmtNum(data.cases.length)} `
+                 + `${data.cases.length === 1 ? 'case' : 'cases'}`}>
       {error ? (
         <div className="empty">{error}</div>
       ) : !data ? (
         <div className="empty">Loading...</div>
+      ) : data.undecided ? (
+        <div className="empty">Decide the remaining suggestions in each case&apos;s Attack events first</div>
       ) : !n ? (
-        <div className="empty">No attack event confirmed yet - decide them in each case&apos;s Attack events</div>
+        <div className="empty">No attack event was confirmed in this project</div>
       ) : (
         <div className="cp-section-body">
           <AttackTimelineView rows={data.findings} tacticOrder={data.tactic_order} showCase

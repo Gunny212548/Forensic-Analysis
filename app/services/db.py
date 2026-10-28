@@ -783,7 +783,7 @@ def _kept_sql(con, keys: list[str] | None) -> str:
     if keys is None:
         return ""
     # One JSON string into a temp table: binding the Python list itself cost
-    # 0.43 s for 526 keys (DuckDB 1.1.3), the JSON 0.01 s. A read-only
+    # 0.43 s for 526 keys (DuckDB 1.5.6), the JSON 0.01 s. A read-only
     # connection may still create a temp table; it goes when the connection closes.
     con.execute("CREATE OR REPLACE TEMP TABLE kept_keys AS "
                 "SELECT unnest(from_json(?, '[\"VARCHAR\"]')) AS k", [json.dumps(keys)])

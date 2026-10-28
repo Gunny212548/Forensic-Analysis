@@ -27,5 +27,5 @@ groups accepted or modified (`case_views.decided`) - and `/graph` returns nothin
 `undecided`, while a suggestion is not decided. Before, the Attack path step drew every
 suggestion, rejected ones included. The keys go in as one JSON string into a temp table
 (`db._kept_sql`): binding the Python list cost 0.43 s a query on a 24,791-finding case with
-526 keys (DuckDB 1.1.3), the JSON 0.01 s. The Overview's Top affected and the MCP tools still
+526 keys (DuckDB 1.5.6), the JSON 0.01 s. The Overview's Top affected and the MCP tools still
 rank every finding.
