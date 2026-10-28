@@ -8,6 +8,7 @@ import StepBar, { stepHref } from '../components/StepBar.jsx'
 import EventsTable from '../components/EventsTable.jsx'
 import ReviewPanel from '../components/ReviewPanel.jsx'
 import AttackGraph from '../components/AttackGraph.jsx'
+import AttackTimelineView from '../components/AttackTimelineView.jsx'
 import MappingNote, { filesByLogSource } from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
 import Question from '../components/Question.jsx'
@@ -555,16 +556,12 @@ function StepBody({ step, caseId, manifest, ready, ai, reload }) {
   }
 }
 
-/** The finding groups the analyst confirmed (accepted or modified): the
- *  ATT&CK tactics they reach as a row of stages, in ATT&CK's order - only the
- *  tactics found, the user's choice of 2026-10-22 - and below, every group in
- *  the order its first event happened. A stage filters the list. Story 6 adds
- *  the gaps between them, the assumptions written for each gap and the
- *  hypotheses. */
+/** The finding groups the analyst confirmed (accepted or modified), as an attack
+ *  timeline (AttackTimelineView, shared with a project's). Story 6 adds the gaps
+ *  between them, the assumptions written for each gap and the hypotheses. */
 function AttackTimeline({ caseId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
-  const [stage, setStage] = useState('')
   useEffect(() => {
     let alive = true
     getFindings(caseId)
@@ -581,7 +578,7 @@ function AttackTimeline({ caseId }) {
   // as written; a group whose time did not parse goes last.
   const rows = data.findings
     .filter((f) => ['Accepted', 'Modified'].includes(f.review?.status))
-    .sort((a, b) => (a.ts_first || '￿').localeCompare(b.ts_first || '￿') || a.key.localeCompare(b.key))
+    .sort((a, b) => (a.ts_first || '\uffff').localeCompare(b.ts_first || '\uffff') || a.key.localeCompare(b.key))
   if (!rows.length) {
     return (
       <Empty>
@@ -589,80 +586,9 @@ function AttackTimeline({ caseId }) {
       </Empty>
     )
   }
-  const names = Object.fromEntries((data.tactic_order || []).map((t) => [t.id, t.name]))
-  const stagesOf = (f) => (f.tactics?.length ? f.tactics : ['unmapped'])
-  // The stages reached, in ATT&CK's order, then the groups no technique maps.
-  const stages = [...(data.tactic_order || []).map((t) => t.id), 'unmapped']
-    .map((id) => {
-      const members = rows.filter((f) => stagesOf(f).includes(id))
-      return members.length ? { id, name: names[id] || 'Not mapped to ATT&CK', members, first: members[0].ts_first } : null
-    })
-    .filter(Boolean)
-  const shown = stage ? rows.filter((f) => stagesOf(f).includes(stage)) : rows
   return (
-    <>
-      <div className="tl-stages" role="tablist" aria-label="ATT&CK tactics reached">
-        {stages.map((st) => (
-          <button
-            type="button"
-            key={st.id}
-            role="tab"
-            aria-selected={stage === st.id}
-            className={`tl-stage ${stage === st.id ? 'tl-stage-on' : ''} ${st.id === 'unmapped' ? 'tl-stage-unmapped' : ''}`}
-            title={stage === st.id ? 'Show every stage' : `Show only ${st.name}`}
-            onClick={() => setStage(stage === st.id ? '' : st.id)}
-          >
-            <span className="tl-stage-name">{st.name}</span>
-            <span className="tl-stage-sub">
-              {st.first ? st.first.slice(0, 10) : 'no time'} · {st.members.length} group{st.members.length === 1 ? '' : 's'}
-            </span>
-          </button>
-        ))}
-      </div>
-      <div className="muted tl-note">
-        Stages are the ATT&amp;CK Enterprise tactics (v20) of the confirmed groups&apos; techniques, in ATT&amp;CK&apos;s order -
-        not the order they happened; that is the list below.
-        {stage && (
-          <>
-            {' '}
-            <button type="button" className="link-button" onClick={() => setStage('')}>Show every stage</button>
-          </>
-        )}
-      </div>
-      <div className="table-scroll">
-        <table className="ov-table">
-          <thead>
-            <tr>
-              <th>First event</th>
-              <th>Last event</th>
-              <th>Stage</th>
-              <th>What happened</th>
-              <th>ATT&amp;CK</th>
-              <th>Events</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((f) => (
-              <tr key={f.key}>
-                <td className="mono">{f.ts_first || ''}</td>
-                <td className="mono">{f.ts_last && f.ts_last !== f.ts_first ? f.ts_last : ''}</td>
-                <td>{stagesOf(f).map((t) => names[t] || 'Not mapped').join(', ')}</td>
-                <td>
-                  <a className="table-link" href={`#/finding/${caseId}/${encodeURIComponent(f.key)}`}>
-                    {f.descr}
-                  </a>
-                  <div className="cell-sub">
-                    {f.fd || f.rid} · {LEVEL_EN[f.level] || f.level}
-                  </div>
-                </td>
-                <td>{(f.mitre || []).join(', ')}</td>
-                <td>{fmtNum(f.cnt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <AttackTimelineView rows={rows} tacticOrder={data.tactic_order}
+                        findingHref={(f) => `#/finding/${caseId}/${encodeURIComponent(f.key)}`} />
   )
 }
 

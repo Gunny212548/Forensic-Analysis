@@ -13,10 +13,18 @@ change), a case is moved to another project of the same customer - never across
 customers (gotcha #40), never into or out of a Closed project, never while it is
 processed - and a project is deleted with every case in it, as a customer is
 (specs/customer_delete.md); deletion is `customer:delete`.
+
+P4: the picture of the whole investigation, read-only, built from the analyst's
+decisions in each case: the attack timeline of every confirmed group of every case,
+and the attack graph and risk ranking of its cases joined - a host or an account is
+the same node in every case of one customer (one network).
 """
 
-from . import case_delete, case_views, custody, hashchain, overview, storage
+from . import case_delete, case_views, custody, db, hashchain, overview, review, rule_meta, storage
 from .severity import level_of
+
+CONFIRMED = (review.ACCEPTED, review.MODIFIED)
+GRAPH_EDGES = 24  # the project graph's budget: the most severe edges of all its cases
 
 MAX_NAME = 200
 
@@ -224,3 +232,77 @@ def delete(company_id: str, project_id: str, actor: str) -> dict:
         log.unlink(missing_ok=True)
         return record
 
+
+
+def _analysed(company_id: str, project_id: str) -> list[dict]:
+    """The project's cases whose findings can be read, oldest upload first."""
+    project = storage.load_project(company_id, project_id)
+    if project is None:
+        raise LookupError(project_id)
+    cases = [m for m in cases_of(company_id, project_id) if case_views.holds_findings(m)]
+    return sorted(cases, key=lambda m: m.get("uploaded_at") or "")
+
+
+def timeline(company_id: str, project_id: str) -> dict:
+    """Every confirmed group (accepted or modified) of every case of the project, in the
+    order its first event happened, each naming its case - the case page's Attack
+    timeline, project-wide - and how many suggestions are still not decided."""
+    rows, undecided, cases = [], 0, []
+    for m in _analysed(company_id, project_id):
+        found = case_views.findings_view(m["case_id"], m, assign_ids=False)
+        undecided += sum(1 for f in found if f["review"]["status"] == review.UNREVIEWED)
+        mine = [{**f, "case_id": m["case_id"], "case_file": m.get("original_filename")}
+                for f in found if f["review"]["status"] in CONFIRMED]
+        cases.append({"case_id": m["case_id"], "file": m.get("original_filename"), "confirmed": len(mine)})
+        rows += mine
+    # ts_first is zone-stamped text, so it sorts as written; a group with no time goes last.
+    rows.sort(key=lambda f: (f.get("ts_first") or "\uffff", f["case_id"], f["key"]))
+    return {"findings": rows, "undecided": undecided, "cases": cases,
+            "tactic_order": [{"id": t, "ta": ta, "name": n} for t, ta, n in rule_meta.TACTIC_ORDER]}
+
+
+def graph(company_id: str, project_id: str) -> dict:
+    """The attack graph and the risk ranking of the project's cases joined. An edge
+    between the same two entities in several cases is one edge naming each case; a
+    risk score is summed over the cases, as the Overview sums it per customer."""
+    edges: dict[tuple, dict] = {}
+    risk: dict[str, dict] = {}
+    for m in _analysed(company_id, project_id):
+        # By id: two cases may carry the same file name (two exports both "log.csv").
+        case = {"case_id": m["case_id"], "file": m.get("original_filename")}
+        for e in db.build_graph(m["case_id"])["edges"]:
+            k = (e["from"], e["to"])
+            have = edges.get(k)
+            if have is None or e["lvl"] > have["lvl"]:
+                merged = {**e, "cases": (have or {}).get("cases", []),
+                          "count": e["count"] + ((have or {}).get("count") or 0),
+                          "rules": sorted(set(e["rules"]) | set((have or {}).get("rules", [])))}
+                edges[k] = merged
+            else:
+                have["count"] += e["count"]
+                have["rules"] = sorted(set(have["rules"]) | set(e["rules"]))
+            if case not in edges[k]["cases"]:
+                edges[k]["cases"].append(case)
+        for role, items in db.risk_scores(m["case_id"]).items():
+            for i in items:
+                r = risk.setdefault(role, {}).setdefault(i["entity"], {
+                    "entity": i["entity"], "score": 0, "findings": 0, "max_lvl": 0, "rules": set(), "cases": 0})
+                r["score"] += i["score"] or 0
+                r["findings"] += i["findings"] or 0
+                r["max_lvl"] = max(r["max_lvl"], i["max_lvl"] or 0)
+                r["rules"] |= set(i["rules"] or [])
+                r["cases"] += 1
+    kept = sorted(edges.values(), key=lambda e: (-e["lvl"], -e["count"], e["from"], e["to"]))[:GRAPH_EDGES]
+    for e in kept:
+        if len(e["cases"]) > 1:
+            e["label"] = f"{e['label']} - in {len(e['cases'])} cases"
+    names: list[str] = []
+    for e in kept:
+        for n in (e["from"], e["to"]):
+            if n not in names:
+                names.append(n)
+    nodes = [{"id": n, "label": n, "type": "ip" if db._IP_LIKE.match(n) else "entity"} for n in names]
+    ranked = {role: sorted(({**r, "rules": sorted(r["rules"])} for r in by.values()),
+                           key=lambda r: (-r["score"], r["entity"]))[:8]
+              for role, by in risk.items()}
+    return {"graph": {"nodes": nodes, "edges": kept}, "risk": ranked}

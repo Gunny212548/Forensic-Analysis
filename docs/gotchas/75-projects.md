@@ -63,3 +63,21 @@
   with nothing deleted, while a case is busy - `case_delete.busy()` is now the one rule for
   customer and project deletion (it was `customer_delete._busy`). An empty project creates the
   `deleted/` folder itself.
+
+## P4 - the whole investigation
+
+- On the project page, under its cases: **Attack timeline of the project**
+  (`GET .../projects/{pj}/timeline`) - every confirmed group (accepted or modified) of every case,
+  in the order its first event happened, each naming its case and file, with the ATT&CK stages
+  over all of them and the count of suggestions not decided yet - and **Attack path of the
+  project** (`GET .../projects/{pj}/graph`) - each case's `db.build_graph` joined: the same two
+  entities in several cases are one edge listing each case and the union of their rules, a host
+  or an account is one node (one customer, one network), the most severe 24 edges kept; the risk
+  ranking summed over the cases, as the Overview sums it per customer. Read-only for every role:
+  decisions stay in each case's Attack events. Correlation rules still run per case.
+- **Cases are named by id, not file name**, in the joined graph: the first check gave one case
+  for two because both were `t.log` - and real exports share names too (`log_30_.csv`).
+- The case page's timeline display moved to `components/AttackTimelineView.jsx`, shared by the
+  case's Attack timeline step and the project's (`showCase` adds the Case column).
+- Like the case page, the project graph still draws every suggestion, not only confirmed ones,
+  until story 7 of case_flow_design; its subtitle says so.

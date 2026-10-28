@@ -139,6 +139,25 @@ async def move_case(company_id: str, project_id: str, payload: MoveIn, request: 
                                  payload.case_id, project_id)
 
 
+# The whole investigation (P4), read-only for every role: the confirmed groups of every
+# case in time order, and the cases' attack graphs and risk ranking joined. Sync: they
+# read case DuckDBs.
+@router.get("/{company_id}/projects/{project_id}/timeline")
+def project_timeline(company_id: str, project_id: str):
+    try:
+        return projects.timeline(company_id, project_id)
+    except LookupError:
+        raise HTTPException(404, "Project not found")
+
+
+@router.get("/{company_id}/projects/{project_id}/graph")
+def project_graph(company_id: str, project_id: str):
+    try:
+        return projects.graph(company_id, project_id)
+    except LookupError:
+        raise HTTPException(404, "Project not found")
+
+
 # What deleting the project would remove, and the cases that block it now (P3).
 @router.get("/{company_id}/projects/{project_id}/deletion")
 def project_deletion_preview(company_id: str, project_id: str, request: Request):

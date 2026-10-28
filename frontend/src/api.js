@@ -124,6 +124,18 @@ export async function getProjectDeletion(companyId, projectId) {
     'Could not read what the deletion would remove')
 }
 
+/** The project's attack timeline: every confirmed group of every case (P4). */
+export async function getProjectTimeline(companyId, projectId) {
+  return jsonOrThrow(await fetch(projectUrl(companyId, projectId, '/timeline')),
+    'Could not load the project timeline')
+}
+
+/** The project's attack graph and risk ranking, its cases joined (P4). */
+export async function getProjectGraph(companyId, projectId) {
+  return jsonOrThrow(await fetch(projectUrl(companyId, projectId, '/graph')),
+    'Could not load the project graph')
+}
+
 /** Delete the project with every case in it, for good (admin, manager). */
 export async function deleteProject(companyId, projectId) {
   return jsonOrThrow(await fetch(projectUrl(companyId, projectId), { method: 'DELETE' }),

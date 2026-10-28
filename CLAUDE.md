@@ -575,9 +575,10 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
   processed and every suggestion decided, reopens at any time (manager, admin),
   takes no new case while Closed. Shown on the customer profile (Projects panel + a Project column),
   on its own page `#/customers/<id>/projects/<pj-id>`, on the case header
-  and under the customer in the Overview / recent-uploads tables. Coming
-  (specs/projects.md): a dashboard per project (P2), rename / move a case /
-  delete (P3), timeline and attack path across its cases (P4).
+  and under the customer in the Overview / recent-uploads tables. Also
+  (specs/projects.md, gotcha #75): an Overview and a Findings filter per project
+  (P2), rename / move a case / delete a project (P3), and on the project page the
+  attack timeline and attack path across its cases (P4).
 - Not yet: **IAI-24 resumable chunked
   upload** (Sprint 6). The upload is one request, so a dropped connection
   restarts a 10 GB file from zero.

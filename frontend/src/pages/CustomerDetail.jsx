@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import {
-  changeProject, deleteProject, getOverview, getProjectDeletion, listCases, listCompanies, listProjects, moveCase,
-  renameProject,
+  changeProject, deleteProject, getOverview, getProjectDeletion, getProjectGraph, getProjectTimeline, listCases,
+  listCompanies, listProjects, moveCase, renameProject,
 } from '../api.js'
+import AttackGraph from '../components/AttackGraph.jsx'
+import AttackTimelineView from '../components/AttackTimelineView.jsx'
+import { RiskTables } from '../components/analysis.jsx'
 import { ago, fmtNum, fmtTime, severityBucket } from '../format.js'
 import { SeverityPill, StatusBadge } from '../components/common.jsx'
-import { Badge } from '../components/cards.jsx'
+import { Badge, Section } from '../components/cards.jsx'
 import { useAccess } from '../permissions.js'
 
 const SEVS = ['critical', 'high', 'medium', 'low']
@@ -211,7 +214,84 @@ function ProjectView({ customer, project, cases, onChange }) {
           <CasesPanel cases={cases} />
         </div>
       </div>
+
+      {/* The whole investigation (specs/projects.md P4): what every case's confirmed
+          events add up to, read-only - decisions are made in each case's Attack events. */}
+      <ProjectTimeline project={project} />
+      <ProjectPath project={project} />
     </section>
+  )
+}
+
+/** Every confirmed group of every case of the project, in the order its first event
+ *  happened, each naming its case (P4) - the case page's Attack timeline, project-wide. */
+function ProjectTimeline({ project }) {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let alive = true
+    getProjectTimeline(project.company_id, project.project_id)
+      .then((d) => alive && setData(d))
+      .catch((err) => alive && setError(err.message))
+    return () => {
+      alive = false
+    }
+  }, [project.company_id, project.project_id])
+  const n = data?.findings.length || 0
+  return (
+    <Section icon="clock" tone={n ? 'danger' : 'muted'} title="Attack timeline of the project"
+             sub={data ? `${fmtNum(n)} confirmed ${n === 1 ? 'group' : 'groups'} across ${fmtNum(data.cases.length)} `
+               + `${data.cases.length === 1 ? 'case' : 'cases'}`
+               + (data.undecided ? ` - ${fmtNum(data.undecided)} suggestions not decided yet` : '') : ''}>
+      {error ? (
+        <div className="empty">{error}</div>
+      ) : !data ? (
+        <div className="empty">Loading...</div>
+      ) : !n ? (
+        <div className="empty">No attack event confirmed yet - decide them in each case&apos;s Attack events</div>
+      ) : (
+        <div className="cp-section-body">
+          <AttackTimelineView rows={data.findings} tacticOrder={data.tactic_order} showCase
+                              findingHref={(f) => `#/finding/${f.case_id}/${encodeURIComponent(f.key)}`} />
+        </div>
+      )}
+    </Section>
+  )
+}
+
+/** The attack graph and risk ranking of the project's cases joined (P4): a host or an
+ *  account is one node in every case of the customer, so what links the cases shows. */
+function ProjectPath({ project }) {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let alive = true
+    getProjectGraph(project.company_id, project.project_id)
+      .then((d) => alive && setData(d))
+      .catch((err) => alive && setError(err.message))
+    return () => {
+      alive = false
+    }
+  }, [project.company_id, project.project_id])
+  const edges = data?.graph?.edges || []
+  const shared = edges.filter((e) => (e.cases || []).length > 1).length
+  return (
+    <Section icon="lateral-movement" tone={edges.length ? 'danger' : 'muted'} title="Attack path of the project"
+             sub={data ? `The cases' graphs joined - ${fmtNum(edges.length)} ${edges.length === 1 ? 'link' : 'links'}`
+               + (shared ? `, ${fmtNum(shared)} seen in more than one case` : '')
+               + ' - every suggestion is drawn, as on the case page, until the path follows decisions' : ''}>
+      {error ? (
+        <div className="empty">{error}</div>
+      ) : !data ? (
+        <div className="empty">Loading...</div>
+      ) : (
+        <div className="cp-section-body">
+          {edges.length ? <AttackGraph graph={data.graph} /> : <div className="empty">No finding links two entities</div>}
+          <div className="section-label">Risk ranking, over the project&apos;s cases</div>
+          <RiskTables risk={data.risk || {}} />
+        </div>
+      )}
+    </Section>
   )
 }
 

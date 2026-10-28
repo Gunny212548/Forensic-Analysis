@@ -249,6 +249,51 @@ empty = storage.create_project(CO, "Empty", "check")
 check("an empty project is deleted too",
       manager.delete(f"/api/companies/{CO}/projects/{empty['project_id']}").status_code == 200)
 
+print("P4: the whole investigation")
+inv = storage.create_project(CO, "Intrusion", "check")
+IV = inv["project_id"]
+
+
+def timed_case(rows: list[tuple[str, str, str, str, list[str]]]) -> str:
+    """A ready case of the Intrusion project: rows of (ts, rid, srcip, dstip, mitre)."""
+    cid = storage.create_case("t.log", "log", 1, company_id=CO, project=inv)["case_id"]
+    con = db.init(cid)
+    for i, (ts, rid, src, dst, mitre) in enumerate(rows):
+        con.execute("INSERT INTO raw_events (row_id, ts, srcip, dstip) VALUES (?, ?, ?, ?)", [i, ts, src, dst])
+        con.execute("INSERT INTO findings (row_id, rid, lvl, descr, mitre) VALUES (?, ?, 5, 'x', ?)", [i, rid, mitre])
+    con.close()
+    storage.update_case(cid, status="ready")
+    return cid
+
+
+firewall = timed_case([("2026-05-02 10:00:00", "R2002", "203.0.113.9", "10.0.0.20", ["T1046"])])
+hosts = timed_case([("2026-05-01 09:00:00", "R3001", "203.0.113.9", "10.0.0.20", ["T1041"]),
+                    ("2026-05-03 11:00:00", "R2007", "10.0.0.20", "198.51.100.4", ["T1071"])])
+for cid in (firewall, hosts):
+    for f in db.collapsed_findings(cid):
+        if f["rid"] != "R2007":  # left undecided
+            manager.post(f"/api/cases/{cid}/review", json={"finding_key": f["key"], "action": "accept"})
+tl = analyst.get(f"/api/companies/{CO}/projects/{IV}/timeline").json()
+check("the project timeline holds the confirmed groups of both cases, and every role reads it",
+      {f["case_id"] for f in tl["findings"]} == {firewall, hosts} and len(tl["findings"]) == 2)
+check("in the order their first event happened, across cases",
+      [f["case_id"] for f in tl["findings"]] == [hosts, firewall]
+      and [f["ts_first"][:10] for f in tl["findings"]] == ["2026-05-01", "2026-05-02"])
+check("a group not decided is left out and counted", tl["undecided"] == 1)
+check("each names its file, and the stages are ATT&CK's",
+      all(f["case_file"] for f in tl["findings"]) and tl["tactic_order"][0]["id"] == "reconnaissance")
+gr = analyst.get(f"/api/companies/{CO}/projects/{IV}/graph").json()
+shared = [e for e in gr["graph"]["edges"] if (e["from"], e["to"]) == ("203.0.113.9", "10.0.0.20")]
+check("the same two hosts in two cases are one edge naming both cases",
+      len(shared) == 1 and len(shared[0]["cases"]) == 2 and set(shared[0]["rules"]) == {"R2002", "R3001"})
+check("a host is one node however many cases it is in",
+      [n["id"] for n in gr["graph"]["nodes"]].count("203.0.113.9") == 1)
+src = {r["entity"]: r for r in gr["risk"].get("sources", [])}
+check("its risk is summed over the cases", src.get("203.0.113.9", {}).get("cases") == 2)
+check("an unknown project is 404",
+      manager.get(f"/api/companies/{CO}/projects/pj-000000000000/timeline").status_code == 404
+      and manager.get(f"/api/companies/{CO}/projects/pj-000000000000/graph").status_code == 404)
+
 jobs.wait_idle(120)  # the uploads above queued real processing; let it finish before exit
 print("\nPROJECTS OK" if not failures else f"\n{failures} FAILED")
 sys.exit(1 if failures else 0)

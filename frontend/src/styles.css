@@ -236,6 +236,7 @@
   .cp-project-actions:has(.cp-delete-project) { flex-basis: 100%; max-width: none; }
   .cp-delete-project { flex-basis: 100%; max-width: 640px; }
   .cp-case-project { min-width: 160px; max-width: 240px; }
+  .cp-section-body { padding: 16px 20px 20px; }
   .cp-avatar {
     width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
     background: var(--info-tint); color: var(--info);
