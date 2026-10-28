@@ -83,9 +83,13 @@ def _case_facts(case_id: str) -> dict:
             "SELECT t, count(*) FROM (SELECT unnest(mitre) AS t FROM findings) GROUP BY t"
         ).fetchall():
             techniques[tid] = n
+        # A case processed before every row carried its product (gotcha #61) has no
+        # column: its events are one source of unknown product until it is re-processed.
+        has_product = con.execute("SELECT count(*) FROM duckdb_columns() WHERE table_name = 'raw_events' "
+                                  "AND column_name = 'product'").fetchone()[0]
         for product, first, last, days in con.execute(
-            "SELECT product, min(ts), max(ts), list(DISTINCT CAST(ts AS DATE)) FROM raw_events "
-            "WHERE ts IS NOT NULL GROUP BY product"
+            f"SELECT {'product' if has_product else 'NULL'} AS p, min(ts), max(ts), "
+            "list(DISTINCT CAST(ts AS DATE)) FROM raw_events WHERE ts IS NOT NULL GROUP BY p"
         ).fetchall():
             coverage[product] = {"first": str(first), "last": str(last),
                                  "days": sorted(d.isoformat() for d in days)}
