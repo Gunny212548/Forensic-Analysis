@@ -71,8 +71,9 @@ these (`SUPERSEDES`, as story 4), so one detection is never two suggestions.
 - **Evidence**: 1006, 1015, 1116 (detected). Their outcome events - 1117 / 1118 / 1119 (and the
   older 1007 / 1008) - join the same suggestion by `Detection ID` on the same host (observed in
   the events as written; the page lists no Detection ID - stated as an internal method), else by
-  host + threat `ID` + `Path`. One detection = one suggestion; its rows are the detection and its
-  outcome events.
+  host + threat `ID` + `Path`. A detection's rows are its detected and outcome events; the
+  suggestion is keyed on the host and the account (gotcha #69's key), so two detections of one
+  account on one host are one suggestion, each row naming its threat.
 - **Text**: `Defender: Trojan:PowerShell/Meterpreter.gen!A (Trojan, Severe) on IT02 - powershell.exe,
   CORP\Leo, via AMSI - Quarantine`. The threat's Type (the part before `:`) is shown as Microsoft
   names it, not mapped.
@@ -83,7 +84,7 @@ these (`SUPERSEDES`, as story 4), so one detection is never two suggestions.
 - **Technique**: none. A detection says what Defender found, not what the attacker did; SigmaHQ's
   blanket T1059 would put adware into Execution. As CP-MAL-2's Anti-Virus verdicts carry none.
   Area **Malware & C2**.
-- **Entity**: the host and the Detection User (`User` on 1006).
+- **Entity**: the host and the Detection User (`Domain` + `User` on 1006 / 1007).
 - **1011 (Q116)**: an item deleted from quarantine had been quarantined, so the threat was on that
   host - but its detection event may be outside the evidence (as Glupteba's is). Recommended: a
   1011 whose threat has no detection event on that host in the evidence becomes a WIN-MAL-2
@@ -96,7 +97,7 @@ these (`SUPERSEDES`, as story 4), so one detection is never two suggestions.
   (virus scanning disabled) - **high** (SigmaHQ b28e58e4's level); 5013 (tamper protection blocked
   a change) - **medium**: the attempt was refused.
 - **Facts on the suggestion, no window** (Q118): when Defender was turned back on (the next 5000
-  on that host, or "not in the evidence"), and the Defender update events (2000 / 2001 / 2014)
+  on that host, or "not in the evidence"), and the Defender update events (2000 / 2001 / 2002)
   nearest before and after - SigmaHQ's update false positive - for the analyst and the AI to weigh.
 - **5007 (Q117)**: most 5007s are routine (the file's is `MpCampRing = 0x4`). Recommended: only a
   5007 whose New Value is under `...\Windows Defender\Exclusions\` - exclusion lists are what
@@ -147,3 +148,26 @@ rules.
 - **Q118 - turned back on (W-D14).** Show the next 5000 and the nearest update events as facts,
   with no window and no level change? Recommended: yes.
 - **Q119 - forms (W-D15).** Claim only the forms checked on a real Defender event? Recommended: yes.
+
+## Built (2026-10-28)
+
+`rules_windows.py` WIN-MAL-2 and WIN-HOST-3; `rules.apply_rules` keeps a level a rule writes when it
+is lower than the rule's declared one (WIN-MAL-2 remediated, WIN-HOST-3's 5013) - no rule wrote one
+before. Found while building, beside the design:
+
+- **Item names differ by event** - the provider's own templates (`Get-WinEvent -ListProvider
+  'Microsoft-Windows-Windows Defender'`): 1006 / 1015 write `Path Found` and `Domain` + `User`, 1007 /
+  1008 `Cleaning Action`, 1116-1119 `Path`, `Action Name`, `Detection User`. Read through all three.
+- **Update events** are 2000 / 2001 / 2002 (Microsoft's page: definitions updated, update failed,
+  engine updated); 2014 is not on the page. Turned back on: 5000 / 5009 / 5011 (read verbatim).
+- **No generic twin.** WIN-MAL-2 is not R3002's equivalent: R3002 is malware traffic a firewall let
+  through - VERIS would have called a Defender detection a Downloader, and the compromised-host
+  pattern would have counted a quarantined one. Its confidence family is its own (AV).
+- **Forms (Q119)**: NXLog JSON (WinEvents.log), event XML and .evtx exported from a Windows 11 PC
+  (23 detections, 16 actions, 2,616 configuration changes, 462 updates) read the same - 39 rows, 36
+  medium (remediated) and 3 high (one Allow); none of the 2,616 routine 5007s flagged. Winlogbeat and
+  Splunk text not checked on a Defender event - not claimed.
+
+Measured: `tests/check_windows_rules.py` OK (with `--winevents`: Meterpreter and Glupteba medium, ACC01's
+5001 high, nothing else); parity `tests/samples` 11 and `D:/logtest` 59 exact, WinEvents.log added
+(669 entries); `check_rule_meta`, `check_products`, `check_case_flow` OK.

@@ -60,6 +60,8 @@ TACTICS = {
     "t1550": ["lateral_movement"],
     "t1558": ["credential_access"],
     "t1003": ["credential_access"],
+    # Story 5f - T1685's Tactic field (content v20.0, read 2026-10-28).
+    "t1685": ["defense_impairment"],
 }
 
 # The Enterprise tactics in the order ATT&CK lists them (attack.mitre.org/tactics/enterprise,
@@ -1086,6 +1088,74 @@ RULE_META.update({
         },
     },
 })
+
+# Story 5f (specs/windows_defender_rules.md): Microsoft Defender Antivirus's own events.
+_DEFENDER_SOURCES = ["windows-event-xml", "windows-evtx", "windows-nxlog-json"]
+_DEFENDER_FORMS = ("Read from Defender's EventData item names, which differ by event (the provider's "
+                   "templates): 1006 / 1015 Path Found and Domain + User, 1007 / 1008 Cleaning Action, "
+                   "1116-1119 Path, Action Name and Detection User. Checked on event XML and .evtx "
+                   "exported from a Windows 11 PC and on NXLog JSON; Winlogbeat JSON and Splunk text not "
+                   "checked on a Defender event.")
+RULE_META.update({
+    "WIN-MAL-2": {
+        "id": "13b945bd-7574-4c4b-9df7-df0739e50e38",
+        "title": "Windows: Microsoft Defender detection",
+        "status": "experimental",
+        "techniques": [],
+        "category": "antivirus", "log_sources": _DEFENDER_SOURCES,
+        "falsepositives": ["A tool the organisation uses that Defender classes as HackTool or PUA",
+                           "A test file (EICAR)"],
+        "ads": {
+            "goal": "Report what Microsoft Defender Antivirus itself detected on a host, and whether it "
+                    "remediated it (W-D12: the product's own verdict, as CP-MAL-2 reads Check Point's).",
+            "strategy": "Defender 1006 / 1015 / 1116 (detected), 1007 / 1117 (action taken) and 1008 / 1118 / "
+                        "1119 (action failed) grouped into one detection by host and Detection ID, else host, "
+                        "threat ID and path. A 1011 (deleted from quarantine) whose threat has no detection event "
+                        "on that host in the evidence is reported too - it had been quarantined (Q116).",
+            "technical_context": _DEFENDER_FORMS + " Detection ID is observed in the events, not named in "
+                                 "Microsoft's field lists. No technique: a detection names what Defender found, "
+                                 "not what the attacker did (SigmaHQ 57b649ef's T1059 would put adware in "
+                                 "Execution).",
+            "blind_spots": "Defender turned off, excluded paths, other antivirus products; ASR (1121 / 1122) and "
+                           "network protection (1125 / 1126) - not on Microsoft's page as read; Defender for "
+                           "Endpoint alerts (not a local event log).",
+            "validation": "WinEvents.log (Meterpreter via AMSI, quarantined; Glupteba deleted from quarantine); "
+                          "Defender events exported from a PC; tests/check_windows_rules.py.",
+            "response": "High when not remediated - no action event, Allow / No action / None (\"don't remediate "
+                        "detected threats\"), or the action failed (1118 / 1119: \"The endpoint might not be "
+                        "protected\"). Medium when quarantined, removed, cleaned or blocked: read how it got "
+                        "there and what the account did around it.",
+        },
+    },
+    "WIN-HOST-3": {
+        "id": "2a336334-15fc-4d19-948b-ebec0d10dbc1",
+        "title": "Windows: Microsoft Defender turned off or tampered with",
+        "status": "experimental",
+        "techniques": ["T1685"],
+        "category": "antivirus", "log_sources": _DEFENDER_SOURCES,
+        "falsepositives": ["Administrator actions (should be investigated) - SigmaHQ b28e58e4",
+                           "Seen being triggered occasionally during Defender updates - SigmaHQ b28e58e4",
+                           "A software deployment adding its own exclusion"],
+        "ads": {
+            "goal": "Detect Microsoft Defender Antivirus being turned off or its exclusions changed "
+                    "(T1685 Disable or Modify Tools, DET0497 AN1369: \"tampering with exclusion lists\").",
+            "strategy": "Defender 5001 (real-time protection disabled), 5010 / 5012 (scanning disabled), 5013 "
+                        "(tamper protection blocked a change) and 5007 whose New Value is under "
+                        "Windows Defender\\Exclusions\\ (Q117 - the key path is observed). Shown with it, no "
+                        "window (Q118): when it was turned back on (5000 / 5009 / 5011) and the nearest Defender "
+                        "update event (2000 / 2001 / 2002) on either side.",
+            "technical_context": _DEFENDER_FORMS + " AN1369's own log sources (7045, Sysmon 5, 13 / 14) are "
+                                 "not read here; 5004's Configuration has no documented values - Timeline only.",
+            "blind_spots": "Defender's service stopped or its process killed (a sequence, not read); changes "
+                           "made while the log was off; Group Policy settings applied with no 5007.",
+            "validation": "WinEvents.log (5001 on ACC01, turned back on two minutes later); "
+                          "tests/check_windows_rules.py.",
+            "response": "High: find who did it - the sign-ins on that host just before - and what ran while "
+                        "it was off. Medium when tamper protection blocked the change.",
+        },
+    },
+})
+
 
 
 def tags(rid: str) -> list[str]:

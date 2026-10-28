@@ -484,6 +484,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #61 Every row carries its product (`products.py`, written after ingest - readers insert positionally); a product rule (`rules.RULE_PRODUCT`) reads `product_events` only; n/a per product and area with its reason; the period each evidence item covers (`period.py`). Story 1 of `specs/per_product_rules.md`.
 - #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; W3 Splunk WinEventLog text: items named from Windows' own message templates (`app/data/windows`, `tools/export_win_templates.ps1`), values as rendered. W4 Winlogbeat / NXLog JSON (`json_shape`): Winlogbeat writes rendered values and leaves out empty items; NXLog's own fields set aside by its documented list, but a template-named item always kept.
 - #59 Check Point Log Exporter records inside a ManageEngine EventLog Analyzer search export (`checkpoint_le.py`): record documented, wrapper observed; fields via `regexp_extract_all`; update logs sharing a `loguid` are `log_update` rows with no verdict; epoch `time` states its zone.
+- #76 Defender's own verdicts (story 5f, `specs/windows_defender_rules.md`): a product's verdict is an in-house rule (Q114, beside W-D1); WIN-MAL-2 one detection per host + Detection ID, medium when remediated, no technique, no generic twin (R3002 would make it a Downloader); WIN-HOST-3 turned off / tampered (T1685); item names differ per event - read the provider's templates; a rule may write a *lower* `lvl` (`least`).
 - #53 Every file is identified before it is read, in Sigma logsource terms (`identify.py`); no column is guessed; a format without a reader, or none, is kept as evidence and not analysed. A file's name proves nothing - JSON-lines arrive as `.log`, exports start with a blank line.
 
 **Time**
@@ -1038,7 +1039,8 @@ techniques match the SQL - run it with the parity check.
 Current set: **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
 CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **Windows** WIN-BRUTE-1..3,
 WIN-AUTH-1 (gotcha #65), WIN-LAT-1..3, WIN-HOST-1..2 (gotcha #66), WIN-MAL-1, WIN-INTEL-1..2
-(gotcha #67), WIN-BRUTE-4, WIN-LAT-4 (gotcha #68) · **generic** (every other product's rows; superseded on Palo Alto /
+(gotcha #67), WIN-BRUTE-4, WIN-LAT-4 (gotcha #68), WIN-MAL-2 Defender detection, WIN-HOST-3 Defender
+turned off (gotcha #76) · **generic** (every other product's rows; superseded on Palo Alto /
 Check Point rows, and the sign-in ones on Windows rows, gotcha #63): R2000 brute-force burst · R2002
 port scan · R2003 service sweep · R2004 policy gap · R2005 spray (many sources, one account) ·
 R2006 multi-source logins within an hour · R2007 beaconing · R2008 login after brute force ·
@@ -1077,8 +1079,9 @@ DuckDB bulk-load fix, and ~38s total while decode was still Python-per-row.
 
 Any change to ingest or rules should be checked for **parity**, and the
 baseline to check against is `tests/baseline.json`, not this file - per-file
-`rows / flagged / per-rule` counts, **668 entries** since 2026-10-22 (re-taken on the dev
-container for the product rules - gotcha #63; the Elastic PAN-OS samples added), asserted by
+`rows / flagged / per-rule` counts, **669 entries** since 2026-10-28 (re-taken on the dev
+container for the product rules - gotcha #63; the Elastic PAN-OS samples added; the user's
+WinEvents.log, 4 flagged - gotcha #76), asserted by
 `tests/check_parity.py`. Run it against the dev container (`--url http://127.0.0.1:8092`) with
 the AI review off there (gotcha #64) - with it on, a hundred uploads take hours. A silent drop to 0 findings
 is exactly the failure mode gotcha #2 describes, and a *plausible* wrong

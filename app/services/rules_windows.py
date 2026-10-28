@@ -54,6 +54,7 @@ import math
 
 from . import lines
 from .rules import IPV4_RE, NON_PUBLIC_IPV4_RE
+from .severity import WEIGHT
 
 PRODUCT = "windows"
 
@@ -784,11 +785,142 @@ RULES += [
     """),
 ]
 
+# Story 5f (specs/windows_defender_rules.md, Q114-Q119): Microsoft Defender Antivirus's own
+# verdicts, read like a firewall's (W-D12) - single events, so no line. Event ids, names and
+# fields from Microsoft's "Review event logs and error codes ... Microsoft Defender Antivirus"
+# (SOURCES.md, read 2026-10-28); item names as Defender writes them in its EventData.
+DEFENDER = "Microsoft-Windows-Windows Defender"
+DEFENDER_DETECTION = (1006, 1015, 1116,           # detected
+                      1007, 1117,                 # action taken
+                      1008, 1118, 1119)           # action failed / critically failed
+DEFENDER_ACTION_TAKEN = (1007, 1117)
+DEFENDER_ACTION_FAILED = (1008, 1118, 1119)
+# 1117: "The Allow, No action, and None actions don't remediate detected threats" - these do.
+DEFENDER_REMEDIATED = ("quarantine", "remove", "clean", "block")
+# Turned off -> the event that says it was turned back on (5001 -> 5000, 5010 -> 5009, 5012 -> 5011).
+DEFENDER_OFF = {5001: (5000, "real-time protection disabled"),
+                5010: (5009, "malware scanning disabled"),
+                5012: (5011, "virus scanning disabled")}
+DEFENDER_TAMPER_BLOCKED = 5013
+DEFENDER_CONFIG_CHANGED = 5007
+DEFENDER_UPDATES = (2000, 2001, 2002)   # definitions updated / update failed / engine updated
+
+# Item names differ by event (the provider's own templates, Get-WinEvent -ListProvider): 1006 /
+# 1015 write `Path Found` and `Domain` + `User`; 1007 / 1008 `Cleaning Action`; 1116-1119 `Path`,
+# `Action Name` and `Detection User`.
+_DEFENDER = f"""
+  SELECT e.row_id, e.ts, w.event_id, {HOST} AS host, w.data AS d,
+         coalesce(w.data['Path'], w.data['Path Found']) AS path,
+         trim(coalesce(w.data['Action Name'], w.data['Cleaning Action'])) AS action,
+         coalesce(w.data['Detection User'],
+                  nullif(trim(coalesce(w.data['Domain'] || '\\', '') || coalesce(w.data['User'], '')), '')) AS usr
+  FROM product_events e JOIN win_events w USING (row_id)
+  WHERE w.provider = '{DEFENDER}'
+"""
+
+
+def _ts(expr: str) -> str:
+    return f"strftime({expr}, '%Y-%m-%d %H:%M:%S')"
+
+
+RULES += [
+    # Defender's detection (W-D13, Q115): the detected event and its outcome events are one
+    # detection - same host and Detection ID (observed in the events; Microsoft's field lists do
+    # not name it), else same host, threat ID and path. Medium when an action taken remediated it
+    # and none failed - Defender stopped it, as a refused row is capped at medium; else high. No
+    # technique: a detection says what Defender found, not what the attacker did (as CP-MAL-2's
+    # Anti-Virus verdicts). Q116: a 1011 (deleted from quarantine) whose threat has no detection
+    # event on that host in the evidence is its own medium suggestion - it had been quarantined.
+    ("WIN-MAL-2", f"""
+        INSERT INTO findings
+        WITH ev AS ({_DEFENDER} AND w.event_id IN {DEFENDER_DETECTION}),
+        k AS (SELECT *, host || '|' || coalesce(nullif(trim(d['Detection ID']), ''),
+                                                coalesce(d['Threat ID'], '') || '|' || coalesce(path, '')) AS det
+              FROM ev),
+        g AS (SELECT det, any_value(host) AS host,
+                     any_value(d['Threat Name']) FILTER (WHERE d['Threat Name'] IS NOT NULL) AS threat,
+                     any_value(d['Category Name']) FILTER (WHERE d['Category Name'] IS NOT NULL) AS cat,
+                     any_value(d['Severity Name']) FILTER (WHERE d['Severity Name'] IS NOT NULL) AS sev,
+                     any_value(d['Process Name']) FILTER (WHERE nullif(d['Process Name'], 'Unknown') IS NOT NULL) AS proc,
+                     any_value(usr) FILTER (WHERE usr IS NOT NULL) AS usr,
+                     any_value(d['Source Name']) FILTER (WHERE d['Source Name'] IS NOT NULL) AS via,
+                     string_agg(DISTINCT action, ', ') FILTER (WHERE event_id IN {DEFENDER_ACTION_TAKEN}) AS actions,
+                     bool_or(event_id IN {DEFENDER_ACTION_FAILED}) AS failed,
+                     bool_or(event_id IN {DEFENDER_ACTION_TAKEN}
+                             AND lower(action) IN {DEFENDER_REMEDIATED}) AS remediated
+              FROM k GROUP BY det),
+        q AS ({_DEFENDER} AND w.event_id = 1011),
+        lone AS (SELECT q.* FROM q WHERE NOT EXISTS (
+                     SELECT 1 FROM ev WHERE ev.host = q.host AND ev.d['Threat ID'] = q.d['Threat ID']))
+        SELECT k.row_id, 'WIN-MAL-2',
+               CASE WHEN g.remediated AND NOT g.failed THEN {WEIGHT['medium']} END,
+               'Defender: ' || coalesce(g.threat, 'threat') ||
+               coalesce(' (' || g.cat || coalesce(', ' || g.sev, '') || ')', '') || ' on ' || g.host ||
+               coalesce(' - ' || g.proc, '') || coalesce(', ' || g.usr, '') || coalesce(', via ' || g.via, '') ||
+               ' - ' || CASE WHEN g.failed THEN 'the action failed' || coalesce(' (' || g.actions || ')', '')
+                             WHEN g.remediated THEN g.actions
+                             WHEN g.actions IS NOT NULL THEN g.actions || ' - not remediated'
+                             ELSE 'no action recorded in the evidence' END,
+               []::VARCHAR[], g.host, coalesce({_account('g.usr')}, '')
+        FROM k JOIN g USING (det)
+        UNION ALL
+        SELECT row_id, 'WIN-MAL-2', {WEIGHT['medium']},
+               'Defender deleted ' || coalesce(d['Threat Name'], 'a threat') ||
+               coalesce(' (' || d['Category Name'] || coalesce(', ' || d['Severity Name'], '') || ')', '') ||
+               ' from quarantine on ' || host || coalesce(' - ' || path, '') ||
+               '; the detection itself is not in the evidence',
+               []::VARCHAR[], host, ''
+        FROM lone
+    """),
+    # Defender turned off or tampered with (W-D14, T1685 DET0497 AN1369; SigmaHQ b28e58e4 for
+    # 5001). High; a change tamper protection blocked (5013) is medium - the attempt was refused.
+    # Q117: a 5007 only when its new value is under Windows Defender\Exclusions\ (the key path is
+    # observed; AN1369 and T1685's procedures name exclusion lists). Q118: when it was turned back
+    # on and the nearest Defender update on either side are shown, with no window.
+    ("WIN-HOST-3", f"""
+        INSERT INTO findings
+        WITH ev AS ({_DEFENDER} AND w.event_id IN ({", ".join(str(i) for i in (
+                        *DEFENDER_OFF, *(on for on, _ in DEFENDER_OFF.values()),
+                        DEFENDER_TAMPER_BLOCKED, DEFENDER_CONFIG_CHANGED, *DEFENDER_UPDATES))})),
+        off AS (SELECT *, CASE event_id {" ".join(f"WHEN {off} THEN {on}" for off, (on, _) in DEFENDER_OFF.items())}
+                          END AS on_id
+                FROM ev
+                WHERE event_id IN ({", ".join(str(i) for i in DEFENDER_OFF)}, {DEFENDER_TAMPER_BLOCKED})
+                   OR (event_id = {DEFENDER_CONFIG_CHANGED}
+                       AND contains(lower(coalesce(d['New Value'], '')), '\\windows defender\\exclusions\\'))),
+        facts AS (
+          SELECT o.row_id,
+                 (SELECT min(x.ts) FROM ev x WHERE x.host = o.host AND x.event_id = o.on_id AND x.ts >= o.ts) AS back_on,
+                 (SELECT arg_max(x.event_id || ' at ' || {_ts('x.ts')}, x.ts) FROM ev x
+                  WHERE x.host = o.host AND x.event_id IN {DEFENDER_UPDATES} AND x.ts < o.ts) AS upd_before,
+                 (SELECT arg_min(x.event_id || ' at ' || {_ts('x.ts')}, x.ts) FROM ev x
+                  WHERE x.host = o.host AND x.event_id IN {DEFENDER_UPDATES} AND x.ts > o.ts) AS upd_after
+          FROM off o)
+        SELECT o.row_id, 'WIN-HOST-3',
+               CASE WHEN o.event_id = {DEFENDER_TAMPER_BLOCKED} THEN {WEIGHT['medium']} END,
+               CASE o.event_id
+                 {" ".join(f"WHEN {off} THEN 'Defender {what} on '" for off, (_, what) in DEFENDER_OFF.items())}
+                 WHEN {DEFENDER_TAMPER_BLOCKED} THEN 'Tamper protection blocked a change to Defender on '
+                 ELSE 'Defender exclusion changed on ' END || o.host ||
+               CASE WHEN o.event_id = {DEFENDER_CONFIG_CHANGED} THEN ': ' || o.d['New Value']
+                    WHEN o.on_id IS NULL THEN ''
+                    WHEN f.back_on IS NULL THEN ' - not turned back on in the evidence'
+                    ELSE ' - turned back on at ' || {_ts('f.back_on')} || ' (' ||
+                         date_diff('minute', o.ts, f.back_on) || ' min later)' END ||
+               CASE WHEN f.upd_before IS NULL AND f.upd_after IS NULL THEN ''
+                    ELSE '; nearest Defender update event: ' ||
+                         concat_ws(', ', f.upd_before || ' before', f.upd_after || ' after') END,
+               ['T1685'], o.host, ''
+        FROM off o JOIN facts f USING (row_id)
+    """),
+]
+
 # The rules that name their finding's entity - what each decided on (specs/finding_entities.md
 # E-D1): a source, an account, or both; WIN-MAL-1 / WIN-INTEL-1 are one process on one host and
-# keep the row's own.
+# keep the row's own. Defender's rules name the host it ran on (and the detection's account).
 ENTITY = ("WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3", "WIN-BRUTE-4", "WIN-AUTH-1", "WIN-LAT-1",
-          "WIN-LAT-2", "WIN-LAT-3", "WIN-LAT-4", "WIN-HOST-1", "WIN-HOST-2", "WIN-INTEL-2")
+          "WIN-LAT-2", "WIN-LAT-3", "WIN-LAT-4", "WIN-HOST-1", "WIN-HOST-2", "WIN-INTEL-2",
+          "WIN-MAL-2", "WIN-HOST-3")
 # WIN-AUTH-1 reads the attempts the BRUTE rules' preparation built, and their findings.
 # WIN-LAT-2 / -3 read the sessions WIN-LAT-1's preparation built; WIN-BRUTE-4 its own epochs.
 PREPARE = {"WIN-BRUTE-1": prepare_brute_1, "WIN-BRUTE-2": prepare_brute_2,
@@ -798,20 +930,26 @@ LEVEL = {"WIN-BRUTE-1": "medium", "WIN-BRUTE-2": "medium", "WIN-BRUTE-3": "mediu
          "WIN-AUTH-1": "high", "WIN-LAT-1": "medium", "WIN-LAT-2": "medium", "WIN-LAT-3": "high",
          "WIN-LAT-4": "medium",
          "WIN-HOST-1": "high", "WIN-HOST-2": "high", "WIN-MAL-1": "high", "WIN-INTEL-1": "high",
-         "WIN-INTEL-2": "medium"}
+         "WIN-INTEL-2": "medium",
+         # Story 5f: high; a finding the event itself lowers writes medium (rules.apply_rules).
+         "WIN-MAL-2": "high", "WIN-HOST-3": "high"}
 LABELS = {"WIN-BRUTE-1": "password guessing", "WIN-BRUTE-2": "password spray",
           "WIN-BRUTE-3": "distributed guessing", "WIN-BRUTE-4": "low-and-slow guessing",
           "WIN-AUTH-1": "login after failures",
           "WIN-LAT-1": "uncommon RDP, then commands", "WIN-LAT-2": "remote service or task",
           "WIN-LAT-3": "NTLM without Kerberos", "WIN-LAT-4": "file copied to admin share, then run",
           "WIN-HOST-1": "Kerberoasting", "WIN-HOST-2": "LSASS dump",
-          "WIN-MAL-1": "beaconing", "WIN-INTEL-1": "known-bad destination", "WIN-INTEL-2": "known-bad sign-in source"}
+          "WIN-MAL-1": "beaconing", "WIN-INTEL-1": "known-bad destination", "WIN-INTEL-2": "known-bad sign-in source",
+          "WIN-MAL-2": "Defender detection", "WIN-HOST-3": "Defender turned off"}
 # The sign-in and beaconing rules count in their generic twins' family (R2), the feed matches in R3's;
-# a host behaviour has none to share.
-FAMILY = {r: ("R2" if r.startswith(("WIN-BRUTE", "WIN-AUTH", "WIN-MAL")) else
+# a host behaviour has none to share, nor has Defender's verdict - its own evidence (AV).
+FAMILY = {r: ("AV" if r == "WIN-MAL-2" else
+              "R2" if r.startswith(("WIN-BRUTE", "WIN-AUTH", "WIN-MAL")) else
               "R3" if r.startswith("WIN-INTEL") else r.split("-")[1]) for r in LEVEL}
 EQUIVALENT = {"WIN-BRUTE-1": "R2000", "WIN-BRUTE-2": "R2009", "WIN-BRUTE-3": "R2005",
               "WIN-AUTH-1": "R2008", "WIN-MAL-1": "R2007", "WIN-INTEL-1": "R3003", "WIN-INTEL-2": "R3004"}
+# WIN-MAL-2 has no generic twin: R3002 is malware *traffic a firewall let through* - VERIS would call
+# a Defender detection a Downloader, and the compromised-host pattern would count one Defender stopped.
 # The generic sign-in rules stop on Windows rows. R2006 (one account, many
 # sources succeeding within an hour) goes with them: on Windows it flagged a
 # domain controller's own machine account signing in from its addresses. So do

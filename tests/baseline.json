@@ -1617,6 +1617,15 @@
   "rows": 11,
   "rules": {}
  },
+ "WinEvents.log": {
+  "flagged": 4,
+  "md5": "007bc560ba67d6af5f639cbf119afb38",
+  "rows": 338,
+  "rules": {
+   "WIN-HOST-3": 1,
+   "WIN-MAL-2": 3
+  }
+ },
  "Win_4985_T1186_Process_Doppelganging.evtx": {
   "flagged": 0,
   "md5": "3e5b8be74f7059c25d5cccf6d496581d",

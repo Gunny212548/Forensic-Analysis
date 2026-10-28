@@ -38,13 +38,16 @@ def check(ok: bool, what: str) -> None:
         FAILED.append(what)
 
 
-def event(eid: int, ts: datetime, host: str, items: dict, sysmon: bool = False) -> str:
+def event(eid: int, ts: datetime, host: str, items: dict, sysmon: bool = False, defender: bool = False) -> str:
     data = "".join(f"<Data Name='{k}'>{v}</Data>" for k, v in items.items())
     t = ts.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "0Z"
     provider = ("<Provider Name='Microsoft-Windows-Sysmon' Guid='{5770385F-C22A-43E0-BF4C-06F5698FFBD9}'/>"
                 if sysmon else
+                "<Provider Name='Microsoft-Windows-Windows Defender' Guid='{11CD958A-C507-4EF3-B3F2-5FD9DFBD2C78}'/>"
+                if defender else
                 "<Provider Name='Microsoft-Windows-Security-Auditing' Guid='{54849625-5478-4994-A5BA-3E3B0328C30D}'/>")
-    channel = "Microsoft-Windows-Sysmon/Operational" if sysmon else "Security"
+    channel = ("Microsoft-Windows-Sysmon/Operational" if sysmon else
+               "Microsoft-Windows-Windows Defender/Operational" if defender else "Security")
     return ("<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System>" + provider +
             f"<EventID>{eid}</EventID><Version>0</Version><Level>0</Level><Task>12544</Task><Opcode>0</Opcode>"
             f"<Keywords>0x8010000000000000</Keywords><TimeCreated SystemTime='{t}'/><EventRecordID>{eid}</EventRecordID>"
@@ -61,6 +64,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("scratch")
     ap.add_argument("--repo", default=str(Path(__file__).resolve().parent.parent))
+    ap.add_argument("--winevents", help="the user's WinEvents.log (story 5f's real case, outside the repo)")
     args = ap.parse_args()
     scratch = Path(args.scratch)
     os.environ["DATA_DIR"] = str(scratch / "data")
@@ -277,8 +281,8 @@ def main() -> int:
     check({"WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3"} <= set(w.get("account-attacks", {}).get("rules", [])),
           "Brute force on Windows runs the WIN rules")
     check(set(w.get("lateral-movement", {}).get("rules", [])) == {"WIN-LAT-1", "WIN-LAT-2", "WIN-LAT-3", "WIN-LAT-4"}
-          and set(w.get("host-activity", {}).get("rules", [])) == {"WIN-HOST-1", "WIN-HOST-2"},
-          "the two host areas run the 5b rules")
+          and set(w.get("host-activity", {}).get("rules", [])) == {"WIN-HOST-1", "WIN-HOST-2", "WIN-HOST-3"},
+          "the two host areas run the 5b rules (and 5f's WIN-HOST-3)")
     lat2 = con.execute("SELECT count(DISTINCT descr) FROM findings WHERE rid = 'WIN-LAT-2' "
                        "AND descr LIKE '%Zabbix%'").fetchone()[0]
     check(lat2 == 4, f"the agent rollout to 4 servers is found - a benign true positive for the analyst ({lat2})")
@@ -313,7 +317,7 @@ def main() -> int:
     check(kept > 0, f"win_events keeps what Windows wrote ({kept})")
     dump = [f for f in per["WIN-HOST-2"] if f["username"] == "adm.backup"]
     hist = [x for x in triage.facts(con, dump[0])] if dump else []
-    check(any("Other findings of account 'adm.backup'" in x and "WIN-AUTH-1" in x and "before this suggestion" in x
+    check(any('Other findings of account "adm.backup"' in x and "WIN-AUTH-1" in x and "before this suggestion" in x
               for x in hist), "the dump's facts say adm.backup was guessed and signed in before (account history)")
     seq = con.execute("SELECT w.event_id, count(*) FROM findings f JOIN win_events w USING (row_id) "
                       "WHERE f.rid = 'WIN-LAT-1' GROUP BY 1 ORDER BY 1").fetchall()
@@ -346,6 +350,105 @@ def main() -> int:
     check(lat1.get(4778) == 1 and lat1.get(1, 0) >= 1, f"the RDP reconnect and what it ran are WIN-LAT-1's ({lat1})")
     check("WIN-HOST-2" not in got, "the dump without an access event is not found (a blind spot, said so)")
     con.close()
+
+    # Story 5f (specs/windows_defender_rules.md): Defender's own verdicts, item names as the
+    # provider's templates write them (1116-1119 Detection User / Action Name; 1006 Domain + User,
+    # Path Found; 1007 Cleaning Action).
+    print("story 5f: Microsoft Defender's detections and Defender turned off")
+
+    def threat(eid, ts, host, det, name, extra=None):
+        items = {"Detection ID": det, "Threat ID": "2147727753", "Threat Name": name, "Severity Name": "Severe",
+                 "Category Name": "Trojan", "Source Name": "AMSI", "Detection User": r"CORP\leo",
+                 "Process Name": r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                 "Path": r"amsi:_C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"}
+        return event(eid, ts, host, {**items, **(extra or {})}, defender=True)
+
+    def dfd(eid, ts, host, items=None):
+        return event(eid, ts, host, items or {"Product Name": "Microsoft Defender Antivirus"}, defender=True)
+
+    lines5f = [
+        # PC1 quarantined it (medium); PC2 detected and nothing more (high); PC3 allowed it (high);
+        # PC4 failed to remove it (high).
+        threat(1116, t0, "pc1.corp.local", "{A1}", "Trojan:PowerShell/Meterpreter.gen!A"),
+        threat(1117, t0 + timedelta(minutes=2), "pc1.corp.local", "{A1}", "Trojan:PowerShell/Meterpreter.gen!A",
+               {"Action Name": "Quarantine"}),
+        threat(1116, t0, "pc2.corp.local", "{A2}", "HackTool:Win32/Mimikatz"),
+        threat(1116, t0, "pc3.corp.local", "{A3}", "HackTool:Win32/Mimikatz"),
+        threat(1117, t0 + timedelta(minutes=1), "pc3.corp.local", "{A3}", "HackTool:Win32/Mimikatz",
+               {"Action Name": "Allow"}),
+        threat(1116, t0, "pc4.corp.local", "{A4}", "Ransom:Win32/LockBit"),
+        threat(1118, t0 + timedelta(minutes=1), "pc4.corp.local", "{A4}", "Ransom:Win32/LockBit",
+               {"Action Name": "Remove"}),
+        # PC5, the older pair: 1006 (Domain + User, Path Found) then 1007 Cleaning Action Remove (medium).
+        dfd(1006, t0, "pc5.corp.local", {"Detection ID": "{A5}", "Threat ID": "1", "Threat Name": "Virus:DOS/EICAR_Test_File",
+                                         "Severity Name": "Severe", "Category Name": "Virus", "Domain": "CORP",
+                                         "User": "ann", "Path Found": r"file:_C:\Users\ann\eicar.com"}),
+        dfd(1007, t0 + timedelta(seconds=5), "pc5.corp.local", {"Detection ID": "{A5}", "Threat ID": "1",
+                                                                 "Threat Name": "Virus:DOS/EICAR_Test_File",
+                                                                 "Cleaning Action": "Remove", "Domain": "CORP",
+                                                                 "User": "ann", "Path": r"file:_C:\Users\ann\eicar.com"}),
+        # A 1011 whose threat was detected here is that detection's; PC6's has none in the evidence.
+        dfd(1011, t0 + timedelta(days=1), "pc1.corp.local", {"Threat ID": "2147727753",
+                                                             "Threat Name": "Trojan:PowerShell/Meterpreter.gen!A"}),
+        dfd(1011, t0 + timedelta(days=1), "pc6.corp.local", {"Threat ID": "2147748182", "Threat Name": "Trojan:Win32/Glupteba!ml",
+                                                             "Severity Name": "Severe", "Category Name": "Trojan",
+                                                             "User": "SYSTEM", "Path": r"file:_C:\Windows\b6a1458f396.exe"}),
+        # SRV1: an update, real-time protection off, back on 2 minutes later (high, the facts shown);
+        # SRV2 off, never back on; SRV3 tamper protection blocked a change (medium); SRV4 an exclusion
+        # (high) and a routine setting (nothing).
+        dfd(2000, t0 - timedelta(minutes=10), "srv1.corp.local"),
+        dfd(5001, t0, "srv1.corp.local"),
+        dfd(5000, t0 + timedelta(minutes=2), "srv1.corp.local"),
+        dfd(5012, t0, "srv2.corp.local"),
+        dfd(5013, t0, "srv3.corp.local", {"Changed Type": "Real-time protection", "Value": "0"}),
+        dfd(5007, t0, "srv4.corp.local",
+            {"Old Value": "", "New Value": r"HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths\C:\Temp = 0x0"}),
+        dfd(5007, t0, "srv4.corp.local",
+            {"Old Value": "", "New Value": r"HKLM\SOFTWARE\Microsoft\Windows Defender\MpEngine\MpCampRing = 0x4"}),
+        # 2050 (sample submitted, "informational") and 5004 (Configuration undocumented): Timeline only.
+        dfd(2050, t0, "pc1.corp.local", {"Filename": r"C:\x.txt"}),
+        dfd(5004, t0, "pc1.corp.local", {"Feature Name": "Network Inspection System", "Configuration": "0"}),
+    ]
+    f5f = scratch / "story5f.xml"
+    f5f.write_text("\n".join(lines5f) + "\n", encoding="utf-8")
+    cid, man, con = run(f5f, "log")
+    ent_src, ent_user = db.entity_sql(con)
+    sugg = {(rid, src, usr): (lvl, n) for rid, src, usr, lvl, n in con.execute(
+        f"SELECT f.rid, {ent_src}, {ent_user}, max(f.lvl), count(*) FROM findings f JOIN raw_events r USING (row_id) "
+        "GROUP BY ALL").fetchall()}
+    from app.services.severity import WEIGHT
+    med, high = WEIGHT["medium"], WEIGHT["high"]
+    # PC1's 1011 joins nothing - its threat was detected there, so it is not a suggestion of its own.
+    expect = {("WIN-MAL-2", "PC1", "leo"): (med, 2), ("WIN-MAL-2", "PC2", "leo"): (high, 1),
+              ("WIN-MAL-2", "PC3", "leo"): (high, 2), ("WIN-MAL-2", "PC4", "leo"): (high, 2),
+              ("WIN-MAL-2", "PC5", "ann"): (med, 2), ("WIN-MAL-2", "PC6", None): (med, 1),
+              ("WIN-HOST-3", "SRV1", None): (high, 1), ("WIN-HOST-3", "SRV2", None): (high, 1),
+              ("WIN-HOST-3", "SRV3", None): (med, 1), ("WIN-HOST-3", "SRV4", None): (high, 1)}
+    check(sugg == expect, f"one suggestion per detection and per change, at its level ({sugg})")
+    descr = dict(con.execute("SELECT r.hostname, any_value(f.descr) FROM findings f JOIN raw_events r USING (row_id) "
+                             "WHERE f.rid = 'WIN-HOST-3' GROUP BY 1").fetchall())
+    srv1 = next((v for k, v in descr.items() if k.lower().startswith("srv1")), "")
+    check("turned back on at" in srv1 and "(2 min later)" in srv1 and "2000 at" in srv1 and "before" in srv1,
+          f"SRV1: when it was turned back on and the nearest update are shown ({srv1})")
+    srv2 = next((v for k, v in descr.items() if k.lower().startswith("srv2")), "")
+    check("not turned back on in the evidence" in srv2, f"SRV2: never turned back on, said so ({srv2})")
+    pc3 = con.execute("SELECT any_value(descr) FROM findings f JOIN raw_events r USING (row_id) "
+                      "WHERE f.rid = 'WIN-MAL-2' AND upper(r.hostname) LIKE 'PC3%'").fetchone()[0] or ""
+    check("Allow - not remediated" in pc3, f"an Allow is not a remediation ({pc3})")
+    mitre = dict(con.execute("SELECT rid, any_value(mitre) FROM findings GROUP BY rid").fetchall())
+    check(mitre.get("WIN-MAL-2") == [] and mitre.get("WIN-HOST-3") == ["T1685"],
+          f"a detection carries no technique, turning Defender off T1685 ({mitre})")
+    con.close()
+    if args.winevents:
+        print("real data: the user's WinEvents.log (NXLog JSON, one event per id)")
+        cid, man, con = run(Path(args.winevents), "log")
+        got = sorted(con.execute("SELECT rid, w.event_id, f.lvl FROM findings f JOIN win_events w USING (row_id) "
+                                 "ORDER BY 1, 2").fetchall())
+        check(got == [("WIN-HOST-3", 5001, high), ("WIN-MAL-2", 1011, med), ("WIN-MAL-2", 1116, med),
+                      ("WIN-MAL-2", 1117, med)],
+              f"Meterpreter quarantined and Glupteba deleted from quarantine (medium), real-time protection "
+              f"off on ACC01 (high) - nothing else ({got})")
+        con.close()
 
     print("\nWINDOWS RULES OK" if not FAILED else f"\n{len(FAILED)} FAILED")
     return 1 if FAILED else 0
