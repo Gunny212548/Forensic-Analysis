@@ -19,7 +19,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | 7 | Technique classification | MITRE ATT&CK, CISA *Best Practices for MITRE ATT&CK Mapping* | `rules.py`, `rule_meta.py` | ✅ |
 | 8 | Severity | Sigma `level`; escalation by ODNI Cyber Threat Framework stage | `app/services/severity.py` | ✅ |
 | 9 | Confidence | Admiralty Code (NATO 6x6) | `app/services/confidence.py` | ✅ |
-| 10 | Attack graph / chain | ATT&CK tactics, ODNI CTF stages | `db.build_graph` | ⚠️ graph exact; stages not labelled on it |
+| 10 | Attack graph / chain | ATT&CK tactics, ODNI CTF stages; NIST SP 800-86 §6.4.2 (data validated by interpretation before it is relied on) | `db.build_graph` over the confirmed groups only (`case_views.decided`), empty until every suggestion is decided - the attack timeline likewise | ⚠️ graph exact; stages not labelled on it |
 | 11 | Entity risk ranking | **Internal method** - see below | `db.risk_scores` | ⚠️ documented here |
 | 12 | AI narrative | VERIS 1.4 (classification), NIST AI RMF 1.0 (governance) | `app/services/veris.py`, `analysis.py` | ✅ VERIS 4A computed from findings, validated against the VERIS schema, given to the model as fact; AI RMF alignment below |
 | 13 | Analyst review audit trail | ISO/IEC 27001:2022 A.8.15 (logging) | `app/services/review.py`, `hashchain.py` | ✅ append-only, hash-chained; pre-chain decisions sealed |

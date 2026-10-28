@@ -7,8 +7,9 @@ Guidance for Claude Code when working in this repo.
 A standalone forensic log analysis tool — **no Wazuh dependency**. Upload any
 log file (syslog/auth.log style text, CSV firewall exports, JSON), the app's
 own decoder + rule engine extracts structured fields and flags
-security-relevant events with MITRE ATT&CK technique IDs. The attack graph
-is then built straight from those findings in SQL, and an LLM (a local Ollama
+security-relevant events with MITRE ATT&CK technique IDs. The attack timeline
+and graph are then built in SQL from the findings the analyst confirmed, once every
+suggestion is decided (gotcha #10), and an LLM (a local Ollama
 model since 2026-10-12; Groq before) writes the
 narrative around it — case summary, attack chain, timeline,
 recommendations.
@@ -16,8 +17,9 @@ recommendations.
 **Where it is going (the user, 2026-10-20 - read this first; gotcha #54).**
 The purpose is *forensic reconstruction from log files*, not SIEM alert grading:
 identify what each log is, put every event on one timeline, let the analyst
-confirm the attack events (the system and the AI only suggest), then build the
-attack timeline, the attack path and a graph of what the attacker did - which
+confirm the attack events (the system and the AI only suggest), then - only once every
+suggestion is decided, from the confirmed ones (the user, 2026-10-28: a suggestion not
+decided is not proven) - build the attack timeline, the attack path and a graph of what the attacker did - which
 command, from which host, to which host. Flow: **Ingest -> Timeline -> Attack
 events -> Attack timeline -> Attack path / graph -> Report**; the Respond step
 (lifecycle, MTTC) is to be removed. **Detection rules are per product since 2026-10-22**
@@ -81,7 +83,7 @@ pipeline.process_case  (services/pipeline.py)
   progress → manifest `progress: {stage, pct, estimated}` about once a
          second (FR-2.5; ingest 0-90, intel 90-92, rules 92-99). Measured
          for line logs/JSON (bytes read), zip members and rules. The CSV fast
-         path is ONE DuckDB statement and 1.1.3 had no query_progress(), so
+         path is ONE DuckDB statement and 1.1.3 (now 1.5.6) had no query_progress(), so
          its share is an elapsed-time estimate at ~60 MB/s, held at 95% of
          the file, flagged `estimated` (the UI prefixes "~"). Manifests are
          now written tmp-then-rename, since they are rewritten while polled.
@@ -120,7 +122,9 @@ POST .../projects/{pj}/cases {case_id}       move a case into this project
 GET  .../projects/{pj}/deletion, DELETE ...  delete the project with its cases
 GET  .../projects/{pj}/timeline | graph      the investigation across its cases:
                                              confirmed groups in time order; the
-                                             cases' graphs and risk joined (P4)
+                                             cases' graphs and risk joined (P4);
+                                             both empty, with `undecided`, while any
+                                             suggestion of its cases is not decided
 GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
 GET  /api/cases/{id}/findings                collapsed findings + computed
                                              confidence + review status + FD id +
@@ -160,8 +164,12 @@ GET  /api/cases/{id}/attack-layer            ATT&CK Navigator layer (format 4.5)
                                              download; 409 unless ready
 GET  /api/rules[/{rid}]                      rule metadata: Sigma fields + ADS
                                              documentation (rule_meta.py)
-POST /api/cases/{id}/analyze                 db.build_graph (SQL) for the
-                                             graph + SQL top-N distinct → the
+GET  /api/cases/{id}/graph                   the Attack path step: db.build_graph +
+                                             risk_scores of the confirmed groups;
+                                             empty, with `undecided`, until every
+                                             suggestion is decided (gotcha #10)
+POST /api/cases/{id}/analyze                 db.build_graph (SQL) of the confirmed
+                                             groups + SQL top-N distinct → the
                                              LLM (Ollama now) for the narrative,
                                              decoded inside a per-case JSON
                                              schema + grounding check (#37)
@@ -286,7 +294,9 @@ anything. The page and its bundle stay public; they hold no data.
 analyst, not a real-time multi-tenant SIEM. DuckDB is embedded (no server to
 operate), columnar (a 65k-row Palo Alto CSV costs a few MB), and its
 GROUP BY/HAVING is exactly what the correlation rules need. An ES cluster
-would be heavy operational baggage for zero benefit at this scale.
+would be heavy operational baggage for zero benefit at this scale. The version is
+**1.5.6** since 2026-10-14 (pinned in `requirements.txt`; 1.1.3 before) - a gotcha or
+comment that names 1.1.3 was measured on the old one.
 
 The UI is a **Vite + React** app whose source is `frontend/` and whose build
 output is `static/` — which is generated, gitignored, and never edited by
@@ -522,7 +532,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #71 Every suggestion is reviewed by the AI itself, no cap (the user's requirement): the case is ready after the rules and the review runs on in the background (`triage.enqueue`, one worker, resumed at start-up), every rule first, a failed batch retried then sent one by one, what is left listed with "Review again" (`POST /ai-review`); batch size measured (`TRIAGE_BATCH`).
 - #64 The AI reviews every suggestion while the case is processed (`triage.py`; since #71 after it is ready): facts computed in SQL (a destination's popularity among internal hosts, the rule's documented false positives), a schema, an address check; advice under each suggestion, kept on the review line; the Upload page counts the suggestions reviewed; `TRIAGE_ENABLED=0` in every rule check and in dev.
 - #5 Groq's output-token limits and the measured sweeps (events 15, max_tokens 950); schema key order is the priority list. Groq only - not the local model.
-- #10 The attack graph is SQL (`db.build_graph()`), not AI - don't hand it back to the model.
+- #10 The attack graph is SQL (`db.build_graph()`), not AI - don't hand it back to the model. Since 2026-10-28 it, its risk ranking and the attack timeline (case and project) take only the confirmed groups (`keys=`, `case_views.decided`) and stay empty until every suggestion is decided; keys go in as one JSON string (a bound list cost 0.43 s a query).
 - #13 Every wrong narrative was missing input, never reasoning: compute the discriminating fact in SQL and hand it over; prompt hardening was measured to do nothing.
 - #36 VERIS 1.4 classification is computed, then handed to the model.
 - #37 The narrative is decoded inside a per-case JSON schema and grounding-checked; every query feeding the prompt needs a total `ORDER BY` tiebreak; citations `F<n>`.
@@ -870,7 +880,8 @@ Two more checks, each for its own layer:
 - **Projects** - `tests/check_projects.py [repo] [--scratch DIR]` (gotcha #75): a project required
   on upload, close / reopen and its gate, a Closed project refused for upload and merge, the
   Overview and Findings per project, the customer's project rows against each project's own
-  Overview, rename / move / delete, the timeline and the joined graph across cases.
+  Overview, rename / move / delete, the timeline and the joined graph across cases (empty while
+  a suggestion is not decided, the rejected one left out once all are).
 - **Customer isolation** - `tests/check_customer_isolation.py <scratch>
   --repo /app` (31 checks, gotchas #40/#41, and projects); run it in the container the same
   way as check_mcp. Run it after touching `storage.py`, any path helper or
@@ -910,7 +921,8 @@ Two more checks, each for its own layer:
   model, no Ollama - run it with `TRIAGE_ENABLED=1`.
 - **Products and periods** - `tests/check_products.py <scratch>` (gotcha #61): product per row, a
   product rule on its rows only, periods and gaps, the n/a matrix, findings unchanged end to end.
-- **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states, and
+- **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states (Attack timeline
+  and Attack path wait for every decision; `/graph` empty until then, never a rejected group), and
   every step citing a standard marked read in `docs/standards/SOURCES.md`.
 
 **`tests/check_parity.py` asserts it, so nobody has to read a table.** Until
