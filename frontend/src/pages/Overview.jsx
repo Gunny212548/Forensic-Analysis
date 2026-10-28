@@ -152,10 +152,11 @@ export default function Overview({ companyId, projectId }) {
         </div>
       </div>
 
-      {/* Every customer at once: the three figures the user asked to see first (2026-10-28) -
-          cases open, suggestions to review, customers. They leave the summary card here, so
-          each is said once; scoped to one customer the card keeps them. */}
-      {!data.company_id && (
+      {/* The overview levels - every customer, or one customer's projects: the three figures
+          the user asked to see first (2026-10-28) - cases open, suggestions to review, and the
+          customers, or this customer's open projects. One project's Overview has the summary
+          card instead. */}
+      {!data.project_id && (
         <div className="ui-stat-grid ov-stats">
           <StatTile icon="cases" tone={t.open_cases ? 'danger' : 'ok'} value={fmtNum(t.open_cases)}
                     label={`Open cases of ${fmtNum(t.cases)}`}
@@ -163,7 +164,14 @@ export default function Overview({ companyId, projectId }) {
           <StatTile icon="shield-alert" tone={t.unreviewed ? SEV_TONE[highest] || 'muted' : 'ok'}
                     value={fmtNum(t.unreviewed)} label="To review"
                     title="Suggestions the analyst has not decided yet, in every case" />
-          <StatTile icon="customers" tone="info" value={fmtNum(t.customers)} label="Customers" />
+          {data.company_id ? (
+            <StatTile icon="findings" tone="info"
+                      value={fmtNum((data.by_project || []).filter((p) => p.status !== 'closed').length)}
+                      label={`Open projects of ${fmtNum((data.by_project || []).length)}`}
+                      title="Investigations of this customer not closed yet" />
+          ) : (
+            <StatTile icon="customers" tone="info" value={fmtNum(t.customers)} label="Customers" />
+          )}
         </div>
       )}
 
@@ -195,13 +203,16 @@ export default function Overview({ companyId, projectId }) {
         <ByCustomer rows={data.by_customer || []} areas={data.areas} coverage={data.coverage || []} />
       )}
 
-      {data.company_id && (
+      {/* One customer: each of its projects' overview and nothing more (the user, 2026-10-28:
+          the customer's page as the first page - a list of projects, no details). Every
+          detail below is on the project's own Overview, which a row opens. */}
+      {data.company_id && !data.project_id && (
+        <ByProject companyId={data.company_id} rows={data.by_project || []} unfiled={data.unfiled_cases || 0}
+                   areas={data.areas} />
+      )}
+
+      {data.project_id && (
         <>
-          {/* The customer's investigations, Open first - the same pattern as By customer one
-              level down; a row opens that project's own Overview. */}
-          {!data.project_id && (
-            <ByProject companyId={data.company_id} rows={data.by_project || []} unfiled={data.unfiled_cases || 0} />
-          )}
           <SummaryCard
             label="Summary"
             side={
@@ -437,11 +448,13 @@ function ByCustomer({ rows, areas, coverage }) {
   )
 }
 
-/** The customer's projects - each one investigation - Open first: status, opened /
- *  closed, cases, suggestions not decided of all, the worst not decided. A row opens
- *  the project's own Overview. Cases from before a project was required are counted
- *  on a last line, as "No project". */
-function ByProject({ companyId, rows, unfiled }) {
+/** The customer's projects - each one investigation - Open first, as By customer lists
+ *  customers one level up: status with its dates, suggestions not decided of all, the
+ *  worst not decided, cases, every suggestion per area, and the evidence each rests on.
+ *  A row opens the project's own Overview, where the details are. Cases from before a
+ *  project was required are counted on a last line, as "No project". */
+function ByProject({ companyId, rows, unfiled, areas }) {
+  const areaName = Object.fromEntries(areas.map((a) => [a.id, a.name]))
   return (
     <Section icon="cases" tone="info" title="Projects"
              sub="Each investigation of this customer - open one for its own Overview">
@@ -451,39 +464,69 @@ function ByProject({ companyId, rows, unfiled }) {
         <div className="table-scroll">
           <table className="ui-rows">
             <thead>
-              <tr><th>#</th><th>Project</th><th>Status</th><th>Opened</th><th>Closed</th><th>Cases</th>
-                <th>Not decided</th><th>Highest not decided</th></tr>
+              <tr><th>#</th><th>Project</th><th>Status</th><th>Not decided</th><th>Highest not decided</th>
+                <th>Cases</th><th>Evidence</th></tr>
             </thead>
             <tbody>
-              {rows.map((p, i) => (
-                <tr key={p.project_id}>
-                  <td className="ui-n">{i + 1}</td>
-                  <td className="ui-main">
-                    <a className="table-link" href={`#/dashboard/${companyId}/${p.project_id}`}>{p.name}</a>
-                  </td>
-                  <td>
-                    <Badge tone={p.status === 'closed' ? 'ok' : 'info'}>{p.status === 'closed' ? 'Closed' : 'Open'}</Badge>
-                  </td>
-                  <td className="ui-count muted">{(p.created_at || '').slice(0, 10)}</td>
-                  <td className="ui-count muted">{p.closed_at ? p.closed_at.slice(0, 10) : '—'}</td>
-                  <td className="ui-count">{fmtNum(p.cases)}</td>
-                  <td className="ui-count"><strong>{fmtNum(p.unreviewed)}</strong> / {fmtNum(p.reviewable)}</td>
-                  <td>
-                    {p.highest ? (
-                      <span className={`sev-tag sev-tag-${p.highest}`}>{SEV_EN[p.highest] || p.highest}</span>
-                    ) : (
-                      <span className="muted">{p.reviewable ? 'All decided' : '—'}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((p, i) => {
+                const parts = Object.entries(p.areas || {}).map(([id, n]) => `${areaName[id] || id} ${fmtNum(n)}`)
+                return (
+                  <tr key={p.project_id}>
+                    <td className="ui-n">{i + 1}</td>
+                    <td>
+                      <div className="ui-main">
+                        <a className="table-link" href={`#/dashboard/${companyId}/${p.project_id}`}>{p.name}</a>
+                      </div>
+                      <div className="ui-sub">
+                        {parts.length ? parts.join(' · ') : p.cases ? 'Nothing suggested' : 'No case uploaded'}
+                      </div>
+                    </td>
+                    <td>
+                      <Badge tone={p.status === 'closed' ? 'ok' : 'info'}>{p.status === 'closed' ? 'Closed' : 'Open'}</Badge>
+                      <div className="ui-sub mono ov-dates">
+                        {(p.created_at || '').slice(0, 10)}
+                        {p.closed_at ? ` → ${p.closed_at.slice(0, 10)}` : ''}
+                      </div>
+                    </td>
+                    <td className="ui-count"><strong>{fmtNum(p.unreviewed)}</strong> / {fmtNum(p.reviewable)}</td>
+                    <td>
+                      {p.highest ? (
+                        <span className={`sev-tag sev-tag-${p.highest}`}>{SEV_EN[p.highest] || p.highest}</span>
+                      ) : (
+                        <span className="muted">{p.reviewable ? 'All decided' : '—'}</span>
+                      )}
+                    </td>
+                    <td className="ui-count">{fmtNum(p.cases)}</td>
+                    <td>
+                      {(p.coverage || []).length ? (
+                        p.coverage.map((c) => (
+                          <div key={c.product} className="ov-evidence">
+                            <div>{c.product_name}</div>
+                            <div className="ui-sub mono">{coveragePeriod(c)}</div>
+                            {c.gap_days > 0 && (
+                              <div className="ui-sub tone-warn ov-gap">
+                                {fmtNum(c.gap_days)} {c.gap_days === 1 ? 'day' : 'days'} without events
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
               {unfiled > 0 && (
                 <tr>
                   <td className="ui-n" />
-                  <td className="muted">No project</td>
-                  <td colSpan={3} className="cell-sub">uploaded before a project was required</td>
+                  <td>
+                    <div className="muted">No project</div>
+                    <div className="ui-sub">uploaded before a project was required - move them into one</div>
+                  </td>
+                  <td colSpan={3} />
                   <td className="ui-count">{fmtNum(unfiled)}</td>
-                  <td colSpan={2} />
+                  <td />
                 </tr>
               )}
             </tbody>

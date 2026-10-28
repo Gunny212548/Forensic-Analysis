@@ -81,3 +81,15 @@
   case's Attack timeline step and the project's (`showCase` adds the Case column).
 - Like the case page, the project graph still draws every suggestion, not only confirmed ones,
   until story 7 of case_flow_design; its subtitle says so.
+
+## 2026-10-28, later: one customer's Overview lists its projects and nothing more
+
+- The user, after the All customers view: clicking into a customer shows its projects, without the
+  details. With a customer and no project chosen the Overview is the header, three tiles (open
+  cases, to review, **open projects of N**), the attention banner when something waits, and the
+  Projects table - by the By customer pattern: each project's suggestions per area under its name,
+  status with opened / closed, not decided, the worst not decided, cases and an Evidence column.
+  The summary card and every detail section show once a project is chosen.
+- `overview.build` collects areas and coverage per project in the same pass (`project_extra`) and
+  puts them on the `by_project` rows. Cases in "No project" have no detail page: move them into
+  a project.

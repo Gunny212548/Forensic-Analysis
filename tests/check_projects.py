@@ -293,6 +293,13 @@ check("its risk is summed over the cases", src.get("203.0.113.9", {}).get("cases
 check("an unknown project is 404",
       manager.get(f"/api/companies/{CO}/projects/pj-000000000000/timeline").status_code == 404
       and manager.get(f"/api/companies/{CO}/projects/pj-000000000000/graph").status_code == 404)
+whole = manager.get("/api/overview", params={"company_id": CO}).json()
+row = next(p for p in whole["by_project"] if p["project_id"] == IV)
+one = manager.get("/api/overview", params={"company_id": CO, "project_id": IV}).json()
+check("a project's row carries its own areas and evidence, as its Overview counts them",
+      row["areas"] == {a["id"]: sum(a["total"].values()) for a in one["areas"] if sum(a["total"].values())}
+      and [(c["product"], c["days"]) for c in row["coverage"]]
+      == [(c["product"], c["days"]) for c in one["coverage"] if "days" in c])
 
 jobs.wait_idle(120)  # the uploads above queued real processing; let it finish before exit
 print("\nPROJECTS OK" if not failures else f"\n{failures} FAILED")

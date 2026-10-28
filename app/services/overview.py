@@ -309,6 +309,7 @@ def build(company_id: str | None = None, project_id: str | None = None) -> dict:
         customer_row(c["company_id"], c["name"])
 
     cov_agg: dict[tuple, dict] = {}        # (company, product) -> files, cases, first, last, days
+    project_extra: dict = {}               # project id -> suggestions per area, coverage per product
     attention_files: list[dict] = []       # files whose reading needs the analyst's attention
     tactic_agg: Counter = Counter()
     tactic_customers: dict[str, set] = {}
@@ -381,21 +382,28 @@ def build(company_id: str | None = None, project_id: str | None = None) -> dict:
             lvl = facts["open_max_lvl"]
             if lvl is not None and (crow["open_max_lvl"] is None or lvl > crow["open_max_lvl"]):
                 crow["open_max_lvl"] = lvl
+        # The same per project (the customer's Overview lists its projects as the All
+        # customers view lists customers): suggestions per area, and coverage below.
+        prow = project_extra.setdefault(m.get("project_id"), {"areas": Counter(), "cov": {}})
         for aid, a in facts["areas"].items():
             crow["areas"][aid] += sum(a["total"].values())
+            prow["areas"][aid] += sum(a["total"].values())
 
         # Evidence coverage: files per log source from the case's periods (one per file
         # or zip member, period.py), days from the events themselves.
         files_of = Counter(p.get("product") for p in m.get("periods") or [])
         for product, cov in facts["coverage"].items():
-            agg = cov_agg.setdefault((m.get("company_id"), product), {
-                "customer": customer, "files": 0, "cases": set(), "first": cov["first"],
-                "last": cov["last"], "days": set()})
-            agg["files"] += files_of.get(product, 0)
-            agg["cases"].add(m["case_id"])
-            agg["first"] = min(agg["first"], cov["first"])
-            agg["last"] = max(agg["last"], cov["last"])
-            agg["days"].update(cov["days"])
+            for agg in (cov_agg.setdefault((m.get("company_id"), product), {
+                            "customer": customer, "files": 0, "cases": set(), "first": cov["first"],
+                            "last": cov["last"], "days": set()}),
+                        prow["cov"].setdefault(product, {
+                            "customer": customer, "files": 0, "cases": set(), "first": cov["first"],
+                            "last": cov["last"], "days": set()})):
+                agg["files"] += files_of.get(product, 0)
+                agg["cases"].add(m["case_id"])
+                agg["first"] = min(agg["first"], cov["first"])
+                agg["last"] = max(agg["last"], cov["last"])
+                agg["days"].update(cov["days"])
         items = m.get("members") or [{"name": m.get("original_filename"), "mapping": m.get("mapping")}]
         for item in items:
             reason = attention_reason(item.get("mapping"))
@@ -555,6 +563,12 @@ def build(company_id: str | None = None, project_id: str | None = None) -> dict:
     if company_id is not None:
         from . import projects as projects_mod
         project_rows = projects_mod.summary(company_id)
+        for p in project_rows:
+            extra = project_extra.get(p["project_id"], {"areas": Counter(), "cov": {}})
+            p["areas"] = {aid: extra["areas"][aid] for aid in areas.AREA_IDS if extra["areas"][aid]}
+            p["coverage"] = sorted((_coverage_row(company_id, agg["customer"], product, agg)
+                                    for product, agg in extra["cov"].items()),
+                                   key=lambda r: r["product_name"].lower())
     return {
         "generated_at": now.isoformat(),
         # What the page is scoped to, and what it can be scoped to.
