@@ -410,15 +410,16 @@ def get_case_flow(case_id: str):
 
 @router.get("/{case_id}/graph")
 def get_case_graph(case_id: str):
-    """The attack graph and the risk ranking, straight from the findings in
-    SQL - the same two the narrative is built around (analysis_jobs), served
-    without it, so the Investigate step never waits for the AI."""
+    """The attack graph and the risk ranking of the confirmed groups, in SQL -
+    the same two the narrative is built around (analysis_jobs), served without
+    it, so the Attack path step never waits for the AI. Empty, with
+    `undecided`, while a suggestion is not decided (case_views.attack_path)."""
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
     if not case_views.holds_findings(manifest):
         raise HTTPException(409, f"Case is not ready yet (status: {manifest.get('status')})")
-    return {"graph": db.build_graph(case_id), "risk": db.risk_scores(case_id)}
+    return case_views.attack_path(case_id)
 
 
 @router.post("/{case_id}/lifecycle")

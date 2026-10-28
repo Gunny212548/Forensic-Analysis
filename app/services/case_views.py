@@ -144,6 +144,33 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
     return findings
 
 
+def decided(case_id: str) -> tuple[list[str], int]:
+    """The finding groups the analyst confirmed (accepted or modified), and how many
+    suggestions are not decided yet. The attack path, its risk ranking and the
+    narrative's graph are drawn from the confirmed ones only (the user, 2026-10-28)."""
+    state = review.current(case_id)
+    confirmed, undecided = [], 0
+    for f in db.collapsed_findings(case_id):
+        status = (state.get(f["key"]) or {}).get("status", review.UNREVIEWED)
+        if status in (review.ACCEPTED, review.MODIFIED):
+            confirmed.append(f["key"])
+        elif status == review.UNREVIEWED:
+            undecided += 1
+    return confirmed, undecided
+
+
+def attack_path(case_id: str) -> dict:
+    """The attack graph and risk ranking of the confirmed groups - empty while a
+    suggestion is not decided (the user, 2026-10-28: the path waits for every
+    decision), with how many are left."""
+    confirmed, undecided = decided(case_id)
+    if undecided:
+        return {"graph": {"nodes": [], "edges": []}, "risk": db.risk_scores(case_id, keys=[]),
+                "undecided": undecided, "confirmed": len(confirmed)}
+    return {"graph": db.build_graph(case_id, keys=confirmed), "risk": db.risk_scores(case_id, keys=confirmed),
+            "undecided": 0, "confirmed": len(confirmed)}
+
+
 def created_at(case_id: str, manifest: dict) -> str | None:
     """When the case's findings were created - the first time the rule
     engine finished on it (custody `processed`), else the upload time. MTTC

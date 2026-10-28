@@ -283,6 +283,16 @@ check("a group not decided is left out and counted", tl["undecided"] == 1)
 check("each names its file, and the stages are ATT&CK's",
       all(f["case_file"] for f in tl["findings"]) and tl["tactic_order"][0]["id"] == "reconnaissance")
 gr = analyst.get(f"/api/companies/{CO}/projects/{IV}/graph").json()
+check("the project's path is empty while a suggestion of any of its cases is not decided",
+      not gr["graph"]["edges"] and not gr["risk"] and gr["undecided"] == 1 and gr["confirmed"] == 2)
+beacon = next(f for f in db.collapsed_findings(hosts) if f["rid"] == "R2007")
+manager.post(f"/api/cases/{hosts}/review",
+             json={"finding_key": beacon["key"], "action": "reject", "reason_code": "misinterpretation"})
+gr = analyst.get(f"/api/companies/{CO}/projects/{IV}/graph").json()
+check("once every suggestion is decided it is drawn from the confirmed groups only",
+      gr["undecided"] == 0 and gr["graph"]["edges"]
+      and not any(e["to"] == "198.51.100.4" for e in gr["graph"]["edges"])
+      and "198.51.100.4" not in {r["entity"] for r in gr["risk"].get("destinations", [])})
 shared = [e for e in gr["graph"]["edges"] if (e["from"], e["to"]) == ("203.0.113.9", "10.0.0.20")]
 check("the same two hosts in two cases are one edge naming both cases",
       len(shared) == 1 and len(shared[0]["cases"]) == 2 and set(shared[0]["rules"]) == {"R2002", "R3001"})

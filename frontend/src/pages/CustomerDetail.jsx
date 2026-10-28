@@ -275,18 +275,21 @@ function ProjectPath({ project }) {
   }, [project.company_id, project.project_id])
   const edges = data?.graph?.edges || []
   const shared = edges.filter((e) => (e.cases || []).length > 1).length
+  const waiting = !!data?.undecided
   return (
     <Section icon="lateral-movement" tone={edges.length ? 'danger' : 'muted'} title="Attack path of the project"
-             sub={data ? `The cases' graphs joined - ${fmtNum(edges.length)} ${edges.length === 1 ? 'link' : 'links'}`
-               + (shared ? `, ${fmtNum(shared)} seen in more than one case` : '')
-               + ' - every suggestion is drawn, as on the case page, until the path follows decisions' : ''}>
+             sub={!data ? '' : waiting
+               ? 'Drawn once every suggestion of its cases is decided'
+               : `The confirmed attack events of its cases joined - ${fmtNum(edges.length)} `
+                 + `${edges.length === 1 ? 'link' : 'links'}`
+                 + (shared ? `, ${fmtNum(shared)} seen in more than one case` : '')}>
       {error ? (
         <div className="empty">{error}</div>
       ) : !data ? (
         <div className="empty">Loading...</div>
-      ) : (
+      ) : waiting ? null : (
         <div className="cp-section-body">
-          {edges.length ? <AttackGraph graph={data.graph} /> : <div className="empty">No finding links two entities</div>}
+          {edges.length ? <AttackGraph graph={data.graph} /> : <div className="empty">No confirmed attack event links two entities</div>}
           <div className="section-label">Risk ranking, over the project&apos;s cases</div>
           <RiskTables risk={data.risk || {}} />
         </div>

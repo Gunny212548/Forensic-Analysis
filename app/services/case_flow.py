@@ -168,22 +168,18 @@ def _attack_timeline(findings: list[dict], unreviewed: list[dict], confirmed: li
 
 def _attack_path(findings: list[dict], unreviewed: list[dict], confirmed: list[dict],
                  step: dict) -> None:
-    """The path is what the confirmed events show, so the step is done only
-    once every suggestion is decided - a graph being drawable is not the
-    analyst's work being finished. Until story 7 the graph itself still draws
-    every suggestion, which the reason says."""
-    note = " - the graph below still draws every suggestion until story 7"
+    """The path is what the confirmed events show, drawn once every suggestion
+    is decided (the user, 2026-10-28) - until then the graph is empty
+    (case_views.attack_path) and the step waits."""
     step.update(total=len(confirmed))
     if not findings:
         step.update(state=DONE, reason="No finding - nothing to draw")
-    elif unreviewed and not confirmed:
-        step.update(state=NOT_STARTED, reason=f"Waits for confirmed attack events{note}")
     elif unreviewed:
-        step.update(state=ACTIVE, reason=f"{_plural(len(confirmed), 'confirmed group')}, "
-                                         f"{len(unreviewed)} not decided yet{note}")
+        # How many are left is the summary card's figure (said once on a page).
+        step.update(state=NOT_STARTED, reason="Drawn once every suggestion is decided")
     elif confirmed:
-        step.update(state=DONE, reason=f"Every suggestion decided; {_plural(len(confirmed), 'confirmed group')}"
-                                       f"{note}")
+        step.update(state=DONE, reason=f"Every suggestion decided; drawn from "
+                                       f"{_plural(len(confirmed), 'confirmed group')}")
     else:
         step.update(state=DONE, reason="No attack event was confirmed - there is no path to draw")
 

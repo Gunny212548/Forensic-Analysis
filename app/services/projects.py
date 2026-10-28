@@ -264,13 +264,22 @@ def timeline(company_id: str, project_id: str) -> dict:
 def graph(company_id: str, project_id: str) -> dict:
     """The attack graph and the risk ranking of the project's cases joined. An edge
     between the same two entities in several cases is one edge naming each case; a
-    risk score is summed over the cases, as the Overview sums it per customer."""
+    risk score is summed over the cases, as the Overview sums it per customer. Drawn
+    from the confirmed groups only, and empty while any case of the project has a
+    suggestion not decided - as on the case's Attack path step (the user, 2026-10-28)."""
     edges: dict[tuple, dict] = {}
     risk: dict[str, dict] = {}
-    for m in _analysed(company_id, project_id):
+    cases = _analysed(company_id, project_id)
+    decisions = {m["case_id"]: case_views.decided(m["case_id"]) for m in cases}
+    undecided = sum(n for _, n in decisions.values())
+    confirmed = sum(len(keys) for keys, _ in decisions.values())
+    if undecided:
+        return {"graph": {"nodes": [], "edges": []}, "risk": {}, "undecided": undecided, "confirmed": confirmed}
+    for m in cases:
+        keys = decisions[m["case_id"]][0]
         # By id: two cases may carry the same file name (two exports both "log.csv").
         case = {"case_id": m["case_id"], "file": m.get("original_filename")}
-        for e in db.build_graph(m["case_id"])["edges"]:
+        for e in db.build_graph(m["case_id"], keys=keys)["edges"]:
             k = (e["from"], e["to"])
             have = edges.get(k)
             if have is None or e["lvl"] > have["lvl"]:
@@ -283,7 +292,7 @@ def graph(company_id: str, project_id: str) -> dict:
                 have["rules"] = sorted(set(have["rules"]) | set(e["rules"]))
             if case not in edges[k]["cases"]:
                 edges[k]["cases"].append(case)
-        for role, items in db.risk_scores(m["case_id"]).items():
+        for role, items in db.risk_scores(m["case_id"], keys=keys).items():
             for i in items:
                 r = risk.setdefault(role, {}).setdefault(i["entity"], {
                     "entity": i["entity"], "score": 0, "findings": 0, "max_lvl": 0, "rules": set(), "cases": 0})
@@ -305,4 +314,4 @@ def graph(company_id: str, project_id: str) -> dict:
     ranked = {role: sorted(({**r, "rules": sorted(r["rules"])} for r in by.values()),
                            key=lambda r: (-r["score"], r["entity"]))[:8]
               for role, by in risk.items()}
-    return {"graph": {"nodes": nodes, "edges": kept}, "risk": ranked}
+    return {"graph": {"nodes": nodes, "edges": kept}, "risk": ranked, "undecided": 0, "confirmed": confirmed}

@@ -140,8 +140,12 @@ def main() -> int:
         c.post(f"/api/cases/{Z}/review", json={"finding_key": fs[0]["key"], "action": "accept"})
         fl = flow(Z)
         ap = step(fl, "attack-path")
-        check(ap["state"] == "active" and ap["total"] == 1,
-              f"Attack path is in progress with one confirmed group ({ap['reason']})")
+        check(ap["state"] == "not_started" and ap["total"] == 1 and "every suggestion is decided" in ap["reason"],
+              f"Attack path waits for every decision ({ap['reason']})")
+        g = c.get(f"/api/cases/{Z}/graph").json()
+        check(not g["graph"]["edges"] and not any(g["risk"].values())
+              and g["undecided"] == len(fs) - 1 and g["confirmed"] == 1,
+              "...and /graph draws nothing while a suggestion is not decided")
         check(step(fl, "report")["state"] == "blocked", f"Report is blocked: {step(fl, 'report')['reason']}")
 
         print("every suggestion confirmed")
@@ -169,6 +173,9 @@ def main() -> int:
         ap = step(fl, "attack-path")
         check(ap["state"] == "done" and "no path" in ap["reason"],
               f"...and the attack path says there is no path ({ap['reason']})")
+        g = c.get(f"/api/cases/{F}/graph").json()
+        check(not g["graph"]["edges"] and not any(g["risk"].values()) and g["undecided"] == 0,
+              "...and /graph draws no rejected suggestion")
 
         print("the timeline is in event-time order")
         r = c.get(f"/api/cases/{Z}/events", params={"only_flagged": "false", "order": "time", "limit": 1000})
@@ -187,7 +194,8 @@ def main() -> int:
         print("graph without the AI")
         g = c.get(f"/api/cases/{Z}/graph")
         body = g.json() if g.status_code == 200 else {}
-        check(g.status_code == 200 and body.get("graph", {}).get("edges"), "/graph returns the attack graph")
+        check(g.status_code == 200 and body.get("graph", {}).get("edges") and body.get("undecided") == 0,
+              "/graph returns the attack graph once every suggestion is decided")
         check(bool(body.get("risk")), "...and the risk ranking")
         check(c.get("/api/cases/nope/flow").status_code == 404, "/flow of an unknown case is 404")
         check(c.get("/api/cases/nope/graph").status_code == 404, "/graph of an unknown case is 404")

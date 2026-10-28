@@ -61,10 +61,13 @@ def sql_context(case_id: str, events: list[dict]) -> tuple[dict, list[dict], dic
     ranking answers "where do I look first". All three stay complete for the
     whole case even when the narrative itself has to be batched.
     """
-    graph = db.build_graph(case_id)
+    # The graph and the ranking are those of the confirmed groups only, as on
+    # the Attack path step (the user, 2026-10-28).
+    confirmed, _ = case_views.decided(case_id)
+    graph = db.build_graph(case_id, keys=confirmed)
     ips = list(dict.fromkeys(e["srcip"] for e in events if e.get("srcip")))
     profiles = db.source_profiles(case_id, ips)
-    risk = db.risk_scores(case_id)
+    risk = db.risk_scores(case_id, keys=confirmed)
     return graph, profiles, risk
 
 

@@ -13,6 +13,7 @@ Why DuckDB rather than flat JSON (what this replaced) or Elasticsearch:
   be heavy operational baggage for a single-analyst forensic tool
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -774,7 +775,24 @@ def top_distinct_findings(case_id: str, limit: int) -> list[dict]:
 _IP_LIKE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
 
 
-def build_graph(case_id: str, limit: int = 14) -> dict:
+def _kept_sql(con, keys: list[str] | None) -> str:
+    """The WHERE term that keeps only the finding groups named in `keys`
+    (finding_key); '' for every finding. The attack path is drawn from the
+    groups the analyst confirmed (the user, 2026-10-28), and keys are matched on
+    the same spelling finding_key() writes."""
+    if keys is None:
+        return ""
+    # One JSON string into a temp table: binding the Python list itself cost
+    # 0.43 s for 526 keys (DuckDB 1.1.3), the JSON 0.01 s. A read-only
+    # connection may still create a temp table; it goes when the connection closes.
+    con.execute("CREATE OR REPLACE TEMP TABLE kept_keys AS "
+                "SELECT unnest(from_json(?, '[\"VARCHAR\"]')) AS k", [json.dumps(keys)])
+    src, user = entity_sql(con)
+    return (f" AND f.rid || '|' || coalesce({src}, '') || '|' || coalesce({user}, '')"
+            f" IN (SELECT k FROM kept_keys)")
+
+
+def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) -> dict:
     """Build the attack graph directly from findings, in SQL.
 
     The graph is not interpretation - it is structure that already exists in
@@ -784,15 +802,17 @@ def build_graph(case_id: str, limit: int = 14) -> dict:
     the budget, and let node names drift from the evidence. Derived here it
     is exact, complete, free, and every edge traces back to real rows.
 
-    Returns the {nodes, edges} shape the frontend already renders.
+    Returns the {nodes, edges} shape the frontend already renders. With
+    `keys`, only those finding groups are drawn (_kept_sql).
     """
-    if not db_path(case_id).exists():
+    if not db_path(case_id).exists() or keys == []:
         return {"nodes": [], "edges": []}
 
     con = connect(case_id, read_only=True)
     try:
+        kept = _kept_sql(con, keys)
         rows = con.execute(
-            """
+            f"""
             SELECT r.srcip                          AS src,
                    coalesce(r.dstip, r.username)    AS dst,
                    f.rid,
@@ -803,7 +823,7 @@ def build_graph(case_id: str, limit: int = 14) -> dict:
             JOIN raw_events r USING (row_id)
             WHERE r.srcip IS NOT NULL
               AND coalesce(r.dstip, r.username) IS NOT NULL
-              AND r.srcip <> coalesce(r.dstip, r.username)
+              AND r.srcip <> coalesce(r.dstip, r.username){kept}
             GROUP BY r.srcip, coalesce(r.dstip, r.username), f.rid
             ORDER BY 1, 2, 3
             """
@@ -865,7 +885,7 @@ def build_graph(case_id: str, limit: int = 14) -> dict:
 _RISK_ROLES = {"sources": "srcip", "destinations": "dstip", "accounts": "username"}
 
 
-def risk_scores(case_id: str, limit: int = 8) -> dict:
+def risk_scores(case_id: str, limit: int = 8, keys: list[str] | None = None) -> dict:
     """Risk-based ranking: accumulate finding severity per entity.
 
     Borrowed from how modern SIEMs triage - instead of treating every rule
@@ -875,13 +895,15 @@ def risk_scores(case_id: str, limit: int = 8) -> dict:
 
     Returns {"sources": [...], "destinations": [...], "accounts": [...]},
     each a list of {entity, score, findings, rules, max_lvl} sorted by score.
+    With `keys`, only those finding groups are scored (_kept_sql).
     """
-    if not db_path(case_id).exists():
+    if not db_path(case_id).exists() or keys == []:
         return {role: [] for role in _RISK_ROLES}
 
     con = connect(case_id, read_only=True)
     out: dict[str, list[dict]] = {}
     try:
+        kept = _kept_sql(con, keys)
         for role, column in _RISK_ROLES.items():
             # Score per rule, then sum - with the per-rule count dampened by a
             # log. A flat sum(lvl) ranks purely by volume: on the customer's
@@ -898,7 +920,7 @@ def risk_scores(case_id: str, limit: int = 8) -> dict:
                            count(*)   AS n
                     FROM findings f
                     JOIN raw_events r USING (row_id)
-                    WHERE r.{column} IS NOT NULL AND r.{column} <> ''
+                    WHERE r.{column} IS NOT NULL AND r.{column} <> ''{kept}
                     GROUP BY r.{column}, f.rid
                 )
                 SELECT entity,

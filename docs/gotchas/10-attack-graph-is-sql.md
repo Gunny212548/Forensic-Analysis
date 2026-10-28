@@ -20,3 +20,12 @@ to 5 entries).
 The prompt now explicitly tells the model *not* to emit a graph, and
 `run_analysis(graph=...)` overwrites the key regardless. `_meta.graph_source`
 records which produced it (`rules` vs `model` for old cached output).
+
+**Only the confirmed groups, once all are decided (the user, 2026-10-28).** The graph and
+the risk ranking beside it (case, project and the narrative's) take `keys=` - the finding
+groups accepted or modified (`case_views.decided`) - and `/graph` returns nothing, with
+`undecided`, while a suggestion is not decided. Before, the Attack path step drew every
+suggestion, rejected ones included. The keys go in as one JSON string into a temp table
+(`db._kept_sql`): binding the Python list cost 0.43 s a query on a 24,791-finding case with
+526 keys (DuckDB 1.1.3), the JSON 0.01 s. The Overview's Top affected and the MCP tools still
+rank every finding.

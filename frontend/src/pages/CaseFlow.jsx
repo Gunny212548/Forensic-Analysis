@@ -592,7 +592,8 @@ function AttackTimeline({ caseId }) {
   )
 }
 
-/** Attack graph and risk ranking, from the findings in SQL (GET /graph). */
+/** Attack graph and risk ranking of the confirmed groups, in SQL (GET /graph) -
+ *  nothing until every suggestion is decided (the user, 2026-10-28). */
 function GraphAndRisk({ caseId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -608,10 +609,21 @@ function GraphAndRisk({ caseId }) {
 
   if (error) return <Empty>{error}</Empty>
   if (!data) return null
+  if (data.undecided) {
+    return (
+      <Empty>
+        Decide the remaining suggestions in <a href={stepHref(caseId, 'attack-events')}>Attack events</a> first.
+      </Empty>
+    )
+  }
   return (
     <>
       <div className="section-label">Attack graph</div>
-      {data.graph?.edges?.length ? <AttackGraph graph={data.graph} /> : <Empty>No edges - no finding links two entities.</Empty>}
+      {data.graph?.edges?.length ? (
+        <AttackGraph graph={data.graph} />
+      ) : (
+        <Empty>No edges - no confirmed attack event links two entities.</Empty>
+      )}
       <div className="section-label">Risk ranking</div>
       <RiskTables risk={data.risk || {}} />
     </>
