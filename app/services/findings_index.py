@@ -98,12 +98,15 @@ def _matches(row: dict, q: str) -> bool:
 
 def listing(company_id: str | None = None, status: str | None = None, severity: str | None = None,
             q: str | None = None, limit: int = 100, offset: int = 0,
-            area: str | None = None, unassigned: bool = False, decision: str | None = None) -> dict:
-    """Workflow findings for one customer, or for every customer. The counts in
-    the header describe the customer scope, before the status / severity / text
-    filters narrow the table."""
+            area: str | None = None, unassigned: bool = False, decision: str | None = None,
+            project_id: str | None = None) -> dict:
+    """Workflow findings for one customer, or for every customer - with `project_id`,
+    for one investigation of it (specs/projects.md P2). The counts in the header
+    describe that scope, before the status / severity / text filters narrow the table."""
     rows = []
     for m in storage.list_manifests(company_id):
+        if project_id is not None and m.get("project_id") != project_id:
+            continue
         if m.get("company_id") and case_views.holds_findings(m):
             rows += case_rows(m)
 

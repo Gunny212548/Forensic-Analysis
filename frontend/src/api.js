@@ -57,9 +57,13 @@ export async function logout() {
 
 /** Everything the Overview page shows, aggregated server-side over all cases
  *  (app/services/overview.py). */
-/** All customers, or one customer's store when `companyId` is given. */
-export async function getOverview(companyId) {
-  const q = companyId ? `?company_id=${encodeURIComponent(companyId)}` : ''
+/** All customers, or one customer's store when `companyId` is given - and one
+ *  project of it with `projectId` (specs/projects.md P2). */
+export async function getOverview(companyId, projectId) {
+  const p = new URLSearchParams()
+  if (companyId) p.set('company_id', companyId)
+  if (companyId && projectId) p.set('project_id', projectId)
+  const q = p.toString() ? `?${p}` : ''
   return jsonOrThrow(await fetch(`/api/overview${q}`), 'Could not load the overview')
 }
 
@@ -146,9 +150,10 @@ export async function getFindingEvents(caseId, key, { limit = 25, offset = 0 } =
 
 /** Every finding in the status workflow, across cases (FR-4.4). `open_count`
  *  is what the Findings menu badge shows. */
-export async function listFindings({ companyId, decision, severity, area, q, limit = 50, offset = 0 } = {}) {
+export async function listFindings({ companyId, projectId, decision, severity, area, q, limit = 50, offset = 0 } = {}) {
   const p = new URLSearchParams({ limit, offset })
   if (companyId) p.set('company_id', companyId)
+  if (companyId && projectId) p.set('project_id', projectId)
   if (decision) p.set('decision', decision)
   if (severity) p.set('severity', severity)
   if (area) p.set('area', area)

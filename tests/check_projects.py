@@ -148,7 +148,31 @@ r = manager.post("/api/cases/merge", json={"case_ids": [c1, c2]})
 check(f"cases of different projects are not merged (409, {r.status_code})",
       r.status_code == 409 and "different projects" in r.json()["detail"])
 
+print("P2: a dashboard per project")
 from app.services import jobs  # noqa: E402
+
+jobs.wait_idle(120)  # the uploads above are processed, so every count below is settled
+whole = manager.get("/api/overview", params={"company_id": CO}).json()
+one = manager.get("/api/overview", params={"company_id": CO, "project_id": PJ}).json()
+mine = projects.cases_of(CO, PJ)
+check("scoped to a project, the Overview counts that project's cases only",
+      one["project_id"] == PJ and one["totals"]["cases"] == len(mine) < whole["totals"]["cases"])
+check("its suggestions are the project's",
+      one["totals"]["reviewable"] == next(p for p in projects.summary(CO) if p["project_id"] == PJ)["reviewable"])
+check("the customer's own Overview lists every project, Open first, and none when one is chosen",
+      {p["project_id"] for p in whole["by_project"]} == {p["project_id"] for p in storage.list_projects(CO)}
+      and one["by_project"] == [] and {p["project_id"] for p in one["project_options"]} >= {PJ})
+check("a project of no customer, or of another, is 404",
+      manager.get("/api/overview", params={"project_id": PJ}).status_code == 404
+      and manager.get("/api/overview", params={"company_id": storage.create_company("Other")["company_id"],
+                                               "project_id": PJ}).status_code == 404)
+fall = manager.get("/api/findings", params={"company_id": CO}).json()
+fpj = manager.get("/api/findings", params={"company_id": CO, "project_id": PJ}).json()
+check("Findings filtered by project lists only that project's cases",
+      all(r["case_id"] in {m["case_id"] for m in mine} for r in fpj["rows"])
+      and fpj["scope_total"] <= fall["scope_total"])
+check("and a project without its customer is 404",
+      manager.get("/api/findings", params={"project_id": PJ}).status_code == 404)
 
 jobs.wait_idle(120)  # the uploads above queued real processing; let it finish before exit
 print("\nPROJECTS OK" if not failures else f"\n{failures} FAILED")

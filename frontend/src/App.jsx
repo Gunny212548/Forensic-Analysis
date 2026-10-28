@@ -182,7 +182,10 @@ export default function App() {
       />
 
       <main className="layout">
-        {page === 'dashboard' && <Overview companyId={param || null} />}
+        {page === 'dashboard' && (
+          // #/dashboard, #/dashboard/<customer> or #/dashboard/<customer>/<project>
+          <Overview companyId={param.split('/')[0] || null} projectId={param.split('/')[1] || null} />
+        )}
         {page === 'upload' && <Upload user={user} />}
         {page === 'findings' && <Findings param={param || null} key={param} />}
         {page === 'customers' && !param && <Customers />}

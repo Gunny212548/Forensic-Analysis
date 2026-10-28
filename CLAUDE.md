@@ -159,7 +159,8 @@ MCP (stdio, read-only)                       app/mcp_server.py - 19 tools over t
                                              same views; every call hash-chain
                                              logged to mcp/access.jsonl (#38);
                                              never assigns FD ids (#51)
-GET  /api/overview                           KPIs, detection areas (every suggestion,
+GET  /api/overview[?company_id=[&project_id=]] one customer, one project of it (#75),
+                                             or all; KPIs, detection areas (every suggestion,
                                              undecided, the case holding most),
                                              attention, suggestions by first-event
                                              day, top entities (an account with its

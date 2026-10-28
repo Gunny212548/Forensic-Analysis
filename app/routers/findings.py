@@ -10,6 +10,7 @@ router = APIRouter(prefix="/api/findings", tags=["findings"])
 @router.get("")
 async def list_findings(
     company_id: str | None = None,
+    project_id: str | None = None,
     status: str | None = None,
     severity: str | None = None,
     area: str | None = None,
@@ -25,6 +26,9 @@ async def list_findings(
     analyst's decision rather than the status workflow (2026-10-27)."""
     if company_id is not None and storage.load_company(company_id) is None:
         raise HTTPException(404, "Customer not found")
+    # One investigation (specs/projects.md P2): a project is a customer's.
+    if project_id is not None and (company_id is None or storage.load_project(company_id, project_id) is None):
+        raise HTTPException(404, "Project not found for this customer")
     if status is not None and status not in (*lifecycle.STATES, findings_index.OPEN_FILTER):
         raise HTTPException(400, "status must be one of: "
                                  + ", ".join((*lifecycle.STATES, findings_index.OPEN_FILTER)))
@@ -36,4 +40,5 @@ async def list_findings(
         raise HTTPException(400, f"area must be one of: {', '.join(areas.AREA_IDS)}")
     # Reads DuckDB for every case it has not cached: off the event loop.
     return await asyncio.to_thread(
-        findings_index.listing, company_id, status, severity, q, limit, offset, area, unassigned, decision)
+        findings_index.listing, company_id, status, severity, q, limit, offset, area, unassigned, decision,
+        project_id)

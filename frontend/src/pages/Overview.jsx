@@ -22,18 +22,18 @@ const ROLE_ICON = { sources: 'server', destinations: 'globe', accounts: 'user' }
  *  tile that counts something links to where it can be worked. What used to be
  *  here and now lives elsewhere: the findings table is the Findings page, the
  *  case list is Customers, the ATT&CK technique list is waiting for its own page. */
-export default function Overview({ companyId }) {
+export default function Overview({ companyId, projectId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     try {
-      setData(await getOverview(companyId))
+      setData(await getOverview(companyId, projectId))
       setError('')
     } catch (err) {
       setError(err.message)
     }
-  }, [companyId])
+  }, [companyId, projectId])
 
   useEffect(() => {
     load()
@@ -46,11 +46,13 @@ export default function Overview({ companyId }) {
 
   const t = data.totals
   const scoped = (data.customer_options || []).find((c) => c.company_id === data.company_id)
+  const project = (data.project_options || []).find((p) => p.project_id === data.project_id)
   const sevTotals = Object.fromEntries(
     SEVS.map((s) => [s, data.areas.reduce((n, a) => n + (a.total[s] || 0), 0)]),
   )
-  // Drill-downs keep the customer this page is scoped to.
-  const scope = data.company_id ? `&company_id=${encodeURIComponent(data.company_id)}` : ''
+  // Drill-downs keep the customer - and the project - this page is scoped to.
+  const scope = (data.company_id ? `&company_id=${encodeURIComponent(data.company_id)}` : '')
+    + (data.project_id ? `&project_id=${encodeURIComponent(data.project_id)}` : '')
   const todo = [
     { n: t.critical_undecided, label: 'critical findings not decided',
       href: `#/findings/severity=critical&decision=Unreviewed${scope}` },
@@ -88,6 +90,14 @@ export default function Overview({ companyId }) {
             {scoped ? (
               <>
                 Customer: <strong>{scoped.name}</strong>
+                {project && (
+                  <>
+                    {' '}· Project: <strong>{project.name}</strong>{' '}
+                    <Badge tone={project.status === 'closed' ? 'ok' : 'info'}>
+                      {project.status === 'closed' ? 'Closed' : 'Open'}
+                    </Badge>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -115,6 +125,24 @@ export default function Overview({ companyId }) {
               </option>
             ))}
           </select>
+          {/* One investigation of the chosen customer (specs/projects.md P2). */}
+          {data.company_id && (
+            <select
+              className="ov-customer"
+              aria-label="Project"
+              value={data.project_id || ''}
+              onChange={(e) => {
+                window.location.hash = `#/dashboard/${data.company_id}${e.target.value ? `/${e.target.value}` : ''}`
+              }}
+            >
+              <option value="">All projects</option>
+              {(data.project_options || []).map((p) => (
+                <option key={p.project_id} value={p.project_id}>
+                  {p.name}{p.status === 'closed' ? ' (closed)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
           <button type="button" className="secondary" onClick={load}>
             Refresh
           </button>
@@ -169,6 +197,11 @@ export default function Overview({ companyId }) {
 
       {data.company_id && (
         <>
+          {/* The customer's investigations, Open first - the same pattern as By customer one
+              level down; a row opens that project's own Overview. */}
+          {!data.project_id && (
+            <ByProject companyId={data.company_id} rows={data.by_project || []} unfiled={data.unfiled_cases || 0} />
+          )}
           <SummaryCard
             label="Summary"
             side={
@@ -396,6 +429,63 @@ function ByCustomer({ rows, areas, coverage }) {
                   </tr>
                 )
               })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  )
+}
+
+/** The customer's projects - each one investigation - Open first: status, opened /
+ *  closed, cases, suggestions not decided of all, the worst not decided. A row opens
+ *  the project's own Overview. Cases from before a project was required are counted
+ *  on a last line, as "No project". */
+function ByProject({ companyId, rows, unfiled }) {
+  return (
+    <Section icon="cases" tone="info" title="Projects"
+             sub="Each investigation of this customer - open one for its own Overview">
+      {!rows.length && !unfiled ? (
+        <div className="empty">No project yet - one is chosen or added when uploading</div>
+      ) : (
+        <div className="table-scroll">
+          <table className="ui-rows">
+            <thead>
+              <tr><th>#</th><th>Project</th><th>Status</th><th>Opened</th><th>Closed</th><th>Cases</th>
+                <th>Not decided</th><th>Highest not decided</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((p, i) => (
+                <tr key={p.project_id}>
+                  <td className="ui-n">{i + 1}</td>
+                  <td className="ui-main">
+                    <a className="table-link" href={`#/dashboard/${companyId}/${p.project_id}`}>{p.name}</a>
+                  </td>
+                  <td>
+                    <Badge tone={p.status === 'closed' ? 'ok' : 'info'}>{p.status === 'closed' ? 'Closed' : 'Open'}</Badge>
+                  </td>
+                  <td className="ui-count muted">{(p.created_at || '').slice(0, 10)}</td>
+                  <td className="ui-count muted">{p.closed_at ? p.closed_at.slice(0, 10) : '—'}</td>
+                  <td className="ui-count">{fmtNum(p.cases)}</td>
+                  <td className="ui-count"><strong>{fmtNum(p.unreviewed)}</strong> / {fmtNum(p.reviewable)}</td>
+                  <td>
+                    {p.highest ? (
+                      <span className={`sev-tag sev-tag-${p.highest}`}>{SEV_EN[p.highest] || p.highest}</span>
+                    ) : (
+                      <span className="muted">{p.reviewable ? 'All decided' : '—'}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {unfiled > 0 && (
+                <tr>
+                  <td className="ui-n" />
+                  <td className="muted">No project</td>
+                  <td colSpan={3} className="cell-sub">uploaded before a project was required</td>
+                  <td className="ui-count">{fmtNum(unfiled)}</td>
+                  <td colSpan={2} />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

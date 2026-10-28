@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { listCompanies, listFindings } from '../api.js'
+import { listCompanies, listFindings, listProjects } from '../api.js'
 import { LEVEL_EN, fmtNum, shortTs } from '../format.js'
 import { StatTile } from '../components/cards.jsx'
 
@@ -26,7 +26,7 @@ function initialFilters(param) {
   if (!param.includes('=')) return { area: param }
   const q = new URLSearchParams(param)
   return { area: q.get('area') || '', severity: q.get('severity') || '', decision: q.get('decision') || '',
-    companyId: q.get('company_id') || '' }
+    companyId: q.get('company_id') || '', projectId: q.get('project_id') || '' }
 }
 
 export default function Findings({ param }) {
@@ -35,6 +35,9 @@ export default function Findings({ param }) {
   // A link from a customer-scoped Overview carries the customer, so the list
   // opens on the findings the number that was clicked counted.
   const [companyId, setCompanyId] = useState(init.companyId || '')
+  // One investigation of that customer (specs/projects.md P2).
+  const [projectId, setProjectId] = useState(init.projectId || '')
+  const [projects, setProjects] = useState([])
   const [decision, setDecision] = useState(init.decision || '')
   const [severity, setSeverity] = useState(init.severity || '')
   const [area, setArea] = useState(init.area || '')
@@ -50,6 +53,13 @@ export default function Findings({ param }) {
       .catch(() => setCompanies([]))
   }, [])
 
+  useEffect(() => {
+    if (!companyId) return setProjects([])
+    listProjects(companyId)
+      .then(setProjects)
+      .catch(() => setProjects([]))
+  }, [companyId])
+
   // Search waits for a pause in typing instead of asking the server per key.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -61,12 +71,12 @@ export default function Findings({ param }) {
 
   const load = useCallback(async () => {
     try {
-      setData(await listFindings({ companyId, decision, severity, area, q, limit: PAGE, offset }))
+      setData(await listFindings({ companyId, projectId, decision, severity, area, q, limit: PAGE, offset }))
       setError('')
     } catch (err) {
       setError(err.message)
     }
-  }, [companyId, decision, severity, area, q, offset])
+  }, [companyId, projectId, decision, severity, area, q, offset])
 
   useEffect(() => {
     load()
@@ -83,6 +93,7 @@ export default function Findings({ param }) {
   if (!data) return <div className="empty">Loading...</div>
 
   const scope = companies.find((c) => c.company_id === companyId)
+  const scopeProject = projects.find((p) => p.project_id === projectId)
   const from = data.total ? data.offset + 1 : 0
   const to = Math.min(data.offset + data.limit, data.total)
 
@@ -94,6 +105,7 @@ export default function Findings({ param }) {
           <div className="subtitle">
             <span className="live-dot" /> {fmtNum(data.undecided_count)} not decided of {fmtNum(data.scope_total)} high
             and critical findings{scope ? ` - ${scope.name}` : ' - all customers'}
+            {scopeProject ? `, project ${scopeProject.name}` : ''}
           </div>
         </div>
         <div className="actions">
@@ -135,7 +147,12 @@ export default function Findings({ param }) {
 
       <div className="panel">
         <div className="filter-bar fd-filters">
-          <select value={companyId} onChange={pick(setCompanyId)} aria-label="Customer">
+          <select value={companyId} aria-label="Customer"
+                  onChange={(e) => {
+                    setCompanyId(e.target.value)
+                    setProjectId('') // a project is one customer's
+                    setOffset(0)
+                  }}>
             <option value="">All customers</option>
             {companies.map((c) => (
               <option value={c.company_id} key={c.company_id}>
@@ -143,6 +160,16 @@ export default function Findings({ param }) {
               </option>
             ))}
           </select>
+          {companyId && (
+            <select value={projectId} onChange={pick(setProjectId)} aria-label="Project">
+              <option value="">All projects</option>
+              {projects.map((p) => (
+                <option value={p.project_id} key={p.project_id}>
+                  {p.name}{p.status === 'closed' ? ' (closed)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
           <select value={decision} onChange={pick(setDecision)} aria-label="Decision">
             <option value="">Any decision</option>
             {DECISIONS.map(([d, label]) => (

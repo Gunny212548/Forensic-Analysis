@@ -264,10 +264,13 @@ def _coverage_row(company_id, customer, product, agg) -> dict:
             "gap_days": sum(g["days"] for g in gaps), "longest_gap": gaps[0] if gaps else None}
 
 
-def build(company_id: str | None = None) -> dict:
+def build(company_id: str | None = None, project_id: str | None = None) -> dict:
     """The Overview page - of one customer when `company_id` is given (each
-    read from that customer's own store), otherwise of all of them."""
+    read from that customer's own store), otherwise of all of them; with
+    `project_id` too, of that one investigation (specs/projects.md P2)."""
     manifests = storage.list_manifests(company_id)
+    if project_id is not None:
+        manifests = [m for m in manifests if m.get("project_id") == project_id]
     all_companies = storage.list_companies()
     companies = [c for c in all_companies if company_id in (None, c["company_id"])]
     now = datetime.now(TZ)
@@ -545,11 +548,22 @@ def build(company_id: str | None = None) -> dict:
                           "customers": sorted(r["customers"], key=str.lower),
                           # The case holding most of its suggestions, opened on Attack events.
                           "case_id": r["cases"].most_common(1)[0][0]})
+    # One customer's projects (specs/projects.md P2): the choices of the project select,
+    # and - on the customer's own Overview, no project chosen - one row each, Open first,
+    # as the All customers view lists customers. Imported here: projects imports this module.
+    project_rows = []
+    if company_id is not None:
+        from . import projects as projects_mod
+        project_rows = projects_mod.summary(company_id)
     return {
         "generated_at": now.isoformat(),
         # What the page is scoped to, and what it can be scoped to.
         "company_id": company_id,
+        "project_id": project_id,
         "customer_options": [{"company_id": c["company_id"], "name": c["name"]} for c in all_companies],
+        "project_options": [{k: p[k] for k in ("project_id", "name", "status")} for p in project_rows],
+        "by_project": project_rows if project_id is None else [],
+        "unfiled_cases": sum(1 for m in manifests if not m.get("project_id")) if project_id is None else 0,
         "totals": {
             "cases": totals["cases"], "ready": totals["ready"],
             "processing": totals["queued"] + totals["processing"], "failed": totals["failed"],

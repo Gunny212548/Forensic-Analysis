@@ -29,3 +29,17 @@
 - `GET /api/companies/{id}/projects` returns `projects.summary` - status, opened / closed, cases,
   suggestions and those not decided, the worst not decided, `can_close` - Open first, then the
   newest. It reads cached case facts (`overview._case_facts`).
+
+## P2 - a dashboard per project
+
+- `#/dashboard/<co>/<pj>`, `GET /api/overview?company_id=&project_id=` and
+  `GET /api/findings?company_id=&project_id=`: the same code paths with the manifests filtered by
+  project, so a project's Overview counts exactly what its cases hold. A `project_id` without its
+  customer, or of another customer, is 404.
+- The customer's own Overview (no project chosen) opens with **Projects** - one row each, Open
+  first, opened / closed, cases, not decided of all, the worst not decided, and a "No project"
+  line for cases from before - the By customer pattern one level down; the customer's sections
+  follow it, all projects together. A project select sits beside the customer select.
+- `overview.build` gets the project rows from `projects.summary`, imported inside the function:
+  `projects` imports `overview` (for `_case_facts`), so a module-level import would be circular.
+- Findings has a project select once a customer is chosen; changing the customer clears it.
