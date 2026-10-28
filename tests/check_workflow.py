@@ -447,6 +447,48 @@ def main() -> int:
         check([-lv[r["highest"]] for r in bc] == sorted(-lv[r["highest"]] for r in bc),
               "worst suggestion not decided first")
 
+        print("Overview: evidence coverage, ATT&CK tactics, top rules")
+        from app.services import overview as overview_mod, rule_meta as rule_meta_mod
+        cov = ov["coverage"]
+        check({r["company_id"] for r in cov} >= {W, OTHER}, "every customer has a coverage row")
+        read = [r for r in cov if r["product"] is not None]
+        check(read and all(r["days"] + r["gap_days"] == r["span_days"] and r["days"] >= 1 for r in read),
+              "days with events + days without = the span, per log source")
+        for cid in (W, OTHER):
+            mans = [storage.load_manifest(x) for x in (A, F, Z, O)]
+            want = sum(1 for m in mans if m.get("company_id") == cid
+                       for p in m.get("periods") or [] if p.get("product"))
+            check(sum(r["files"] for r in read if r["company_id"] == cid) == want,
+                  f"coverage counts every file of the customer's periods ({want})")
+        row = overview_mod._coverage_row("x", "X", "windows", {
+            "files": 2, "cases": {"c"}, "first": "2026-01-01 08:00:00", "last": "2026-01-10 09:00:00",
+            "days": {"2026-01-01", "2026-01-02", "2026-01-06", "2026-01-10"}})
+        check(row["span_days"] == 10 and row["days"] == 4 and row["gap_days"] == 6
+              and row["longest_gap"] == {"from": "2026-01-03", "to": "2026-01-05", "days": 3},
+              "gaps: the days with no event between the first and the last, longest first")
+        check(overview_mod.attention_reason({"method": "documented"}) is None
+              and overview_mod.attention_reason({"method": "no_reader"}) == "no reader - kept, not analysed"
+              and overview_mod.attention_reason({"method": "documented", "missing_fields": ["srcip"]})
+              == "documented columns missing"
+              and overview_mod.attention_reason({"method": "documented", "coverage": {"not_loaded": 3}})
+              == "rows not loaded",
+              "a file needs attention by the Ingest step's test")
+        every = [x for cid in (A, F, Z, O) for x in findings(cid)]
+        tac = ov["tactics"]
+        check([t["id"] for t in tac] == [t for t, _, _ in rule_meta_mod.TACTIC_ORDER],
+              "every ATT&CK tactic, in ATT&CK's order")
+        check(all(t["suggestions"] == sum(1 for x in every if t["id"] in (x.get("tactics") or [])) for t in tac),
+              "a tactic counts the suggestions whose techniques reach it, as the case page")
+        tr = ov["top_rules"]
+        check(0 < len(tr) <= 10 and [r["suggestions"] for r in tr] == sorted((r["suggestions"] for r in tr), reverse=True),
+              "top rules: at most 10, most suggestions first")
+        check(all(r["suggestions"] == sum(1 for x in every if x["rid"] == r["rid"])
+                  == r["accepted"] + r["modified"] + r["rejected"] + r["undecided"] for r in tr),
+              "a rule's suggestions add up, and its decisions add up to them")
+        check(all(r["undecided"] == sum(1 for x in every if x["rid"] == r["rid"]
+                                        and x["review"]["status"] == "Unreviewed") for r in tr),
+              "not decided as the cases say")
+
         print("Overview: top affected accounts name their computers and sources")
         from app.services import db as db_mod
         tops = c.get("/api/overview").json()["top_entities"]

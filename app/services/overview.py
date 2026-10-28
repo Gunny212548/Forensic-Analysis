@@ -20,7 +20,8 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from .. import config
-from . import areas, case_views, custody, db, filestamp, finding_ids, findings_index, lifecycle, review, storage
+from . import (areas, case_views, custody, db, filestamp, finding_ids, findings_index, lifecycle, products,
+               review, rule_meta, rules, storage)
 from .severity import level_of
 
 TZ = timezone(timedelta(hours=config.EVENT_TZ_OFFSET_HOURS))
@@ -73,12 +74,21 @@ def _case_facts(case_id: str) -> dict:
             return hit[1]
 
     techniques: dict[str, int] = {}
+    # The days each log source's events fall on, for the evidence coverage: a day
+    # with no event of any file of that source is a gap (period.py, NIST SP 800-92 §2.3).
+    coverage: dict = {}
     con = db.connect(case_id, read_only=True)
     try:
         for tid, n in con.execute(
             "SELECT t, count(*) FROM (SELECT unnest(mitre) AS t FROM findings) GROUP BY t"
         ).fetchall():
             techniques[tid] = n
+        for product, first, last, days in con.execute(
+            "SELECT product, min(ts), max(ts), list(DISTINCT CAST(ts AS DATE)) FROM raw_events "
+            "WHERE ts IS NOT NULL GROUP BY product"
+        ).fetchall():
+            coverage[product] = {"first": str(first), "last": str(last),
+                                 "days": sorted(d.isoformat() for d in days)}
     finally:
         con.close()
 
@@ -100,6 +110,16 @@ def _case_facts(case_id: str) -> dict:
             if flow.get(f["key"], {}).get("status", lifecycle.OPEN) != lifecycle.RESOLVED:
                 wf_open_lvls.append(f["lvl"] or 0)
     review_ts = [e["ts"] for e in review.log(case_id) if e.get("ts")]
+
+    # Per rule, its suggestions by the analyst's decision (Top rules); per ATT&CK
+    # tactic, the suggestions whose techniques reach it - one suggestion can reach
+    # several tactics.
+    by_rule: dict[str, Counter] = {}
+    tactics: Counter = Counter()
+    for f in collapsed:
+        by_rule.setdefault(f["rid"], Counter())[state.get(f["key"], {}).get("status", review.UNREVIEWED)] += 1
+        for t in rule_meta.tactics_of(f.get("mitre") or []):
+            tactics[t] += 1
 
     entities = []
     ranked = db.risk_scores(case_id, limit=5)
@@ -177,7 +197,8 @@ def _case_facts(case_id: str) -> dict:
              "open_max_lvl": max(open_lvls) if open_lvls else None,
              "wf_tracked": wf_tracked, "wf_open": len(wf_open_lvls), "areas": area_facts,
              "wf_open_max_lvl": max(wf_open_lvls) if wf_open_lvls else None,
-             "last_review": max(review_ts) if review_ts else None}
+             "last_review": max(review_ts) if review_ts else None,
+             "rules": by_rule, "tactics": tactics, "coverage": coverage}
     with _lock:
         _cache[case_id] = (stamp, facts)
     return facts
@@ -185,6 +206,58 @@ def _case_facts(case_id: str) -> dict:
 
 def _ago_key(iso: str) -> str:
     return iso or ""
+
+
+def attention_reason(mapping: dict | None) -> str | None:
+    """Why a file's reading needs the analyst's attention, or None - the same test
+    as the Ingest step's Files read (Mapping.jsx needsAttention); change both."""
+    if not mapping:
+        return None
+    method = mapping.get("method")
+    if method == "no_reader":
+        return "no reader - kept, not analysed"
+    if method == "unrecognised":
+        return "not recognised - not analysed"
+    if method != "documented" and not mapping.get("line_profiles"):
+        return "columns guessed"
+    if mapping.get("heuristic_fields"):
+        return "columns guessed"
+    if mapping.get("missing_fields"):
+        return "documented columns missing"
+    j = mapping.get("json") or {}
+    if j.get("unparseable") or j.get("broken_at_byte") is not None:
+        return "JSON not read whole"
+    w = mapping.get("windows") or {}
+    if w.get("unreadable") or w.get("unreadable_chunks") or w.get("reader_errors") or w.get("unmatched_messages"):
+        return "Windows records not read"
+    if (mapping.get("syslog") or {}).get("year_inferred"):
+        return "year inferred"
+    c = mapping.get("coverage") or {}
+    if (c.get("not_loaded") or 0) > 0:
+        return "rows not loaded"
+    if (c.get("time_unparsed") or 0) > 0:
+        return "time unreadable"
+    return None
+
+
+def _coverage_row(company_id, customer, product, agg) -> dict:
+    """One customer's one log source: its files, first and last event, and the days
+    between them with no event of that source (the gaps, longest first)."""
+    days = sorted(agg["days"])
+    first, last = datetime.fromisoformat(days[0]).date(), datetime.fromisoformat(days[-1]).date()
+    gaps = []
+    for a, b in zip(days, days[1:]):
+        d0, d1 = datetime.fromisoformat(a).date(), datetime.fromisoformat(b).date()
+        if (d1 - d0).days > 1:
+            gaps.append({"from": (d0 + timedelta(days=1)).isoformat(),
+                         "to": (d1 - timedelta(days=1)).isoformat(), "days": (d1 - d0).days - 1})
+    gaps.sort(key=lambda g: (-g["days"], g["from"]))
+    return {"company_id": company_id, "customer": customer, "product": product,
+            "product_name": products.PRODUCTS.get(product, {}).get("name") or product or "Other",
+            "files": agg["files"], "cases": len(agg["cases"]),
+            "first": agg["first"], "last": agg["last"],
+            "span_days": (last - first).days + 1, "days": len(days),
+            "gap_days": sum(g["days"] for g in gaps), "longest_gap": gaps[0] if gaps else None}
 
 
 def build(company_id: str | None = None) -> dict:
@@ -227,6 +300,12 @@ def build(company_id: str | None = None) -> dict:
 
     for c in companies:
         customer_row(c["company_id"], c["name"])
+
+    cov_agg: dict[tuple, dict] = {}        # (company, product) -> files, cases, first, last, days
+    attention_files: list[dict] = []       # files whose reading needs the analyst's attention
+    tactic_agg: Counter = Counter()
+    tactic_customers: dict[str, set] = {}
+    rule_agg: dict[str, dict] = {}         # rid -> decisions, customers, suggestions per case
 
     for m in manifests:
         # Every listed item names its customer, so an unscoped page never
@@ -297,6 +376,33 @@ def build(company_id: str | None = None) -> dict:
                 crow["open_max_lvl"] = lvl
         for aid, a in facts["areas"].items():
             crow["areas"][aid] += sum(a["total"].values())
+
+        # Evidence coverage: files per log source from the case's periods (one per file
+        # or zip member, period.py), days from the events themselves.
+        files_of = Counter(p.get("product") for p in m.get("periods") or [])
+        for product, cov in facts["coverage"].items():
+            agg = cov_agg.setdefault((m.get("company_id"), product), {
+                "customer": customer, "files": 0, "cases": set(), "first": cov["first"],
+                "last": cov["last"], "days": set()})
+            agg["files"] += files_of.get(product, 0)
+            agg["cases"].add(m["case_id"])
+            agg["first"] = min(agg["first"], cov["first"])
+            agg["last"] = max(agg["last"], cov["last"])
+            agg["days"].update(cov["days"])
+        items = m.get("members") or [{"name": m.get("original_filename"), "mapping": m.get("mapping")}]
+        for item in items:
+            reason = attention_reason(item.get("mapping"))
+            if reason:
+                attention_files.append({"case_id": m["case_id"], "customer": customer,
+                                        "file": item.get("name"), "reason": reason})
+        for t, n in facts["tactics"].items():
+            tactic_agg[t] += n
+            tactic_customers.setdefault(t, set()).add(customer)
+        for rid, decisions in facts["rules"].items():
+            r = rule_agg.setdefault(rid, {"decisions": Counter(), "customers": set(), "cases": Counter()})
+            r["decisions"].update(decisions)
+            r["customers"].add(customer)
+            r["cases"][m["case_id"]] += sum(decisions.values())
         if facts["wf_unreviewed"]:
             urgent_rows += [r for r in findings_index.case_rows(m) if r["review"] == review.UNREVIEWED]
         for aid, a in facts["areas"].items():
@@ -406,6 +512,35 @@ def build(company_id: str | None = None) -> dict:
         r["highest"] = level_of(r.pop("open_max_lvl"))
         # Every suggestion per area, as the area cards count them; areas in their order.
         r["areas"] = {aid: r["areas"][aid] for aid in areas.AREA_IDS if r["areas"][aid]}
+
+    # Evidence coverage, in the By customer order; a customer with nothing read has
+    # one row with no log source, so every customer is accounted for.
+    coverage = []
+    for r in customer_rows:
+        rows = [_coverage_row(cid, agg["customer"], product, agg)
+                for (cid, product), agg in cov_agg.items() if cid == r["company_id"]]
+        rows.sort(key=lambda x: x["product_name"].lower())
+        coverage += rows or [{"company_id": r["company_id"], "customer": r["name"], "product": None,
+                              "cases": r["cases"]}]
+
+    # Every ATT&CK Enterprise tactic in ATT&CK's order, the ones nothing reached at 0.
+    tactic_cards = [{"id": t, "ta": ta, "name": name, "suggestions": tactic_agg[t],
+                     "customers": sorted(tactic_customers.get(t, ()), key=str.lower)}
+                    for t, ta, name in rule_meta.TACTIC_ORDER]
+
+    # The rules that suggested most, with what the analysts decided - a rule whose
+    # suggestions are mostly rejected is one to re-tune. Ties by rule id, so the list
+    # does not reorder between loads.
+    top_rules = []
+    for rid, r in sorted(rule_agg.items(), key=lambda x: (-sum(x[1]["decisions"].values()), x[0]))[:10]:
+        d = r["decisions"]
+        top_rules.append({"rid": rid, "label": rules.RULE_LABELS.get(rid, rid),
+                          "suggestions": sum(d.values()), "accepted": d[review.ACCEPTED],
+                          "modified": d[review.MODIFIED], "rejected": d[review.REJECTED],
+                          "undecided": d[review.UNREVIEWED],
+                          "customers": sorted(r["customers"], key=str.lower),
+                          # The case holding most of its suggestions, opened on Attack events.
+                          "case_id": r["cases"].most_common(1)[0][0]})
     return {
         "generated_at": now.isoformat(),
         # What the page is scoped to, and what it can be scoped to.
@@ -443,6 +578,10 @@ def build(company_id: str | None = None) -> dict:
                   for d, c in daily.items()],
         "top_entities": top_entities,
         "by_customer": customer_rows,
+        "coverage": coverage,
+        "attention_files": attention_files,
+        "tactics": tactic_cards,
+        "top_rules": top_rules,
         # One technique is the same behaviour in every customer, so it stays
         # one card - naming each customer it was seen in.
         "techniques": [{"id": t, "name": TECHNIQUE_NAMES.get(t, ""), "cases": n, "findings": tech_findings[t],

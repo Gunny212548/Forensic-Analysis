@@ -203,6 +203,8 @@ export default function Overview({ companyId }) {
           one holds (the user, 2026-10-28). Scoped, the page is that customer's already. */}
       {!data.company_id && <ByCustomer rows={data.by_customer || []} areas={data.areas} />}
 
+      <Coverage rows={data.coverage || []} attention={data.attention_files || []} />
+
       <section aria-label="Detection areas">
         <div className="area-title">
           <h2 className="section-h">Detection areas</h2>
@@ -214,6 +216,8 @@ export default function Overview({ companyId }) {
           ))}
         </div>
       </section>
+
+      <Tactics tactics={data.tactics || []} />
 
       <div className="ov-row">
         <div className="panel ov-panel">
@@ -248,6 +252,8 @@ export default function Overview({ companyId }) {
           </div>
         </div>
       </div>
+
+      <TopRules rules={data.top_rules || []} />
 
       <Section
         icon="alert"
@@ -375,6 +381,143 @@ function ByCustomer({ rows, areas }) {
                   </tr>
                 )
               })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  )
+}
+
+/** What each customer's evidence covers, per log source: its files, the first and
+ *  last event, how many days between them hold an event and the gaps - a quiet day
+ *  can be a log not collected (NIST SP 800-92 §2.3), so it is read before trusting
+ *  one. Under it, every file whose reading needs attention (the Ingest step's test). */
+function Coverage({ rows, attention }) {
+  const period = (r) => {
+    const [d0, t0] = r.first.split(' ')
+    const [d1, t1] = r.last.split(' ')
+    return d0 === d1 ? `${d0} ${t0.slice(0, 5)} → ${t1.slice(0, 5)}` : `${d0} → ${d1}`
+  }
+  const gaps = (r) => {
+    if (!r.gap_days) return 'none'
+    const g = r.longest_gap
+    return `${fmtNum(r.gap_days)} ${r.gap_days === 1 ? 'day' : 'days'}, longest ${g.days} (${g.from} → ${g.to})`
+  }
+  return (
+    <Section icon="cases" tone="info" title="Evidence coverage"
+             sub="What each customer's evidence covers, per log source - read it before trusting a quiet period">
+      {!rows.length ? (
+        <div className="empty">No customer yet</div>
+      ) : (
+        <div className="table-scroll">
+          <table className="ui-rows">
+            <thead>
+              <tr><th>#</th><th>Customer</th><th>Log source</th><th>Files</th><th>Period</th>
+                <th>Days with events</th><th>Days without</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={`${r.company_id}|${r.product}`}>
+                  <td className="ui-n">{i + 1}</td>
+                  <td className="ui-main">
+                    {r.company_id ? (
+                      <a className="table-link" href={`#/dashboard/${encodeURIComponent(r.company_id)}`}>{r.customer}</a>
+                    ) : (
+                      r.customer
+                    )}
+                  </td>
+                  {r.product === null ? (
+                    <td colSpan={5} className="muted">{r.cases ? 'Nothing read yet' : 'No case uploaded'}</td>
+                  ) : (
+                    <>
+                      <td>{r.product_name}</td>
+                      <td className="ui-count">{fmtNum(r.files)}</td>
+                      <td className="ui-count">{period(r)}</td>
+                      <td className="ui-count">{fmtNum(r.days)} of {fmtNum(r.span_days)}</td>
+                      <td className={r.gap_days ? 'tone-warn ov-gap' : 'muted'}>{gaps(r)}</td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="ui-section-more">
+        {!attention.length ? (
+          <span className="muted">Every file was read as its log source documents it</span>
+        ) : (
+          <ul className="ov-attn-files">
+            {attention.slice(0, 10).map((a, i) => (
+              <li key={i}>
+                <a className="table-link" href={`#/case/${a.case_id}/ingest`}>{a.file}</a>
+                <span className="cust-tag cust-tag-after">{a.customer}</span> - {a.reason}
+              </li>
+            ))}
+            {attention.length > 10 && <li className="muted">and {fmtNum(attention.length - 10)} more</li>}
+          </ul>
+        )}
+      </div>
+    </Section>
+  )
+}
+
+/** Every ATT&CK Enterprise tactic in ATT&CK's order, as chevrons: the suggestions
+ *  whose techniques reach it and the customers they are in, grey where nothing did -
+ *  how far the attacks got at a glance. Order is ATT&CK's, not the order things
+ *  happened (that is each case's Attack timeline). */
+function Tactics({ tactics }) {
+  const reached = tactics.filter((t) => t.suggestions).length
+  return (
+    <Section icon="lateral-movement" tone={reached ? 'danger' : 'muted'} title="ATT&CK tactics reached"
+             sub="Suggestions per tactic, every case in scope - one suggestion can reach more than one">
+      <div className="ov-tactics" role="list">
+        {tactics.map((t) => (
+          <div key={t.id} role="listitem" className={`ov-tactic${t.suggestions ? ' ov-tactic-on' : ''}`}
+               title={`${t.name} (${t.ta})${t.customers.length ? ` - ${t.customers.join(', ')}` : ' - not seen'}`}>
+            <span className="ov-tactic-name">{t.name}</span>
+            <span className="ov-tactic-n">{t.suggestions ? fmtNum(t.suggestions) : '·'}</span>
+            <span className="ov-tactic-sub">{t.customers.join(', ')}</span>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+/** The rules that suggested most, with what the analysts decided of their
+ *  suggestions - a rule whose suggestions are mostly rejected is one to re-tune.
+ *  A rule opens the case holding most of its suggestions, on Attack events. */
+function TopRules({ rules }) {
+  return (
+    <Section icon="findings" tone="info" title="Top rules"
+             sub="The rules that suggested most, and what analysts decided - many rejected is a rule worth re-tuning">
+      {!rules.length ? (
+        <div className="empty">Nothing suggested yet</div>
+      ) : (
+        <div className="table-scroll">
+          <table className="ui-rows">
+            <thead>
+              <tr><th>#</th><th>Rule</th><th>Suggestions</th><th title="accepted or modified">Accepted</th>
+                <th>Rejected</th><th>Not decided</th></tr>
+            </thead>
+            <tbody>
+              {rules.map((r, i) => (
+                <tr key={r.rid}>
+                  <td className="ui-n">{i + 1}</td>
+                  <td>
+                    <div className="ui-main">
+                      <a className="table-link mono" href={`#/case/${r.case_id}/attack-events`}>{r.rid}</a> · {r.label}
+                    </div>
+                    <div className="ui-sub">{r.customers.join(', ')}</div>
+                  </td>
+                  <td className="ui-count"><strong>{fmtNum(r.suggestions)}</strong></td>
+                  <td className="ui-count">{fmtNum(r.accepted + r.modified)}</td>
+                  <td className={`ui-count${r.rejected ? ' tone-warn ov-gap' : ''}`}>{fmtNum(r.rejected)}</td>
+                  <td className="ui-count">{fmtNum(r.undecided)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

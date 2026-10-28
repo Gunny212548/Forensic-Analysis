@@ -126,6 +126,20 @@
   .chip-ok { background: var(--ok-tint); color: var(--ok); }
   .ov-row { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 16px; }
   .ov-total-of { font-size: 24px; color: var(--muted); margin-left: 6px; }
+  .ov-gap { color: var(--tone); }
+  .ov-attn-files { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  /* ATT&CK tactics on the Overview: every tactic as a chevron, the ones reached in
+     the danger tint - tokens only, so both themes hold. */
+  .ov-tactics { display: flex; flex-wrap: wrap; gap: 4px; padding: 16px 20px 20px; }
+  .ov-tactic { flex: 1 1 130px; min-height: 84px; padding: 10px 24px 10px 22px; display: grid;
+    align-content: start; gap: 2px; background: var(--subtle); color: var(--muted);
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%); }
+  .ov-tactic:first-child { padding-left: 14px;
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%); }
+  .ov-tactic-on { background: var(--danger-tint); color: var(--danger); }
+  .ov-tactic-name { font-size: 11.5px; font-weight: 600; line-height: 1.25; }
+  .ov-tactic-n { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+  .ov-tactic-sub { font-size: 11px; color: var(--text-2); }
   .fill-critical { background: var(--danger); }
   .fill-high { background: var(--warn); }
   .fill-medium { background: var(--info); }

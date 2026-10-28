@@ -163,7 +163,9 @@ GET  /api/overview                           KPIs, detection areas (every sugges
                                              findings (high / critical not decided),
                                              activity, by_customer (each customer's
                                              own figures - the section shown only
-                                             unscoped); MTTC still returned, not shown
+                                             unscoped), coverage + attention_files,
+                                             tactics (all 15), top_rules (10, with
+                                             decisions); MTTC still returned, not shown
                                              (services/overview.py; per-case facts
                                              cached on a fingerprint of DuckDB, review
                                              log, custody log and id registry;

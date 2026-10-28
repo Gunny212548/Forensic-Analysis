@@ -87,3 +87,15 @@ Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
   keeps "Suggestions not decided" with Open cases and Customers under it). The fact tiles beside
   the chart (last upload, cases processed, areas with suggestions) went the same day at the
   user's word, on both views: the line under the title and the area cards already say them.
+- **2026-10-28: three SIEM-style sections, both views** (the user asked what a SIEM dashboard
+  holds, then for these three, mockups approved). **Evidence coverage** under By customer: per
+  customer and log source the files (the case's `periods`), first / last event, days with an event
+  of that source of the span and the days without (longest gap named), then every file whose
+  reading needs attention - `overview.attention_reason` is the Ingest step's
+  `Mapping.needsAttention` in Python, **change both**. **ATT&CK tactics reached** after the area
+  cards: all 15 tactics as chevrons in ATT&CK's order, suggestions per tactic (one can reach
+  several) and their customers, grey where none. **Top rules** after severity / top affected: the
+  ten rules with most suggestions and the decisions on them (accepted includes modified), a rule
+  opens the case holding most of its suggestions on Attack events (there is no rule page). Left
+  out on purpose: EPS / licence, MTTx (no status moves since Respond went), a geo map (nothing
+  fetched at runtime), compliance. `check_workflow.py` checks each against the cases.
