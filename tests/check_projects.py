@@ -174,6 +174,81 @@ check("Findings filtered by project lists only that project's cases",
 check("and a project without its customer is 404",
       manager.get("/api/findings", params={"project_id": PJ}).status_code == 404)
 
+print("P3: rename")
+from app.services import case_delete, custody  # noqa: E402
+
+check("an analyst may not rename (403)",
+      analyst.put(f"/api/companies/{CO}/projects/{PJ}", json={"name": "x"}).status_code == 403)
+check("a name another project has is refused (409), an empty one is 400",
+      manager.put(f"/api/companies/{CO}/projects/{PJ}", json={"name": "phishing"}).status_code == 409
+      and manager.put(f"/api/companies/{CO}/projects/{PJ}", json={"name": "  "}).status_code == 400)
+r = manager.put(f"/api/companies/{CO}/projects/{PJ}", json={"name": "Ransomware 2026 (Lockbit)"})
+check("a manager renames it", r.status_code == 200 and r.json()["name"] == "Ransomware 2026 (Lockbit)")
+check("and every case of it carries the new name",
+      {m["project_name"] for m in projects.cases_of(CO, PJ)} == {"Ransomware 2026 (Lockbit)"})
+check("the rename is in the project's log", projects.history(CO, PJ)[-1]["action"] == "renamed")
+
+print("P3: moving a case")
+OTHER = other["project_id"]
+legacy = case_with_findings(None, [("R3001", "10.0.0.7", "kim")])  # a case from before (Q112)
+check("an analyst may not move a case (403)",
+      analyst.post(f"/api/companies/{CO}/projects/{OTHER}/cases", json={"case_id": legacy}).status_code == 403)
+r = manager.post(f"/api/companies/{CO}/projects/{OTHER}/cases", json={"case_id": legacy})
+check("a case in no project is moved into one",
+      r.status_code == 200 and r.json()["project_id"] == OTHER and r.json()["project_name"] == "Phishing")
+check("the move is on the case's chain of custody and in the project's log",
+      custody.entries(legacy)[-1]["action"] == "moved" and projects.history(CO, OTHER)[-1]["action"] == "case_moved_in")
+r = manager.post(f"/api/companies/{CO}/projects/{PJ}/cases", json={"case_id": legacy})
+check("and on to another project", r.status_code == 200 and r.json()["project_id"] == PJ
+      and projects.history(CO, OTHER)[-1]["action"] == "case_moved_out")
+foreign_co = storage.create_company("Foreign")
+foreign = storage.create_case("x.log", "log", 1, company_id=foreign_co["company_id"],
+                              project=storage.create_project(foreign_co["company_id"], "F", "check"))["case_id"]
+check("another customer's case is not moved in (404)",
+      manager.post(f"/api/companies/{CO}/projects/{PJ}/cases", json={"case_id": foreign}).status_code == 404)
+for key in [f["key"] for f in db.collapsed_findings(c2)]:
+    manager.post(f"/api/cases/{c2}/review", json={"finding_key": key, "action": "accept"})
+check("(Phishing closes once its case is decided)",
+      manager.post(f"/api/companies/{CO}/projects/{OTHER}/close").status_code == 200)
+r = manager.post(f"/api/companies/{CO}/projects/{OTHER}/cases", json={"case_id": legacy})
+check(f"a case is not moved into a closed project (409, {r.status_code})", r.status_code == 409)
+r = manager.post(f"/api/companies/{CO}/projects/{PJ}/cases", json={"case_id": c2})
+check(f"nor out of one (409, {r.status_code})", r.status_code == 409 and "closed" in r.json()["detail"])
+manager.post(f"/api/companies/{CO}/projects/{OTHER}/reopen")
+storage.update_case(c2, status="processing")
+check("nor while it is processed (409)",
+      manager.post(f"/api/companies/{CO}/projects/{PJ}/cases", json={"case_id": c2}).status_code == 409)
+storage.update_case(c2, status="ready")
+
+print("P3: deleting a project")
+doomed = storage.create_project(CO, "Doomed", "check")
+DP = doomed["project_id"]
+d1 = case_with_findings(doomed, [("R3001", "10.0.0.8", "zed")])
+keep_cases = {m["case_id"] for m in storage.list_manifests(CO)} - {d1}
+check("an analyst may not see or delete (403)",
+      analyst.get(f"/api/companies/{CO}/projects/{DP}/deletion").status_code == 403
+      and analyst.delete(f"/api/companies/{CO}/projects/{DP}").status_code == 403)
+pre = manager.get(f"/api/companies/{CO}/projects/{DP}/deletion").json()
+check(f"the preview counts what goes {pre}", pre["cases"] == 1 and pre["suggestions"] == 1 and pre["busy"] == [])
+storage.update_case(d1, status="processing")
+check("refused while a case of it is processed (409), nothing goes",
+      manager.delete(f"/api/companies/{CO}/projects/{DP}").status_code == 409
+      and storage.load_manifest(d1) is not None and storage.load_project(CO, DP) is not None)
+storage.update_case(d1, status="ready")
+r = manager.delete(f"/api/companies/{CO}/projects/{DP}")
+check("a manager deletes it", r.status_code == 200 and r.json()["deleted"] == DP)
+check("the project and its case are gone, every other case stays",
+      storage.load_project(CO, DP) is None and storage.load_manifest(d1) is None
+      and keep_cases <= {m["case_id"] for m in storage.list_manifests(CO)})
+rec = case_delete.records(CO)
+check("the customer's deletion record has the case, then the project carrying its log",
+      [e["action"] for e in rec[-2:]] == ["case_deleted", "project_deleted"]
+      and rec[-1]["cases"] == [d1] and rec[-1]["project_name"] == "Doomed"
+      and hashchain.verify(case_delete.log_path(CO)).get("intact"))
+empty = storage.create_project(CO, "Empty", "check")
+check("an empty project is deleted too",
+      manager.delete(f"/api/companies/{CO}/projects/{empty['project_id']}").status_code == 200)
+
 jobs.wait_idle(120)  # the uploads above queued real processing; let it finish before exit
 print("\nPROJECTS OK" if not failures else f"\n{failures} FAILED")
 sys.exit(1 if failures else 0)

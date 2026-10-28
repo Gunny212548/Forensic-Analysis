@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import { changeProject, getOverview, listCases, listCompanies, listProjects } from '../api.js'
+import {
+  changeProject, deleteProject, getOverview, getProjectDeletion, listCases, listCompanies, listProjects, moveCase,
+  renameProject,
+} from '../api.js'
 import { ago, fmtNum, fmtTime, severityBucket } from '../format.js'
 import { SeverityPill, StatusBadge } from '../components/common.jsx'
 import { Badge } from '../components/cards.jsx'
@@ -135,7 +138,8 @@ export default function CustomerDetail({ companyId, projectId }) {
 
           <ProjectsPanel companyId={companyId} projects={projects} cases={cases} />
 
-          <CasesPanel cases={cases} showProject />
+          <CasesPanel cases={cases} showProject projects={projects} companyId={companyId}
+                      onChange={() => setVersion((v) => v + 1)} />
         </div>
       </div>
     </section>
@@ -167,7 +171,11 @@ function ProjectView({ customer, project, cases, onChange }) {
             {' '}· last activity {ago(last)}
           </div>
         </div>
-        <ProjectAction project={project} onChange={onChange} />
+        <div className="cp-project-actions">
+          <ProjectRename project={project} onChange={onChange} />
+          <ProjectAction project={project} onChange={onChange} />
+          <ProjectDelete project={project} />
+        </div>
       </div>
 
       <div className="cp-grid">
@@ -246,6 +254,149 @@ function ProjectAction({ project, onChange }) {
   )
 }
 
+/** Rename the project, inline (P3): manager and admin. The name is how an upload finds
+ *  a project, so the server refuses one another project of the customer already has. */
+function ProjectRename({ project, onChange }) {
+  const { can, why } = useAccess()
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(project.name)
+  const [error, setError] = useState('')
+  if (!editing) {
+    return (
+      <button type="button" className="secondary" disabled={!can('customer:manage')} title={why('customer:manage')}
+              onClick={() => { setName(project.name); setEditing(true) }}>
+        Rename
+      </button>
+    )
+  }
+  const save = async () => {
+    setError('')
+    try {
+      await renameProject(project.company_id, project.project_id, name)
+      setEditing(false)
+      onChange()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+  return (
+    <div className="cp-rename">
+      <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Project name" autoFocus />
+      <button type="button" className="btn-primary" disabled={!name.trim()} onClick={save}>Save</button>
+      <button type="button" className="secondary" onClick={() => { setEditing(false); setError('') }}>Cancel</button>
+      {error && <div className="lc-error">{error}</div>}
+    </div>
+  )
+}
+
+/** Delete the project with every case in it (P3): admin and manager, as a customer -
+ *  what goes read from the server, the project's name typed back. */
+function ProjectDelete({ project }) {
+  const { can, why } = useAccess()
+  const [info, setInfo] = useState(null)
+  const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const start = () => {
+    setOpen(true)
+    getProjectDeletion(project.company_id, project.project_id).then(setInfo, (err) => setError(err.message))
+  }
+  const confirm = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      await deleteProject(project.company_id, project.project_id)
+      window.location.hash = `#/customers/${project.company_id}`
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
+  }
+  if (!open) {
+    return (
+      <button type="button" className="secondary danger-outline" disabled={!can('customer:delete')}
+              title={why('customer:delete')} onClick={start}>
+        Delete project
+      </button>
+    )
+  }
+  const n = (v, one, many) => `${fmtNum(v)} ${v === 1 ? one : many}`
+  return (
+    <div className="delete-case cp-delete-project">
+      {!info ? (
+        <div className="muted">{error || 'Reading what would be deleted...'}</div>
+      ) : (
+        <>
+          <div>
+            Deletes the project <strong>{info.name}</strong> for good
+            {info.cases
+              ? `: ${n(info.cases, 'case', 'cases')} (evidence files, events, findings, AI analyses, review logs and chains of custody), ${n(info.suggestions, 'suggestion', 'suggestions')} and ${n(info.decisions, 'analyst decision', 'analyst decisions')}.`
+              : '. It holds no case.'}{' '}
+            Who deleted it and when, each case&apos;s record and the project&apos;s own log stay in the
+            customer&apos;s deletion record.
+          </div>
+          {info.busy.length > 0 && (
+            <div className="lc-error">
+              Cannot be deleted now - wait until these are done:{' '}
+              {info.busy.map((b) => `${b.file || b.case_id} (${b.reason})`).join('; ')}
+            </div>
+          )}
+          <label>
+            <span>Type <code>{info.name}</code> to confirm</span>
+            <input value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus spellCheck={false} />
+          </label>
+          <div className="delete-actions">
+            <button className="danger" disabled={busy || info.busy.length > 0 || typed.trim() !== info.name.trim()}
+                    onClick={confirm}>
+              {busy ? 'Deleting...' : 'Delete project for good'}
+            </button>
+            <button className="secondary" disabled={busy} onClick={() => { setOpen(false); setTyped(''); setError('') }}>
+              Cancel
+            </button>
+          </div>
+          {error && <div className="lc-error">{error}</div>}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** A case's project, changeable here (P3): manager and admin move a case into another
+ *  Open project of the customer - never out of a Closed one, never while processing. */
+function CaseProject({ m, projects, companyId, onChange }) {
+  const { can, why } = useAccess()
+  const [error, setError] = useState('')
+  const current = projects.find((p) => p.project_id === m.project_id)
+  const locked = current?.status === 'closed'
+  const busy = m.status === 'queued' || m.status === 'processing'
+  const reason = why('customer:manage') || (locked ? `"${current.name}" is closed - reopen it to move a case out`
+    : busy ? 'The case is being processed' : '')
+  const move = async (e) => {
+    setError('')
+    try {
+      await moveCase(companyId, e.target.value, m.case_id)
+      onChange()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+  return (
+    <>
+      <select className="cp-case-project" value={m.project_id || ''} aria-label={`Project of ${m.original_filename}`}
+              disabled={!can('customer:manage') || locked || busy} title={reason} onChange={move}>
+        {!m.project_id && <option value="" disabled>No project</option>}
+        {projects.map((p) => (
+          <option key={p.project_id} value={p.project_id} disabled={p.status === 'closed' && p.project_id !== m.project_id}>
+            {p.name}{p.status === 'closed' ? ' (closed)' : ''}
+          </option>
+        ))}
+      </select>
+      {error && <div className="lc-error">{error}</div>}
+    </>
+  )
+}
+
 function ProjectsPanel({ companyId, projects, cases }) {
   const unfiled = cases.filter((m) => !m.project_id).length
   return (
@@ -309,7 +460,7 @@ function ProjectsPanel({ companyId, projects, cases }) {
   )
 }
 
-function CasesPanel({ cases, showProject = false }) {
+function CasesPanel({ cases, showProject = false, projects = [], companyId, onChange }) {
   const cols = showProject ? 8 : 7
   return (
     <div className="panel">
@@ -346,7 +497,9 @@ function CasesPanel({ cases, showProject = false }) {
                   <td>
                     {isReady ? <a href={`#/case/${m.case_id}`}>{m.original_filename}</a> : m.original_filename}
                   </td>
-                  {showProject && <td>{m.project_name || '—'}</td>}
+                  {showProject && (
+                    <td><CaseProject m={m} projects={projects} companyId={companyId} onChange={onChange} /></td>
+                  )}
                   <td>{m.evidence?.recorded_by || '—'}</td>
                   <td>{isReady ? <SeverityPill severity={m.severity} /> : '—'}</td>
                   <td className="num mono">{isReady ? fmtNum(m.flagged_count) : '—'}</td>

@@ -17,7 +17,7 @@ import shutil
 from pathlib import Path
 
 from .. import config
-from . import analysis_jobs, case_delete, db, finding_ids, hashchain, review, storage
+from . import case_delete, db, finding_ids, hashchain, review, storage
 
 
 class Busy(Exception):
@@ -31,19 +31,6 @@ def log_path() -> Path:
 def records() -> list[dict]:
     path = log_path()
     return hashchain.entries(path) if path.exists() else []
-
-
-def _busy(manifests: list[dict]) -> list[dict]:
-    """The cases that block a deletion now, and why."""
-    out = []
-    for m in manifests:
-        if m.get("status") in case_delete.BUSY:
-            out.append({"case_id": m["case_id"], "file": m.get("original_filename"),
-                        "reason": f"the case is {m.get('status')}"})
-        elif analysis_jobs.job_running(storage.load_analysis_job(m["case_id"])):
-            out.append({"case_id": m["case_id"], "file": m.get("original_filename"),
-                        "reason": "an AI analysis of the case is running"})
-    return out
 
 
 def preview(company_id: str) -> dict:
@@ -62,7 +49,7 @@ def preview(company_id: str) -> dict:
         fd_ids += len(finding_ids.lookup(m["case_id"]))
     return {"company_id": company_id, "name": company.get("name"), "cases": len(manifests),
             "projects": len(storage.list_projects(company_id)), "suggestions": suggestions,
-            "decisions": decisions, "fd_ids": fd_ids, "busy": _busy(manifests)}
+            "decisions": decisions, "fd_ids": fd_ids, "busy": case_delete.busy(manifests)}
 
 
 def delete(company_id: str, actor: str) -> dict:
@@ -72,7 +59,7 @@ def delete(company_id: str, actor: str) -> dict:
     if company is None:
         raise LookupError(company_id)
     manifests = storage.list_manifests(company_id)
-    busy = _busy(manifests)
+    busy = case_delete.busy(manifests)
     if busy:
         raise Busy("wait until these cases are done: "
                    + "; ".join(f"{b['file'] or b['case_id']} ({b['reason']})" for b in busy))

@@ -36,6 +36,21 @@ def records(company_id: str) -> list[dict]:
     return hashchain.entries(path) if path.exists() else []
 
 
+def busy(manifests: list[dict]) -> list[dict]:
+    """The cases among `manifests` that cannot be deleted now, and why - the rule
+    delete() applies, asked first by whatever deletes many cases at once (a
+    customer, a project), so nothing goes unless everything can."""
+    out = []
+    for m in manifests:
+        if m.get("status") in BUSY:
+            out.append({"case_id": m["case_id"], "file": m.get("original_filename"),
+                        "reason": f"the case is {m.get('status')}"})
+        elif analysis_jobs.job_running(storage.load_analysis_job(m["case_id"])):
+            out.append({"case_id": m["case_id"], "file": m.get("original_filename"),
+                        "reason": "an AI analysis of the case is running"})
+    return out
+
+
 def delete(case_id: str, actor: str) -> dict:
     """Delete one case; returns the deletion record. Raises Busy, or
     LookupError for a case that does not exist."""

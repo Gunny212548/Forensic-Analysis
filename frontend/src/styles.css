@@ -223,11 +223,19 @@
   }
 
   /* Customer profile (CustomerDetail.jsx): header card, profile column, main column. */
-  .cp-head { display: flex; align-items: center; gap: 18px; }
+  .cp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
   .cp-head h1 { margin: 0; }
   .cp-title { flex: 1 1 auto; min-width: 0; }
   .cp-head h1 .ui-badge { vertical-align: middle; margin-left: 6px; }
   .cp-project-action { display: grid; justify-items: end; gap: 4px; max-width: 360px; text-align: right; }
+  .cp-project-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; justify-content: flex-end;
+    max-width: 640px; }
+  .cp-rename { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .cp-rename input { min-width: 220px; }
+  /* The confirmation takes a line of its own under the actions, so the title keeps its room. */
+  .cp-project-actions:has(.cp-delete-project) { flex-basis: 100%; max-width: none; }
+  .cp-delete-project { flex-basis: 100%; max-width: 640px; }
+  .cp-case-project { min-width: 160px; max-width: 240px; }
   .cp-avatar {
     width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
     background: var(--info-tint); color: var(--info);

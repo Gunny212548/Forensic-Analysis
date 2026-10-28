@@ -94,6 +94,42 @@ export async function changeProject(companyId, projectId, action) {
   )
 }
 
+function projectUrl(companyId, projectId, rest = '') {
+  return `/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}${rest}`
+}
+
+/** Rename a project - on it and on every case of it (manager, admin). */
+export async function renameProject(companyId, projectId, name) {
+  return jsonOrThrow(
+    await fetch(projectUrl(companyId, projectId), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+    }),
+    'Could not rename the project',
+  )
+}
+
+/** Move one of the customer's cases into a project (manager, admin). */
+export async function moveCase(companyId, projectId, caseId) {
+  return jsonOrThrow(
+    await fetch(projectUrl(companyId, projectId, '/cases'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ case_id: caseId }),
+    }),
+    'Could not move the case',
+  )
+}
+
+/** What deleting the project would remove, and the cases that block it now. */
+export async function getProjectDeletion(companyId, projectId) {
+  return jsonOrThrow(await fetch(projectUrl(companyId, projectId, '/deletion')),
+    'Could not read what the deletion would remove')
+}
+
+/** Delete the project with every case in it, for good (admin, manager). */
+export async function deleteProject(companyId, projectId) {
+  return jsonOrThrow(await fetch(projectUrl(companyId, projectId), { method: 'DELETE' }),
+    'Could not delete the project')
+}
+
 /** FR-6.1: case load per customer (app/services/overview.py customers()). */
 export async function getCustomerSummary() {
   return jsonOrThrow(await fetch('/api/companies/summary'), 'Could not load customers')

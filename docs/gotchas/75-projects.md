@@ -43,3 +43,23 @@
 - `overview.build` gets the project rows from `projects.summary`, imported inside the function:
   `projects` imports `overview` (for `_case_facts`), so a module-level import would be circular.
 - Findings has a project select once a customer is chosen; changing the customer clears it.
+
+## P3 - managing projects
+
+- **Rename** (`PUT /api/companies/{co}/projects/{pj}`, manager / admin): the name is on the
+  project *and* copied onto every case's manifest (`project_name`), so both are rewritten; a
+  name another project of the customer has is refused (409) - upload finds a project by name.
+- **Move a case** (`POST /api/companies/{co}/projects/{pj}/cases {"case_id"}`, manager / admin):
+  into an Open project of the same customer only; refused out of a Closed project, into one, and
+  while the case is queued or processing. A `moved` line goes on the case's chain of custody (from,
+  to, names) and `case_moved_out` / `case_moved_in` into both projects' logs. On the customer
+  page, each case's Project cell is the select. A case from before a project was required is
+  moved into one this way (Q112). `custody.record` takes the case id itself - passing `case_id`
+  again in its details raised a TypeError on the first run of the check.
+- **Delete a project** (`GET .../deletion`, `DELETE /api/companies/{co}/projects/{pj}`,
+  `customer:delete`): every case goes as a deleted case does (`case_delete.delete`, a
+  `case_deleted` line each in the customer's `deleted/log.jsonl`), then one `project_deleted`
+  line carrying the project's own log and question, then the project file and its log. Refused,
+  with nothing deleted, while a case is busy - `case_delete.busy()` is now the one rule for
+  customer and project deletion (it was `customer_delete._busy`). An empty project creates the
+  `deleted/` folder itself.
