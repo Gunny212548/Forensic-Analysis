@@ -13,7 +13,7 @@ import MappingNote, { filesByLogSource } from '../components/Mapping.jsx'
 import Evidence from '../components/Evidence.jsx'
 import Question from '../components/Question.jsx'
 import Reprocess, { Method } from '../components/Reprocess.jsx'
-import { Detection, Lines, Periods } from '../components/Period.jsx'
+import { Detection, Lines, Periods, Sigma } from '../components/Period.jsx'
 import Veris from '../components/Veris.jsx'
 import DeleteCase from '../components/DeleteCase.jsx'
 import {
@@ -478,6 +478,13 @@ function IngestRecord({ caseId, status, reload, children }) {
                  sub="Where each threshold rule took its line from on this evidence"
                  stats={[{ label: 'Rules', value: fmtNum(lineRules.length) }]}>
           <div className="ing-body"><Lines lines={data.lines} /></div>
+        </Section>
+      )}
+      {data.sigma?.status === 'ran' && (
+        <Section icon="settings" tone="muted" title="SigmaHQ rules" defaultOpen={false}
+                 sub="The community rule set run beside ours, and what could not run on this evidence"
+                 stats={[{ label: 'Ran', value: fmtNum(data.sigma.ran) }]}>
+          <div className="ing-body"><Sigma sigma={data.sigma} /></div>
         </Section>
       )}
       <Section icon="upload" tone="muted" title="Method of the last run"

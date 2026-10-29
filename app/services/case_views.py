@@ -65,6 +65,8 @@ def ingest_view(case_id: str, manifest: dict) -> dict:
         "detection": manifest.get("detection"),
         # D16: where each line-drawing rule put its line on this evidence.
         "lines": manifest.get("lines"),
+        # specs/sigma_windows.md: which SigmaHQ rule set ran, and per rule what could not.
+        "sigma": manifest.get("sigma"),
         "warnings": ingest_warnings(manifest),
     }
 

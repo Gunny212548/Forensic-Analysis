@@ -1,0 +1,23 @@
+# The image's `sigma` build stage only (Dockerfile, tools/sigma_build.py) - the app itself
+# never imports pySigma; it runs the SQL this stage writes. Pinned exactly, dependencies
+# too: the converted rules are part of how a case's findings were produced (ADR-006).
+pySigma==2.0.1
+pySigma-backend-sqlite==2.1.1
+certifi==2026.10.23
+charset-normalizer==3.5.2
+diskcache==5.6.3
+diskcache-stubs==5.6.3.6.20240818
+google-re2==1.1.20251105
+idna==3.20
+Jinja2==3.1.6
+jq==1.13.0
+MarkupSafe==3.0.4
+packaging==26.3
+pyparsing==3.3.3
+PyYAML==6.0.3
+requests==2.34.2
+types-PyYAML==6.0.12.20260906
+typing_extensions==4.16.0
+urllib3==2.8.0
+# The app's own DuckDB (requirements.txt): the dialect's self-test must run on the engine that runs the SQL.
+duckdb==2.0.0

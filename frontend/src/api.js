@@ -209,18 +209,22 @@ export async function listFindings({ companyId, projectId, decision, severity, a
   return jsonOrThrow(await fetch(`/api/findings?${p}`), 'Could not load findings')
 }
 
-/** The rule set never changes while the app runs, so it is fetched once. */
-let rulesPromise = null
-export function getRules() {
-  if (!rulesPromise) {
-    rulesPromise = fetch('/api/rules')
-      .then((resp) => jsonOrThrow(resp, 'Could not load the detection rules'))
-      .catch((err) => {
-        rulesPromise = null // let a later open retry
-        throw err
-      })
+/** One rule's documentation. The rule set never changes while the app runs, so each rule is
+ *  fetched once - one at a time, since SigmaHQ's 1,500 rules joined the list (sigma_windows.md). */
+const rulePromises = new Map()
+export function getRule(rid) {
+  if (!rulePromises.has(rid)) {
+    rulePromises.set(
+      rid,
+      fetch(`/api/rules/${encodeURIComponent(rid)}`)
+        .then((resp) => jsonOrThrow(resp, 'Could not load the detection rule'))
+        .catch((err) => {
+          rulePromises.delete(rid) // let a later open retry
+          throw err
+        }),
+    )
   }
-  return rulesPromise
+  return rulePromises.get(rid)
 }
 
 /** The case's VERIS record, or null when it has no high/critical finding

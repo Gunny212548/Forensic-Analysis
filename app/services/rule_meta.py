@@ -34,6 +34,7 @@ the last change to a rule's logic or level.
 
 import re
 
+from . import rules_sigma, sigma
 from .rules import RULE_LABELS, RULE_LEVEL
 
 AUTHOR = "forensic-analyzer"
@@ -1188,8 +1189,26 @@ def _plain(text: str) -> str:
     return _DEV_REF.sub("", text)
 
 
+def _describe_sigma(rid: str) -> dict:
+    """A SigmaHQ rule as SigmaHQ wrote it: its author, link and licence (DRL 1.1), no ADS of ours."""
+    r = sigma.by_rid()[rid]
+    prov = sigma.bundle()["provenance"] or {}
+    return {
+        "rid": rid, "label": RULE_LABELS.get(rid, r["title"]), "id": r["id"], "title": r["title"],
+        "status": r["status"], "description": r.get("description") or "", "author": r.get("author"),
+        "date": r.get("date"), "modified": r.get("modified"), "references": r.get("references") or [],
+        "logsource": r["logsource"], "log_sources": WINDOWS_SOURCES, "level": r["level"],
+        "tags": r.get("tags") or [], "falsepositives": r.get("falsepositives") or [],
+        "origin": "SigmaHQ", "url": r["url"], "commit": prov.get("commit"),
+        "license": prov.get("license"), "license_url": prov.get("license_url"),
+        "ads": None,
+    }
+
+
 def describe(rid: str) -> dict:
     """One rule in Sigma field names, plus its ADS documentation."""
+    if RULE_META[rid].get("origin") == "SigmaHQ":
+        return _describe_sigma(rid)
     m = RULE_META[rid]
     m = {**m, "falsepositives": [_plain(f) for f in m["falsepositives"]],
          "ads": {k: _plain(v) for k, v in m["ads"].items()}}
@@ -1238,6 +1257,8 @@ def problems() -> list[str]:
             out.append(f"{rid}: no metadata")
             continue
         m = RULE_META[rid]
+        if m.get("origin") == "SigmaHQ":
+            continue  # SigmaHQ's own metadata, checked against its samples by tests/check_sigma.py
         sql_mitre = re.findall(r"'(T\d{4}(?:\.\d{3})?)'", sql)
         if sorted(sql_mitre) != sorted(m["techniques"]):
             out.append(f"{rid}: techniques {m['techniques']} but its SQL writes {sql_mitre}")
@@ -1261,3 +1282,22 @@ def problems() -> list[str]:
     out += [f"{rid}: deprecated but still in rules.py" for rid in sorted(running)
             if RULE_META.get(rid, {}).get("status") == "deprecated"]
     return out
+
+
+# SigmaHQ's suggesting rules (specs/sigma_windows.md S-D6): metadata from the rule itself. Their
+# techniques' tactics come from the rules' own tags (attack.credential-access -> credential_access),
+# the union over every SigmaHQ rule naming the technique, added only for a technique the table
+# above does not already map.
+_SIGMA_TACTICS: dict[str, set] = {}
+for _rid in rules_sigma.ENTITY:
+    _r = sigma.by_rid()[_rid]
+    RULE_META[_rid] = {"id": _r["id"], "title": _r["title"], "status": _r["status"],
+                       "techniques": _r["techniques"], "category": _r["logsource"].get("category")
+                       or _r["logsource"].get("service"), "log_sources": WINDOWS_SOURCES,
+                       "falsepositives": _r.get("falsepositives") or [], "origin": "SigmaHQ"}
+    _tac = {x.replace("-", "_") for x in _r.get("tactics") or []} & set(_TACTIC_RANK)
+    for _t in _r["techniques"]:
+        _SIGMA_TACTICS.setdefault(_t.lower().split(".")[0], set()).update(_tac)
+for _key, _tac in _SIGMA_TACTICS.items():
+    if _key not in TACTICS and _tac:
+        TACTICS[_key] = sorted(_tac, key=_TACTIC_RANK.get)

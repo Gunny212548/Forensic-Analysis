@@ -390,7 +390,11 @@ def main() -> int:
 
         print("Overview detection areas")
         from app.services import areas as areas_mod, rules as rules_mod
-        check(all(len([a for a in areas_mod.AREAS if rid in a["rids"]]) == 1 for rid in rules_mod.RULE_LABELS),
+        # Ours are listed on exactly one card; SigmaHQ's are placed by their tactic in AREA_OF only
+        # (specs/sigma_windows.md S-D6) - every rule is counted somewhere on the Overview.
+        check(all(len([a for a in areas_mod.AREAS if rid in a["rids"]]) == 1
+                  for rid in rules_mod.RULE_LABELS if not rid.startswith("SIGMA-"))
+              and all(areas_mod.AREA_OF.get(rid) in areas_mod.AREA_IDS for rid in rules_mod.RULE_LABELS),
               "every rule belongs to exactly one area")
         ov = c.get("/api/overview").json()
         ar = ov["areas"]

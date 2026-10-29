@@ -131,12 +131,26 @@ def collect(url: str, files: list[Path]) -> tuple[dict, list[str]]:
             # Keyed by name -> list, never name -> one result: the corpus
             # holds two different files both called log_30_.csv, and a plain
             # assignment silently dropped one of them from the check.
-            results.setdefault(m["original_filename"], []).append({
+            # SigmaHQ's counts apart from ours (specs/sigma_windows.md S-D8): `flagged` and `rules`
+            # stay the in-house rules', comparable with every entry taken before SigmaHQ ran.
+            matched = m.get("rules_matched") or {}
+            origin = m.get("flagged_by_origin")
+            entry = {
                 "rows": m["total_rows"],
-                "flagged": m["flagged_count"],
-                "rules": dict(sorted((m.get("rules_matched") or {}).items())),
+                "flagged": origin.get("in-house", 0) if origin is not None else m["flagged_count"],
+                "rules": dict(sorted((r, n) for r, n in matched.items() if not r.startswith("SIGMA-"))),
                 "md5": hashlib.md5(path.read_bytes()).hexdigest(),
-            })
+            }
+            sg = m.get("sigma") or {}
+            sg_flagged = (origin or {}).get("SigmaHQ", 0)
+            if sg.get("status") == "ran" and (sg_flagged or sg.get("marks")):
+                entry["sigma"] = {
+                    "commit": (sg.get("provenance") or {}).get("commit"),
+                    "flagged": sg_flagged,
+                    "rules": dict(sorted((r, n) for r, n in matched.items() if r.startswith("SIGMA-"))),
+                    "marks": dict(sorted((sg.get("marks") or {}).items())),
+                }
+            results.setdefault(m["original_filename"], []).append(entry)
         pending = still
         if pending:
             time.sleep(2)
@@ -188,6 +202,18 @@ def compare(baseline: dict, actual: dict, scanned_md5: set[str]) -> list[str]:
                     before, after = want["rules"].get(rid, 0), got["rules"].get(rid, 0)
                     if before != after:
                         problems.append(f"DRIFT    {tag}: {rid} {before:,} -> {after:,}")
+            ws, gs = want.get("sigma") or {}, got.get("sigma") or {}
+            if ws != gs:
+                if not ws:
+                    problems.append(f"SIGMA    {tag}: SigmaHQ matches not in baseline ({gs.get('flagged', 0)} "
+                                    f"flagged, {len(gs.get('marks') or {})} marking rules)")
+                elif ws.get("commit") != gs.get("commit"):
+                    problems.append(f"SIGMA    {tag}: SigmaHQ commit {ws.get('commit')} -> {gs.get('commit')} "
+                                    f"(a new pin needs a new baseline)")
+                else:
+                    for part in ("flagged", "rules", "marks"):
+                        if ws.get(part) != gs.get(part):
+                            problems.append(f"SIGMA    {tag}: {part} {ws.get(part)} -> {gs.get(part)}")
     got_md5 = {v["md5"] for variants in actual.values() for v in variants}
     for name in sorted(set(baseline) - set(actual)):
         for variant in _variants(baseline[name]):

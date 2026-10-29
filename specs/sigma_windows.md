@@ -1,6 +1,7 @@
 # SigmaHQ rules on Windows events - design (story 6, ADR-006's engine)
 
-Status: **Proposed 2026-10-29** - waiting on the user (Q124-Q133). Branch `sigma-windows`.
+Status: **Approved 2026-10-29 - Q124-Q133 as recommended** (the user: "ok"), Q133 included: a
+Windows export of this PC may be used to measure the noise. Branch `sigma-windows`.
 Spike (b) scripts: `specs/spike-sigma/win_run.py` (convert / run / regress) and the DuckDB
 dialect of spike (a), `duck_dialect.py`, with one fix found here (booleans, S-D2).
 
@@ -108,6 +109,10 @@ alerting) only as marks (S-D4).
 
 ### S-D4 - high / critical are suggestions; the rest are marks on the timeline (Q127)
 
+The Sigma rules specification 2.1.0 draws the same line (`docs/STANDARDS.md`, already read): "While
+`low` and `medium` level events have an informative character, events with `high` and `critical`
+level should lead to immediate reviews by security analysts".
+
 - **High and critical**: a finding like any other - in Attack events, decided by the analyst,
   explained by the AI (gotchas #64 / #71 / #72), in the attack timeline and graph once confirmed.
 - **Medium, low, informational** (and every threat-hunting rule): a **mark on the event** in the
@@ -146,6 +151,14 @@ SigmaHQ's "Windows Defender Threat Detected" fires on the same events. Listed tw
 in-house rule named on the mark, are marks only: Defender threat detected / real-time protection
 disabled (WIN-MAL-2 / WIN-HOST-3). Others are added only when measured on the same rows.
 
+As built (2026-10-29): a twin selects only event ids of the provider its in-house rule reads and
+decides nothing more about them - six: Threat Detected and AMSI Trigger (WIN-MAL-2's 1006 / 1015 /
+1116 / 1117), Real-time Protection / Malware and PUA Scanning / Virus Scanning disabled and Tamper
+Protection Trigger (WIN-HOST-3's 5001 / 5010 / 5012 / 5013). Virus Scanning Disabled was found on
+story 5f's capture (`check_windows_rules.py` failed with it as a second suggestion of SRV2's 5012).
+Not twins: Configuration Changes and Exploit Guard Tamper (5007 values WIN-HOST-3 does not read),
+RedSun (one named threat - it says more than WIN-MAL-2).
+
 ### S-D8 - stored beside the in-house findings, baselined apart (Q131)
 
 High / critical go into `findings` (so review, AI, FD ids, graph and Overview work unchanged) with
@@ -158,6 +171,48 @@ revision 5's "Sigma findings are stored apart" kept in the baseline, not in the 
 
 A stage between the rules and the escalations, its progress counted; ~45 s on a large case. A rule
 that fails at run time is listed with its error on the case, the rest go on.
+
+## Built (2026-10-29, stories 6a + 6b)
+
+- **Build stage** (`Dockerfile` `sigma`, `requirements-sigma.txt`, `tools/sigma_build.py`): SigmaHQ
+  `05d1031f` as its GitHub archive, checked by SHA-256 (fetching by git hash through BuildKit failed
+  mid-transfer after 9 minutes); the dialect's differential self-test runs first and fails the build
+  on any difference but the two where SQLite is wrong; the JSON (6.8 MB) lands at `/opt/sigma` -
+  outside `app/`, which the dev compose mounts over. The archive build and the git checkout give the
+  same file byte for byte (`2e640a30...`). The app never imports pySigma.
+- **Runtime**: `sigma.py` (bundle, logsource CTE, marks, the case record), `rules_sigma.py` (1,492
+  suggesting rules as Windows product rules), `rules.apply_rules(failures=)`: a SigmaHQ rule that
+  fails is listed on the case and the rest run; one of ours still fails the case.
+- **The case**: `manifest.sigma` (commit, versions, file hash, ran / not applicable / not readable /
+  not convertible, matches, failures) shown as "SigmaHQ rules" on the Ingest step; marks on each event
+  in the events table and timeline (`db._events`, a link to the rule, its author in the tooltip); the
+  rule card shows a SigmaHQ rule as SigmaHQ wrote it, with its author, link and DRL 1.1 (fetched one
+  rule at a time now - the list would be 1,500 rules); `flagged_by_origin` beside `flagged_count`.
+- `tests/check_sigma.py`; `check_parity.py` keeps SigmaHQ's counts in a `sigma` section of each
+  entry (S-D8), `flagged` and `rules` staying ours.
+
+**Where the build differs from the design, and why:**
+- **Q129's id**: `SIGMA-` + the **whole UUID**, not 8 hex - SigmaHQ authors copy ids, so different
+  rules share 8 hex (4 pairs) and even 12 (`7e9cf7b6-e827-11ed-...`).
+- **S-D7's twins**: six, not two (above).
+- **One column name was a trap**: a rule field called `Data` is win_events' `data` column to DuckDB
+  (identifiers are case-insensitive) - the rule's fields are selected into a CTE and its condition
+  runs there alone, host and account under names no Sigma field has.
+
+**Measured with the build:**
+- SigmaHQ's own regression samples through the app's pipeline: **439 of 445 exact**, the same six as
+  the spike, each named in `check_sigma.py` (a keyword rule; two Defender 5007 rules and one network
+  rule give 0; two give 2 of 1).
+- **Kinnaree** (the pipeline, the S-D5 key): SigmaHQ 80 suggestions on 648 events - 78 hold attack
+  events, 2 the admin's benign true positive on HQ-PC040, **0 events on a look-alike**; incidents K1-K12
+  and K15 (13), with ours all 15. In-house unchanged (523 suggestions). 44 s for the case.
+- **Mekong**: `check_windows_rules.py` - no plain or look-alike event flagged, every incident as before.
+- **This PC's own logs (Q133)**: System, Application, PowerShell (both), Defender and Task Scheduler,
+  143,776 events: **0 SigmaHQ suggestions**; 9 rules mark events (Application Uninstalled 124,
+  Defender history deletion 80, the Defender twin 45, web-request cmdlets in script blocks 23 - this
+  session's own PowerShell - and five more). The Security log needs administrator rights and there is
+  no Sysmon here: of 2,878 rules 350 had events, so this says nothing about the Sysmon / Security rules'
+  noise. That measurement still needs a real export with both.
 
 ## Not in this story
 

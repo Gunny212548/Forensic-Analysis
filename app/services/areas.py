@@ -43,6 +43,12 @@ AREAS: list[dict] = [
 ]
 
 AREA_OF: dict[str, str] = {rid: a["id"] for a in AREAS for rid in a["rids"]}
+# SigmaHQ's rules by their first tactic (specs/sigma_windows.md S-D6) - in AREA_OF only, not in
+# the cards' rule lists: those are copied onto every case's detection matrix, and 1,498 ids
+# would say nothing a reader can use there.
+from .rules_sigma import AREAS as _SIGMA_AREAS  # noqa: E402
+
+AREA_OF.update(_SIGMA_AREAS)
 AREA_IDS: tuple[str, ...] = tuple(a["id"] for a in AREAS)
 
 # The four chips on a card. A Sigma level has five; informational folds into low.

@@ -27,8 +27,8 @@ from pathlib import Path
 
 from .. import config
 from . import (archive, checkpoint_le, custody, db, decode, finding_ids, identify, intel, logsources,
-               parsers, period, products, profiles, provenance, repro, rules, severity, storage,
-               winevent)
+               parsers, period, products, profiles, provenance, repro, rules, severity, sigma,
+               storage, winevent)
 
 log = logging.getLogger(__name__)
 
@@ -853,14 +853,27 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
         progress.set("rules", INTEL_END, force=True)
         # Where each line-drawing rule put its line on this evidence (lines.py).
         rule_lines: dict = {}
+        sigma_failed: dict = {}
         matched = rules.apply_rules(
-            con, on_rule=lambda i, n: progress.set("rules", INTEL_END + (99 - INTEL_END) * i / n),
-            lines=rule_lines)
+            con, on_rule=lambda i, n: progress.set("rules", INTEL_END + (97 - INTEL_END) * i / n),
+            lines=rule_lines, failures=sigma_failed)
+        # SigmaHQ's other rules mark the events they match, and the case records which rule set
+        # ran and what could not (specs/sigma_windows.md S-D4, S-D9). Its high / critical rules
+        # ran above, among the product rules.
+        sigma_record = sigma.apply_marks(con, on_rule=lambda i, n: progress.set("rules", 97 + 2 * i / n))
+        if sigma_failed:
+            sigma_record.setdefault("errors", []).extend(
+                {"rid": rid, "error": err} for rid, err in sorted(sigma_failed.items()))
         escalated = severity.escalate(con)
         sev_summary = severity.summary(con)
         # Behaviour profiles (layer C facts, profiles.py): after the rules,
         # because nothing in them is a finding and nothing below reads them.
         profiles.build(con)
+        # Flagged events by where the rule came from (S-D8): the in-house count stays comparable
+        # with every case processed before SigmaHQ ran (tests/baseline.json).
+        flagged_origin = dict(con.execute(
+            "SELECT CASE WHEN rid LIKE 'SIGMA-%' THEN 'SigmaHQ' ELSE 'in-house' END, count(DISTINCT row_id) "
+            "FROM findings GROUP BY 1").fetchall())
         con.close()
         con = None
 
@@ -889,6 +902,8 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             detection=products.matrix(present, rules.RULE_PRODUCT, rules.RULE_SUPERSEDED),
             periods=periods,
             lines=rule_lines,
+            sigma=sigma_record,
+            flagged_by_origin=flagged_origin,
             **extra,
         )
         # The reproducibility record (repro.py): what produced these findings.

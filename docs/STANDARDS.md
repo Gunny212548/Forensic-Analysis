@@ -16,6 +16,7 @@ Status: ✅ implemented · ⚠️ partial · ❌ not yet
 | 4 | Canonical event schema | OCSF | - | ❌ own schema (`raw_events`) |
 | 5 | Threat intelligence | OASIS STIX 2.1 / TAXII 2.1 | `app/services/intel.py` | ⚠️ STIX 2.1 bundles read (IP-equality indicators); no TAXII client - export a collection and drop the bundle in |
 | 6 | Detection rules | Sigma rules specification v2.1.0 (metadata), Palantir ADS framework (documentation) | `app/services/rule_meta.py` | ✅ metadata; detection stays SQL |
+| 6b | SigmaHQ rules (Windows) | Sigma rules specification v2.1.0 (high / critical "should lead to immediate reviews", low / medium "an informative character" - suggestions vs marks), Sigma taxonomy appendix v2.1.0 (logsource -> channel / event id, field names), Detection Rule License 1.1 (every match names the author), SigmaHQ's regression samples (439 of 445 exact through the pipeline) | `app/services/sigma.py`, `rules_sigma.py`, `tools/sigma_build.py`; `specs/sigma_windows.md` | ✅ Windows |
 | 7 | Technique classification | MITRE ATT&CK, CISA *Best Practices for MITRE ATT&CK Mapping* | `rules.py`, `rule_meta.py` | ✅ |
 | 8 | Severity | Sigma `level`; escalation by ODNI Cyber Threat Framework stage | `app/services/severity.py` | ✅ |
 | 9 | Confidence | Admiralty Code (NATO 6x6) | `app/services/confidence.py` | ✅ |

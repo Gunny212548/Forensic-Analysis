@@ -108,6 +108,30 @@ export default function EventsTable({ caseId, order = 'row' }) {
   )
 }
 
+/** SigmaHQ rules that mark this event without making it a suggestion - medium and below,
+ *  threat hunting, or the twin of one of our rules (specs/sigma_windows.md S-D4, S-D7).
+ *  Each names its author, as the Detection Rule License 1.1 asks of every match. */
+function SigmaMarks({ marks }) {
+  if (!marks || !marks.length) return null
+  return (
+    <div className="sigma-marks">
+      {marks.map((m) => (
+        <a
+          key={m.rid}
+          href={m.url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className={`sigma-mark sev-tag sev-tag-${m.level}`}
+          title={`SigmaHQ rule by ${m.author || 'unknown author'} (Detection Rule License 1.1)` +
+            (m.twin_of ? ` - the same events ${m.twin_of} decides` : '')}
+        >
+          {m.title}
+        </a>
+      ))}
+    </div>
+  )
+}
+
 function AllRows({ events, onProfile }) {
   return (
     <table>
@@ -152,7 +176,10 @@ function AllRows({ events, onProfile }) {
             </td>
             {/* Layer A: the event type, named by the server (db.EVENT_TYPES)
                 so the table and the MCP tools use the same words. */}
-            <td>{e.event || ''}</td>
+            <td>
+              {e.event || ''}
+              <SigmaMarks marks={e.sigma} />
+            </td>
             <td>{e.verdict || ''}</td>
             <td>
               {e.app || ''}

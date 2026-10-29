@@ -103,6 +103,72 @@ export function Detection({ detection }) {
   )
 }
 
+/** Which SigmaHQ rule set ran on this evidence and what could not (specs/sigma_windows.md):
+ *  a rule with no event of its log source here is not applicable, never a 0; one reading ETW
+ *  or a channel the Sigma taxonomy does not name cannot be read; one pySigma could not convert
+ *  is listed too (ADR-006 decision 3). High / critical rules are suggestions, the rest marks. */
+export function Sigma({ sigma }) {
+  if (!sigma) return null
+  if (sigma.status !== 'ran') return <div className="muted">{sigma.reason || 'SigmaHQ rules did not run.'}</div>
+  const p = sigma.provenance || {}
+  const suggested = Object.values(sigma.suggestions || {}).reduce((a, b) => a + b, 0)
+  const marked = Object.values(sigma.marks || {}).reduce((a, b) => a + b, 0)
+  return (
+    <div>
+      <table className="ov-table">
+        <tbody>
+          <tr>
+            <th>Rule set</th>
+            <td>
+              <a href={`${p.source}/tree/${p.commit}`} target="_blank" rel="noreferrer noopener" className="mono">
+                SigmaHQ {(p.commit || '').slice(0, 7)}
+              </a>{' '}
+              · {fmtNum(sigma.rules)} Windows rules ·{' '}
+              <a href={p.license_url} target="_blank" rel="noreferrer noopener">
+                {p.license}
+              </a>
+              <div className="muted">
+                converted by pySigma {p.pysigma} (SQLite backend {p.pysigma_backend_sqlite}, DuckDB dialect) ·{' '}
+                {p.taxonomy} · file SHA-256 <span className="mono">{(sigma.sha256 || '').slice(0, 16)}</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <th>Ran</th>
+            <td>
+              {fmtNum(sigma.ran)} rules had events of their log source
+              <div className="muted">
+                {fmtNum(sigma.not_applicable)} not applicable (no such events here) · {fmtNum(sigma.not_readable)} cannot
+                be read (ETW, or a channel the taxonomy does not name) · {fmtNum(sigma.not_convertible)} not convertible
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <th>Matched</th>
+            <td>
+              {fmtNum(Object.keys(sigma.suggestions || {}).length)} high / critical rules on {fmtNum(suggested)} events
+              (suggestions) · {fmtNum(Object.keys(sigma.marks || {}).length)} other rules on {fmtNum(marked)} events
+              (marks on the timeline)
+            </td>
+          </tr>
+          {sigma.errors?.length > 0 && (
+            <tr>
+              <th>Failed</th>
+              <td>
+                {sigma.errors.map((e) => (
+                  <div key={e.rid} className="mono muted">
+                    {e.rid}: {e.error}
+                  </div>
+                ))}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 const METHOD_NAMES = {
   trw: 'TRW',
   'no-line': 'No line',

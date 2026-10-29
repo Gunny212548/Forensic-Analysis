@@ -30,7 +30,10 @@ members only) or TRW - no number set on one customer applied to another. Palo Al
 Point have theirs, Windows its sign-in, lateral-movement, host, beaconing and feed rules (gotchas
 #65-#70, `specs/windows_rules.md` stories 5a-5e) and Microsoft Defender's own verdicts (gotcha #76,
 `specs/windows_defender_rules.md` story 5f - a product's verdict is an in-house rule, any other single
-event waits for SigmaHQ); the generic R-rules still run on every other product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
+event is SigmaHQ's). **SigmaHQ's Windows rules run beside ours since 2026-10-29** (story 6,
+`specs/sigma_windows.md`, gotcha #79): a pinned commit converted at image build, high / critical as
+suggestions naming their author (DRL 1.1), the rest as marks on the timeline. The generic R-rules
+still run on every other product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
 explains every suggestion and never decides** (gotcha #72), **no cap** - in the background once the case is ready (gotchas #64,
 #71; the user, 2026-10-26: "ทุก Finding ที่เจอต้องได้รับการ review จาก AI"). **Every step must cite a
 standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
@@ -91,7 +94,11 @@ pipeline.process_case  (services/pipeline.py)
   then → products.mark + period per evidence item (gotcha #61)
        → rules.apply_rules() = SQL INSERT ... SELECT per rule; a product
          rule reads its product's rows, a line-drawing rule takes its line
-         from lines.py and the manifest keeps it (`lines`, gotcha #62)
+         from lines.py and the manifest keeps it (`lines`, gotcha #62);
+         SigmaHQ's high / critical Windows rules run last among them
+       → sigma.apply_marks: SigmaHQ's other rules mark events (`sigma_marks`),
+         the manifest's `sigma` says which commit ran and what could not
+         (converted at image build into /opt/sigma, gotcha #79)
        → escalations, profiles, FD ids
        → status=ready (or failed + error/traceback on the manifest)
        → triage.enqueue: the AI reviews every suggestion in the background, one
@@ -482,6 +489,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
 - #76 Defender's own verdicts (story 5f, `specs/windows_defender_rules.md`): a product's verdict is an in-house rule (Q114, beside W-D1); WIN-MAL-2 one detection per host + Detection ID, medium when remediated, no technique, no generic twin (R3002 would make it a Downloader); WIN-HOST-3 turned off / tampered (T1685); item names differ per event - read the provider's templates; a rule may write a *lower* `lvl` (`least`).
 - #70 The user's blind Windows quarter (`D:\logtest\blind-windows`, now read - no longer blind): WIN-AUTH-1's spray branch leaves out computer accounts (the sprayer's own `web01$`), WIN-MAL-1 leaves out a (process, destination) beaconing on more than half the Sysmon hosts, named on the line record (ESET's timer, 40,725 rows) - only from 20 hosts up, else one host's evidence hid every beacon (Q105); not-attack rows 43,523 -> 2,567; K1 / K6 / K8 / K9 / K11 still missed.
+- #79 SigmaHQ on Windows (story 6, `specs/sigma_windows.md`): converted at image build into `/opt/sigma` (pySigma never at runtime), high / critical are `SIGMA-<uuid>` product rules, the rest marks on events (`sigma_marks`); pySigma's Windows pipelines pin `pysigma<2` (taxonomy map instead), booleans as text, the whole UUID as id, a `Data` field shadows `data`, one SigmaHQ rule's error never fails a case.
 - #78 Public Windows data (`D:/logtest/internet`: EVTX-ATTACK-SAMPLES, OTRF): WIN-HOST-2 needs PROCESS_VM_READ (`GrantedAccess & 0x10`, W-D17) - svchost's 0x3000 Prefetch write fired on 6 datasets; the dev image without `--build` had no `evtx` library (every .evtx one row); never run a script beside a data folder named like a library; 43 OTRF flat-JSON datasets have no reader.
 - #77 Story 5g: WIN-LAT-2 / -4 flag a (source, account, service / task / file) seen on one day of the evidence only - two days or more is expected (AN1468 UserContext, AN1185 allowlists; Veeam / PDQ 2,560 rows -> 8, attacks kept); join the day count with `IS NOT DISTINCT FROM`; lower `%SystemRoot%` before replacing it - a 4697 never matched the written file.
 - #68 Windows story 5d: WIN-BRUTE-4 (B5) is Javed & Paxson's CUSUM and saw nothing until the normal was cleaned as the paper cleans it (pointwise brute-forcers out, §5's automation test) and Z counted in quarter failures (`lines.CUSUM_SCALE`) - W3 156 of 246; 4768 0x6 a failed attempt; a 4778 reconnect carries the session's own id (WIN-LAT-1, OTRF found); ADMIN$ / C$ in WIN-LAT-2, WIN-LAT-4 file copied then run; 7045 untyped.
@@ -936,6 +944,11 @@ Two more checks, each for its own layer:
 - **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states (Attack timeline
   and Attack path wait for every decision; `/graph` empty until then, never a rejected group), and
   every step citing a standard marked read in `docs/standards/SOURCES.md`.
+- **SigmaHQ** - `tests/check_sigma.py <scratch> --sigma <checkout> --dockerfile <Dockerfile>` (gotcha #79,
+  `specs/sigma_windows.md`): the bundle at `/opt/sigma` matches the Dockerfile's pin and attributes every
+  rule; SigmaHQ's 445 Windows regression samples through the pipeline, 439 exact and only the six named
+  differences; a failing SigmaHQ rule never fails a case. Needs a dev image built after story 6
+  (`--build`) and the pinned commit's `regression_data/` copied in (`D:/sigma-spike/sigma`); ~30 min.
 
 **`tests/check_parity.py` asserts it, so nobody has to read a table.** Until
 2026-09-15 every ingest change was validated by uploading files, curling
@@ -1095,9 +1108,11 @@ DuckDB bulk-load fix, and ~38s total while decode was still Python-per-row.
 
 Any change to ingest or rules should be checked for **parity**, and the
 baseline to check against is `tests/baseline.json`, not this file - per-file
-`rows / flagged / per-rule` counts, **669 entries** since 2026-10-28 (re-taken on the dev
+`rows / flagged / per-rule` counts, **675 entries** since 2026-10-29 (re-taken on the dev
 container for the product rules - gotcha #63; the Elastic PAN-OS samples added; the user's
-WinEvents.log, 4 flagged - gotcha #76), asserted by
+WinEvents.log, 4 flagged - gotcha #76; this PC's own six exports, `D:/logtest/this-pc`; and a
+`sigma` section on 217 Windows entries - SigmaHQ's commit, flagged, rules and marks, kept apart so
+`flagged` / `rules` stay ours, gotcha #79), asserted by
 `tests/check_parity.py`. Run it against the dev container (`--url http://127.0.0.1:8092`) with
 the AI review off there (gotcha #64) - with it on, a hundred uploads take hours. A silent drop to 0 findings
 is exactly the failure mode gotcha #2 describes, and a *plausible* wrong

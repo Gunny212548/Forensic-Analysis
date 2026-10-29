@@ -123,7 +123,18 @@
   "flagged": 0,
   "md5": "004aea2c5b8f66304094429c6504f016",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-0badd08f-c6a3-4630-90d3-6875cca440be": 1
+   },
+   "rules": {
+    "SIGMA-16f5d8ca-44bd-47c8-acbe-6fc95a16c12f": 1,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "4624_LT3_AnonymousLogon_Localhost_-_JuicyPotato.evtx.log": {
   "flagged": 0,
@@ -471,7 +482,16 @@
   "flagged": 0,
   "md5": "5f2d9a7383b9173a2cae6ae29a0f0dbd",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-12ba6a38-adb3-4d6b-91ba-a7fb248e3199": 1,
+    "SIGMA-2632954e-db1c-49cb-9936-67d1ef1d17d2": 1
+   },
+   "rules": {}
+  }
  },
  "4765_sidhistory_add_t1178.evtx.log": {
   "flagged": 0,
@@ -495,7 +515,15 @@
   "flagged": 0,
   "md5": "79662986ae3842d2159dd33882065fb9",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-53ad8e36-f573-46bf-97e4-15ba5bf4bb51": 1
+   }
+  }
  },
  "4794_DSRM_password_change_t1098.evtx.log": {
   "flagged": 0,
@@ -657,13 +685,37 @@
   "flagged": 0,
   "md5": "339b97597027c20f26c5e8204959bdc8",
   "rows": 55,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-e5ac86dd-2da1-454b-be74-05d26c769d7d": 22
+   },
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "ACL_ForcePwd_SPNAdd_User_Computer_Accounts.evtx.log": {
   "flagged": 0,
   "md5": "2625120b80ed98a4f8139188ef8885f4",
   "rows": 55,
   "rules": {}
+ },
+ "Application.evtx": {
+  "flagged": 0,
+  "md5": "9c91b9ecbc63bb2a273d2318666a9ee2",
+  "rows": 46831,
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-570ae5ec-33dc-427c-b815-db86228ad43e": 124
+   },
+   "rules": {}
+  }
  },
  "CA_4624_4625_LogonType2_LogonProc_chrome.evtx": {
   "flagged": 0,
@@ -681,7 +733,15 @@
   "flagged": 0,
   "md5": "becffbf52ebce7b4532557a95f343b00",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-17d619c1-e020-4347-957e-1d1207455c93": 3
+   },
+   "rules": {}
+  }
  },
  "CA_DCSync_4662.evtx.log": {
   "flagged": 0,
@@ -693,7 +753,15 @@
   "flagged": 0,
   "md5": "4a82d6e3e36e2b807754a10e9f5b2364",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-9e099d99-44c2-42b6-a6d8-54c3545cab29": 1
+   }
+  }
  },
  "CA_PetiPotam_etw_rpc_efsr_5_6.evtx": {
   "flagged": 0,
@@ -705,7 +773,17 @@
   "flagged": 0,
   "md5": "04cc9fe95164447a5c6eea0b85eaffa8",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-4b60e527-ec73-4b47-8cb3-f02ad927ca65": 1
+   },
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "CA_chrome_firefox_opera_4663.evtx.log": {
   "flagged": 0,
@@ -717,7 +795,16 @@
   "flagged": 0,
   "md5": "f7c6ca9355c92c87eb0377de38882e82",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-4a1b6da0-d94f-4fc3-98fc-2d9cb9e5ee76": 2,
+    "SIGMA-962fe167-e48d-4fd6-9974-11e5b9a5d6d1": 1
+   },
+   "rules": {}
+  }
  },
  "CA_hashdump_4663_4656_lsass_access.evtx.log": {
   "flagged": 0,
@@ -729,19 +816,45 @@
   "flagged": 0,
   "md5": "e4dc94ead836becba559fce9381fe56b",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-77564cc2-7382-438b-a7f6-395c2ae53b9a": 1
+   }
+  }
  },
  "CA_keepass_KeeThief_Get-KeePassDatabaseKey.evtx": {
   "flagged": 0,
   "md5": "ae62379fe2693311879dc437d38f960c",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-eeb2e3dc-c1f4-40dd-9bd5-149ee465ad50": 2
+   },
+   "rules": {
+    "SIGMA-77564cc2-7382-438b-a7f6-395c2ae53b9a": 2
+   }
+  }
  },
  "CA_protectedstorage_5145_rpc_masterkey.evtx": {
   "flagged": 0,
   "md5": "d78b6f501ea45d9e576f54b023b9beef",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-45545954-4016-43c6-855e-eae8f1c369dc": 1
+   }
+  }
  },
  "CA_protectedstorage_5145_rpc_masterkey.evtx.log": {
   "flagged": 0,
@@ -753,7 +866,17 @@
   "flagged": 0,
   "md5": "974852aeabc87bab9a410f990bbe4305",
   "rows": 9,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-a18dd26b-6450-46de-8c91-9659150cf088": 1
+   },
+   "rules": {
+    "SIGMA-f239b326-2f41-4d6b-9dfa-c846a60ef505": 2
+   }
+  }
  },
  "CA_teamviewer-dumper_sysmon_10.evtx": {
   "flagged": 0,
@@ -765,13 +888,34 @@
   "flagged": 0,
   "md5": "a34b9184f9e147e47dfc7c4e5eff8e03",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-1f21ec3f-810d-4b0e-8045-322202e22b4b": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1
+   },
+   "rules": {
+    "SIGMA-09706624-b7f6-455d-9d02-adee024cee1d": 1,
+    "SIGMA-d522eca2-2973-4391-a3e0-ef0374321dae": 1
+   }
+  }
  },
  "DACL_DCSync_Right_Powerview__Add-DomainObjectAcl.evtx": {
   "flagged": 0,
   "md5": "99c995e663c792b67510c2485c62902a",
   "rows": 28,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 19,
+   "marks": {},
+   "rules": {
+    "SIGMA-2c99737c-585d-4431-b61a-c911d86ff32f": 18,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "DACL_DCSync_Right_Powerview__Add-DomainObjectAcl.evtx.log": {
   "flagged": 0,
@@ -783,13 +927,29 @@
   "flagged": 0,
   "md5": "3c3e61b2c463ec22962f718055c26456",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-100ef69e-3327-481c-8e5c-6d80d9507556": 1
+   }
+  }
  },
  "DE_1102_security_log_cleared.evtx": {
   "flagged": 0,
   "md5": "0868ba6f10c24411f5536e05d50aaa1a",
   "rows": 112,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "DE_1102_security_log_cleared.evtx.log": {
   "flagged": 0,
@@ -801,7 +961,18 @@
   "flagged": 0,
   "md5": "7d9223fddf6ca9f4f3d8a329a02055b9",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-5ef9853e-4d0e-4a70-846f-a9ca37d876da": 1,
+    "SIGMA-fa34b441-961a-42fa-a100-ecc28c886725": 1
+   },
+   "rules": {
+    "SIGMA-9bd012ee-0dff-44d7-84a0-aa698cfd87a3": 1
+   }
+  }
  },
  "DE_EventLog_Service_Crashed.evtx": {
   "flagged": 0,
@@ -813,7 +984,18 @@
   "flagged": 0,
   "md5": "849a25889682ebc328c0731a42dad7c8",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-66b6be3d-55d0-4f47-9855-d69df21740ea": 2,
+    "SIGMA-cfeed607-6aa4-4bbd-9627-b637deb723c8": 2
+   },
+   "rules": {
+    "SIGMA-7b449a5e-1db5-4dd0-a2dc-4e3a67282538": 2
+   }
+  }
  },
  "DE_Fake_ComputerAccount_4720.evtx.log": {
   "flagged": 0,
@@ -843,13 +1025,34 @@
   "flagged": 0,
   "md5": "650a1b370e102f2588d9c71b5f9a26db",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-297afac9-5d02-4138-8c58-b977bac60556": 1,
+    "SIGMA-9637e8a5-7131-4f7f-bdc7-2b05d8670c43": 1
+   },
+   "rules": {}
+  }
  },
  "DE_RDP_Tunnel_5156.evtx": {
   "flagged": 0,
   "md5": "951e2f89674d533807b832ae83d64360",
   "rows": 101,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 6,
+   "marks": {
+    "SIGMA-0f63e1ef-1eb9-4226-9d54-8927ca08520a": 1
+   },
+   "rules": {
+    "SIGMA-51e33403-2a37-4d66-a574-1fda1782cc31": 1,
+    "SIGMA-5bed80b6-b3e8-428e-a3ae-d3c757589e41": 4,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "DE_RDP_Tunnel_5156.evtx.log": {
   "flagged": 0,
@@ -861,7 +1064,15 @@
   "flagged": 0,
   "md5": "569be8374bf3c347ff942205d0434cf4",
   "rows": 18,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-51e33403-2a37-4d66-a574-1fda1782cc31": 1
+   }
+  }
  },
  "DE_RDP_Tunneling_4624.evtx.log": {
   "flagged": 0,
@@ -879,7 +1090,15 @@
   "flagged": 0,
   "md5": "c74dbbbb03a575e737d58b74cbb25af7",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-48437c39-9e5f-47fb-af95-3d663c3f2919": 1
+   },
+   "rules": {}
+  }
  },
  "DE_WinEventLogSvc_Crash_System_7036.evtx": {
   "flagged": 0,
@@ -903,7 +1122,15 @@
   "flagged": 0,
   "md5": "11c7a1059f417886a3343279d8b9c39b",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "DE_suspicious_remote_eventlog_svc_access_5145.evtx.log": {
   "flagged": 0,
@@ -915,13 +1142,40 @@
   "flagged": 0,
   "md5": "873d25ef0849c1256dd3d4fe09b72fc7",
   "rows": 73,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-8a3038e8-9c9d-46f8-b184-66234a160f6f": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 3,
+    "SIGMA-c75309a3-59f8-4a8d-9c2c-4c927ad50555": 1
+   },
+   "rules": {
+    "SIGMA-48a61b29-389f-4032-b317-b30de6b95314": 1,
+    "SIGMA-ed74fe75-7594-4b4b-ae38-e38e3fd2eb23": 2
+   }
+  }
  },
  "DE_timestomp_and_dll_sideloading_and_RunPersist.evtx": {
   "flagged": 0,
   "md5": "dd551286576e1b8af10b502d5034de3c",
   "rows": 23,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-20f0ee37-5942-4e45-b7d5-c5b5db9df5cd": 1,
+    "SIGMA-297afac9-5d02-4138-8c58-b977bac60556": 1,
+    "SIGMA-379fa130-190e-4c3f-b7bc-6c8e834485f3": 1,
+    "SIGMA-9637e8a5-7131-4f7f-bdc7-2b05d8670c43": 1,
+    "SIGMA-a762e74f-4dce-477c-b023-4ed81df600f9": 1
+   },
+   "rules": {
+    "SIGMA-02ee49e2-e294-4d0f-9278-f5b3212fc588": 1
+   }
+  }
  },
  "DE_xp_cmdshell_enabled_MSSQL_EID_15457.evtx": {
   "flagged": 0,
@@ -939,7 +1193,18 @@
   "flagged": 0,
   "md5": "55e9dc4ea97f12aa0a0683e3c3702cf9",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-72cd00d6-490c-4650-86ff-1d11f491daa1": 1
+   },
+   "rules": {
+    "SIGMA-7aaaf4b8-e47c-4295-92ee-6ed40a6f60c8": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Discovery_Remote_System_NamedPipes_Sysmon_18.evtx": {
   "flagged": 0,
@@ -951,13 +1216,34 @@
   "flagged": 0,
   "md5": "6935625e162f87ce95be6739c4b0aef4",
   "rows": 20,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-8de1cbe8-d6f5-496d-8237-5f44a721c7a0": 1
+   },
+   "rules": {
+    "SIGMA-637f689e-b4a5-4a86-be0e-0100a0a33ba2": 2,
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1
+   }
+  }
  },
  "Exec_sysmon_meterpreter_reversetcp_msipackage.evtx": {
   "flagged": 0,
   "md5": "829069d06e36c40e1e5c46eccce48d40",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-1e53dd56-8d83-4eb4-a43e-b790a05510aa": 1,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1
+   },
+   "rules": {}
+  }
  },
  "Exec_via_cpl_Application_Experience_EventID_17_ControlPanelApplet.evtx": {
   "flagged": 0,
@@ -981,7 +1267,20 @@
   "flagged": 0,
   "md5": "c65bd578885afc2a910f665f32a3a286",
   "rows": 14,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d": 2,
+    "SIGMA-1f21ec3f-810d-4b0e-8045-322202e22b4b": 1,
+    "SIGMA-96036718-71cc-4027-a538-d1587e0006a7": 2,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 1
+   },
+   "rules": {
+    "SIGMA-52d8b0c6-53d6-439a-9e41-52ad442ad9ad": 1
+   }
+  }
  },
  "ImpersonateUser-via_local_Pass_The_Hash_Sysmon_and_Security.evtx.log": {
   "flagged": 0,
@@ -993,7 +1292,18 @@
   "flagged": 0,
   "md5": "0688d52a80c672a1b9707087a895a0cf",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-8eef149c-bd26-49f2-9e5a-9b00e3af499b": 1,
+    "SIGMA-def8b624-e08f-4ae1-8612-1ba21190da6b": 1
+   },
+   "rules": {
+    "SIGMA-192a0330-c20b-4356-90b6-7b7049ae0b87": 1
+   }
+  }
  },
  "Invoke_TokenDuplication_UAC_Bypass4624.evtx.log": {
   "flagged": 0,
@@ -1026,7 +1336,19 @@
   "flagged": 0,
   "md5": "28d3173f655430d2f28ed36193d1629d",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-8eef149c-bd26-49f2-9e5a-9b00e3af499b": 1,
+    "SIGMA-def8b624-e08f-4ae1-8612-1ba21190da6b": 1
+   },
+   "rules": {
+    "SIGMA-192a0330-c20b-4356-90b6-7b7049ae0b87": 1,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx.log": {
   "flagged": 0,
@@ -1050,13 +1372,29 @@
   "flagged": 0,
   "md5": "bc55522742410b5b79c766ad151846a9",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-ed5d72a6-f8f4-479d-ba79-02f6a80d7471": 1
+   }
+  }
  },
  "LM_ImageLoad_NFSH_Sysmon_7.evtx": {
   "flagged": 0,
   "md5": "57bbf71771dc1fcb6d8b292afa950794",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-857c8db3-c89b-42fb-882b-f681c7cf4da2": 2
+   },
+   "rules": {}
+  }
  },
  "LM_NewShare_Added_Sysmon_12_13.evtx": {
   "flagged": 0,
@@ -1068,7 +1406,16 @@
   "flagged": 0,
   "md5": "f5c544fb3b39c7afdb1e51d8ee2753e0",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-734f8d9b-42b8-41b2-bcf5-abaf49d5a3c8": 1,
+    "SIGMA-7be5fb68-f9ef-476d-8b51-0256ebece19e": 1
+   },
+   "rules": {}
+  }
  },
  "LM_REMCOM_5145_TargetHost.evtx": {
   "flagged": 0,
@@ -1106,6 +1453,19 @@
   "rows": 34,
   "rules": {
    "WIN-LAT-2": 2
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-12ba6a38-adb3-4d6b-91ba-a7fb248e3199": 2,
+    "SIGMA-4f86b304-3e02-40e3-aa5d-e88a167c9617": 1
+   },
+   "rules": {
+    "SIGMA-35ba1d85-724d-42a3-889f-2e2362bcaf23": 1,
+    "SIGMA-968eef52-9cff-4454-8992-1e74b9cbad6c": 1,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
   }
  },
  "LM_ScheduledTask_ATSVC_target_host.evtx.log": {
@@ -1118,7 +1478,17 @@
   "flagged": 0,
   "md5": "ed3e19e3218e9c034ec22f0c5d783c31",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-941e5c45-cda7-4864-8cea-bbb7458d194a": 2
+   },
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "LM_WMIC_4648_rpcss.evtx.log": {
   "flagged": 0,
@@ -1154,19 +1524,52 @@
   "flagged": 0,
   "md5": "095dbab74821dc6d550a0a4195c895dc",
   "rows": 9,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 3,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-c248c896-e412-4279-8c15-1c558067b6fa": 1,
+    "SIGMA-c30fb093-1109-4dc8-88a8-b30d11c95a5d": 1
+   },
+   "rules": {
+    "SIGMA-05a2ab7e-ce11-4b63-86db-ab32e763e11d": 3,
+    "SIGMA-10c14723-61c7-4c75-92ca-9af245723ad2": 3,
+    "SIGMA-ab9e3b40-0c85-4ba1-aede-455d226fd124": 3,
+    "SIGMA-f1f3bf22-deb2-418d-8cce-e1a45e46a5bd": 1
+   }
+  }
  },
  "LM_regsvc_DirectoryServiceExtPt_Lsass_NTDS_AdamXpn.evtx": {
   "flagged": 0,
   "md5": "c655e4b1afa92106bdd38fb6ca22bc38",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-b3503044-60ce-4bf4-bbcb-e3db98788823": 2
+   }
+  }
  },
  "LM_renamed_psexecsvc_5145.evtx": {
   "flagged": 0,
   "md5": "4f8478211c8b985a70dff88dd6c3364e",
   "rows": 22,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {},
+   "rules": {
+    "SIGMA-52d8b0c6-53d6-439a-9e41-52ad442ad9ad": 4,
+    "SIGMA-c462f537-a1e3-41a6-b5fc-b2c2cef9bf82": 3
+   }
+  }
  },
  "LM_renamed_psexecsvc_5145.evtx.log": {
   "flagged": 0,
@@ -1178,13 +1581,35 @@
   "flagged": 0,
   "md5": "394d423026880824667468f064ef3dcb",
   "rows": 9,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {
+    "SIGMA-f9d091f6-f1c7-4873-a24f-050b4a02b4dd": 1
+   },
+   "rules": {
+    "SIGMA-3a9b8c1e-5b2e-4f7a-9d1c-2a7f3b6e1c55": 4
+   }
+  }
  },
  "LM_sysmon_3_12_13_1_SharpRDP.evtx": {
   "flagged": 0,
   "md5": "88dbfcb7fa3b3a7f4e2a1a06a07b1d90",
   "rows": 38,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 17,
+   "marks": {
+    "SIGMA-178e615d-e666-498b-9630-9ed363038101": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1,
+    "SIGMA-f9d091f6-f1c7-4873-a24f-050b4a02b4dd": 4
+   },
+   "rules": {
+    "SIGMA-3a9b8c1e-5b2e-4f7a-9d1c-2a7f3b6e1c55": 17
+   }
+  }
  },
  "LM_sysmon_3_DCOM_ShellBrowserWindow_ShellWindows.evtx": {
   "flagged": 0,
@@ -1196,31 +1621,91 @@
   "flagged": 0,
   "md5": "451ccf3e4636b2c3d1d31e9cddc838e0",
   "rows": 10,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {
+    "SIGMA-536e2947-3729-478c-9903-745aaffe60d2": 3,
+    "SIGMA-5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 3,
+    "SIGMA-98767d61-b2e8-4d71-b661-e36783ee24c1": 3,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1,
+    "SIGMA-d0d28567-4b9a-45e2-8bbc-fb1b66a1f7f6": 2,
+    "SIGMA-d75d6b6b-adb9-48f7-824b-ac2e786efe1f": 3,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 2
+   },
+   "rules": {
+    "SIGMA-2617e7ed-adb7-40ba-b0f3-8f9945fe6c09": 3,
+    "SIGMA-4a5f5a5e-ac01-474b-9b4e-d61298c9df1d": 1,
+    "SIGMA-61a7697c-cb79-42a8-a2ff-5f0cdfae0130": 1,
+    "SIGMA-d522eca2-2973-4391-a3e0-ef0374321dae": 1,
+    "SIGMA-d7bcd677-645d-4691-a8d4-7a5602b780d1": 2,
+    "SIGMA-e32d4572-9826-4738-b651-95fa63747e8a": 3
+   }
+  }
  },
  "LM_sysmon_remote_task_src_powershell.evtx": {
   "flagged": 0,
   "md5": "90a64edf870549ce04ab420dadb90bf1",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-1f21ec3f-810d-4b0e-8045-322202e22b4b": 2
+   },
+   "rules": {}
+  }
  },
  "LM_tsclient_startup_folder.evtx": {
   "flagged": 0,
   "md5": "7a751997182331c0d16ff0e4046d2414",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-297afac9-5d02-4138-8c58-b977bac60556": 1,
+    "SIGMA-2aa0a6b4-a865-495b-ab51-c28249537b75": 1
+   },
+   "rules": {
+    "SIGMA-52753ea4-b3a0-4365-910d-36cff487b789": 1
+   }
+  }
  },
  "LM_typical_IIS_webshell_sysmon_1_10_traces.evtx": {
   "flagged": 0,
   "md5": "c5b233cc3c6c153c2a10382a504dadf3",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-183e7ea8-ac4b-4c23-9aec-b3dac4e401ac": 2,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 2
+   },
+   "rules": {
+    "SIGMA-8202070f-edeb-4d31-a010-a26c72ac5600": 1
+   }
+  }
  },
  "LM_winrm_exec_sysmon_1_winrshost.evtx": {
   "flagged": 0,
   "md5": "8aa6d42063486f9e6227af3e568772e9",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-79df3f68-dccb-48e9-9171-b75cbc37c51d": 1
+   },
+   "rules": {}
+  }
  },
  "LM_winrm_target_wrmlogs_91_wsmanShellStarted_poorLog.evtx": {
   "flagged": 0,
@@ -1232,13 +1717,41 @@
   "flagged": 0,
   "md5": "0f5f5728e3b4e41f5c2d9043ba883a15",
   "rows": 15,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-949f1ffb-6e85-4f00-ae1e-c3c5b190d605": 1,
+    "SIGMA-d21374ff-f574-44a7-9998-4a8c8bf33d7d": 4,
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 2
+   },
+   "rules": {
+    "SIGMA-8a582fe2-0882-4b89-a82a-da6b2dc32937": 2
+   }
+  }
  },
  "LM_wmiexec_impacket_sysmon_whoami.evtx": {
   "flagged": 0,
   "md5": "a4465d2aea66827a9a7eaf3eb8f2de02",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 3,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-c248c896-e412-4279-8c15-1c558067b6fa": 1,
+    "SIGMA-c30fb093-1109-4dc8-88a8-b30d11c95a5d": 1,
+    "SIGMA-d21374ff-f574-44a7-9998-4a8c8bf33d7d": 3
+   },
+   "rules": {
+    "SIGMA-058f4380-962d-40a5-afce-50207d36d7e2": 3,
+    "SIGMA-10c14723-61c7-4c75-92ca-9af245723ad2": 3,
+    "SIGMA-ab9e3b40-0c85-4ba1-aede-455d226fd124": 3
+   }
+  }
  },
  "LM_xp_cmdshell_MSSQL_Events.evtx": {
   "flagged": 0,
@@ -1271,7 +1784,16 @@
   "flagged": 0,
   "md5": "194b695c37fc1fc78d376ab47572d55f",
   "rows": 10,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-218d2855-2bba-4f61-9c85-81d0ea63ac71": 10,
+    "SIGMA-ebfe73c2-5bc9-4ed9-aaa8-8b54b2b4777d": 10
+   },
+   "rules": {}
+  }
  },
  "Mail_itsupport_Header.txt": {
   "flagged": 0,
@@ -1279,11 +1801,59 @@
   "rows": 0,
   "rules": {}
  },
+ "Microsoft-Windows-PowerShell_Operational.evtx": {
+  "flagged": 0,
+  "md5": "40477d054c18deb731e123fb6e31eac6",
+  "rows": 32503,
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-1139d2e2-84b1-4226-b445-354492eba8ba": 23
+   },
+   "rules": {}
+  }
+ },
+ "Microsoft-Windows-TaskScheduler_Operational.evtx": {
+  "flagged": 0,
+  "md5": "1f83dae35478669aef357fe90594264a",
+  "rows": 1,
+  "rules": {}
+ },
+ "Microsoft-Windows-Windows_Defender_Operational.evtx": {
+  "flagged": 45,
+  "md5": "844e832c9cfa9156efd876b3c2321839",
+  "rows": 8226,
+  "rules": {
+   "WIN-MAL-2": 45
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-2afe6582-e149-11ea-87d0-0242ac130003": 80,
+    "SIGMA-57b649ef-ff42-4fb0-8bf6-62da243a1708": 45,
+    "SIGMA-dd80db93-6ec2-4f4c-a017-ad40da6ffe81": 1
+   },
+   "rules": {}
+  }
+ },
  "NTLM2SelfRelay-med0x2e-security_4624_4688.evtx": {
   "flagged": 0,
   "md5": "e00de1c2a3b65e2560ea3d467135c9a1",
   "rows": 11,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-0badd08f-c6a3-4630-90d3-6875cca440be": 1
+   },
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "NTLM2SelfRelay-med0x2e-security_4624_4688.evtx.log": {
   "flagged": 0,
@@ -1295,7 +1865,15 @@
   "flagged": 0,
   "md5": "42a2d5817a5f56fa3a363422615bd6a5",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-c265cf08-3f99-46c1-8d59-328247057d57": 2
+   },
+   "rules": {}
+  }
  },
  "Network_Service_Guest_added_to_admins_4732.evtx.log": {
   "flagged": 0,
@@ -1313,7 +1891,88 @@
   "flagged": 0,
   "md5": "e7372acb103c54e580874248716d771a",
   "rows": 565,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 43,
+   "marks": {
+    "SIGMA-0955e4e1-c281-4fb9-9ee1-5ee7b4b754d2": 3,
+    "SIGMA-0f06a3a5-6a09-413f-8743-e6cf35561297": 6,
+    "SIGMA-0f920ebe-7aea-4c54-b202-9aa0c609cfe5": 1,
+    "SIGMA-183e7ea8-ac4b-4c23-9aec-b3dac4e401ac": 2,
+    "SIGMA-1c67a717-32ba-409b-a45d-0fb704a73a81": 1,
+    "SIGMA-1e33157c-53b1-41ad-bbcc-780b80b58288": 1,
+    "SIGMA-1f21ec3f-810d-4b0e-8045-322202e22b4b": 3,
+    "SIGMA-1fb76ab8-fa60-4b01-bddd-71e89bf555da": 2,
+    "SIGMA-20f0ee37-5942-4e45-b7d5-c5b5db9df5cd": 3,
+    "SIGMA-213d6a77-3d55-4ce8-ba74-fcfef741974e": 3,
+    "SIGMA-221b251a-357a-49a9-920a-271802777cc0": 2,
+    "SIGMA-24357373-078f-44ed-9ac4-6d334a668a11": 2,
+    "SIGMA-2aa0a6b4-a865-495b-ab51-c28249537b75": 1,
+    "SIGMA-3abd6094-7027-475f-9630-8ab9be7b9725": 1,
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 1,
+    "SIGMA-4f84b697-c9ed-4420-8ab5-e09af5b2345d": 1,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-62510e69-616b-4078-b371-847da438cc03": 2,
+    "SIGMA-7c9340a9-e2ee-4e43-94c5-c54ebbea1006": 4,
+    "SIGMA-7cccd811-7ae9-4ebe-9afd-cb5c406b824b": 1,
+    "SIGMA-81bcb81b-5b1f-474b-b373-52c871aaa7b1": 1,
+    "SIGMA-85ff530b-261d-48c6-a441-facaa2e81e48": 1,
+    "SIGMA-867356ee-9352-41c9-a8f2-1be690d78216": 1,
+    "SIGMA-8d85cf08-bf97-4260-ba49-986a2a65129c": 1,
+    "SIGMA-92626ddd-662c-49e3-ac59-f6535f12d189": 2,
+    "SIGMA-970007b7-ce32-49d0-a4a4-fbef016950bd": 18,
+    "SIGMA-9aa5106d-bce3-4b13-86df-3a20f1d5cf0b": 2,
+    "SIGMA-9ace0707-b560-49b8-b6ca-5148b42f39fb": 1,
+    "SIGMA-a29c1813-ab1f-4dde-b489-330b952e91ae": 2,
+    "SIGMA-a762e74f-4dce-477c-b023-4ed81df600f9": 1,
+    "SIGMA-ab37a6ec-6068-432b-a64e-2c7bf95b1d22": 4,
+    "SIGMA-b17ea6f7-6e90-447e-a799-e6c0a493d6ce": 1,
+    "SIGMA-b236190c-1c61-41e9-84b3-3fe03f6d76b0": 2,
+    "SIGMA-b9cbbc17-d00d-4e3d-a827-b06d03d2380d": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 5,
+    "SIGMA-c7e91a02-d771-4a6d-a700-42587e0b1095": 1,
+    "SIGMA-cbf93e5d-ca6c-4722-8bea-e9119007c248": 9,
+    "SIGMA-ce2c44b5-a6ac-412a-afba-9e89326fa972": 1,
+    "SIGMA-d059842b-6b9d-4ed1-b5c3-5b89143c6ede": 2,
+    "SIGMA-de587dce-915e-4218-aac4-835ca6af6f70": 2,
+    "SIGMA-e4b6d2a7-d8a4-4f19-acbd-943c16d90647": 2,
+    "SIGMA-e62a9f0c-ca1e-46b2-85d5-a6da77f86d1a": 1,
+    "SIGMA-f117933c-980c-4f78-b384-e3d838111165": 1,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 3,
+    "SIGMA-f576a613-2392-4067-9d1a-9345fb58d8d1": 2,
+    "SIGMA-f59c3faf-50f3-464b-9f4c-1b67ab512d99": 1,
+    "SIGMA-f674e36a-4b91-431e-8aef-f8a96c2aca35": 1,
+    "SIGMA-f8ad2e2c-40b6-4117-84d7-20b89896ab23": 1
+   },
+   "rules": {
+    "SIGMA-1444443e-6757-43e4-9ea4-c8fc705f79a2": 2,
+    "SIGMA-21d856f9-9281-4ded-9377-51a1a6e2a432": 2,
+    "SIGMA-24c8392b-aa3c-46b7-a545-43f71657fe98": 1,
+    "SIGMA-2ddef153-167b-4e89-86b6-757a9e65dcac": 2,
+    "SIGMA-327ff235-94eb-4f06-b9de-aaee571324be": 3,
+    "SIGMA-4a0b2c7e-7cb2-495d-8b63-5f268e7bfd67": 1,
+    "SIGMA-4f73421b-5a0b-4bbf-a892-5a7fb99bea66": 1,
+    "SIGMA-5afee48e-67dd-4e03-a783-f74259dcf998": 1,
+    "SIGMA-5b80a791-ad9b-4b75-bcc1-ad4e1e89c200": 2,
+    "SIGMA-60fc936d-2eb0-4543-8a13-911c750a1dfc": 1,
+    "SIGMA-6f0947a4-1c5e-4e0d-8ac7-53159b8f23ca": 2,
+    "SIGMA-8518ed3d-f7c9-4601-a26c-f361a4256a0c": 2,
+    "SIGMA-8bc64091-6875-4881-aaf9-7bd25b5dda08": 1,
+    "SIGMA-8d63dadf-b91b-4187-87b6-34a1114577ea": 1,
+    "SIGMA-92fa78e7-4d39-45f1-91a3-8b23f3f1088d": 1,
+    "SIGMA-b7e2a8d4-74bb-4b78-adc9-3f92af2d4829": 4,
+    "SIGMA-baca5663-583c-45f9-b5dc-ea96a22ce542": 7,
+    "SIGMA-c73124a7-3e89-44a3-bdc1-25fe4df754b1": 2,
+    "SIGMA-c947b146-0abc-4c87-9c64-b17e9d7274a2": 2,
+    "SIGMA-cc9cbe82-7bc0-4ef5-bc23-bbfb83947be7": 1,
+    "SIGMA-e7be6119-fc37-43f0-ad4f-1f3f99be2f9f": 2,
+    "SIGMA-f57f8d16-1f39-4dcb-a604-6c73d9b54b3d": 2,
+    "SIGMA-f5d19838-41b5-476c-98d8-ba8af4929ee2": 2,
+    "SIGMA-fd877b94-9bb5-4191-bb25-d79cbd93c167": 7,
+    "SIGMA-ffa6861c-4461-4f59-8a41-578c39f3f23e": 1
+   }
+  }
  },
  "Persistence_Shime_Microsoft-Windows-Application-Experience_Program-Telemetry_500.evtx": {
   "flagged": 0,
@@ -1331,7 +1990,19 @@
   "flagged": 0,
   "md5": "78e767a761cc5ff71c333c6738f910e8",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-9f22ccd5-a435-453b-af96-bf99cbb594d4": 1,
+    "SIGMA-af4c87ce-bdda-4215-b998-15220772e993": 1,
+    "SIGMA-f62176f3-8128-4faa-bf6c-83261322e5eb": 1
+   },
+   "rules": {
+    "SIGMA-84c174ab-d3ef-481f-9c86-a50d0b8e3edb": 1
+   }
+  }
  },
  "PrivEsc_CVE-2020-1313_Sysmon_13_UScheduler_Cmdline.evtx": {
   "flagged": 0,
@@ -1343,13 +2014,33 @@
   "flagged": 0,
   "md5": "0c7c910250cf2961a049fb2f5a485466",
   "rows": 13,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-178e615d-e666-498b-9630-9ed363038101": 1,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1
+   },
+   "rules": {
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1
+   }
+  }
  },
  "PrivEsc_NetSvc_SessionToken_Retrival_via_localSMB_Auth_5145.evtx": {
   "flagged": 0,
   "md5": "fd46233b75a3eae5a9a085452e16a38a",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-52d8b0c6-53d6-439a-9e41-52ad442ad9ad": 1
+   }
+  }
  },
  "PrivEsc_NetSvc_SessionToken_Retrival_via_localSMB_Auth_5145.evtx.log": {
   "flagged": 0,
@@ -1361,7 +2052,15 @@
   "flagged": 0,
   "md5": "6a6d8b66daaee7afade6c039a88a7ab8",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-4f86b304-3e02-40e3-aa5d-e88a167c9617": 1
+   },
+   "rules": {}
+  }
  },
  "PrivEsc_SeImpersonatePriv_enabled_back_for_upnp_localsvc_4698.evtx.log": {
   "flagged": 0,
@@ -1379,13 +2078,33 @@
   "flagged": 0,
   "md5": "47e50802169ea641cac0204d057a5923",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-178e615d-e666-498b-9630-9ed363038101": 1,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1
+   },
+   "rules": {
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1
+   }
+  }
  },
  "Runas_4624_4648_Webshell_CreateProcessAsUserA.evtx": {
   "flagged": 0,
   "md5": "eb322c299e5a34d200f66c8981656b44",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "Runas_4624_4648_Webshell_CreateProcessAsUserA.evtx.log": {
   "flagged": 0,
@@ -1425,25 +2144,62 @@
   "flagged": 0,
   "md5": "fa9521cab4d384918cd8ace8bac6fc30",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-3f3f3506-1895-401b-9cc3-e86b16e630d0": 1,
+    "SIGMA-a24e5861-c6ca-4fde-a93c-ba9256feddf0": 1
+   },
+   "rules": {}
+  }
  },
  "Sysmon_12_DE_AntiForensics_MRU_DeleteKey.evtx": {
   "flagged": 0,
   "md5": "565d6958abe4461f2fcea2e1929bda7d",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {},
+   "rules": {
+    "SIGMA-3a9b8c1e-5b2e-4f7a-9d1c-2a7f3b6e1c55": 3
+   }
+  }
  },
  "Sysmon_13_1_UACBypass_SDCLTBypass.evtx": {
   "flagged": 0,
   "md5": "9ec83ccafa113fe824de9cb4a6fa7bb0",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-da2738f2-fadb-4394-afa7-0a0674885afa": 1
+   },
+   "rules": {}
+  }
  },
  "Sysmon_13_1_UAC_Bypass_EventVwrBypass.evtx": {
   "flagged": 0,
   "md5": "16bf02152b9a41dd3ccc24a1bcbce8ea",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 1
+   },
+   "rules": {
+    "SIGMA-674202d0-b22a-4af4-ae5f-2eda1f3da1af": 1,
+    "SIGMA-be344333-921d-4c4d-8bb8-e584cf584780": 1,
+    "SIGMA-cbec226f-63d9-4eca-9f52-dfb6652f24df": 1
+   }
+  }
  },
  "Sysmon_13_Local_Admin_Password_Changed.evtx": {
   "flagged": 0,
@@ -1455,145 +2211,430 @@
   "flagged": 0,
   "md5": "10f2fb99c7b0dda536cdfd4d3be7c0bf",
   "rows": 64,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1,
+    "SIGMA-b5de0c9a-6f19-43e0-af4e-55ad01f550af": 18
+   },
+   "rules": {
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1,
+    "SIGMA-e31033fc-33f0-4020-9a16-faf9b31cbf08": 1
+   }
+  }
  },
  "Sysmon_7_dllhijack_cdpsshims_CDPSvc.evtx": {
   "flagged": 0,
   "md5": "2b4ee222b459f4cbe4ac57701b2f9c8a",
   "rows": 13,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-183e7ea8-ac4b-4c23-9aec-b3dac4e401ac": 2,
+    "SIGMA-2a072a96-a086-49fa-bcb5-15cc5a619093": 2,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-57712d7a-679c-4a41-a913-87e7175ae429": 1,
+    "SIGMA-81bcb81b-5b1f-474b-b373-52c871aaa7b1": 1
+   },
+   "rules": {
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1,
+    "SIGMA-e31033fc-33f0-4020-9a16-faf9b31cbf08": 1
+   }
+  }
  },
  "Sysmon_Exec_CompiledHTML.evtx": {
   "flagged": 0,
   "md5": "1d2e99f73395239380a0dfc8fe712bf8",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-2c28c248-7f50-417a-9186-a85b223010ee": 1,
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 1,
+    "SIGMA-68c8acb4-1b60-4890-8e82-3ddf7a6dba84": 1,
+    "SIGMA-9fc51a3c-81b3-4fa7-b35f-7c02cf10fd2d": 1,
+    "SIGMA-fff9d2b7-e11c-4a69-93d3-40ef66189767": 1
+   },
+   "rules": {
+    "SIGMA-4782eb5a-a513-4523-a0ac-f3082b26ac5c": 1,
+    "SIGMA-52cad028-0ff0-4854-8f67-d25dfcbc78b4": 1,
+    "SIGMA-f5d19838-41b5-476c-98d8-ba8af4929ee2": 1
+   }
+  }
  },
  "Sysmon_UACME_22.evtx": {
   "flagged": 0,
   "md5": "75d9293d19af0a2d4b1195b8a40dcf28",
   "rows": 19,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 5,
+   "marks": {
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 2
+   },
+   "rules": {
+    "SIGMA-1ca6bd18-0ba0-44ca-851c-92ed89a61085": 2,
+    "SIGMA-6360757a-d460-456c-8b13-74cf0e60cceb": 2,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_23.evtx": {
   "flagged": 0,
   "md5": "fe0486c9de49592bf4af0189869171f1",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-a743ceba-c771-4d75-97eb-8a90f7f4844c": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_30.evtx": {
   "flagged": 0,
   "md5": "25004e5fcc9b955bf6a538b02f073bee",
   "rows": 11,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-4b991083-3d0e-44ce-8fc4-b254025d8d4b": 2,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 2
+   },
+   "rules": {
+    "SIGMA-6b98b92b-4f00-4f62-b4fe-4d1920215771": 2,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_32.evtx": {
   "flagged": 0,
   "md5": "fd4c9af666422c6d2d4223baac26c89e",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-68578b43-65df-4f81-9a9b-92f32711a951": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_33.evtx": {
   "flagged": 0,
   "md5": "46625f5423dc02e0cbd6739d4cb770cb",
   "rows": 9,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {},
+   "rules": {
+    "SIGMA-152f3630-77c1-4284-bcc0-4cc68ab2f6e7": 1,
+    "SIGMA-46dd5308-4572-4d12-aa43-8938f0184d4f": 1,
+    "SIGMA-7f741dcf-fc22-4759-87b4-9ae8376676a2": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_34.evtx": {
   "flagged": 0,
   "md5": "c13e7b646e5615ff2947d891a4ecce89",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {},
+   "rules": {
+    "SIGMA-724ea201-6514-4f38-9739-e5973c34f49a": 1,
+    "SIGMA-b697e69c-746f-4a86-9f59-7bfff8eab881": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_36_FileCreate.evtx": {
   "flagged": 0,
   "md5": "2700536cc6dd49761323ad1b60de8c2d",
   "rows": 13,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-39ed3c80-e6a1-431b-9df3-911ac53d08a7": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_37_FileCreate.evtx": {
   "flagged": 0,
   "md5": "97bc1380d1c347cd1339ce2d2b3be737",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-39ed3c80-e6a1-431b-9df3-911ac53d08a7": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_38.evtx": {
   "flagged": 0,
   "md5": "ecbc1ebcb331c6958823dfee2353d6e3",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-e52cb31c-10ed-4aea-bcb7-593c9f4a315b": 1
+   },
+   "rules": {
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 2
+   }
+  }
  },
  "Sysmon_UACME_39.evtx": {
   "flagged": 0,
   "md5": "669ca6cb119cba9604d8ccbde4bb3586",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {},
+   "rules": {
+    "SIGMA-05a2ab7e-ce11-4b63-86db-ab32e763e11d": 1,
+    "SIGMA-93a19907-d4f9-4deb-9f91-aac4692776a6": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_41.evtx": {
   "flagged": 0,
   "md5": "613cbb9ecd7f373fcb798eb1686154c3",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-4b991083-3d0e-44ce-8fc4-b254025d8d4b": 1
+   },
+   "rules": {
+    "SIGMA-49f2f17b-b4c8-4172-a68b-d5bf95d05130": 1,
+    "SIGMA-4b60e6f2-bf39-47b4-b4ea-398e33cfe253": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_43.evtx": {
   "flagged": 0,
   "md5": "8d4385ae2b9c15b0e93b45561adb59a7",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-4b991083-3d0e-44ce-8fc4-b254025d8d4b": 1
+   },
+   "rules": {
+    "SIGMA-49f2f17b-b4c8-4172-a68b-d5bf95d05130": 1,
+    "SIGMA-4b60e6f2-bf39-47b4-b4ea-398e33cfe253": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_45.evtx": {
   "flagged": 0,
   "md5": "c8cce2f36d9a77d70415fb96251f9999",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {},
+   "rules": {
+    "SIGMA-152f3630-77c1-4284-bcc0-4cc68ab2f6e7": 1,
+    "SIGMA-503d581c-7df0-4bbe-b9be-5840c0ecc1fc": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_53.evtx": {
   "flagged": 0,
   "md5": "3d0588c7c389090d66a8d4297a6b208b",
   "rows": 14,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-40f9af16-589d-4984-b78d-8c2aec023197": 1,
+    "SIGMA-da2738f2-fadb-4394-afa7-0a0674885afa": 1
+   },
+   "rules": {
+    "SIGMA-46dd5308-4572-4d12-aa43-8938f0184d4f": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1
+   }
+  }
  },
  "Sysmon_UACME_54.evtx": {
   "flagged": 0,
   "md5": "01755be698814618b0d9a91f94509e3b",
   "rows": 10,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 2
+   }
+  }
  },
  "Sysmon_UACME_56.evtx": {
   "flagged": 0,
   "md5": "ef8b8467195c09f0bc396fe7219b8c26",
   "rows": 15,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1
+   },
+   "rules": {
+    "SIGMA-46dd5308-4572-4d12-aa43-8938f0184d4f": 1,
+    "SIGMA-89a9a0e0-f61a-42e5-8957-b1479565a658": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 1,
+    "SIGMA-d797268e-28a9-49a7-b9a8-2f5039011c5c": 1
+   }
+  }
  },
  "Sysmon_UACME_63.evtx": {
   "flagged": 0,
   "md5": "fdbd91358515cc30433d8402d899183c",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-e52cb31c-10ed-4aea-bcb7-593c9f4a315b": 1
+   },
+   "rules": {
+    "SIGMA-05a2ab7e-ce11-4b63-86db-ab32e763e11d": 1
+   }
+  }
  },
  "Sysmon_UACME_64.evtx": {
   "flagged": 0,
   "md5": "47995423a9204ebef016cb05006c4a98",
   "rows": 530,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {},
+   "rules": {
+    "SIGMA-80fc36aa-945e-4181-89f2-2f907ab6775d": 1,
+    "SIGMA-bdd8157d-8e85-4397-bb82-f06cc9c71dbb": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 2
+   }
+  }
  },
  "Sysmon_meterpreter_ReflectivePEInjection_to_notepad_.evtx": {
   "flagged": 0,
   "md5": "6493efcd19d54e3700ce40a88f8c600b",
   "rows": 13,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-a1a144b7-5c9b-4853-a559-2172be8d4a03": 9,
+    "SIGMA-c3a99af4-35a9-4668-879e-c09aeb4f2bdf": 1,
+    "SIGMA-eeb2e3dc-c1f4-40dd-9bd5-149ee465ad50": 9
+   },
+   "rules": {
+    "SIGMA-5bb68627-3198-40ca-b458-49f973db8752": 1,
+    "SIGMA-a7c3d773-caef-227e-a7e7-c2f13c622329": 1,
+    "SIGMA-cbec226f-63d9-4eca-9f52-dfb6652f24df": 1
+   }
+  }
  },
  "Sysmon_uacme_58.evtx": {
   "flagged": 0,
   "md5": "40fbf2a0513cd6c0be4f07cf6903e86e",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {},
+   "rules": {
+    "SIGMA-4b60e6f2-bf39-47b4-b4ea-398e33cfe253": 1,
+    "SIGMA-724ea201-6514-4f38-9739-e5973c34f49a": 1,
+    "SIGMA-966315ef-c5e1-4767-ba25-fce9c8de3660": 1,
+    "SIGMA-d38d2fa4-98e6-4a24-aff1-410b0c9ad177": 2
+   }
+  }
+ },
+ "System.evtx": {
+  "flagged": 0,
+  "md5": "6e8481b85427fd8876ee7ff79ad4a891",
+  "rows": 44016,
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-13cfeb75-9e33-4d04-b0f7-ab8faaa95a59": 28,
+    "SIGMA-882fbe50-d8d7-4e29-ae80-0648a8556866": 1,
+    "SIGMA-acfa2210-0d71-4eeb-b477-afab494d596c": 3,
+    "SIGMA-f512acbf-e662-4903-843e-97ce4652b740": 12
+   },
+   "rules": {}
+  }
  },
  "System_7045_namedpipe_privesc.evtx": {
   "flagged": 0,
   "md5": "015133c9482d3733199cde12e1175fa0",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-26481afe-db26-4228-b264-25a29fe6efc7": 1
+   },
+   "rules": {
+    "SIGMA-1d61f71d-59d2-479e-9562-4ff5f4ead16b": 1,
+    "SIGMA-843544a7-56e0-4dcc-a44f-5cc266dd97d6": 1
+   }
+  }
  },
  "Tunna_rdp_tunnel_IIS.log": {
   "flagged": 0,
@@ -1605,7 +2646,15 @@
   "flagged": 0,
   "md5": "86adc8086af8e695672d8a044909e335",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-3d7679bd-0c00-440c-97b0-3f204273e6c7": 1
+   },
+   "rules": {}
+  }
  },
  "UACME_61_Changepk.evtx": {
   "flagged": 0,
@@ -1619,6 +2668,14 @@
   "rows": 11,
   "rules": {
    "WIN-MAL-2": 11
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-57b649ef-ff42-4fb0-8bf6-62da243a1708": 11
+   },
+   "rules": {}
   }
  },
  "WinEvents.log": {
@@ -1628,6 +2685,27 @@
   "rules": {
    "WIN-HOST-3": 1,
    "WIN-MAL-2": 3
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-00bb5bd5-1379-4fcf-a965-a5b6f7478064": 2,
+    "SIGMA-2afe6582-e149-11ea-87d0-0242ac130003": 1,
+    "SIGMA-39a94fd1-8c9a-4ff6-bf22-c058762f8014": 1,
+    "SIGMA-411742ad-89b0-49cb-a7b0-3971b5c1e0a4": 1,
+    "SIGMA-470ec5fa-7b4e-4071-b200-4c753100f49b": 1,
+    "SIGMA-4f86b304-3e02-40e3-aa5d-e88a167c9617": 1,
+    "SIGMA-5570c4d9-8fdd-4622-965b-403a5a101aa0": 1,
+    "SIGMA-570ae5ec-33dc-427c-b815-db86228ad43e": 2,
+    "SIGMA-57b649ef-ff42-4fb0-8bf6-62da243a1708": 2,
+    "SIGMA-69aeb277-f15f-4d2d-b32a-55e883609563": 1,
+    "SIGMA-83c161b6-ca67-4f33-8ad0-644a0737cf07": 1,
+    "SIGMA-b28e58e4-2a72-4fae-bdee-0fbe904db642": 1,
+    "SIGMA-e9d4ab66-a532-4ef7-a502-66a9e4a34f5d": 1,
+    "SIGMA-e9faba72-4974-4ab2-a4c5-46e25ad59e9b": 2
+   },
+   "rules": {}
   }
  },
  "Win_4985_T1186_Process_Doppelganging.evtx": {
@@ -1642,17 +2720,39 @@
   "rows": 2,
   "rules": {}
  },
+ "Windows_PowerShell.evtx": {
+  "flagged": 0,
+  "md5": "e9b40ed74e91b8ecf55f928f567097a6",
+  "rows": 12199,
+  "rules": {}
+ },
  "Zerologon_CVE-2020-1472_DFIR_System_NetLogon_Error_EventID_5805.evtx": {
   "flagged": 0,
   "md5": "d7aea8552eeb2d4b1c17fd0ea363953d",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-100ef69e-3327-481c-8e5c-6d80d9507556": 1
+   }
+  }
  },
  "Zerologon_VoidSec_CVE-2020-1472_4626_LT3_Anonym_follwedby_4742_DC_Anony_DC.evtx": {
   "flagged": 0,
   "md5": "1b50a25a501bcfffa5b590c54cc08d9b",
   "rows": 9,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "Zerologon_VoidSec_CVE-2020-1472_4626_LT3_Anonym_follwedby_4742_DC_Anony_DC.evtx.log": {
   "flagged": 0,
@@ -1686,7 +2786,20 @@
   "flagged": 0,
   "md5": "21a16b8754da1dccbf0e63c285581c22",
   "rows": 11,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d": 1,
+    "SIGMA-96036718-71cc-4027-a538-d1587e0006a7": 1
+   },
+   "rules": {
+    "SIGMA-16c37b52-b141-42a5-a3ea-bbe098444397": 1,
+    "SIGMA-7a3b6d1f-4a2b-4f8c-9d7e-e9f8cbf21a35": 2,
+    "SIGMA-f17211f1-1f24-4d0c-829f-31e28dc93cdd": 1
+   }
+  }
  },
  "auth.log": {
   "flagged": 58,
@@ -1717,7 +2830,20 @@
   "flagged": 0,
   "md5": "bae10055162921bb5516f9811e46ca27",
   "rows": 33,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-0f920ebe-7aea-4c54-b202-9aa0c609cfe5": 2,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 2,
+    "SIGMA-87911521-7098-470b-a459-9a57fc80bdfd": 1,
+    "SIGMA-8ac03a65-6c84-4116-acad-dc1558ff7a77": 2,
+    "SIGMA-a762e74f-4dce-477c-b023-4ed81df600f9": 1,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 1
+   },
+   "rules": {}
+  }
  },
  "bits_openvpn.evtx": {
   "flagged": 0,
@@ -1759,19 +2885,46 @@
   "flagged": 0,
   "md5": "5ac026e6c8c43626e7b5803988e62f43",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-fecfd1a1-cc78-4313-a1ea-2ee2e8ec27a7": 1
+   }
+  }
  },
  "de_hiding_files_via_attrib_cmdlet.evtx": {
   "flagged": 0,
   "md5": "177dc2f7fc8d0102ef875eb8fba07d32",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-4281cb20-2994-4580-aa63-c8b86d019934": 1
+   },
+   "rules": {}
+  }
  },
  "de_portforward_netsh_rdp_sysmon_13_1.evtx": {
   "flagged": 0,
   "md5": "1e06a48bbad7982f9852b186fa3f1af0",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-322ed9ec-fcab-4f67-9a34-e7c6aef43614": 1,
+    "SIGMA-a54f842a-3713-4b45-8c84-5f136fdebd3c": 1
+   },
+   "rules": {
+    "SIGMA-782d6f3e-4c5d-4b8c-92a3-1d05fed72e63": 1
+   }
+  }
  },
  "de_powershell_execpolicy_changed_sysmon_13.evtx": {
   "flagged": 0,
@@ -1783,13 +2936,31 @@
   "flagged": 0,
   "md5": "932e8d3fa9e1738eec60f4b35aa79eed",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-1a5c46e9-f32f-42f7-b2bc-6e9084db7fbf": 1
+   }
+  }
  },
  "de_unmanagedpowershell_psinject_sysmon_7_8_10.evtx": {
   "flagged": 0,
   "md5": "fe2babcb7f9baee8e0b85b584f1c0aa5",
   "rows": 84,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-092bc4b9-3d1d-43b4-a6b4-8c8acd83522f": 1,
+    "SIGMA-a1a144b7-5c9b-4853-a559-2172be8d4a03": 82,
+    "SIGMA-eeb2e3dc-c1f4-40dd-9bd5-149ee465ad50": 82
+   },
+   "rules": {}
+  }
  },
  "dfir_rdpsharp_target_RdpCoreTs_168_68_131.evtx": {
   "flagged": 0,
@@ -1807,7 +2978,19 @@
   "flagged": 0,
   "md5": "d6579a744c4ef45a0c547dda91a1a296",
   "rows": 63,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 7,
+   "marks": {
+    "SIGMA-12ba6a38-adb3-4d6b-91ba-a7fb248e3199": 8
+   },
+   "rules": {
+    "SIGMA-35ba1d85-724d-42a3-889f-2e2362bcaf23": 6,
+    "SIGMA-968eef52-9cff-4454-8992-1e74b9cbad6c": 6,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "dicovery_4661_net_group_domain_admins_target.evtx.log": {
   "flagged": 0,
@@ -1819,13 +3002,31 @@
   "flagged": 0,
   "md5": "357574786f5c6f4f2364bc0a39a920fc",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-72cd00d6-490c-4650-86ff-1d11f491daa1": 1
+   },
+   "rules": {
+    "SIGMA-7aaaf4b8-e47c-4295-92ee-6ed40a6f60c8": 1
+   }
+  }
  },
  "discovery_bloodhound.evtx": {
   "flagged": 0,
   "md5": "5d7fcba0cbb0a1d688f1fd791b73386e",
   "rows": 10,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "discovery_bloodhound.evtx.log": {
   "flagged": 0,
@@ -1855,13 +3056,29 @@
   "flagged": 0,
   "md5": "247b44a2533ffcde754588e6c2f4cea5",
   "rows": 52,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-678dfc63-fefb-47a5-a04c-26bcf8cc9f65": 1
+   },
+   "rules": {}
+  }
  },
  "discovery_psloggedon.evtx": {
   "flagged": 0,
   "md5": "2a2ac935f72a78fca0b8d4dcd39e4a0e",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "discovery_psloggedon.evtx.log": {
   "flagged": 0,
@@ -1879,13 +3096,39 @@
   "flagged": 0,
   "md5": "ff30095450f37c5aa11eda668bbf50d9",
   "rows": 40,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 19,
+   "marks": {
+    "SIGMA-d0d28567-4b9a-45e2-8bbc-fb1b66a1f7f6": 1,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 1,
+    "SIGMA-fb843269-508c-4b76-8b8d-88679db22ce7": 1
+   },
+   "rules": {
+    "SIGMA-2d3cdeec-c0db-45b4-aa86-082f7eb75701": 18,
+    "SIGMA-4ebc877f-4612-45cb-b3a5-8e3834db36c9": 1,
+    "SIGMA-754ed792-634f-40ae-b3bc-e0448d33f695": 1,
+    "SIGMA-8202070f-edeb-4d31-a010-a26c72ac5600": 1,
+    "SIGMA-b9d9cc83-380b-4ba3-8d8f-60c0e7e2930c": 1,
+    "SIGMA-bed2a484-9348-4143-8a8a-b801c979301c": 1,
+    "SIGMA-ca2092a1-c273-4878-9b4b-0d60115bf5ea": 1
+   }
+  }
  },
  "discovery_sysmon_3_Invoke_UserHunter_SourceMachine.evtx": {
   "flagged": 0,
   "md5": "f78d27beed121204d407b41d20e929ca",
   "rows": 9,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-1f21ec3f-810d-4b0e-8045-322202e22b4b": 2
+   },
+   "rules": {}
+  }
  },
  "dst10-8-2-37.csv": {
   "flagged": 82,
@@ -1917,7 +3160,18 @@
   "flagged": 0,
   "md5": "2dc66bee3e582babf3163eed438ec3a0",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1
+   },
+   "rules": {
+    "SIGMA-b8fd0e93-ff58-4cbd-8f48-1c114e342e62": 1,
+    "SIGMA-efdd8dd5-cee8-4e59-9390-7d4d5e4dd6f6": 2
+   }
+  }
  },
  "esxupdate.log": {
   "flagged": 0,
@@ -1935,13 +3189,30 @@
   "flagged": 0,
   "md5": "d912ae66efed41a90cc48cca1ba43bb4",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-7dc2dedd-7603-461a-bc13-15803d132355": 1,
+    "SIGMA-a24e5861-c6ca-4fde-a93c-ba9256feddf0": 1
+   },
+   "rules": {}
+  }
  },
  "evasion_codeinj_odzhan_spoolsv_sysmon_10_1.evtx": {
   "flagged": 0,
   "md5": "4c31ff9fad088f0bebc26333d043f218",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-a24e5861-c6ca-4fde-a93c-ba9256feddf0": 1
+   },
+   "rules": {}
+  }
  },
  "evasion_execution_imageload_wuauclt_lolbas.evtx": {
   "flagged": 0,
@@ -1953,7 +3224,15 @@
   "flagged": 0,
   "md5": "82350f689ef2f9f96e8c605fb7450afa",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-20f0ee37-5942-4e45-b7d5-c5b5db9df5cd": 1
+   },
+   "rules": {}
+  }
  },
  "eventlog-analyzer-search-export.csv": {
   "flagged": 2,
@@ -1979,7 +3258,15 @@
   "flagged": 0,
   "md5": "86f46e3459f19d440e480ee2f3c1a545",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-f3a98ce4-6164-4dd4-867c-4d83de7eca51": 1
+   },
+   "rules": {}
+  }
  },
  "exec_emotet_ps_800_get-item.evtx": {
   "flagged": 0,
@@ -2015,49 +3302,128 @@
   "flagged": 0,
   "md5": "1b328dfe73dd9747ba921414c5947068",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-9e50a8b3-dd05-4eb8-9153-bdb6b79d50b0": 1
+   },
+   "rules": {}
+  }
  },
  "exec_persist_rundll32_mshta_scheduledtask_sysmon_1_3_11.evtx": {
   "flagged": 0,
   "md5": "d3e8f074d8c6266b9199ab5b4e03124c",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {
+    "SIGMA-2c28c248-7f50-417a-9186-a85b223010ee": 2,
+    "SIGMA-92626ddd-662c-49e3-ac59-f6535f12d189": 1,
+    "SIGMA-a762e74f-4dce-477c-b023-4ed81df600f9": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1,
+    "SIGMA-c3a99af4-35a9-4668-879e-c09aeb4f2bdf": 1
+   },
+   "rules": {
+    "SIGMA-3a6586ad-127a-4d3b-a677-1e6eacdf8fde": 2,
+    "SIGMA-4782eb5a-a513-4523-a0ac-f3082b26ac5c": 2,
+    "SIGMA-b98d0db6-511d-45de-ad02-e82a98729620": 1,
+    "SIGMA-cc7abbd0-762b-41e3-8a26-57ad50d2eea3": 1,
+    "SIGMA-f2c64357-b1d2-41b7-849f-34d2682c0fad": 1
+   }
+  }
  },
  "exec_sysmon_1_11_lolbin_rundll32_openurl_FileProtocolHandler.evtx": {
   "flagged": 0,
   "md5": "1c76586d7edfe55775a324fbfd4345b3",
   "rows": 11,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 5
+   },
+   "rules": {
+    "SIGMA-3a6586ad-127a-4d3b-a677-1e6eacdf8fde": 1,
+    "SIGMA-e32f92d1-523e-49c3-9374-bdb13b46a3ba": 1
+   }
+  }
  },
  "exec_sysmon_1_11_lolbin_rundll32_shdocvw_openurl.evtx": {
   "flagged": 0,
   "md5": "c38dcaaf94009addee942cb4d999a551",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-a762e74f-4dce-477c-b023-4ed81df600f9": 1,
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 1
+   },
+   "rules": {}
+  }
  },
  "exec_sysmon_1_11_lolbin_rundll32_zipfldr_RouteTheCall.evtx": {
   "flagged": 0,
   "md5": "d38785f694aeb2a07c00a39128ecdf90",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 1
+   },
+   "rules": {}
+  }
  },
  "exec_sysmon_1_7_jscript9_defense_evasion.evtx": {
   "flagged": 0,
   "md5": "0f5f30f580d89975a97e575f921d86f6",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-867356ee-9352-41c9-a8f2-1be690d78216": 1,
+    "SIGMA-b236190c-1c61-41e9-84b3-3fe03f6d76b0": 1
+   },
+   "rules": {}
+  }
  },
  "exec_sysmon_1_ftp.evtx": {
   "flagged": 0,
   "md5": "ccc52d03dd18161e607039a70c44716c",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-06b401f4-107c-4ff9-947f-9ec1e7649f1e": 1
+   },
+   "rules": {}
+  }
  },
  "exec_sysmon_1_lolbin_pcalua.evtx": {
   "flagged": 0,
   "md5": "d556baa022ba4a13d91da6305b399ce8",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-0955e4e1-c281-4fb9-9ee1-5ee7b4b754d2": 1
+   },
+   "rules": {}
+  }
  },
  "exec_sysmon_1_lolbin_renamed_regsvr32_scrobj.evtx": {
   "flagged": 0,
@@ -2069,37 +3435,96 @@
   "flagged": 0,
   "md5": "ea1294fdaf1013270e14bd9e9fe3d447",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 1
+   },
+   "rules": {}
+  }
  },
  "exec_sysmon_1_rundll32_pcwutl_LaunchApplication.evtx": {
   "flagged": 0,
   "md5": "2cc3fc58578662bed716b07f9d17a5bd",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-9386d78a-7207-4048-9c9f-a93a7c2d1c05": 1,
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 1
+   },
+   "rules": {}
+  }
  },
  "exec_sysmon_lobin_regsvr32_sct.evtx": {
   "flagged": 0,
   "md5": "6f5ee2b7f59e9bd838b89ab8f98fa695",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-4b991083-3d0e-44ce-8fc4-b254025d8d4b": 1,
+    "SIGMA-867356ee-9352-41c9-a8f2-1be690d78216": 1,
+    "SIGMA-ab37a6ec-6068-432b-a64e-2c7bf95b1d22": 1,
+    "SIGMA-b236190c-1c61-41e9-84b3-3fe03f6d76b0": 1,
+    "SIGMA-c7e91a02-d771-4a6d-a700-42587e0b1095": 1
+   },
+   "rules": {}
+  }
  },
  "exec_wmic_xsl_internet_sysmon_3_1_11.evtx": {
   "flagged": 0,
   "md5": "efbd1421c33144cdb772af9471599cb5",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-221b251a-357a-49a9-920a-271802777cc0": 1
+   },
+   "rules": {
+    "SIGMA-8d63dadf-b91b-4187-87b6-34a1114577ea": 1
+   }
+  }
  },
  "execution_evasion_visual_studio_prebuild_event.evtx": {
   "flagged": 0,
   "md5": "5def2204a77d39eb776f57df7df3b525",
   "rows": 29,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-65236ec7-ace0-4f0c-82fd-737b04fd4dcb": 1,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 1
+   },
+   "rules": {}
+  }
  },
  "faxhell_sysmon_7_1_18_3_bindshell_dllhijack.evtx": {
   "flagged": 0,
   "md5": "4b5e4d9cc294f4f62618e8e486cef038",
   "rows": 10,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1
+   },
+   "rules": {
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1,
+    "SIGMA-828af599-4c53-4ed2-ba4a-a9f835c434ea": 1
+   }
+  }
  },
  "fdm.log": {
   "flagged": 0,
@@ -2132,6 +3557,14 @@
   "rules": {
    "WIN-AUTH-1": 2,
    "WIN-BRUTE-2": 9
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
   }
  },
  "kerberos_pwd_spray_4771.evtx.log": {
@@ -2150,19 +3583,50 @@
   "flagged": 0,
   "md5": "1f4923398ae495a3a5623c9287080234",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-2aa0a6b4-a865-495b-ab51-c28249537b75": 1
+   },
+   "rules": {}
+  }
  },
  "lm_remote_registry_sysmon_1_13_3.evtx": {
   "flagged": 0,
   "md5": "408212c9becc8fa1cb608c28eb47430b",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d": 1,
+    "SIGMA-20f0ee37-5942-4e45-b7d5-c5b5db9df5cd": 1,
+    "SIGMA-96036718-71cc-4027-a538-d1587e0006a7": 1
+   },
+   "rules": {}
+  }
  },
  "lm_sysmon_18_remshell_over_namedpipe.evtx": {
   "flagged": 0,
   "md5": "4c99d62bdabf3fbcf4c8965bec59ac03",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1,
+    "SIGMA-c248c896-e412-4279-8c15-1c558067b6fa": 1,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 1
+   },
+   "rules": {
+    "SIGMA-fe3ac066-98bb-432a-b1e7-a5229cb39d4a": 1
+   }
+  }
  },
  "log.csv": {
   "flagged": 0,
@@ -2388,7 +3852,25 @@
   "flagged": 0,
   "md5": "32453bd3afa853a96ef172b102d550d3",
   "rows": 11,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d": 1,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d": 1,
+    "SIGMA-96036718-71cc-4027-a538-d1587e0006a7": 1,
+    "SIGMA-c3a99af4-35a9-4668-879e-c09aeb4f2bdf": 1,
+    "SIGMA-cea72823-df4d-4567-950c-0b579eaf0846": 1
+   },
+   "rules": {
+    "SIGMA-1228c958-e64e-4e71-92ad-7d429f4138ba": 1,
+    "SIGMA-1bf0ba65-9a39-42a2-9271-31d31bf2f0bf": 1,
+    "SIGMA-4aa6040b-3f28-44e3-a769-9208e5feb5ec": 1,
+    "SIGMA-bfd34392-c591-4009-b938-9fd985a28b85": 1
+   }
+  }
  },
  "maldoc_mshta_via_shellbrowserwind_rundll32.evtx.log": {
   "flagged": 0,
@@ -2406,7 +3888,15 @@
   "flagged": 0,
   "md5": "a51d35dd5e9c87de78b74145b7a9a857",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "net_share_drive_5142.evtx.log": {
   "flagged": 0,
@@ -2474,7 +3964,62 @@
   "flagged": 0,
   "md5": "63339e2428faf52e563f575c8362b30b",
   "rows": 122,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 18,
+   "marks": {
+    "SIGMA-19b08b1c-861d-4e75-a1ef-ea0c1baf202b": 1,
+    "SIGMA-1e33157c-53b1-41ad-bbcc-780b80b58288": 3,
+    "SIGMA-1f21ec3f-810d-4b0e-8045-322202e22b4b": 1,
+    "SIGMA-1fb76ab8-fa60-4b01-bddd-71e89bf555da": 2,
+    "SIGMA-221b251a-357a-49a9-920a-271802777cc0": 1,
+    "SIGMA-2c28c248-7f50-417a-9186-a85b223010ee": 2,
+    "SIGMA-322ed9ec-fcab-4f67-9a34-e7c6aef43614": 2,
+    "SIGMA-3b6ab547-8ec2-4991-b9d2-2b06702a48d7": 1,
+    "SIGMA-536e2947-3729-478c-9903-745aaffe60d2": 2,
+    "SIGMA-56321594-9087-49d9-bf10-524fe8479452": 1,
+    "SIGMA-576426ad-0131-4001-ae01-be175da0c108": 1,
+    "SIGMA-867356ee-9352-41c9-a8f2-1be690d78216": 1,
+    "SIGMA-92626ddd-662c-49e3-ac59-f6535f12d189": 1,
+    "SIGMA-9aa5106d-bce3-4b13-86df-3a20f1d5cf0b": 1,
+    "SIGMA-9fc51a3c-81b3-4fa7-b35f-7c02cf10fd2d": 2,
+    "SIGMA-a54f842a-3713-4b45-8c84-5f136fdebd3c": 2,
+    "SIGMA-a762e74f-4dce-477c-b023-4ed81df600f9": 1,
+    "SIGMA-ab37a6ec-6068-432b-a64e-2c7bf95b1d22": 1,
+    "SIGMA-b236190c-1c61-41e9-84b3-3fe03f6d76b0": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 34,
+    "SIGMA-c3a99af4-35a9-4668-879e-c09aeb4f2bdf": 2,
+    "SIGMA-c7e91a02-d771-4a6d-a700-42587e0b1095": 1,
+    "SIGMA-c90362e0-2df3-4e61-94fe-b37615814cb1": 1,
+    "SIGMA-cdc8da7d-c303-42f8-b08c-b4ab47230263": 1,
+    "SIGMA-cdf05894-89e7-4ead-b2b0-0a5f97a90f2f": 1,
+    "SIGMA-d042284c-a296-4988-9be5-f424fadcc28c": 1,
+    "SIGMA-d059842b-6b9d-4ed1-b5c3-5b89143c6ede": 1,
+    "SIGMA-d21374ff-f574-44a7-9998-4a8c8bf33d7d": 1,
+    "SIGMA-d3c3861d-c504-4c77-ba55-224ba82d0118": 1,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 2
+   },
+   "rules": {
+    "SIGMA-0dba975d-a193-4ed1-a067-424df57570d1": 2,
+    "SIGMA-1cf465a1-2609-4c15-9b66-c32dbe4bfd67": 1,
+    "SIGMA-24c8392b-aa3c-46b7-a545-43f71657fe98": 1,
+    "SIGMA-2ddef153-167b-4e89-86b6-757a9e65dcac": 1,
+    "SIGMA-42a5f1e7-9603-4f6d-97ae-3f37d130d794": 1,
+    "SIGMA-4782eb5a-a513-4523-a0ac-f3082b26ac5c": 4,
+    "SIGMA-5b80a791-ad9b-4b75-bcc1-ad4e1e89c200": 1,
+    "SIGMA-67f113fa-e23d-4271-befa-30113b3e08b1": 1,
+    "SIGMA-6f0947a4-1c5e-4e0d-8ac7-53159b8f23ca": 1,
+    "SIGMA-737e618a-a410-49b5-bec3-9e55ff7fbc15": 2,
+    "SIGMA-8518ed3d-f7c9-4601-a26c-f361a4256a0c": 1,
+    "SIGMA-85b0b087-eddf-4a2b-b033-d771fa2b9775": 2,
+    "SIGMA-8d63dadf-b91b-4187-87b6-34a1114577ea": 1,
+    "SIGMA-b98d0db6-511d-45de-ad02-e82a98729620": 1,
+    "SIGMA-cc9cbe82-7bc0-4ef5-bc23-bbfb83947be7": 1,
+    "SIGMA-e66779cc-383e-4224-a3a4-267eeb585c40": 1,
+    "SIGMA-f0540f7e-2db3-4432-b9e0-3965486744bc": 1
+   }
+  }
  },
  "persist_bitsadmin_Microsoft-Windows-Bits-Client-Operational.evtx": {
   "flagged": 0,
@@ -2486,37 +4031,91 @@
   "flagged": 0,
   "md5": "3dc2e1d50d20cfb3d571e927a5194fd9",
   "rows": 19,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-9637e8a5-7131-4f7f-bdc7-2b05d8670c43": 1
+   },
+   "rules": {}
+  }
  },
  "persist_turla_outlook_backdoor_comhijack.evtx": {
   "flagged": 0,
   "md5": "5656ab58b05c41f9e50f77ad7ed886c5",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-9b0f8a61-91b2-464f-aceb-0527e0a45020": 1
+   },
+   "rules": {}
+  }
  },
  "persist_valid_account_guest_rid_hijack.evtx": {
   "flagged": 0,
   "md5": "3cc154761dfc18762e0298a9a6822696",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-25ffa65d-76d8-4da5-a832-3f2b0136e133": 1,
+    "SIGMA-c7da8edc-49ae-45a2-9e61-9fd860e4e73d": 1
+   },
+   "rules": {}
+  }
  },
  "persistence_SilentProcessExit_ImageHijack_sysmon_13_1.evtx": {
   "flagged": 0,
   "md5": "7a5942d00a3b0771e58b9c729056e1b1",
   "rows": 13,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-cbf93e5d-ca6c-4722-8bea-e9119007c248": 1
+   },
+   "rules": {
+    "SIGMA-36803969-5421-41ec-b92f-8500f79c23b0": 3
+   }
+  }
  },
  "persistence_accessibility_features_osk_sysmon1.evtx": {
   "flagged": 0,
   "md5": "4aededb78553804ae5ef0d4dd42ccf01",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-8de1cbe8-d6f5-496d-8237-5f44a721c7a0": 1
+   },
+   "rules": {
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1
+   }
+  }
  },
  "persistence_hidden_local_account_sysmon.evtx": {
   "flagged": 0,
   "md5": "bba715b95825a947e39c7febd11ce07e",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-460479f3-80b7-42da-9c43-2cc1d54dbccd": 1
+   }
+  }
  },
  "persistence_pendingGPO_sysmon_13.evtx": {
   "flagged": 0,
@@ -2528,7 +4127,18 @@
   "flagged": 0,
   "md5": "d33a8b638417b980cd9076c245e591c5",
   "rows": 10,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-17d619c1-e020-4347-957e-1d1207455c93": 1,
+    "SIGMA-32e19d25-4aed-4860-a55a-be99cb0bf7ed": 2
+   },
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "persistence_security_dcshadow_4742.evtx.log": {
   "flagged": 0,
@@ -2540,31 +4150,98 @@
   "flagged": 0,
   "md5": "34f362d064b94cd56428a75424cd9790",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-9c226817-8dc9-46c2-a58d-66655aafd7dc": 1
+   }
+  }
  },
  "persistence_sysmon_11_13_1_shime_appfix.evtx": {
   "flagged": 0,
   "md5": "b23944dd6af3aa29ce4513264f950cd4",
   "rows": 237,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 27,
+   "marks": {
+    "SIGMA-1e59c230-6670-45bf-83b0-98903780607e": 4,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-517490a7-115a-48c6-8862-1a481504d5a8": 11,
+    "SIGMA-5df86130-4e95-4a54-90f7-26541b40aec2": 2,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 4,
+    "SIGMA-8de1cbe8-d6f5-496d-8237-5f44a721c7a0": 1,
+    "SIGMA-a762e74f-4dce-477c-b023-4ed81df600f9": 4,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 19,
+    "SIGMA-dfb5b4e8-91d0-4291-b40a-e3b0d3942c45": 30,
+    "SIGMA-ee63c85c-6d51-4d12-ad09-04e25877a947": 6,
+    "SIGMA-fdfcbd78-48f1-4a4b-90ac-d82241e368c5": 2
+   },
+   "rules": {
+    "SIGMA-2617e7ed-adb7-40ba-b0f3-8f9945fe6c09": 22,
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1,
+    "SIGMA-d522eca2-2973-4391-a3e0-ef0374321dae": 4
+   }
+  }
  },
  "phish_windows_credentials_powershell_scriptblockLog_4104.evtx": {
   "flagged": 0,
   "md5": "aeef1e25b9ec43808e8fa37d2f078cc5",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-4096a49c-7de4-4da0-a230-c66ccd56ea5a": 1,
+    "SIGMA-b29a93fb-087c-4b5b-a84d-ee3309e69d08": 1,
+    "SIGMA-df69cb1d-b891-4cd9-90c7-d617d90100ce": 1
+   },
+   "rules": {
+    "SIGMA-ca8b77a9-d499-4095-b793-5d5f330d450e": 1
+   }
+  }
  },
  "powercat_revShell_sysmon_1_3.evtx": {
   "flagged": 0,
   "md5": "c331a01474a4a4587471981a739452d3",
   "rows": 9,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-0ef56343-059e-4cb6-adc1-4c3c967c5e46": 1,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1
+   },
+   "rules": {}
+  }
  },
  "ppl_bypass_ppldump_knowdll_hijack_sysmon_security.evtx": {
   "flagged": 0,
   "md5": "9bb7d22e432d2cefd497459a3f31148b",
   "rows": 20,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {
+    "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d": 1,
+    "SIGMA-3a525307-d100-48ae-b3b9-0964699d7f97": 1,
+    "SIGMA-5ef9853e-4d0e-4a70-846f-a9ca37d876da": 1,
+    "SIGMA-96036718-71cc-4027-a538-d1587e0006a7": 2
+   },
+   "rules": {
+    "SIGMA-24e3e58a-646b-4b50-adef-02ef935b9fc8": 1,
+    "SIGMA-3a9b8c1e-5b2e-4f7a-9d1c-2a7f3b6e1c55": 1,
+    "SIGMA-a5a2d357-1ab8-4675-a967-ef9990a59391": 1,
+    "SIGMA-ffa6861c-4461-4f59-8a41-578c39f3f23e": 2
+   }
+  }
  },
  "ppl_bypass_ppldump_knowdll_hijack_sysmon_security.evtx.log": {
   "flagged": 0,
@@ -2576,7 +4253,15 @@
   "flagged": 0,
   "md5": "bb069ea6f207a0a2f36c372ca83273cb",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-749c9f5e-b353-4b90-a9c1-05243357ca4b": 1
+   }
+  }
  },
  "privesc_KrbRelayUp_windows_4624.evtx.log": {
   "flagged": 0,
@@ -2594,49 +4279,148 @@
   "flagged": 0,
   "md5": "2efd5ddb1df8710ab7706332b687e435",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d": 1,
+    "SIGMA-178e615d-e666-498b-9630-9ed363038101": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1,
+    "SIGMA-96036718-71cc-4027-a538-d1587e0006a7": 1
+   },
+   "rules": {
+    "SIGMA-24e3e58a-646b-4b50-adef-02ef935b9fc8": 1,
+    "SIGMA-637f689e-b4a5-4a86-be0e-0100a0a33ba2": 2
+   }
+  }
  },
  "privesc_rotten_potato_from_webshell_metasploit_sysmon_1_8_3.evtx": {
   "flagged": 0,
   "md5": "9da3daaa6ff4421d91153df022e036cb",
   "rows": 13,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 8,
+   "marks": {
+    "SIGMA-a1a144b7-5c9b-4853-a559-2172be8d4a03": 2,
+    "SIGMA-a24e5861-c6ca-4fde-a93c-ba9256feddf0": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1
+   },
+   "rules": {
+    "SIGMA-02d1d718-dd13-41af-989d-ea85c7fab93f": 1,
+    "SIGMA-e81528db-fc02-45e8-8e98-4e84aba1f10b": 7
+   }
+  }
  },
  "privesc_seimpersonate_tosys_spoolsv_sysmon_17_18.evtx": {
   "flagged": 0,
   "md5": "95a409e82c2f873ecaa765404d4a1036",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-178e615d-e666-498b-9630-9ed363038101": 1,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 1
+   },
+   "rules": {
+    "SIGMA-637f689e-b4a5-4a86-be0e-0100a0a33ba2": 2,
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1
+   }
+  }
  },
  "privesc_spoolfool_mahdihtm_sysmon_1_11_7_13.evtx": {
   "flagged": 0,
   "md5": "1ac9d1ae05d8fe81984b3467dc462bd8",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-02fb90de-c321-4e63-a6b9-25f4b03dfd14": 1
+   },
+   "rules": {}
+  }
  },
  "privesc_spoolsv_spl_file_write_sysmon11.evtx": {
   "flagged": 0,
   "md5": "add8f317d598059e057e0ab9ea36ffd0",
   "rows": 37,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 7,
+   "marks": {
+    "SIGMA-41ca393d-538c-408a-ac27-cf1e038be80c": 1,
+    "SIGMA-4b991083-3d0e-44ce-8fc4-b254025d8d4b": 1,
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 4,
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 3
+   },
+   "rules": {
+    "SIGMA-396f6630-f3ac-44e3-bfc8-1b161bc00c4e": 1,
+    "SIGMA-69bd9b97-2be2-41b6-9816-fb08757a4d1a": 4,
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1,
+    "SIGMA-d522eca2-2973-4391-a3e0-ef0374321dae": 1
+   }
+  }
  },
  "privesc_sysmon_cve_20201030_spooler.evtx": {
   "flagged": 0,
   "md5": "7446c77a19495a3194ebc23a37825b4b",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-02fb90de-c321-4e63-a6b9-25f4b03dfd14": 1,
+    "SIGMA-9637e8a5-7131-4f7f-bdc7-2b05d8670c43": 1
+   },
+   "rules": {}
+  }
  },
  "privesc_unquoted_svc_sysmon_1_11.evtx": {
   "flagged": 0,
   "md5": "0ae09d6c275cef76f678359807fa6bf9",
   "rows": 87,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d": 1,
+    "SIGMA-297afac9-5d02-4138-8c58-b977bac60556": 1,
+    "SIGMA-36480ae1-a1cb-4eaa-a0d6-29801d7e9142": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1,
+    "SIGMA-7cccd811-7ae9-4ebe-9afd-cb5c406b824b": 1,
+    "SIGMA-96036718-71cc-4027-a538-d1587e0006a7": 1
+   },
+   "rules": {
+    "SIGMA-8c3c76ca-8f8b-4b1d-aaf3-81aebcd367c9": 1,
+    "SIGMA-d522eca2-2973-4391-a3e0-ef0374321dae": 1
+   }
+  }
  },
  "privexchange_dirkjan.evtx": {
   "flagged": 0,
   "md5": "0ee83bb0cb042b1d33634ad130ae3d94",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-2c99737c-585d-4431-b61a-c911d86ff32f": 2
+   }
+  }
  },
  "privexchange_dirkjan.evtx.log": {
   "flagged": 0,
@@ -2648,7 +4432,15 @@
   "flagged": 0,
   "md5": "e5463f86c7b05f88c842e36ce5187c54",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d0d2f720-d14f-448d-8242-51ff396a334e": 1
+   }
+  }
  },
  "psh_lsass_memory_dump_comsvcs_2020-10-18T19500924.json": {
   "flagged": 0,
@@ -2669,6 +4461,19 @@
   "rules": {
    "WIN-LAT-1": 8,
    "WIN-LAT-3": 1
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-0badd08f-c6a3-4630-90d3-6875cca440be": 14,
+    "SIGMA-3a525307-d100-48ae-b3b9-0964699d7f97": 1
+   },
+   "rules": {
+    "SIGMA-69ca12af-119d-44ed-b50f-a47af0ebc364": 1,
+    "SIGMA-78d5cab4-557e-454f-9fb9-a222bd0d5edc": 1,
+    "SIGMA-a5a2d357-1ab8-4675-a967-ef9990a59391": 1
+   }
   }
  },
  "rdp_interactive_taskmanager_lsass_dump_2020-09-22043748.json": {
@@ -2687,13 +4492,30 @@
   "flagged": 0,
   "md5": "b8a578bd2eb8af8458d7e3104eb0f4c0",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-259e5a6a-b8d2-4c38-86e2-26c5e651361d": 1,
+    "SIGMA-fdfcbd78-48f1-4a4b-90ac-d82241e368c5": 1
+   },
+   "rules": {}
+  }
  },
  "remote_pwd_reset_rpc_mimikatz_postzerologon_target_DC.evtx": {
   "flagged": 0,
   "md5": "983c504efae48afc7feedf157388a683",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "remote_pwd_reset_rpc_mimikatz_postzerologon_target_DC.evtx.log": {
   "flagged": 0,
@@ -2705,7 +4527,16 @@
   "flagged": 0,
   "md5": "235ee2ed17f4885eb97012a04a0fbe60",
   "rows": 31,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {},
+   "rules": {
+    "SIGMA-b210394c-ba12-4f89-9117-44a2464b9511": 3,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "remote_sam_registry_access_via_backup_operator_priv.evtx.log": {
   "flagged": 0,
@@ -2717,7 +4548,16 @@
   "flagged": 0,
   "md5": "80bdff42afc0f82f044926335f5cf385",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-614cf376-6651-47c4-9dcc-6b9527f749f4": 1,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "remote_task_update_4624_4702_same_logonid.evtx.log": {
   "flagged": 0,
@@ -2747,19 +4587,55 @@
   "flagged": 0,
   "md5": "46642abfda17eda9a0dc8f8f51678b59",
   "rows": 50,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-81325ce1-be01-4250-944f-b4789644556f": 1,
+    "SIGMA-92626ddd-662c-49e3-ac59-f6535f12d189": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 2,
+    "SIGMA-dd2a821e-3b07-4d3b-a9ac-929fe4c6ca0c": 1,
+    "SIGMA-dd6b39d9-d9be-4a3b-8fe0-fe3c6a5c1795": 4,
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 1,
+    "SIGMA-e79a9e79-eb72-4e78-a628-0e7e8f59e89c": 1
+   },
+   "rules": {
+    "SIGMA-69bd9b97-2be2-41b6-9816-fb08757a4d1a": 1
+   }
+  }
  },
  "rundll32_hollowing_wermgr_masquerading.evtx": {
   "flagged": 0,
   "md5": "67edcbd48b2b0f191af10861c2eb1770",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {},
+   "rules": {
+    "SIGMA-58bf96d9-ff5f-44bd-8dcc-1c4f79bf3a27": 1,
+    "SIGMA-d8937fe7-42d5-4b4d-8178-e089c908f63f": 1
+   }
+  }
  },
  "samaccount_spoofing_CVE-2021-42287_CVE-2021-42278_DC_securitylogs.evtx": {
   "flagged": 0,
   "md5": "c04aa1ab9f64a7cda1b77f943bc2213b",
   "rows": 18,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-20d96d95-5a20-4cf1-a483-f3bda8a7c037": 1
+   },
+   "rules": {
+    "SIGMA-45eb2ae2-9aa2-4c3a-99a5-6e5077655466": 1,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "samaccount_spoofing_CVE-2021-42287_CVE-2021-42278_DC_securitylogs.evtx.log": {
   "flagged": 0,
@@ -3371,7 +5247,19 @@
   "flagged": 0,
   "md5": "36987d8cfa7b1cecee6ce96c9eaf926c",
   "rows": 14,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-8eef149c-bd26-49f2-9e5a-9b00e3af499b": 1,
+    "SIGMA-def8b624-e08f-4ae1-8612-1ba21190da6b": 1
+   },
+   "rules": {
+    "SIGMA-192a0330-c20b-4356-90b6-7b7049ae0b87": 1,
+    "SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1
+   }
+  }
  },
  "security_4624_4673_token_manip.evtx.log": {
   "flagged": 0,
@@ -3401,19 +5289,57 @@
   "flagged": 0,
   "md5": "f377a1724433fd3da2f4792429618640",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-20f0ee37-5942-4e45-b7d5-c5b5db9df5cd": 1
+   },
+   "rules": {
+    "SIGMA-02ee49e2-e294-4d0f-9278-f5b3212fc588": 1
+   }
+  }
  },
  "sideloading_uacbypass_rundll32_injection_c2.evtx": {
   "flagged": 0,
   "md5": "dfce60bcda5f8dcd8fe4d28801a15f5b",
   "rows": 18,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 8,
+   "marks": {
+    "SIGMA-297afac9-5d02-4138-8c58-b977bac60556": 1,
+    "SIGMA-379fa130-190e-4c3f-b7bc-6c8e834485f3": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1,
+    "SIGMA-c3a99af4-35a9-4668-879e-c09aeb4f2bdf": 1,
+    "SIGMA-e2e01011-5910-4267-9c3b-4149ed5479cf": 6
+   },
+   "rules": {
+    "SIGMA-02d1d718-dd13-41af-989d-ea85c7fab93f": 3,
+    "SIGMA-0b0cd537-fc77-4e6e-a973-e53495c1083d": 2,
+    "SIGMA-1775e15e-b61b-4d14-a1a3-80981298085a": 1,
+    "SIGMA-438025f9-5856-4663-83f7-52f878a70a50": 3,
+    "SIGMA-49f2f17b-b4c8-4172-a68b-d5bf95d05130": 1,
+    "SIGMA-4b60e6f2-bf39-47b4-b4ea-398e33cfe253": 1,
+    "SIGMA-aa3a6f94-890e-4e22-b634-ffdfd54792cc": 1
+   }
+  }
  },
  "sideloading_wwlib_sysmon_7_1_11.evtx": {
   "flagged": 0,
   "md5": "17fe1827d9741168f45857c03719b531",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-e2e01011-5910-4267-9c3b-4149ed5479cf": 1
+   },
+   "rules": {}
+  }
  },
  "smb_bi_auth_conn_spoolsample.evtx": {
   "flagged": 0,
@@ -3425,13 +5351,35 @@
   "flagged": 0,
   "md5": "8bd5b7b99da00c25bc9fade23721245f",
   "rows": 27,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 3,
+    "SIGMA-d21374ff-f574-44a7-9998-4a8c8bf33d7d": 3
+   },
+   "rules": {
+    "SIGMA-058f4380-962d-40a5-afce-50207d36d7e2": 3,
+    "SIGMA-10c14723-61c7-4c75-92ca-9af245723ad2": 3,
+    "SIGMA-5cdb711b-5740-4fb2-ba88-f7945027afac": 1,
+    "SIGMA-8a582fe2-0882-4b89-a82a-da6b2dc32937": 1
+   }
+  }
  },
  "spoolsample_5145.evtx": {
   "flagged": 0,
   "md5": "10555d6e38c35ee9b1828c55bb3c433d",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-214e8f95-100a-4e04-bb31-ef6cba8ce07e": 1
+   },
+   "rules": {}
+  }
  },
  "spoolsample_5145.evtx.log": {
   "flagged": 0,
@@ -3466,13 +5414,35 @@
   "flagged": 0,
   "md5": "e4f22a1a3288bf45c7766c2f64725196",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-949f1ffb-6e85-4f00-ae1e-c3c5b190d605": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1
+   },
+   "rules": {
+    "SIGMA-1228c958-e64e-4e71-92ad-7d429f4138ba": 1,
+    "SIGMA-88f680b8-070e-402c-ae11-d2914f2257f1": 1,
+    "SIGMA-e32d4572-9826-4738-b651-95fa63747e8a": 1
+   }
+  }
  },
  "susp_explorer_exec_root_cmdline__rimpq__CyberRaiju.evtx": {
   "flagged": 0,
   "md5": "68e3de47042227777c983ed8f36d597b",
   "rows": 10,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-949f1ffb-6e85-4f00-ae1e-c3c5b190d605": 2,
+    "SIGMA-9eb271b9-24ae-4cd4-9465-19cfc1047f3e": 1
+   },
+   "rules": {}
+  }
  },
  "sysboot.log": {
   "flagged": 0,
@@ -3612,6 +5582,20 @@
   "rows": 4,
   "rules": {
    "WIN-HOST-2": 4
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-3a525307-d100-48ae-b3b9-0964699d7f97": 2,
+    "SIGMA-5ef9853e-4d0e-4a70-846f-a9ca37d876da": 2
+   },
+   "rules": {
+    "SIGMA-69ca12af-119d-44ed-b50f-a47af0ebc364": 1,
+    "SIGMA-9bd012ee-0dff-44d7-84a0-aa698cfd87a3": 1,
+    "SIGMA-9f5c1d59-33be-4e60-bcab-85d2f566effd": 1,
+    "SIGMA-a5a2d357-1ab8-4675-a967-ef9990a59391": 2
+   }
   }
  },
  "sysmon_10_11_outlfank_dumpert_and_andrewspecial_memdump.evtx": {
@@ -3620,49 +5604,142 @@
   "rows": 15,
   "rules": {
    "WIN-HOST-2": 9
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 8,
+   "marks": {
+    "SIGMA-3a525307-d100-48ae-b3b9-0964699d7f97": 4,
+    "SIGMA-5ef9853e-4d0e-4a70-846f-a9ca37d876da": 8
+   },
+   "rules": {
+    "SIGMA-2704ab9e-afe2-4854-a3b1-0c0706d03578": 1,
+    "SIGMA-93d94efc-d7ad-4161-ad7d-1638c4f908d8": 3,
+    "SIGMA-9bd012ee-0dff-44d7-84a0-aa698cfd87a3": 2,
+    "SIGMA-9f5c1d59-33be-4e60-bcab-85d2f566effd": 2,
+    "SIGMA-a5a2d357-1ab8-4675-a967-ef9990a59391": 1
+   }
   }
  },
  "sysmon_10_1_memdump_comsvcs_minidump.evtx": {
   "flagged": 0,
   "md5": "8c7242bc60a0fdbfaffb9b2188416c15",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-1e33157c-53b1-41ad-bbcc-780b80b58288": 1,
+    "SIGMA-a24e5861-c6ca-4fde-a93c-ba9256feddf0": 1,
+    "SIGMA-d21374ff-f574-44a7-9998-4a8c8bf33d7d": 1,
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 1
+   },
+   "rules": {
+    "SIGMA-646ea171-dded-4578-8a4d-65e9822892e3": 1,
+    "SIGMA-8a582fe2-0882-4b89-a82a-da6b2dc32937": 1
+   }
+  }
  },
  "sysmon_10_1_ppid_spoofing.evtx": {
   "flagged": 0,
   "md5": "ff0ab1fbca2f927803f239f30e521162",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-250ae82f-736e-4844-a68b-0b5e8cc887da": 1
+   },
+   "rules": {}
+  }
  },
  "sysmon_10_lsass_mimikatz_sekurlsa_logonpasswords.evtx": {
   "flagged": 0,
   "md5": "8b86373364e09b77b69ab1e4de05f359",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-678dfc63-fefb-47a5-a04c-26bcf8cc9f65": 1
+   },
+   "rules": {
+    "SIGMA-d0d2f720-d14f-448d-8242-51ff396a334e": 1
+   }
+  }
  },
  "sysmon_11_1_15_WScriptBypassUAC.evtx": {
   "flagged": 0,
   "md5": "ab1597a3276cb5516662c031c132e499",
   "rows": 15,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 8,
+   "marks": {
+    "SIGMA-2c28c248-7f50-417a-9186-a85b223010ee": 1,
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 1,
+    "SIGMA-59b39960-5f9d-4a49-9cef-1e4d2c1d0cb9": 8,
+    "SIGMA-5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d": 1
+   },
+   "rules": {
+    "SIGMA-c74c0390-3e20-41fd-a69a-128f0275a5ea": 8
+   }
+  }
  },
  "sysmon_11_1_7_uacbypass_cliconfg.evtx": {
   "flagged": 0,
   "md5": "70ec5bc426007e973364309cd90fd597",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-59b39960-5f9d-4a49-9cef-1e4d2c1d0cb9": 2
+   },
+   "rules": {
+    "SIGMA-c74c0390-3e20-41fd-a69a-128f0275a5ea": 2
+   }
+  }
  },
  "sysmon_11_1_lolbas_downldr_desktopimgdownldr.evtx": {
   "flagged": 0,
   "md5": "abb667e32c0656ddeb701750c232ae51",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {},
+   "rules": {
+    "SIGMA-bb58aa4a-b80b-415a-a2c0-2f65a4c81009": 2,
+    "SIGMA-fc4f4817-0c53-4683-a4ee-b17a64bc1039": 1
+   }
+  }
  },
  "sysmon_11_7_1_uacbypass_windirectory_mocking.evtx": {
   "flagged": 0,
   "md5": "6ab3a4301976c7a4f10f8ccdcdc431de",
   "rows": 10,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {
+    "SIGMA-297afac9-5d02-4138-8c58-b977bac60556": 1,
+    "SIGMA-9637e8a5-7131-4f7f-bdc7-2b05d8670c43": 1
+   },
+   "rules": {
+    "SIGMA-0cbe38c0-270c-41d9-ab79-6e5a9a669290": 1,
+    "SIGMA-4ac47ed3-44c2-4b1f-9d51-bf46e8914126": 2,
+    "SIGMA-4fc0deee-0057-4998-ab31-d24e46e0aba4": 1,
+    "SIGMA-b6f91281-20aa-446a-b986-38a92813a18f": 1
+   }
+  }
  },
  "sysmon_13_1_12_11_perfmonUACBypass.evtx": {
   "flagged": 0,
@@ -3674,127 +5751,364 @@
   "flagged": 0,
   "md5": "3317d89269d48c851550b02932ce4f7f",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1
+   },
+   "rules": {
+    "SIGMA-674202d0-b22a-4af4-ae5f-2eda1f3da1af": 1,
+    "SIGMA-97a80ec7-0e2f-4d05-9ef4-65760e634f6b": 1
+   }
+  }
  },
  "sysmon_13_1_meterpreter_getsystem_NamedPipeImpersonation.evtx": {
   "flagged": 0,
   "md5": "dcd47568b35d3cb247af2509369815b5",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1
+   },
+   "rules": {
+    "SIGMA-15619216-e993-4721-b590-4c520615a67d": 1,
+    "SIGMA-9bd04a79-dabe-4f1f-a5ff-92430265c96b": 1,
+    "SIGMA-d522eca2-2973-4391-a3e0-ef0374321dae": 1
+   }
+  }
  },
  "sysmon_13_1_persistence_via_winlogon_shell.evtx": {
   "flagged": 0,
   "md5": "b60c0f5d4736fadf212ee152f8232849",
   "rows": 25,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-297afac9-5d02-4138-8c58-b977bac60556": 1,
+    "SIGMA-671bb7e3-a020-4824-a00e-2ee5b55f385e": 2,
+    "SIGMA-b655a06a-31c0-477a-95c2-3726b83d649d": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 3,
+    "SIGMA-cbf93e5d-ca6c-4722-8bea-e9119007c248": 1
+   },
+   "rules": {
+    "SIGMA-0a98a10c-685d-4ab0-bddc-b6bdd1d48458": 1
+   }
+  }
  },
  "sysmon_13_keylogger_directx.evtx": {
   "flagged": 0,
   "md5": "e05ace79bab67f15f90e4d0c31bcf706",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1
+   },
+   "rules": {}
+  }
  },
  "sysmon_13_rdp_settings_tampering.evtx": {
   "flagged": 0,
   "md5": "2d1b3629157dcb3ca06055725ab94f2f",
   "rows": 20,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-37ae075c-271b-459b-8d7b-55ad5f993dd8": 3,
+    "SIGMA-612e47e9-8a59-43a6-b404-f48683f45bd6": 1,
+    "SIGMA-a2863fbc-d5cb-48d5-83fb-d976d4b1743b": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 2,
+    "SIGMA-cd5cfd80-aa5f-44c0-9c20-108c4ae12e3c": 1
+   },
+   "rules": {
+    "SIGMA-01aeb693-138d-49d2-9403-c4f52d7d3d62": 1,
+    "SIGMA-3f6b7b62-61aa-45db-96bd-9c31b36b653c": 1,
+    "SIGMA-509e84b9-a71a-40e0-834f-05470369bd1e": 1
+   }
+  }
  },
  "sysmon_1_11_exec_as_system_via_schedtask.evtx": {
   "flagged": 0,
   "md5": "6ddef5654c7afd2575c64f736a2250f6",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1,
+    "SIGMA-81325ce1-be01-4250-944f-b4789644556f": 1,
+    "SIGMA-92626ddd-662c-49e3-ac59-f6535f12d189": 1,
+    "SIGMA-a762e74f-4dce-477c-b023-4ed81df600f9": 1
+   },
+   "rules": {}
+  }
  },
  "sysmon_1_11_rundll32_cpl_ostap.evtx": {
   "flagged": 0,
   "md5": "1e5c367fca8926dfc3245a4865f06ebd",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-e79a9e79-eb72-4e78-a628-0e7e8f59e89c": 1
+   },
+   "rules": {
+    "SIGMA-1228c958-e64e-4e71-92ad-7d429f4138ba": 1,
+    "SIGMA-99b7460d-c9f1-40d7-a316-1f36f61d52ee": 1
+   }
+  }
  },
  "sysmon_1_13_11_cmstp_ini_uacbypass.evtx": {
   "flagged": 0,
   "md5": "653430ce2c2374de7cf6e8fbf997102f",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-4b991083-3d0e-44ce-8fc4-b254025d8d4b": 1
+   },
+   "rules": {
+    "SIGMA-49f2f17b-b4c8-4172-a68b-d5bf95d05130": 1,
+    "SIGMA-4b60e6f2-bf39-47b4-b4ea-398e33cfe253": 1,
+    "SIGMA-b6d235fc-1d38-4b12-adbe-325f06728f37": 1,
+    "SIGMA-e66779cc-383e-4224-a3a4-267eeb585c40": 1
+   }
+  }
  },
  "sysmon_1_13_UACBypass_AppPath_Control.evtx": {
   "flagged": 0,
   "md5": "9910b1eaad2096f90fe84efe7f312a8a",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-da2738f2-fadb-4394-afa7-0a0674885afa": 1
+   },
+   "rules": {}
+  }
  },
  "sysmon_1_7_11_mcx2prov_uacbypass.evtx": {
   "flagged": 0,
   "md5": "41e1e4f0a1fe3457783f18ebbfa25554",
   "rows": 9,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-59b39960-5f9d-4a49-9cef-1e4d2c1d0cb9": 2
+   },
+   "rules": {
+    "SIGMA-4fc0deee-0057-4998-ab31-d24e46e0aba4": 1,
+    "SIGMA-c74c0390-3e20-41fd-a69a-128f0275a5ea": 2
+   }
+  }
  },
  "sysmon_1_7_11_migwiz.evtx": {
   "flagged": 0,
   "md5": "fbc1f37731f132583b74ae2594b88530",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-59b39960-5f9d-4a49-9cef-1e4d2c1d0cb9": 2
+   },
+   "rules": {
+    "SIGMA-c74c0390-3e20-41fd-a69a-128f0275a5ea": 2
+   }
+  }
  },
  "sysmon_1_7_11_sysprep_uacbypass.evtx": {
   "flagged": 0,
   "md5": "5067fcc29c15f3160140c490d33aebf6",
   "rows": 7,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-59b39960-5f9d-4a49-9cef-1e4d2c1d0cb9": 2
+   },
+   "rules": {
+    "SIGMA-c74c0390-3e20-41fd-a69a-128f0275a5ea": 2
+   }
+  }
  },
  "sysmon_1_7_elevate_uacbypass_sysprep.evtx": {
   "flagged": 0,
   "md5": "f1ce1f2e1314ec3c475045ca4d7f4ce1",
   "rows": 15,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 2,
+    "SIGMA-bd8b828d-0dca-48e1-8a63-8a58ecf2644f": 2,
+    "SIGMA-f4bbd493-b796-416e-bbf2-121235348529": 1
+   },
+   "rules": {}
+  }
  },
  "sysmon_1_exec_via_sql_xpcmdshell.evtx": {
   "flagged": 0,
   "md5": "3670210b0288dbe68e4a7c2b71feaf04",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-4f4eaa9f-5ad4-410c-a4be-bc6132b0175a": 1
+   },
+   "rules": {
+    "SIGMA-869b9ca7-9ea2-4a5a-8325-e80e62f75445": 1
+   }
+  }
  },
  "sysmon_1_persist_bitsjob_SetNotifyCmdLine.evtx": {
   "flagged": 0,
   "md5": "4865e034babe833d7f935e830afa23ef",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-867356ee-9352-41c9-a8f2-1be690d78216": 1,
+    "SIGMA-b236190c-1c61-41e9-84b3-3fe03f6d76b0": 1,
+    "SIGMA-c7e91a02-d771-4a6d-a700-42587e0b1095": 1
+   },
+   "rules": {}
+  }
  },
  "sysmon_1_smss_child_proc_bootexecute_setupexecute.evtx": {
   "flagged": 0,
   "md5": "92f298b29f860beb974ea895b5d922f7",
   "rows": 1,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1
+   },
+   "rules": {
+    "SIGMA-d522eca2-2973-4391-a3e0-ef0374321dae": 1
+   }
+  }
  },
  "sysmon_20_21_1_CommandLineEventConsumer.evtx": {
   "flagged": 0,
   "md5": "abb1fb619dec81f33242fb1f4778b9d7",
   "rows": 17,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-0f06a3a5-6a09-413f-8743-e6cf35561297": 6,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1,
+    "SIGMA-678dfc63-fefb-47a5-a04c-26bcf8cc9f65": 1,
+    "SIGMA-d85ecdd7-b855-4e6e-af59-d9c78b5b861e": 1
+   },
+   "rules": {}
+  }
  },
  "sysmon_2_11_evasion_timestomp_MACE.evtx": {
   "flagged": 0,
   "md5": "df0533b4bd17824cf6402b57f2299a95",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-2aa0a6b4-a865-495b-ab51-c28249537b75": 1
+   },
+   "rules": {
+    "SIGMA-28208707-fe31-437f-9a7f-4b1108b94d2e": 1
+   }
+  }
  },
  "sysmon_2x10_lsass_with_different_pid_RtlCreateProcessReflection.evtx": {
   "flagged": 0,
   "md5": "d6e2ce7c5a25fded9b20154fb44012ef",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-5ef9853e-4d0e-4a70-846f-a9ca37d876da": 3,
+    "SIGMA-fa34b441-961a-42fa-a100-ecc28c886725": 3
+   },
+   "rules": {
+    "SIGMA-9bd012ee-0dff-44d7-84a0-aa698cfd87a3": 3
+   }
+  }
  },
  "sysmon_3_10_Invoke-Mimikatz_hosted_Github.evtx": {
   "flagged": 0,
   "md5": "16c7b3f29a674627498dba833b5c991a",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-0f920ebe-7aea-4c54-b202-9aa0c609cfe5": 1,
+    "SIGMA-1f21ec3f-810d-4b0e-8045-322202e22b4b": 1,
+    "SIGMA-5ef9853e-4d0e-4a70-846f-a9ca37d876da": 1
+   },
+   "rules": {}
+  }
  },
  "sysmon_exec_from_vss_persistence.evtx": {
   "flagged": 0,
   "md5": "398f888017b19aa0031c97a0331d406a",
   "rows": 17,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 10,
+   "marks": {
+    "SIGMA-502b42de-4306-40b4-9596-6f590c81f073": 1,
+    "SIGMA-526be59f-a573-4eea-b5f7-f0973207634d": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 7,
+    "SIGMA-76f55eaa-d27f-4213-9d45-7b0e4b60bbae": 2,
+    "SIGMA-b17ea6f7-6e90-447e-a799-e6c0a493d6ce": 2,
+    "SIGMA-bd8b828d-0dca-48e1-8a63-8a58ecf2644f": 1,
+    "SIGMA-d85ecdd7-b855-4e6e-af59-d9c78b5b861e": 2
+   },
+   "rules": {
+    "SIGMA-3c89a1e8-0fba-449e-8f1b-8409d6267ec8": 2,
+    "SIGMA-79ce34ca-af29-4d0e-b832-fc1b377020db": 1,
+    "SIGMA-cbec226f-63d9-4eca-9f52-dfb6652f24df": 7,
+    "SIGMA-f57f8d16-1f39-4dcb-a604-6c73d9b54b3d": 4
+   }
+  }
  },
  "sysmon_local_account_creation_and_added_admingroup_12_13.evtx": {
   "flagged": 0,
@@ -3806,61 +6120,171 @@
   "flagged": 0,
   "md5": "7e1828942603d9702c779ace95ac8131",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-1723e720-616d-4ddc-ab02-f7e3685a4713": 1,
+    "SIGMA-e593cf51-88db-4ee1-b920-37e89012a3c9": 1
+   },
+   "rules": {
+    "SIGMA-1228c958-e64e-4e71-92ad-7d429f4138ba": 1,
+    "SIGMA-88f680b8-070e-402c-ae11-d2914f2257f1": 1,
+    "SIGMA-e32d4572-9826-4738-b651-95fa63747e8a": 1
+   }
+  }
  },
  "sysmon_lolbin_bohops_vshadow_exec.evtx": {
   "flagged": 0,
   "md5": "6ade83c5299d09a778a58eb20d0a113b",
   "rows": 6,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-d7c75059-2901-4578-b209-8837fd31c6a8": 2
+   },
+   "rules": {}
+  }
  },
  "sysmon_mshta_sharpshooter_stageless_meterpreter.evtx": {
   "flagged": 0,
   "md5": "9fb970ca582b2b86d6ddf12f552ff324",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-cea72823-df4d-4567-950c-0b579eaf0846": 1
+   },
+   "rules": {
+    "SIGMA-1228c958-e64e-4e71-92ad-7d429f4138ba": 1
+   }
+  }
  },
  "sysmon_privesc_from_admin_to_system_handle_inheritance.evtx": {
   "flagged": 0,
   "md5": "d13d5284b9adfc5ee168d8dfd5e188a4",
   "rows": 3,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-4b991083-3d0e-44ce-8fc4-b254025d8d4b": 1,
+    "SIGMA-61065c72-5d7d-44ef-bf41-6a36684b545f": 1
+   },
+   "rules": {
+    "SIGMA-d522eca2-2973-4391-a3e0-ef0374321dae": 1
+   }
+  }
  },
  "sysmon_privesc_psexec_dwell.evtx": {
   "flagged": 0,
   "md5": "eff671396db10b3c6c3bcfd8511c2492",
   "rows": 12,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-41504465-5e3a-4a5b-a5b4-2a0baadd4463": 2,
+    "SIGMA-f3f3a972-f982-40ad-b63c-bca6afdfad7c": 3,
+    "SIGMA-fdfcbd78-48f1-4a4b-90ac-d82241e368c5": 1
+   },
+   "rules": {
+    "SIGMA-7c0dcd3d-acf8-4f71-9570-f448b0034f94": 1
+   }
+  }
  },
  "sysmon_rdrleakdiag_lsass_dump.evtx": {
   "flagged": 0,
   "md5": "8def5b510fcfee96e88806def748e463",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {
+    "SIGMA-3a525307-d100-48ae-b3b9-0964699d7f97": 1,
+    "SIGMA-bafd07c6-3ea5-454a-b4be-058fbb073de7": 1
+   },
+   "rules": {
+    "SIGMA-c8da0dfd-4ed0-4b68-962d-13c9c884384e": 1,
+    "SIGMA-edadb1e5-5919-4e4c-8462-a9e643b02c4b": 1
+   }
+  }
  },
  "sysmon_uacbypass_CDSSync_schtask_hijack_byeintegrity5.evtx": {
   "flagged": 0,
   "md5": "4b0a623923793b2ca47cc83840cde285",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 3,
+   "marks": {
+    "SIGMA-4b991083-3d0e-44ce-8fc4-b254025d8d4b": 1,
+    "SIGMA-9e9a9002-56c4-40fd-9eff-e4b09bfa5f6c": 1
+   },
+   "rules": {
+    "SIGMA-4fc0deee-0057-4998-ab31-d24e46e0aba4": 1,
+    "SIGMA-966315ef-c5e1-4767-ba25-fce9c8de3660": 1,
+    "SIGMA-b447f7de-1e53-4cbf-bfb4-f1f6d0b04e4e": 1
+   }
+  }
  },
  "sysmon_vbs_sharpshooter_stageless_meterpreter.evtx": {
   "flagged": 0,
   "md5": "d7ab0eb827eec753fac21b97f408ba9f",
   "rows": 5,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-08249dc0-a28d-4555-8ba5-9255a198e08c": 1,
+    "SIGMA-1e33157c-53b1-41ad-bbcc-780b80b58288": 1,
+    "SIGMA-cea72823-df4d-4567-950c-0b579eaf0846": 1
+   },
+   "rules": {
+    "SIGMA-1228c958-e64e-4e71-92ad-7d429f4138ba": 1
+   }
+  }
  },
  "sysmon_zipexec.evtx": {
   "flagged": 0,
   "md5": "808934aed8ed6bbf4005647888853008",
   "rows": 8,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-1e33157c-53b1-41ad-bbcc-780b80b58288": 1,
+    "SIGMA-36480ae1-a1cb-4eaa-a0d6-29801d7e9142": 1,
+    "SIGMA-90dcf730-1b71-4ae7-9ffc-6fcf62bd0132": 2,
+    "SIGMA-b1ec66c6-f4d1-4b5c-96dd-af28ccae7727": 1
+   },
+   "rules": {}
+  }
  },
  "temp_scheduled_task_4698_4699.evtx": {
   "flagged": 0,
   "md5": "0cd7b2093c852ca7259d0b87455c06be",
   "rows": 2,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-4f86b304-3e02-40e3-aa5d-e88a167c9617": 1
+   },
+   "rules": {}
+  }
  },
  "temp_scheduled_task_4698_4699.evtx.log": {
   "flagged": 0,
@@ -3998,13 +6422,33 @@
   "flagged": 0,
   "md5": "49dcbc002201cd39f36bf91e53c766cc",
   "rows": 12,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 2,
+   "marks": {},
+   "rules": {
+    "SIGMA-ed74fe75-7594-4b4b-ae38-e38e3fd2eb23": 2
+   }
+  }
  },
  "tutto_malseclogon.evtx": {
   "flagged": 0,
   "md5": "7e5e98f2099a2ae401e8981794fcff1e",
   "rows": 15,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-678dfc63-fefb-47a5-a04c-26bcf8cc9f65": 1,
+    "SIGMA-8eef149c-bd26-49f2-9e5a-9b00e3af499b": 1,
+    "SIGMA-def8b624-e08f-4ae1-8612-1ba21190da6b": 1
+   },
+   "rules": {
+    "SIGMA-192a0330-c20b-4356-90b6-7b7049ae0b87": 1
+   }
+  }
  },
  "tutto_malseclogon.evtx.log": {
   "flagged": 0,
@@ -4090,6 +6534,14 @@
   "rows": 162,
   "rules": {
    "WIN-BRUTE-2": 40
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-0badd08f-c6a3-4630-90d3-6875cca440be": 16
+   },
+   "rules": {}
   }
  },
  "windows-security-xml-spray.log": {
@@ -4098,6 +6550,14 @@
   "rows": 232,
   "rules": {
    "WIN-BRUTE-2": 100
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-0badd08f-c6a3-4630-90d3-6875cca440be": 21
+   },
+   "rules": {}
   }
  },
  "windows-security.log": {
@@ -4110,7 +6570,15 @@
   "flagged": 0,
   "md5": "3098cd8aa5a06241106f8ed274af946e",
   "rows": 40,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-8ac03a65-6c84-4116-acad-dc1558ff7a77": 1
+   },
+   "rules": {}
+  }
  },
  "windows_bits_4_59_60_lolbas_desktopimgdownldr.evtx": {
   "flagged": 0,
@@ -4122,12 +6590,31 @@
   "flagged": 0,
   "md5": "6e216a1800612cab94d65a22cb8e1bec",
   "rows": 13,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-20f0ee37-5942-4e45-b7d5-c5b5db9df5cd": 1
+   },
+   "rules": {}
+  }
  },
  "wmighost_sysmon_20_21_1.evtx": {
   "flagged": 0,
   "md5": "22c6be2ab11c6850528e570b79495f65",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 1,
+   "marks": {
+    "SIGMA-0f06a3a5-6a09-413f-8743-e6cf35561297": 2,
+    "SIGMA-ec1d5e28-8f3b-4188-a6f8-6e8df81dc28e": 1
+   },
+   "rules": {
+    "SIGMA-fe21810c-2a8c-478f-8dd3-5a287fb2a0e0": 1
+   }
+  }
  }
 }

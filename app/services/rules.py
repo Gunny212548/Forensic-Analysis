@@ -488,7 +488,9 @@ RULE_LEVEL: dict[str, str] = {
 # What a rule id looks like: a generic R-rule (R2000) or a product rule
 # (PAN-SCAN-1, <PRODUCT>-<AREA>-<n>, specs/per_product_rules.md). For checking
 # the shape of input; whether the rule exists is rule_meta's to say.
-RULE_ID_PATTERN = r"(?:R\d{4}|[A-Z]{2,4}-[A-Z]{3,5}-\d{1,3})"
+# A SigmaHQ rule is SIGMA- and the rule's whole UUID (specs/sigma_windows.md S-D6).
+RULE_ID_PATTERN = (r"(?:R\d{4}|[A-Z]{2,4}-[A-Z]{3,5}-\d{1,3}"
+                   r"|SIGMA-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
 
 # The product a rule is written for (specs/per_product_rules.md, D11). Such a
 # rule reads `product_events` - the rows of its product only - instead of
@@ -538,11 +540,14 @@ RULE_ENTITY: set = set()
 
 def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
                 rule_product=None, lines: dict | None = None,
-                rule_superseded=None) -> dict[str, int]:
+                rule_superseded=None, failures: dict | None = None) -> dict[str, int]:
     """Runs every rule against the case's raw_events, filling findings.
     Returns {rule_id: rows_matched} so the pipeline can log/report it.
     `on_rule(done, total)` is called after each rule, for progress (FR-2.5).
     `lines`, when given, receives each line-drawing rule's record.
+    `failures`, when given, receives {rule_id: error} of the SigmaHQ rules that failed: one of
+    SigmaHQ's rules failing is listed on the case and the others run (specs/sigma_windows.md
+    S-D9); one of ours failing is a bug and fails the case, as before.
     `rules` / `rule_product` / `rule_superseded` replace the module's (tests)."""
     rules = RULES if rules is None else rules
     rule_product = RULE_PRODUCT if rule_product is None else rule_product
@@ -576,7 +581,14 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
             if lines is not None and record is not None:
                 lines[rid] = record
         before = con.execute("SELECT count(*) FROM findings").fetchone()[0]
-        con.execute(sql, params or None)
+        if rid.startswith("SIGMA-"):
+            try:
+                con.execute(sql)
+            except duckdb.Error as e:
+                if failures is not None:
+                    failures[rid] = f"{type(e).__name__}: {str(e)[:200]}"
+        else:
+            con.execute(sql, params or None)
         after = con.execute("SELECT count(*) FROM findings").fetchone()[0]
         if after > before:
             matched[rid] = after - before
@@ -621,10 +633,11 @@ def _products_present(con: duckdb.DuckDBPyConnection) -> set[str]:
 
 # Product rule sets (D11), after everything above they import. They run after
 # the generic rules, which stay until story 4 retires them.
-from . import rules_checkpoint, rules_firewall, rules_paloalto, rules_windows  # noqa: E402
+from . import rules_checkpoint, rules_firewall, rules_paloalto, rules_sigma, rules_windows  # noqa: E402
 
 _GENERIC = dict(RULES)
-for _mod in (rules_paloalto, rules_checkpoint, rules_windows):
+# SigmaHQ's high / critical Windows rules last: after the in-house ones (S-D9).
+for _mod in (rules_paloalto, rules_checkpoint, rules_windows, rules_sigma):
     for _rid, _sql in _mod.RULES + rules_firewall.from_generic(_mod.FROM_GENERIC, _GENERIC):
         RULES.append((_rid, _sql))
         RULE_PRODUCT[_rid] = _mod.PRODUCT

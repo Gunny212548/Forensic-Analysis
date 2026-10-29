@@ -183,6 +183,11 @@
   /* Layer C facts on an event: neutral on purpose - a fact, not a severity. */
   .context-chip { display: inline-block; font-size: 11px; color: var(--muted); background: var(--subtle);
     border-radius: 999px; padding: 1px 8px; margin: 1px 4px 1px 0; white-space: nowrap; }
+  /* SigmaHQ marks under an event type (EventsTable SigmaMarks): links to the rule, no button look. */
+  .sigma-marks { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+  .sigma-mark { text-decoration: none; white-space: nowrap; max-width: 260px; overflow: hidden;
+    text-overflow: ellipsis; }
+  .sigma-mark:hover, .sigma-mark:focus-visible { text-decoration: underline; }
   /* A value that opens something (a source address -> its behaviour profile). */
   .link-btn { all: unset; cursor: pointer; color: var(--accent); }
   .link-btn:hover, .link-btn:focus-visible { text-decoration: underline; }

@@ -459,7 +459,9 @@ def _events(con, cond: str, params: list, order: str, limit: int, offset: int) -
     # a case processed before profiles existed.
     has_profiles = con.execute("SELECT count(*) FROM duckdb_tables() "
                                "WHERE table_name = 'profile_source'").fetchone()[0] > 0
+    marks = _sigma_marks(con, [r["row_id"] for r in out])
     for row in out:
+        row["sigma"] = marks.get(row["row_id"], [])
         row["ts"] = _fmt_ts(row["ts"]) or None  # zone-stamped, as list_findings
         row["event"] = EVENT_TYPES.get(row["action"], row["action"])
         if row["event"] is None and row["hostname"] and (w := _WIN_UNTYPED.match(row["raw"] or "")):
@@ -483,6 +485,27 @@ def _events(con, cond: str, params: list, order: str, limit: int, offset: int) -
                            f"by {listed[row[side]]}")
         row["context"] = ctx
         del row["src_refused"]
+    return out
+
+
+def _sigma_marks(con, row_ids: list[int]) -> dict[int, list[dict]]:
+    """row_id -> the SigmaHQ rules that mark it (specs/sigma_windows.md S-D4): medium and below,
+    threat hunting, an in-house rule's twin. Each names its author (DRL 1.1). A case processed
+    before SigmaHQ ran has no marks."""
+    if not row_ids or not con.execute("SELECT count(*) FROM duckdb_tables() "
+                                      "WHERE table_name = 'sigma_marks'").fetchone()[0]:
+        return {}
+    from . import sigma
+
+    rules = sigma.by_rid()
+    out: dict[int, list[dict]] = {}
+    for row_id, rid, level in con.execute(
+            "SELECT row_id, rid, level FROM sigma_marks WHERE row_id IN (SELECT unnest(?)) ORDER BY row_id, rid",
+            [row_ids]).fetchall():
+        r = rules.get(rid, {})
+        out.setdefault(row_id, []).append({
+            "rid": rid, "title": r.get("title", rid), "level": level, "author": r.get("author"),
+            "url": r.get("url"), "twin_of": sigma.TWINS.get(r.get("id"))})
     return out
 
 
