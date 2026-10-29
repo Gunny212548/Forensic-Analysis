@@ -332,8 +332,8 @@ frontend/src/
                        DeleteCase · DeleteCustomer · AttackGraph ·
                        AttackTimelineView (a case's and a project's) · analysis.jsx (chain/timeline/
                        risk/meta, grounding warnings) · common.jsx (severity
-                       pill, status badge, MITRE tags). Workspace.jsx is left
-                       over from #/result and nothing imports it; Lifecycle.jsx
+                       pill, status badge, MITRE tags). Workspace.jsx (left
+                       over from #/result) was removed on 2026-10-29; Lifecycle.jsx
                        went with the status workflow's buttons (gotcha #73)
 ```
 
