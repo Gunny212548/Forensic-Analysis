@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -16,7 +17,49 @@ from .routers import users as users_router
 from . import config
 from .services import auth, authz, jobs, storage
 
-app = FastAPI(title="Forensic Analyzer")
+
+def on_startup():
+    # Accounts belong in AUTH_DIR, not beside customer data (config.py).
+    stray = [n for n in ("users.json", "session_secret") if (Path(config.DATA_DIR) / n).exists()]
+    if stray:
+        logging.getLogger("forensic").warning(
+            "%s found in DATA_DIR (%s) - accounts now live in AUTH_DIR (%s) and these are "
+            "not read; move them there or delete them", ", ".join(stray), config.DATA_DIR,
+            config.AUTH_DIR)
+    legacy = storage.ensure_root()
+    if legacy:
+        # Cases in the pre-2026-10-14 flat layout are invisible until moved
+        # into their customers' stores - say so instead of showing an empty app.
+        logging.getLogger("forensic").warning(
+            "%s customer/case record(s) are still in the old shared layout and are not "
+            "shown; adding customers or cases is refused until you run: "
+            "python tools/migrate_to_customers.py --apply", legacy)
+    # Start the pipeline workers, and queue again whatever a previous run
+    # left unfinished (services/jobs.py). Not while the store is in the
+    # old layout: those cases are not visible to it.
+    if not legacy:
+        jobs.start()
+        # And the AI reviews a stop cut short: only what has no advice yet is sent again
+        # (services/triage.py, specs/ai_review_coverage.md C-D4).
+        from .services import triage
+        triage.resume()
+
+
+def on_shutdown():
+    # A deliberate stop (deploy, reboot): running jobs give their attempt back, so
+    # only a stop nobody announced counts against a file (services/jobs.py).
+    jobs.stop()
+
+
+# Starlette 1.0 dropped @app.on_event; startup and shutdown run from the lifespan.
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    on_startup()
+    yield
+    on_shutdown()
+
+
+app = FastAPI(title="Forensic Analyzer", lifespan=lifespan)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -107,41 +150,6 @@ def _refuse_oversized_upload(request: Request) -> JSONResponse | None:
 @app.exception_handler(storage.StoreNeedsMigration)
 async def needs_migration(_request: Request, exc: storage.StoreNeedsMigration):
     return JSONResponse({"detail": str(exc)}, status_code=503)
-
-
-@app.on_event("startup")
-async def on_startup():
-    # Accounts belong in AUTH_DIR, not beside customer data (config.py).
-    stray = [n for n in ("users.json", "session_secret") if (Path(config.DATA_DIR) / n).exists()]
-    if stray:
-        logging.getLogger("forensic").warning(
-            "%s found in DATA_DIR (%s) - accounts now live in AUTH_DIR (%s) and these are "
-            "not read; move them there or delete them", ", ".join(stray), config.DATA_DIR,
-            config.AUTH_DIR)
-    legacy = storage.ensure_root()
-    if legacy:
-        # Cases in the pre-2026-10-14 flat layout are invisible until moved
-        # into their customers' stores - say so instead of showing an empty app.
-        logging.getLogger("forensic").warning(
-            "%s customer/case record(s) are still in the old shared layout and are not "
-            "shown; adding customers or cases is refused until you run: "
-            "python tools/migrate_to_customers.py --apply", legacy)
-    # Start the pipeline workers, and queue again whatever a previous run
-    # left unfinished (services/jobs.py). Not while the store is in the
-    # old layout: those cases are not visible to it.
-    if not legacy:
-        jobs.start()
-        # And the AI reviews a stop cut short: only what has no advice yet is sent again
-        # (services/triage.py, specs/ai_review_coverage.md C-D4).
-        from .services import triage
-        triage.resume()
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    # A deliberate stop (deploy, reboot): running jobs give their attempt back, so
-    # only a stop nobody announced counts against a file (services/jobs.py).
-    jobs.stop()
 
 
 @app.get("/api/health")

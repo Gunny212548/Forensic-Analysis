@@ -84,7 +84,7 @@ pipeline.process_case  (services/pipeline.py)
   progress → manifest `progress: {stage, pct, estimated}` about once a
          second (FR-2.5; ingest 0-90, intel 90-92, rules 92-99). Measured
          for line logs/JSON (bytes read), zip members and rules. The CSV fast
-         path is ONE DuckDB statement and 1.1.3 (now 1.5.6) had no query_progress(), so
+         path is ONE DuckDB statement and 1.1.3 (now 2.0.0) had no query_progress(), so
          its share is an elapsed-time estimate at ~60 MB/s, held at 95% of
          the file, flagged `estimated` (the UI prefixes "~"). Manifests are
          now written tmp-then-rename, since they are rewritten while polled.
@@ -296,8 +296,11 @@ analyst, not a real-time multi-tenant SIEM. DuckDB is embedded (no server to
 operate), columnar (a 65k-row Palo Alto CSV costs a few MB), and its
 GROUP BY/HAVING is exactly what the correlation rules need. An ES cluster
 would be heavy operational baggage for zero benefit at this scale. The version is
-**1.5.6** since 2026-10-14 (pinned in `requirements.txt`; 1.1.3 before) - a gotcha or
-comment that names 1.1.3 was measured on the old one.
+**2.0.0** since 2026-10-29 (pinned in `requirements.txt`; 1.5.6 from 2026-10-14, 1.1.3
+before) - a gotcha or comment that names 1.1.3 or 1.5.6 was measured on an old one. 2.0
+opens the 1.5.6 case files and keeps their storage version, but a case it creates or
+re-processes is storage version 69, which no 1.x can open: going back to 1.5.6 strands
+those cases. Every check and the parity baseline gave the same answers on 2.0.
 
 The UI is a **Vite + React** app whose source is `frontend/` and whose build
 output is `static/` — which is generated, gitignored, and never edited by
