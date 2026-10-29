@@ -303,7 +303,100 @@ sprayed user who signs in (flagged); one process to one address on most hosts (l
 record) beside one host's beacon (flagged). The Mekong quarter unchanged; parity. The blind quarter
 re-scored and reported as a measurement of the fix only.
 
+## Story 5g - a deployment tool's routine is not lateral movement (approved 2026-10-29)
+
+Q120 yes, Q121 / Q122 as recommended (the user: "yes", 2026-10-29). Every rule scored on the three
+ground-truth quarters with the code of story 5f (Lotus Check Point, Mekong, Kinnaree): Mekong flags no
+plain or look-alike event; on Kinnaree 2,560 of the 2,567 not-attack rows are WIN-LAT-2 / WIN-LAT-4 -
+2 of WIN-LAT-2's 4 suggestions and 2 of WIN-LAT-4's 3 are a backup product's guest helper
+(`svc_veeam` from 10.50.1.40, `VeeamGuestHelper` on 5 servers, **91 of the 91 days**) and a software
+deployment tool (`svc_pdq` from 10.50.1.50, `PDQDeployRunner-1..3` on 43 machines, **3 days**). The
+attacks the rules find are each one day: K10's smbexec service `BTOBTO`, K12's task
+`\Microsoft\Windows\Defrag\ScheduledDefragCheck` and `kin.exe`; Mekong's W8 `PSEXESVC` and its two
+benign rollouts (Zabbix agent, a patch through C$ - one day each, shown to the analyst on purpose).
+
+### W-D16 - a remote service, task or copied file seen on two days or more is expected (Q120)
+
+The analytics name the tuning and leave its content to the defender: AN1468's UserContext "Distinguish
+expected remote administrators vs. rare/first-time access by specific users" (T1021.002 DET0530), and
+AN1185's ServiceBinaryAllowlist "Known binaries/services expected to be invoked via services.exe" and
+RemoteExecutionHosts "Approved remote hosts that may trigger service execution (e.g., via PsExec)"
+(T1569.002 DET0421) - re-read 2026-10-29. No allowlist comes with an upload (no asset inventory), so
+"expected" is read off the evidence, the way Q87 read AN0931's first-time pairs for WIN-LAT-1:
+
+- **WIN-LAT-2**: the (source, account, service or task name) of each hit; flagged only when that name
+  was created by that account from that source on **one day** of the evidence (4697 / 4698 in a
+  network logon's session, any host).
+- **WIN-LAT-4**: the (source, account, file path) of each write then run; flagged only when that file
+  was written by that account from that source on **one day**.
+- A one-time rollout stays flagged - an analyst decides it (Mekong's two benign ones).
+
+**The risk, said plainly:** an attacker who installs the same service name from the same source as the
+same account on two different days is left out of both rules - the blind spot WIN-LAT-1 already has.
+A different name, a different source or a different account on any day is still flagged.
+
+Measured before building (the queries on the scored cases): Kinnaree's Veeam and PDQ out (0 of the
+2,560 rows), K10 and K12 kept; Mekong unchanged.
+
+**Built 2026-10-29** (gotcha #77). Kinnaree: WIN-LAT-2 not-attack rows 1,232 -> 0 (suggestions 4 -> 2),
+WIN-LAT-4 1,328 -> 8 (3 -> 2) - only FILE01 and APP01 audit 5145, and there two PDQ runner files were
+written on one day, so by the rule's own evidence they are a first time; left for the analyst. K10 /
+K12 unchanged, Lotus unchanged. Found writing the test: WIN-LAT-4 read `%SystemRoot%` only in lower
+case, so a 4697 never matched the written file (Windows writes it mixed case) - now lowered first;
+Mekong's W8 gains its service-install row (WIN-LAT-4 3 -> 4 attack rows), nothing else moves.
+
+### W-D17 - LSASS opened with the right to read its memory (Q123, approved 2026-10-29)
+
+Found on public data the rules were not built on (2026-10-29, `D:/logtest/internet`: EVTX-ATTACK-SAMPLES
+271 files, OTRF Security-Datasets 91 host datasets). WIN-HOST-2 fired on 6 OTRF datasets that are not a
+dump (DCOM, WMI, a service DLL hijack, mimikatz key extraction): `svchost.exe` (the Prefetch writer)
+opening lsass.exe with GrantedAccess `0x3000` and then writing a `.pf` file. The rule never read the
+access. What was read (2026-10-29):
+
+- Microsoft, MiniDumpWriteDump, hProcess: "This handle must have PROCESS_QUERY_INFORMATION and
+  PROCESS_VM_READ access to the process."
+- Microsoft, Process Security and Access Rights: PROCESS_VM_READ (0x0010) "Required to read memory in a
+  process using ReadProcessMemory."; PROCESS_QUERY_LIMITED_INFORMATION is 0x1000.
+- AN1030 (T1003.001 DET0363), AccessMask: "Set to 0x1F0FFF to detect full memory access attempts; can
+  be scoped down to reduce noise."
+
+Decision: WIN-HOST-2 counts a Sysmon 10 only when its GrantedAccess carries PROCESS_VM_READ
+(`& 0x10`) - the least a process needs to read lsass's memory, by a dump (MiniDumpWriteDump) or directly
+(ReadProcessMemory, mimikatz's 0x1010). Scoped down from AN1030's 0x1F0FFF as its own field allows; a
+handle that cannot read memory cannot dump credentials. Expected from the hits' access values: the six
+`0x3000` datasets out; procdump, Dumpert / AndrewSpecial, powerdump and the RDP Task Manager dump kept
+(0x1fffff / 0x1f3fff / 0x1410); Mekong's W7 (0x1fffff) kept; OTRF's PowerShell-remoting `wsmprovhost.exe`
+(0x1410, 0x1f3fff, then a CLR log) still flagged - it can read memory, the analyst decides.
+
+**Built 2026-10-29** (gotcha #78), measured as expected: the six datasets fire nothing, every dump kept,
+Lotus / Mekong / Kinnaree unchanged.
+
+### Not changed (Q121, Q122)
+
+- **WIN-LAT-1, the admin's RDP from the jump host** (Kinnaree, 1 suggestion, 7 rows): a pair seen on one
+  day is exactly AN0931's first-time pair the user chose (Q87); left for the analyst.
+- **CP-MAL-1, a monitoring proxy's 15-minute heartbeat** (Lotus, 1 suggestion, 8,876 rows): by timing
+  it is a beacon (gotcha #15), and the fleet test of W-D11 needs a fleet - one proxy is one host. Left
+  for the analyst. R3001's OneDrive uploads (14 rows) wait for a data-transfer legitimacy criterion
+  (PAN-DATA-1).
+- Missed incidents are new detections, not fixes: K1 / K6 / K8 / K11's single events wait for the
+  SigmaHQ story (W-D1); K9 is WIN-LAT-3's stated blind spot; Lotus I3 / I6 need a Check Point sign-in
+  document (or the user's OK to use the undocumented "Failed Log In").
+
+### Tests
+
+`tests/check_windows_rules.py`: a remote service and a copied-then-run file created on two days from
+one source as one account (not flagged), and the same on one day (flagged) - beside the Mekong
+quarter, unchanged. Parity. Kinnaree and Lotus re-scored, reported as a measurement of the fix.
+
 ## Questions
+
+- **Q120 - expected remote services (W-D16).** Flag WIN-LAT-2 / WIN-LAT-4 only when their (source,
+  account, service / task / file) is seen on one day of the evidence? Recommended: yes.
+- **Q121 - WIN-LAT-1's jump host.** Leave as Q87 chose? Recommended: yes.
+- **Q122 - CP-MAL-1's heartbeat.** Leave for the analyst? Recommended: yes.
+- **Q123 - LSASS access (W-D17).** Count a Sysmon 10 on lsass.exe for WIN-HOST-2 only when its
+  GrantedAccess carries PROCESS_VM_READ (0x10)? Recommended: yes. **Answered: yes** (the user: "ok").
 
 - **Q98 - the sprayer's own computer account (W-D10).** Leave computer accounts out of WIN-AUTH-1's
   spray branch only? Recommended: yes.

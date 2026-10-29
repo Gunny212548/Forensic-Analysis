@@ -584,7 +584,10 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
             on_rule(i, len(rules))
 
     whens = " ".join(f"WHEN '{rid}' THEN {WEIGHT[lvl]}" for rid, lvl in RULE_LEVEL.items())
-    con.execute(f"UPDATE findings SET lvl = CASE rid {whens} ELSE {WEIGHT['low']} END")
+    # A rule may write a lower weight when the event itself says so (WIN-MAL-2: Defender
+    # remediated the threat); it can never raise its rule's declared level.
+    con.execute(f"UPDATE findings SET lvl = least(coalesce(lvl, {WEIGHT['critical']}), "
+                f"CASE rid {whens} ELSE {WEIGHT['low']} END)")
     # A refused connection never crossed the intrusion boundary (ODNI CTF:
     # Engagement, not Presence), so no rule can make it a prompt-review
     # alert - a C2 beacon denied every time is an attempt, not a channel.

@@ -28,8 +28,9 @@ product has its own rules over six areas, every rule names its behaviour and the
 saying why it is a finding, and its line comes from the case's own evidence (legitimate
 members only) or TRW - no number set on one customer applied to another. Palo Alto and Check
 Point have theirs, Windows its sign-in, lateral-movement, host, beaconing and feed rules (gotchas
-#65-#70, `specs/windows_rules.md` stories 5a-5e); the generic R-rules still run on every other
-product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
+#65-#70, `specs/windows_rules.md` stories 5a-5e) and Microsoft Defender's own verdicts (gotcha #76,
+`specs/windows_defender_rules.md` story 5f - a product's verdict is an in-house rule, any other single
+event waits for SigmaHQ); the generic R-rules still run on every other product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
 explains every suggestion and never decides** (gotcha #72), **no cap** - in the background once the case is ready (gotchas #64,
 #71; the user, 2026-10-26: "ทุก Finding ที่เจอต้องได้รับการ review จาก AI"). **Every step must cite a
 standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
@@ -474,7 +475,10 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
+- #76 Defender's own verdicts (story 5f, `specs/windows_defender_rules.md`): a product's verdict is an in-house rule (Q114, beside W-D1); WIN-MAL-2 one detection per host + Detection ID, medium when remediated, no technique, no generic twin (R3002 would make it a Downloader); WIN-HOST-3 turned off / tampered (T1685); item names differ per event - read the provider's templates; a rule may write a *lower* `lvl` (`least`).
 - #70 The user's blind Windows quarter (`D:\logtest\blind-windows`, now read - no longer blind): WIN-AUTH-1's spray branch leaves out computer accounts (the sprayer's own `web01$`), WIN-MAL-1 leaves out a (process, destination) beaconing on more than half the Sysmon hosts, named on the line record (ESET's timer, 40,725 rows) - only from 20 hosts up, else one host's evidence hid every beacon (Q105); not-attack rows 43,523 -> 2,567; K1 / K6 / K8 / K9 / K11 still missed.
+- #78 Public Windows data (`D:/logtest/internet`: EVTX-ATTACK-SAMPLES, OTRF): WIN-HOST-2 needs PROCESS_VM_READ (`GrantedAccess & 0x10`, W-D17) - svchost's 0x3000 Prefetch write fired on 6 datasets; the dev image without `--build` had no `evtx` library (every .evtx one row); never run a script beside a data folder named like a library; 43 OTRF flat-JSON datasets have no reader.
+- #77 Story 5g: WIN-LAT-2 / -4 flag a (source, account, service / task / file) seen on one day of the evidence only - two days or more is expected (AN1468 UserContext, AN1185 allowlists; Veeam / PDQ 2,560 rows -> 8, attacks kept); join the day count with `IS NOT DISTINCT FROM`; lower `%SystemRoot%` before replacing it - a 4697 never matched the written file.
 - #68 Windows story 5d: WIN-BRUTE-4 (B5) is Javed & Paxson's CUSUM and saw nothing until the normal was cleaned as the paper cleans it (pointwise brute-forcers out, §5's automation test) and Z counted in quarter failures (`lines.CUSUM_SCALE`) - W3 156 of 246; 4768 0x6 a failed attempt; a 4778 reconnect carries the session's own id (WIN-LAT-1, OTRF found); ADMIN$ / C$ in WIN-LAT-2, WIN-LAT-4 file copied then run; 7045 untyped.
 - #67 Windows beaconing and feeds (WIN-MAL-1, WIN-INTEL-1..2): R2007's method per (host, process, destination) with silences over an hour left out - R2007 missed a working-hours beacon; supersede R2007 / R3003-R3005 on Windows rows; documentation ranges never reach a feed.
 - #66 Windows lateral movement / host rules: steps linked by the session (TargetLogonId -> SubjectLogonId, Sysmon ProcessGuid; ASOF to the latest 4624), no window; WIN-LAT-1 = an RDP pair seen on one day of the evidence (the user's choice); WIN-LAT-3 compares an account with its own Kerberos; two areas, eight Overview cards; the OTRF reconnect (4624 type 7) and a dump with no Sysmon 10 are missed.
@@ -909,7 +913,10 @@ Two more checks, each for its own layer:
   flagged - and the real PurpleSharp spray; the lateral-movement and host rules (gotcha #66) on the same
   quarter and the real OTRF RDP / LSASS capture; story 5d (gotcha #68): W3 / W10 / W11, the CUSUM on a
   known series, 4768 0x6, the OTRF reconnect; one suggestion per behaviour (gotcha #69); story 5e
-  (gotcha #70): a sprayer's own `...$`, a fleet-wide beacon.
+  (gotcha #70): a sprayer's own `...$`, a fleet-wide beacon; story 5f (gotcha #76): Defender detections
+  and their outcome (medium only when remediated), a lone 1011, turned off / back on, tamper protection,
+  exclusions vs a routine 5007; story 5g (gotcha #77): a deployment tool's two-day service not flagged - and with `--winevents "D:/logtest/window test/WinEvents.log"` the
+  user's file (3 suggestions, nothing else).
 - **The user's blind Windows quarter** - `D:\logtest\blind-windows` (`gen_windows_blind.py`, seed
   20260401, Kinnaree Textiles, K1-K15, `out/answer_key/`). **Its key has been read** (gotcha #70): it
   measures fixes now, not the rule set; a fair blind test needs another seed whose key nobody reads.
@@ -964,8 +971,10 @@ The Check Point benchmark is in the baseline but is not under `Logtest`;
 check it with `python tests/check_parity.py D:/logtest` (gotcha #43).
 Since W2 that run also covers `D:/logtest/windows` (gotcha #60): `.evtx` is a parity suffix,
 and the 278 EVTX-ATTACK-SAMPLES files (GPL-3.0, so outside the repo) plus two exports from this
-PC are in the baseline - 279 names, 127,519 rows, 0 flagged (no in-house rule fires on them; the
-Windows detections are the SigmaHQ story's). The clone's stray `.log` / `.txt` / `.json` files
+PC are in the baseline - 279 names, 127,519 rows, 0 flagged at W2, before any Windows rule. That
+folder is gone; since 2026-10-29 the samples are re-cloned at `D:/logtest/internet/evtx-attack-samples`
+beside OTRF's host datasets (`otrf/`, zips - no parity suffix), and 5 of them flag now, as the Windows
+rules intend (gotcha #78). The clone's stray `.log` / `.txt` / `.json` files
 came in with them. W3 added `splunk-text/` (attack_data's account_lockout, 9,245 rows, R2000 24 /
 R2006 177 / R2008 3, and 54 files of the lab's Security events rendered in Splunk's layout by
 `tests/make_splunk_text.ps1`) and, in `tests/samples`, `windows-security.log` 0 -> 4 rows plus
@@ -1021,7 +1030,10 @@ The generic rules live in `rules.py` as `(rule_id, SQL)` pairs — each is one
 against a `GROUP BY ... HAVING` subquery. Conventions: `R1xxx` single-event
 host/auth, `R2xxx` correlation, `R3xxx` network/firewall. Insert `lvl` as
 `NULL`, declare the rule's Sigma level in `RULE_LEVEL` (gotcha #26), and
-always populate `mitre`.
+always populate `mitre`. Two exceptions: a rule may write a *lower* weight when the
+event itself says so (`apply_rules` keeps `least(written, declared)` - WIN-MAL-2 when
+Defender remediated, WIN-HOST-3's blocked change; gotcha #76), and a product's own verdict
+that names no attacker behaviour carries no technique (CP-MAL-2's Anti-Virus, WIN-MAL-2).
 
 Adding a rule needs no engine changes — append to `RULES` and it runs. Add a
 `RULE_LEVEL` entry (a rule without one defaults to `low`) and a
@@ -1038,7 +1050,8 @@ techniques match the SQL - run it with the parity check.
 Current set: **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
 CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **Windows** WIN-BRUTE-1..3,
 WIN-AUTH-1 (gotcha #65), WIN-LAT-1..3, WIN-HOST-1..2 (gotcha #66), WIN-MAL-1, WIN-INTEL-1..2
-(gotcha #67), WIN-BRUTE-4, WIN-LAT-4 (gotcha #68) · **generic** (every other product's rows; superseded on Palo Alto /
+(gotcha #67), WIN-BRUTE-4, WIN-LAT-4 (gotcha #68), WIN-MAL-2 Defender detection, WIN-HOST-3 Defender
+turned off (gotcha #76) · **generic** (every other product's rows; superseded on Palo Alto /
 Check Point rows, and the sign-in ones on Windows rows, gotcha #63): R2000 brute-force burst · R2002
 port scan · R2003 service sweep · R2004 policy gap · R2005 spray (many sources, one account) ·
 R2006 multi-source logins within an hour · R2007 beaconing · R2008 login after brute force ·
@@ -1077,8 +1090,9 @@ DuckDB bulk-load fix, and ~38s total while decode was still Python-per-row.
 
 Any change to ingest or rules should be checked for **parity**, and the
 baseline to check against is `tests/baseline.json`, not this file - per-file
-`rows / flagged / per-rule` counts, **668 entries** since 2026-10-22 (re-taken on the dev
-container for the product rules - gotcha #63; the Elastic PAN-OS samples added), asserted by
+`rows / flagged / per-rule` counts, **669 entries** since 2026-10-28 (re-taken on the dev
+container for the product rules - gotcha #63; the Elastic PAN-OS samples added; the user's
+WinEvents.log, 4 flagged - gotcha #76), asserted by
 `tests/check_parity.py`. Run it against the dev container (`--url http://127.0.0.1:8092`) with
 the AI review off there (gotcha #64) - with it on, a hundred uploads take hours. A silent drop to 0 findings
 is exactly the failure mode gotcha #2 describes, and a *plausible* wrong
