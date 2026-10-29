@@ -23,6 +23,9 @@ class DuckDialect(sqliteBackend):
     # SQLite TEXT column every non-numeric string compares greater than any number).
     # Compare numbers as numbers; a value that is not one is not a match.
     compare_op_expression = "TRY_CAST({field} AS DOUBLE) {operator} {value}"
+    # A boolean is matched as 'true' or 1; against a VARCHAR column the bare 1 makes DuckDB
+    # cast every value to an integer and fail on 'false'. Both forms as text.
+    bool_numeric_values = {True: "'1'", False: "'0'"}
 
     def convert_condition_field_eq_val_num(self, cond, state):
         return f"TRY_CAST({self.escape_and_quote_field(cond.field)} AS DOUBLE)={cond.value}"
