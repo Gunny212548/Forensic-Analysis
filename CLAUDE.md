@@ -344,8 +344,8 @@ signed-in account, see *Login*) and `fa_recent_uploads` (since IAI-28 the
 Upload page's "My recent uploads" are the cases whose `evidence.recorded_by`
 is the signed-in account, from `GET /api/cases` - they follow the analyst
 across browsers, and a case that no longer exists cannot linger). The
-original is preserved at `legacy/index.html.orig` — this repo is not a git
-checkout, so that copy is the only history it has.
+original was kept as `legacy/index.html.orig` until 2026-10-29; it is in git
+history now (`git show fb61af5:legacy/index.html.orig`).
 
 **What "no external JS" now means.** The old page took it literally: no build
 step and no dependency, because a vis-network CDN import had been removed

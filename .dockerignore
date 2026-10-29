@@ -3,7 +3,6 @@ metabase/
 frontend/node_modules/
 # static/ is produced by the frontend build stage, never copied from here.
 static/
-legacy/
 tests/
 data/
 .env
