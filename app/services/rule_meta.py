@@ -914,11 +914,14 @@ RULE_META.update({
                     "(T1021.002 DET0530 AN1468; T1569.002 DET0421 AN1185).",
             "strategy": "4624 LogonType 3, then 4697 (service installed) or 4698 (task created) in that "
                         "session on that host; ADMIN$ / C$ opened in the session before it (5140) is named "
-                        "and kept on the finding. A service carries T1569.002 too.",
+                        "and kept on the finding. A service carries T1569.002 too. Only a (source, account, "
+                        "service or task name) created on one day of the evidence - one seen on two days or "
+                        "more is expected (AN1468 UserContext, AN1185 allowlists, read off the evidence).",
             "technical_context": _WIN_SESSION + " System 7045 is not typed - no Microsoft page for it was "
                                                 "found; a host that logs a service only there is not read.",
             "blind_spots": "Services created over WMI or with no 4697 audit; tasks on another host than the "
-                           "logon's.",
+                           "logon's; the same service name installed from the same source as the same account "
+                           "on two days or more.",
             "validation": _WIN_5B.format(found="W8 PSEXESVC in the pass-the-hash session; the Zabbix rollout "
                                                "found and labelled a benign true positive"),
             "response": "Read the service's file and what it ran; a deployment tool is closed as benign.",
@@ -938,11 +941,13 @@ RULE_META.update({
             "strategy": "5145 on ADMIN$ / C$ with WriteData (AccessMask 0x2), the file = ShareLocalPath + "
                         "RelativeTargetName; then on the same host a 4697 whose ServiceFileName names it "
                         "(%SystemRoot% read as C:\\Windows) or a 4688 / Sysmon 1 of that image. Joined by the "
-                        "path, no window. A service carries T1569.002 too.",
+                        "path, no window. A service carries T1569.002 too. Only a (source, account, file) "
+                        "written on one day of the evidence, as WIN-LAT-2.",
             "technical_context": "Needs Detailed File Share auditing (5145), which many sites leave off; a "
                                  "host without it shows nothing here (Microsoft 5145).",
             "blind_spots": "A copy through another share or protocol; the source host's side (which session "
-                           "started it - a time window, left out); a file renamed after the copy.",
+                           "started it - a time window, left out); a file renamed after the copy; the same file "
+                           "written from the same source as the same account on two days or more.",
             "validation": _WIN_5B.format(found="W8, PSEXESVC.exe copied to SQL01's ADMIN$ and run; the "
                                                "patch copied through C$ found and labelled a benign true "
                                                "positive"),

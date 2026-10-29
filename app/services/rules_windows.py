@@ -553,11 +553,19 @@ RULES += [
     # PsExec's shape (T1021.002 DET0530 AN1468 "remote service creation, task
     # scheduling"; a service: T1569.002 DET0421 AN1185, PsExec "creating temporary
     # services").
+    # Only a (source, account, service or task) created on one day of the evidence: one seen on
+    # two days or more is expected - AN1468's "expected remote administrators vs. rare/first-time
+    # access", AN1185's allowlists, read off the evidence (W-D16, Q120).
     ("WIN-LAT-2", f"""
         INSERT INTO findings
-        WITH a AS (SELECT a.*, l.account, l.source FROM win_session_acts a
-                   JOIN win_logons l ON l.row_id = a.logon_row
-                   WHERE a.event_id IN (4697, 4698) AND l.ltype = '3'),
+        WITH a0 AS (SELECT a.*, l.account, l.source FROM win_session_acts a
+                    JOIN win_logons l ON l.row_id = a.logon_row
+                    WHERE a.event_id IN (4697, 4698) AND l.ltype = '3'),
+        pd AS (SELECT source, account, what, count(DISTINCT CAST(ts AS DATE)) AS days FROM a0 GROUP BY ALL),
+        a AS (SELECT a0.* FROM a0 JOIN pd ON pd.source IS NOT DISTINCT FROM a0.source
+                                         AND pd.account IS NOT DISTINCT FROM a0.account
+                                         AND pd.what IS NOT DISTINCT FROM a0.what
+              WHERE pd.days = 1),
         -- AN1468's "access to ADMIN$ / C$" in the same session (5140, logged once per session).
         sh AS (SELECT row_id, logon_row, what AS share, ts FROM win_session_acts
                WHERE event_id = 5140 AND {_admin_share("what")}),
@@ -577,7 +585,8 @@ RULES += [
     # PSEXESVC.exe to ADMIN$ and installs it (T1021.002 AN1468, W-D8, Q91). 5145 names the file
     # (RelativeTargetName under ShareLocalPath) and the access (AccessMask 0x2 WriteData); it
     # needs Detailed File Share auditing - a host without it shows nothing here. Joined by the
-    # file's path on the same host, the run after the write: no window.
+    # file's path on the same host, the run after the write: no window. Only a (source, account,
+    # file) written on one day of the evidence, as WIN-LAT-2 (W-D16, Q120).
     ("WIN-LAT-4", f"""
         INSERT INTO findings
         WITH wr AS (
@@ -592,17 +601,23 @@ RULES += [
             AND coalesce(trim(w.data['RelativeTargetName']), '') NOT IN ('', '\\')),
         run AS (
           SELECT e.row_id, e.ts, {HOST} AS host, w.event_id,
-                 lower(replace(CASE WHEN w.event_id = 4697 THEN w.data['ServiceFileName']
+                 -- lower first: Windows writes %SystemRoot% in mixed case.
+                 replace(lower(CASE WHEN w.event_id = 4697 THEN w.data['ServiceFileName']
                                     WHEN w.event_id = 4688 THEN w.data['NewProcessName']
-                                    ELSE w.data['Image'] END, '%systemroot%', 'c:\\windows')) AS image,
+                                    ELSE w.data['Image'] END), '%systemroot%', 'c:\\windows') AS image,
                  coalesce(w.data['ServiceName'], e.program) AS what
           FROM product_events e JOIN win_events w USING (row_id)
           WHERE e.ts IS NOT NULL AND ((w.provider = '{SECURITY}' AND w.event_id IN (4697, 4688))
                                       OR (w.provider = '{SYSMON}' AND w.event_id = 1))),
-        pairs AS (SELECT wr.row_id AS wrow, run.row_id AS rrow, wr.host, wr.account, wr.source, wr.share,
-                         wr.path, run.event_id, run.what
-                  FROM wr JOIN run ON run.host = wr.host AND run.ts >= wr.ts
-                                  AND (run.image = wr.path OR (run.event_id = 4697 AND contains(run.image, wr.path)))),
+        pairs0 AS (SELECT wr.row_id AS wrow, run.row_id AS rrow, wr.ts AS wts, wr.host, wr.account, wr.source,
+                          wr.share, wr.path, run.event_id, run.what
+                   FROM wr JOIN run ON run.host = wr.host AND run.ts >= wr.ts
+                                   AND (run.image = wr.path OR (run.event_id = 4697 AND contains(run.image, wr.path)))),
+        pd AS (SELECT source, account, path, count(DISTINCT CAST(wts AS DATE)) AS days FROM pairs0 GROUP BY ALL),
+        pairs AS (SELECT p.* FROM pairs0 p JOIN pd ON pd.source IS NOT DISTINCT FROM p.source
+                                                  AND pd.account IS NOT DISTINCT FROM p.account
+                                                  AND pd.path = p.path
+                  WHERE pd.days = 1),
         r AS (SELECT wrow AS row_id, wrow, rrow FROM pairs UNION ALL SELECT rrow, wrow, rrow FROM pairs)
         SELECT r.row_id, 'WIN-LAT-4', NULL,
                p.path || ' written to ' || p.share || ' on ' || p.host || ' as ' || p.account || ' from ' ||

@@ -18,6 +18,7 @@ over by a reconnect), W11 (Kerberos user-name enumeration) and W8's ADMIN$ copy 
 OTRF's reconnect found through the session's own logon id.
 specs/finding_entities.md adds: one suggestion per behaviour (the entity a rule names), no
 IPv4-mapped address in the timeline column, the account's history among the AI's facts.
+Story 5g adds: a remote service / copied file seen on two days is expected, on one day flagged.
 """
 
 import argparse
@@ -227,6 +228,32 @@ def main() -> int:
     check(mal_of(con) == {"agent.exe", "implant.exe"} and not rec.get("left_out")
           and "under 20" in (rec.get("note") or ""),
           f"under 20 hosts every beacon is flagged ({mal_of(con)}, {rec.get('note')})")
+    con.close()
+
+    print("story 5g: a remote service or copied file seen on two days is expected")
+    lines5g = []
+
+    def push(ts, host, account, source, svc, lid):
+        # A network logon, the file written to ADMIN$, then installed as a service in that session.
+        return [event(4624, ts, host, {"TargetUserName": account, "TargetLogonId": lid, "LogonType": "3",
+                                       "IpAddress": source, "AuthenticationPackageName": "Kerberos"}),
+                event(5145, ts + timedelta(seconds=1), host,
+                      {"SubjectUserName": account, "SubjectLogonId": lid, "IpAddress": source,
+                       "ShareName": r"\\*\ADMIN$", "ShareLocalPath": r"\??\C:\Windows",
+                       "RelativeTargetName": f"{svc}.exe", "AccessMask": "0x2"}),
+                event(4697, ts + timedelta(seconds=2), host,
+                      {"SubjectUserName": account, "SubjectLogonId": lid, "ServiceName": svc,
+                       "ServiceFileName": rf"%SystemRoot%\{svc}.exe"})]
+    # The deployment tool's agent on two days, to two hosts; an admin's one-off service on one day.
+    lines5g += push(t0, "srv1.corp.local", "svc_deploy", "10.0.8.5", "deployagent", "0xa01")
+    lines5g += push(t0 + timedelta(days=1), "srv2.corp.local", "svc_deploy", "10.0.8.5", "deployagent", "0xa02")
+    lines5g += push(t0 + timedelta(hours=3), "srv1.corp.local", "adm", "10.0.8.9", "btobto", "0xa03")
+    f5g = scratch / "story5g.xml"
+    f5g.write_text("\n".join(lines5g) + "\n", encoding="utf-8")
+    cid, man, con = run(f5g, "log")
+    for rid in ("WIN-LAT-2", "WIN-LAT-4"):
+        who = {r[0] for r in con.execute(f"SELECT DISTINCT entity_user FROM findings WHERE rid = '{rid}'").fetchall()}
+        check(who == {"adm"}, f"{rid}: the one-day service flagged, the tool's two-day agent not ({who})")
     con.close()
 
     print("the synthetic Windows quarter, against its ground truth")
