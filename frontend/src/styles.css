@@ -5,9 +5,9 @@
    The old dark palette was tuned against real cases for screenshots in
    case reports. Everything that carried meaning in it still does: the
    severity buckets, the review stripes and the status colours keep their
-   roles, only re-mapped onto Figma's tokens. The attack graph alone keeps
-   its dark canvas (--graph-bg), because its SVG colours are drawn for it -
-   it gets the Figma treatment with its own story (IAI-61).
+   roles, only re-mapped onto Figma's tokens. The attack graph kept a dark
+   canvas until IAI-61 (2026-10-29) gave it the Figma's look on the panel
+   colours; its parts are the .ag-* rules, every colour a token.
 
    Two themes since 2026-10-27 (the user's request, after the SOCRadar
    layout): light, the default, on :root and dark under [data-theme=dark]
@@ -43,7 +43,6 @@
     --info: #2A5FC1;
     --info-tint: #DCE6F7;
     --shadow: rgba(18,21,28,.09);
-    --graph-bg: #0f172a;
     --sans: "IBM Plex Sans", "IBM Plex Sans Thai", -apple-system, "Segoe UI", Roboto, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   }
@@ -648,8 +647,36 @@
   .job-bar > span { display: block; height: 100%; background: var(--info); }
   .job-progress.stale .job-bar > span { background: var(--warn); }
 
-  .graph-wrap { overflow-x: auto; background: var(--graph-bg); border: 1px solid var(--panel-border); border-radius: 4px; padding: 10px; }
+  .graph-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 4px; padding: 16px; }
   .graph-wrap svg { display: block; }
+  /* The attack graph (AttackGraph.jsx, IAI-61): column heads, round nodes coloured by role
+     (source / pivot / sink), an icon for the node's kind, callouts, edges by severity. */
+  .ag-head { font-size: 11px; letter-spacing: .04em; fill: var(--muted); }
+  .ag-disc { stroke-width: 2; }
+  .ag-source .ag-disc { fill: var(--danger-tint); stroke: var(--danger); }
+  .ag-pivot .ag-disc { fill: var(--warn-tint); stroke: var(--warn); }
+  .ag-sink .ag-disc { fill: var(--info-tint); stroke: var(--info); }
+  .ag-icon { fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ag-source .ag-icon { stroke: var(--danger); }
+  .ag-pivot .ag-icon { stroke: var(--warn); }
+  .ag-sink .ag-icon { stroke: var(--info); }
+  .ag-name { font-family: var(--mono); font-size: 12px; font-weight: 600; fill: var(--text); text-anchor: middle; }
+  .ag-pill text { font-size: 10.5px; font-weight: 600; text-anchor: middle; }
+  .ag-pill-feed rect { fill: var(--danger); }
+  .ag-pill-feed text { fill: var(--panel); }
+  .ag-pill-ext rect { fill: var(--warn-tint); stroke: var(--warn); }
+  .ag-pill-ext text { fill: var(--warn); }
+  .ag-edge { fill: none; stroke-width: 1.6; }
+  .ag-label rect { fill: var(--panel); stroke-width: 1; }
+  .ag-label text { font-family: var(--mono); font-size: 11px; }
+  .ag-critical.ag-edge, .ag-label.ag-critical rect { stroke: var(--danger); }
+  .ag-high.ag-edge, .ag-label.ag-high rect { stroke: var(--warn); }
+  .ag-medium.ag-edge, .ag-label.ag-medium rect { stroke: var(--info); }
+  .ag-low.ag-edge, .ag-label.ag-low rect { stroke: var(--muted); }
+  .ag-label.ag-critical text, .ag-arrow.ag-critical path { fill: var(--danger); }
+  .ag-label.ag-high text, .ag-arrow.ag-high path { fill: var(--warn); }
+  .ag-label.ag-medium text, .ag-arrow.ag-medium path { fill: var(--info); }
+  .ag-label.ag-low text, .ag-arrow.ag-low path { fill: var(--muted); }
 
   /* Result-page workspace: sidebar tabs + content pane, instead of one long scroll */
   .ws { display: flex; gap: 20px; align-items: flex-start; }

@@ -271,6 +271,7 @@ def graph(company_id: str, project_id: str) -> dict:
     from the confirmed groups only, and empty while any case of the project has a
     suggestion not decided - as on the case's Attack path step (the user, 2026-10-28)."""
     edges: dict[tuple, dict] = {}
+    about: dict[str, dict] = {}
     risk: dict[str, dict] = {}
     cases = _analysed(company_id, project_id)
     decisions = {m["case_id"]: case_views.decided(m["case_id"]) for m in cases}
@@ -282,7 +283,14 @@ def graph(company_id: str, project_id: str) -> dict:
         keys = decisions[m["case_id"]][0]
         # By id: two cases may carry the same file name (two exports both "log.csv").
         case = {"case_id": m["case_id"], "file": m.get("original_filename")}
-        for e in db.build_graph(m["case_id"], keys=keys)["edges"]:
+        graph = db.build_graph(m["case_id"], keys=keys)
+        # A node's facts (IAI-61): the case that says most - one where a feed lists the address,
+        # or the node is a target (an account), beats one that does not.
+        for node in graph["nodes"]:
+            have = about.get(node["id"])
+            if have is None or len(node.get("about") or "") > len(have.get("about") or ""):
+                about[node["id"]] = {k: node.get(k) for k in ("kind", "external", "listed_by", "about")}
+        for e in graph["edges"]:
             k = (e["from"], e["to"])
             have = edges.get(k)
             if have is None or e["lvl"] > have["lvl"]:
@@ -313,7 +321,8 @@ def graph(company_id: str, project_id: str) -> dict:
         for n in (e["from"], e["to"]):
             if n not in names:
                 names.append(n)
-    nodes = [{"id": n, "label": n, "type": "ip" if db._IP_LIKE.match(n) else "entity"} for n in names]
+    nodes = [{"id": n, "label": n, "type": "ip" if db._IP_LIKE.match(n) else "entity",
+              **about.get(n, {})} for n in names]
     ranked = {role: sorted(({**r, "rules": sorted(r["rules"])} for r in by.values()),
                            key=lambda r: (-r["score"], r["entity"]))[:8]
               for role, by in risk.items()}

@@ -200,6 +200,20 @@ def main() -> int:
         check(g.status_code == 200 and body.get("graph", {}).get("edges") and body.get("undecided") == 0,
               "/graph returns the attack graph once every suggestion is decided")
         check(bool(body.get("risk")), "...and the risk ranking")
+        # IAI-61: each node says what the evidence says about it - an address internal or external
+        # (RFC 1918, not ipaddress.is_private, which calls the RFC 5737 attackers private), else
+        # an account or a host; never a role nobody recorded.
+        nodes = body.get("graph", {}).get("nodes") or []
+        ok = bool(nodes)
+        for n in nodes:
+            if n["type"] == "ip":
+                internal = n["id"].startswith(("10.", "192.168.", "127.")) or \
+                    (n["id"].startswith("172.") and 16 <= int(n["id"].split(".")[1]) <= 31)
+                ok &= n.get("kind") == "address" and n.get("external") is (not internal) and \
+                    n.get("about", "").startswith("internal address" if internal else "external address")
+            else:
+                ok &= n.get("kind") in ("account", "host") and n.get("about") == n.get("kind")
+        check(ok, f"every node names its kind and, for an address, internal or external ({nodes[:3]})")
         check(c.get("/api/cases/nope/flow").status_code == 404, "/flow of an unknown case is 404")
         check(c.get("/api/cases/nope/graph").status_code == 404, "/graph of an unknown case is 404")
 

@@ -379,9 +379,8 @@ the type is IBM Plex Sans / Plex Sans Thai / Plex Mono, bundled via
 `@fontsource` so the nothing-fetched-at-runtime rule above still holds.
 Plex Sans has no Thai glyphs, and most UI text is Thai, which is why the Thai
 cut is there too. Severity, review-status and job colours kept their meanings
-and were only re-mapped onto the Figma tokens. Exception: the attack graph
-keeps a dark canvas (`--graph-bg`), because the colours in `AttackGraph.jsx`
-are drawn for it; it gets the Figma treatment in its own story (IAI-61). The
+and were only re-mapped onto the Figma tokens. The attack graph kept a dark
+canvas until IAI-61 (2026-10-29) put it on the panel colours, below. The
 whole UI is in English, as the Figma is (since 2026-10-12, see *Decisions*).
 
 **The SOCRadar layout, light and dark (2026-10-27, the user's request).** The
@@ -417,13 +416,22 @@ it, are `--warn` - give any new severity or warning colour `--warn`, never
 value under both themes; a literal hex in a rule is wrong in one of them.
 
 The attack graph is still a **static SVG** with no library
-(`components/AttackGraph.jsx`), and its geometry is deliberately the same
-arithmetic the old page used, because these diagrams get screenshotted into
-reports: nodes in columns by role (pure sources left, pure sinks right,
-anything with both in/out in the middle), and edge labels anchored just past
-the *source* node rather than at the edge midpoint — these graphs are usually
-many sources converging on one target, so every midpoint lands in the same
-spot and the labels pile up on top of each other.
+(`components/AttackGraph.jsx`), and its layout keeps the old page's logic,
+because these diagrams get screenshotted into reports: nodes in columns by role
+(pure sources left, pure sinks right, anything with both in/out in the middle),
+and edge labels anchored just past the *source* node rather than at the edge
+midpoint — these graphs are usually many sources converging on one target, so
+every midpoint lands in the same spot and the labels pile up on top of each other.
+**Its look since IAI-61 (2026-10-29, the user's choice between the Figma and a
+Microsoft attack-path picture: "three columns, the attack-path look")**: column
+heads (SOURCES / PIVOTS / SINKS), round nodes coloured by role with an icon for
+the node's kind (address, host, account), the name underneath and callouts
+(*On threat feed*, *External*), curved edges in the colour of their highest
+finding's level, technique labels in outlined boxes; every colour a token
+(`.ag-*` in styles.css). A node says only what the evidence does
+(`db.node_facts`): internal is RFC 1918 / loopback / link-local - not
+`ipaddress.is_private`, which also calls the RFC 5737 documentation ranges the
+synthetic attackers use private - and no role such as "domain controller".
 
 Two things the rewrite changed on purpose:
 - **`escapeHtml()` is gone.** The old page concatenated `innerHTML`, so every

@@ -13,6 +13,7 @@ Why DuckDB rather than flat JSON (what this replaced) or Elasticsearch:
   be heavy operational baggage for a single-analyst forensic tool
 """
 
+import ipaddress
 import json
 import re
 from pathlib import Path
@@ -839,6 +840,7 @@ def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) ->
         return {"nodes": [], "edges": []}
 
     con = connect(case_id, read_only=True)
+    listed: dict[str, str] = {}
     try:
         kept = _kept_sql(con, keys)
         rows = con.execute(
@@ -858,6 +860,8 @@ def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) ->
             ORDER BY 1, 2, 3
             """
         ).fetchall()
+        # Which feeds list each address, for the node's line under its name (IAI-61).
+        listed = _listed(con, {n for src, dst, *_ in rows for n in (src, dst) if _IP_LIKE.match(n or "")})
     finally:
         con.close()
 
@@ -902,11 +906,34 @@ def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) ->
         for n in (e["from"], e["to"]):
             if n not in names:
                 names.append(n)
-    nodes = [
-        {"id": n, "label": n, "type": "ip" if _IP_LIKE.match(n) else "entity"}
-        for n in names
-    ]
+    accounts = {e["to"] for e in edges}
+    nodes = [{"id": n, "label": n, "type": "ip" if _IP_LIKE.match(n) else "entity",
+              **node_facts(n, n in accounts, listed.get(n))} for n in names]
     return {"nodes": nodes, "edges": edges}
+
+
+# RFC 1918's private blocks, loopback and link-local. Not ipaddress.is_private: that also counts
+# the documentation ranges (RFC 5737) as private, where the synthetic quarters put their attackers.
+_INTERNAL = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+                                                "127.0.0.0/8", "169.254.0.0/16")]
+
+
+def node_facts(name: str, is_target: bool, listed_by: str | None) -> dict:
+    """What the attack graph says about a node (IAI-61): only what the evidence does - an address
+    internal or external and the feeds listing it, or an account / host name. `kind` picks its
+    icon, `external` / `listed_by` its callouts, `about` its tooltip. No role such as "domain
+    controller": there is no asset inventory to say so (CLAUDE.md, *Decisions*)."""
+    if _IP_LIKE.match(name):
+        try:
+            external = not any(ipaddress.ip_address(name) in net for net in _INTERNAL)
+        except ValueError:
+            external = True
+        about = "external address" if external else "internal address"
+        return {"kind": "address", "external": external, "listed_by": listed_by,
+                "about": f"{about} · listed by {listed_by}" if listed_by else about}
+    # A non-address source is a workstation name (a 4776's); a target is the account signed in to.
+    kind = "account" if is_target else "host"
+    return {"kind": kind, "external": False, "listed_by": None, "about": kind}
 
 
 # Roles an entity can play in a finding. Scored separately because a
