@@ -477,6 +477,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
 - #76 Defender's own verdicts (story 5f, `specs/windows_defender_rules.md`): a product's verdict is an in-house rule (Q114, beside W-D1); WIN-MAL-2 one detection per host + Detection ID, medium when remediated, no technique, no generic twin (R3002 would make it a Downloader); WIN-HOST-3 turned off / tampered (T1685); item names differ per event - read the provider's templates; a rule may write a *lower* `lvl` (`least`).
 - #70 The user's blind Windows quarter (`D:\logtest\blind-windows`, now read - no longer blind): WIN-AUTH-1's spray branch leaves out computer accounts (the sprayer's own `web01$`), WIN-MAL-1 leaves out a (process, destination) beaconing on more than half the Sysmon hosts, named on the line record (ESET's timer, 40,725 rows) - only from 20 hosts up, else one host's evidence hid every beacon (Q105); not-attack rows 43,523 -> 2,567; K1 / K6 / K8 / K9 / K11 still missed.
+- #78 Public Windows data (`D:/logtest/internet`: EVTX-ATTACK-SAMPLES, OTRF): WIN-HOST-2 needs PROCESS_VM_READ (`GrantedAccess & 0x10`, W-D17) - svchost's 0x3000 Prefetch write fired on 6 datasets; the dev image without `--build` had no `evtx` library (every .evtx one row); never run a script beside a data folder named like a library; 43 OTRF flat-JSON datasets have no reader.
 - #77 Story 5g: WIN-LAT-2 / -4 flag a (source, account, service / task / file) seen on one day of the evidence only - two days or more is expected (AN1468 UserContext, AN1185 allowlists; Veeam / PDQ 2,560 rows -> 8, attacks kept); join the day count with `IS NOT DISTINCT FROM`; lower `%SystemRoot%` before replacing it - a 4697 never matched the written file.
 - #68 Windows story 5d: WIN-BRUTE-4 (B5) is Javed & Paxson's CUSUM and saw nothing until the normal was cleaned as the paper cleans it (pointwise brute-forcers out, §5's automation test) and Z counted in quarter failures (`lines.CUSUM_SCALE`) - W3 156 of 246; 4768 0x6 a failed attempt; a 4778 reconnect carries the session's own id (WIN-LAT-1, OTRF found); ADMIN$ / C$ in WIN-LAT-2, WIN-LAT-4 file copied then run; 7045 untyped.
 - #67 Windows beaconing and feeds (WIN-MAL-1, WIN-INTEL-1..2): R2007's method per (host, process, destination) with silences over an hour left out - R2007 missed a working-hours beacon; supersede R2007 / R3003-R3005 on Windows rows; documentation ranges never reach a feed.
@@ -970,8 +971,10 @@ The Check Point benchmark is in the baseline but is not under `Logtest`;
 check it with `python tests/check_parity.py D:/logtest` (gotcha #43).
 Since W2 that run also covers `D:/logtest/windows` (gotcha #60): `.evtx` is a parity suffix,
 and the 278 EVTX-ATTACK-SAMPLES files (GPL-3.0, so outside the repo) plus two exports from this
-PC are in the baseline - 279 names, 127,519 rows, 0 flagged (no in-house rule fires on them; the
-Windows detections are the SigmaHQ story's). The clone's stray `.log` / `.txt` / `.json` files
+PC are in the baseline - 279 names, 127,519 rows, 0 flagged at W2, before any Windows rule. That
+folder is gone; since 2026-10-29 the samples are re-cloned at `D:/logtest/internet/evtx-attack-samples`
+beside OTRF's host datasets (`otrf/`, zips - no parity suffix), and 5 of them flag now, as the Windows
+rules intend (gotcha #78). The clone's stray `.log` / `.txt` / `.json` files
 came in with them. W3 added `splunk-text/` (attack_data's account_lockout, 9,245 rows, R2000 24 /
 R2006 177 / R2008 3, and 54 files of the lab's Security events rendered in Splunk's layout by
 `tests/make_splunk_text.ps1`) and, in `tests/samples`, `windows-security.log` 0 -> 4 rows plus

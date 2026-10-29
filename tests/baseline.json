@@ -1101,10 +1101,12 @@
   "rules": {}
  },
  "LM_ScheduledTask_ATSVC_target_host.evtx": {
-  "flagged": 0,
+  "flagged": 2,
   "md5": "1fa713d1c9f2cc2a8ce45912d2070439",
   "rows": 34,
-  "rules": {}
+  "rules": {
+   "WIN-LAT-2": 2
+  }
  },
  "LM_ScheduledTask_ATSVC_target_host.evtx.log": {
   "flagged": 0,
@@ -1612,10 +1614,12 @@
   "rules": {}
  },
  "WinDefender_Events_1117_1116_AtomicRedTeam.evtx": {
-  "flagged": 0,
+  "flagged": 11,
   "md5": "83ac4a5940fc446913cbae613d85b900",
   "rows": 11,
-  "rules": {}
+  "rules": {
+   "WIN-MAL-2": 11
+  }
  },
  "WinEvents.log": {
   "flagged": 4,
@@ -2122,10 +2126,13 @@
   "rules": {}
  },
  "kerberos_pwd_spray_4771.evtx": {
-  "flagged": 0,
+  "flagged": 11,
   "md5": "82d715de876f66f9cec81aac124d83e2",
   "rows": 12,
-  "rules": {}
+  "rules": {
+   "WIN-AUTH-1": 2,
+   "WIN-BRUTE-2": 9
+  }
  },
  "kerberos_pwd_spray_4771.evtx.log": {
   "flagged": 0,
@@ -3600,16 +3607,20 @@
   "rules": {}
  },
  "sysmon_10_11_lsass_memdump.evtx": {
-  "flagged": 0,
+  "flagged": 4,
   "md5": "85f213a960a5b9443474336665305234",
   "rows": 4,
-  "rules": {}
+  "rules": {
+   "WIN-HOST-2": 4
+  }
  },
  "sysmon_10_11_outlfank_dumpert_and_andrewspecial_memdump.evtx": {
-  "flagged": 0,
+  "flagged": 9,
   "md5": "eb0d195506b400c6f07822a8ccc76109",
   "rows": 15,
-  "rules": {}
+  "rules": {
+   "WIN-HOST-2": 9
+  }
  },
  "sysmon_10_1_memdump_comsvcs_minidump.evtx": {
   "flagged": 0,

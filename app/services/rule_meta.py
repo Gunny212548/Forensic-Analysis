@@ -1010,7 +1010,10 @@ RULE_META.update({
             "goal": "Detect a process that opens lsass.exe and then writes a file - a memory dump "
                     "(T1003.001 DET0363 AN1030).",
             "strategy": "Sysmon 10 with TargetImage lsass.exe, then Sysmon 11 by the same process "
-                        "(SourceProcessGUID = ProcessGuid) on the same host. Registry writes are left out.",
+                        "(SourceProcessGUID = ProcessGuid) on the same host. Registry writes are left out. "
+                        "Only a GrantedAccess carrying PROCESS_VM_READ (0x10) - the right MiniDumpWriteDump "
+                        "and ReadProcessMemory need (Microsoft); AN1030's 0x1F0FFF scoped down as its "
+                        "AccessMask field allows.",
             "technical_context": "Needs Sysmon with process access (10) and file creation (11) logged.",
             "blind_spots": "A Sysmon configuration that does not log the access (measured: the OTRF Task "
                            "Manager dump has the lsass.DMP file but no Sysmon 10 for it); dumps written by "

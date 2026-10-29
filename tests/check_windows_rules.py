@@ -18,7 +18,8 @@ over by a reconnect), W11 (Kerberos user-name enumeration) and W8's ADMIN$ copy 
 OTRF's reconnect found through the session's own logon id.
 specs/finding_entities.md adds: one suggestion per behaviour (the entity a rule names), no
 IPv4-mapped address in the timeline column, the account's history among the AI's facts.
-Story 5g adds: a remote service / copied file seen on two days is expected, on one day flagged.
+Story 5g adds: a remote service / copied file seen on two days is expected, on one day flagged; an
+lsass handle without PROCESS_VM_READ is not a dump.
 """
 
 import argparse
@@ -254,6 +255,26 @@ def main() -> int:
     for rid in ("WIN-LAT-2", "WIN-LAT-4"):
         who = {r[0] for r in con.execute(f"SELECT DISTINCT entity_user FROM findings WHERE rid = '{rid}'").fetchall()}
         check(who == {"adm"}, f"{rid}: the one-day service flagged, the tool's two-day agent not ({who})")
+    con.close()
+
+    # W-D17: an lsass handle that cannot read memory (svchost's 0x3000, then a Prefetch file) is not a
+    # dump; procdump's 0x1fffff then a .dmp is.
+    lines17 = []
+    for k, (img, access, written) in enumerate([(r"C:\Windows\System32\svchost.exe", "0x3000",
+                                                 r"C:\Windows\Prefetch\CONHOST.EXE-1F3E9D7E.pf"),
+                                                (r"C:\Tools\procdump.exe", "0x1fffff", r"C:\Tools\lsass.dmp")]):
+        g = f"{{0000{k}}}"
+        lines17.append(event(10, t0 + timedelta(minutes=k), "pc9.corp.local",
+                             {"SourceProcessGUID": g, "SourceImage": img, "TargetImage": r"C:\Windows\system32\lsass.exe",
+                              "GrantedAccess": access, "SourceUser": r"CORP\amy"}, sysmon=True))
+        lines17.append(event(11, t0 + timedelta(minutes=k, seconds=2), "pc9.corp.local",
+                             {"ProcessGuid": g, "Image": img, "TargetFilename": written}, sysmon=True))
+    f17 = scratch / "story5g-lsass.xml"
+    f17.write_text("\n".join(lines17) + "\n", encoding="utf-8")
+    cid, man, con = run(f17, "log")
+    dumps = {r[0] for r in con.execute("SELECT DISTINCT descr FROM findings WHERE rid = 'WIN-HOST-2'").fetchall()}
+    check(len(dumps) == 1 and "procdump" in next(iter(dumps)),
+          f"WIN-HOST-2: procdump's 0x1fffff dump flagged, svchost's 0x3000 Prefetch write not ({dumps})")
     con.close()
 
     print("the synthetic Windows quarter, against its ground truth")

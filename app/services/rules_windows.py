@@ -672,7 +672,9 @@ RULES += [
     # LSASS dump: a process opens lsass.exe, then writes a file (T1003.001 DET0363
     # AN1030 - "then invokes memory dump, file creation"), joined by the process's
     # Sysmon GUID. Registry writes are left out: an antivirus reads lsass and writes
-    # its own keys all day.
+    # its own keys all day. Only an access that can read lsass's memory - PROCESS_VM_READ
+    # (0x10), which MiniDumpWriteDump and ReadProcessMemory need (W-D17, Q123): svchost's
+    # 0x3000 before writing a Prefetch file cannot dump anything.
     ("WIN-HOST-2", f"""
         INSERT INTO findings
         WITH acc AS (SELECT e.row_id, e.ts, {HOST} AS host, lower(w.data['SourceProcessGUID']) AS g,
@@ -680,7 +682,8 @@ RULES += [
                             {_account("w.data['SourceUser']")} AS account
                      FROM product_events e JOIN win_events w USING (row_id)
                      WHERE w.provider = '{SYSMON}' AND w.event_id = 10
-                       AND lower(w.data['TargetImage']) LIKE '%\\lsass.exe'),
+                       AND lower(w.data['TargetImage']) LIKE '%\\lsass.exe'
+                       AND (try_cast(trim(w.data['GrantedAccess']) AS BIGINT) & 16) <> 0),
         wr AS (SELECT e.row_id, e.ts, {HOST} AS host, lower(w.data['ProcessGuid']) AS g,
                       w.data['TargetFilename'] AS f
                FROM product_events e JOIN win_events w USING (row_id)

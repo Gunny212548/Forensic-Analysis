@@ -345,6 +345,32 @@ K12 unchanged, Lotus unchanged. Found writing the test: WIN-LAT-4 read `%SystemR
 case, so a 4697 never matched the written file (Windows writes it mixed case) - now lowered first;
 Mekong's W8 gains its service-install row (WIN-LAT-4 3 -> 4 attack rows), nothing else moves.
 
+### W-D17 - LSASS opened with the right to read its memory (Q123, approved 2026-10-29)
+
+Found on public data the rules were not built on (2026-10-29, `D:/logtest/internet`: EVTX-ATTACK-SAMPLES
+271 files, OTRF Security-Datasets 91 host datasets). WIN-HOST-2 fired on 6 OTRF datasets that are not a
+dump (DCOM, WMI, a service DLL hijack, mimikatz key extraction): `svchost.exe` (the Prefetch writer)
+opening lsass.exe with GrantedAccess `0x3000` and then writing a `.pf` file. The rule never read the
+access. What was read (2026-10-29):
+
+- Microsoft, MiniDumpWriteDump, hProcess: "This handle must have PROCESS_QUERY_INFORMATION and
+  PROCESS_VM_READ access to the process."
+- Microsoft, Process Security and Access Rights: PROCESS_VM_READ (0x0010) "Required to read memory in a
+  process using ReadProcessMemory."; PROCESS_QUERY_LIMITED_INFORMATION is 0x1000.
+- AN1030 (T1003.001 DET0363), AccessMask: "Set to 0x1F0FFF to detect full memory access attempts; can
+  be scoped down to reduce noise."
+
+Decision: WIN-HOST-2 counts a Sysmon 10 only when its GrantedAccess carries PROCESS_VM_READ
+(`& 0x10`) - the least a process needs to read lsass's memory, by a dump (MiniDumpWriteDump) or directly
+(ReadProcessMemory, mimikatz's 0x1010). Scoped down from AN1030's 0x1F0FFF as its own field allows; a
+handle that cannot read memory cannot dump credentials. Expected from the hits' access values: the six
+`0x3000` datasets out; procdump, Dumpert / AndrewSpecial, powerdump and the RDP Task Manager dump kept
+(0x1fffff / 0x1f3fff / 0x1410); Mekong's W7 (0x1fffff) kept; OTRF's PowerShell-remoting `wsmprovhost.exe`
+(0x1410, 0x1f3fff, then a CLR log) still flagged - it can read memory, the analyst decides.
+
+**Built 2026-10-29** (gotcha #78), measured as expected: the six datasets fire nothing, every dump kept,
+Lotus / Mekong / Kinnaree unchanged.
+
 ### Not changed (Q121, Q122)
 
 - **WIN-LAT-1, the admin's RDP from the jump host** (Kinnaree, 1 suggestion, 7 rows): a pair seen on one
@@ -369,6 +395,8 @@ quarter, unchanged. Parity. Kinnaree and Lotus re-scored, reported as a measurem
   account, service / task / file) is seen on one day of the evidence? Recommended: yes.
 - **Q121 - WIN-LAT-1's jump host.** Leave as Q87 chose? Recommended: yes.
 - **Q122 - CP-MAL-1's heartbeat.** Leave for the analyst? Recommended: yes.
+- **Q123 - LSASS access (W-D17).** Count a Sysmon 10 on lsass.exe for WIN-HOST-2 only when its
+  GrantedAccess carries PROCESS_VM_READ (0x10)? Recommended: yes. **Answered: yes** (the user: "ok").
 
 - **Q98 - the sprayer's own computer account (W-D10).** Leave computer accounts out of WIN-AUTH-1's
   spray branch only? Recommended: yes.
