@@ -298,9 +298,11 @@ GROUP BY/HAVING is exactly what the correlation rules need. An ES cluster
 would be heavy operational baggage for zero benefit at this scale. The version is
 **2.0.0** since 2026-10-29 (pinned in `requirements.txt`; 1.5.6 from 2026-10-14, 1.1.3
 before) - a gotcha or comment that names 1.1.3 or 1.5.6 was measured on an old one. 2.0
-opens the 1.5.6 case files and keeps their storage version, but a case it creates or
-re-processes is storage version 69, which no 1.x can open: going back to 1.5.6 strands
-those cases. Every check and the parity baseline gave the same answers on 2.0.
+opens the 1.5.6 case files and keeps their storage version. By default it would write new
+ones as storage version 69, which no 1.x opens, so `db.connect` passes
+`storage_compatibility_version: v1.5.0` (`db.DB_CONFIG`) and a case 2.0 writes still opens
+in 1.5.6 (checked: a Check Point case processed on 2.0, read back by 1.5.6) - going back
+strands nothing. Every check and the parity baseline gave the same answers on 2.0.
 
 The UI is a **Vite + React** app whose source is `frontend/` and whose build
 output is `static/` — which is generated, gitignored, and never edited by

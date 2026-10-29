@@ -97,12 +97,19 @@ def db_path(case_id: str) -> Path:
     return storage.case_dir(case_id, "db") / f"{case_id}.duckdb"
 
 
+# Case files stay in the storage format DuckDB 1.5 reads: 2.0 writes version 69 by
+# default, which no 1.x opens, so a step back to 1.5.6 would strand every case 2.0
+# created or re-processed. Passed on every connection - DuckDB refuses a second one
+# to the same file with a different configuration.
+DB_CONFIG = {"storage_compatibility_version": "v1.5.0"}
+
+
 def connect(case_id: str, read_only: bool = False) -> duckdb.DuckDBPyConnection:
     if not read_only:
         # A writable connection creates the file - only ever in an owner's store.
         storage.require_owner(case_id)
         db_path(case_id).parent.mkdir(parents=True, exist_ok=True)
-    con = duckdb.connect(str(db_path(case_id)), read_only=read_only)
+    con = duckdb.connect(str(db_path(case_id)), read_only=read_only, config=DB_CONFIG)
     # Set on every connection, not just the ingest one, so a zone-less
     # timestamp means the same thing wherever it is cast (config.EVENT_TZ_*).
     con.execute(f"SET TimeZone = '{config.EVENT_TZ_NAME}'")
