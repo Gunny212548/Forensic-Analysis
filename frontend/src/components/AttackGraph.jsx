@@ -24,10 +24,12 @@ const ROW_GAP = 124
 const PAD_X = 16
 const HEAD_H = 44
 const LABEL_H = 20
-const LABEL_MAX = 46 // characters of an edge label before it is cut (the whole one is its tooltip)
+const LABEL_STEP = LABEL_H + 6 // one label below the last, for a node with several edges
+const LABEL_MAX = 34 // characters of a rule label before it is cut (the whole one is its tooltip)
 const NAME_MAX = 22
-const CHAR_W = 6.6 // IBM Plex Mono at 11px
-const PILL_CHAR_W = 6.2 // IBM Plex Sans at 10.5px, a little generous
+const TECH_W = 7 // IBM Plex Mono 600 at 11px
+const TEXT_W = 6.1 // IBM Plex Sans at 11px, a little generous
+const PILL_CHAR_W = 6.3 // IBM Plex Sans 600 at 10.5px, a little generous
 
 const ROLE = ['source', 'pivot', 'sink']
 const ROLE_HEAD = ['SOURCES', 'PIVOTS (SOURCE + SINK)', 'SINKS']
@@ -80,34 +82,46 @@ function layout(edges) {
   // With nothing in the middle, fall back to two columns so the diagram is
   // not stretched across an empty gap. Each column keeps its role for its head.
   const used = cols.map((c, role) => ({ role, names: c })).filter((c) => c.names.length)
-  const tallest = Math.max(...used.map((c) => c.names.length))
+  // A node's row is as tall as the labels it stacks: one per edge leaving it, downward from its
+  // centre. A fixed row let a source with many edges spill its labels over the next node's
+  // (found on real data, 2026-10-29).
+  const rowH = (n) => Math.max(ROW_GAP, R + 8 + ((outDeg[n] || 1) - 1) * LABEL_STEP + LABEL_H / 2 + 26)
+  const heights = used.map((col) => col.names.reduce((s, n) => s + rowH(n), 0))
+  const tallest = Math.max(...heights)
 
   const pos = {}
-  used.forEach((col, ci) =>
-    col.names.forEach((n, ri) => {
-      pos[n] = {
-        cx: PAD_X + COL_W / 2 + ci * COL_GAP,
-        cy: HEAD_H + R + ri * ROW_GAP + ((tallest - col.names.length) * ROW_GAP) / 2,
-        role: col.role,
-      }
-    }),
-  )
+  used.forEach((col, ci) => {
+    let y = HEAD_H + (tallest - heights[ci]) / 2
+    col.names.forEach((n) => {
+      pos[n] = { cx: PAD_X + COL_W / 2 + ci * COL_GAP, cy: y + R + 8, role: col.role }
+      y += rowH(n)
+    })
+  })
 
   return {
     pos,
     names: [...names],
     heads: used.map((col, ci) => ({ x: PAD_X + ci * COL_GAP, text: ROLE_HEAD[col.role] })),
     width: PAD_X * 2 + (used.length - 1) * COL_GAP + COL_W,
-    height: HEAD_H + tallest * ROW_GAP,
+    height: HEAD_H + tallest,
   }
 }
 
-/** The callouts under a node: what the evidence says that matters to the path. */
-function callouts(node) {
-  const out = []
-  if (node.listed_by) out.push({ cls: 'ag-pill-feed', text: 'On threat feed', title: `listed by ${node.listed_by}` })
-  if (node.external) out.push({ cls: 'ag-pill-ext', text: 'External', title: 'not in an RFC 1918 private range' })
-  return out
+/** The callout under a node - what the evidence says that matters to the path, in one bubble
+ *  pointing at it: red when a feed lists the address, amber when it is only external. */
+function callout(node) {
+  const parts = []
+  const why = []
+  if (node.external) {
+    parts.push('External')
+    why.push('not in an RFC 1918 private range')
+  }
+  if (node.listed_by) {
+    parts.push('On threat feed')
+    why.push(`listed by ${node.listed_by}`)
+  }
+  if (!parts.length) return null
+  return { cls: node.listed_by ? 'ag-callout-feed' : 'ag-callout-ext', text: parts.join(' · '), title: why.join('; ') }
 }
 
 export default function AttackGraph({ graph }) {
@@ -135,28 +149,42 @@ export default function AttackGraph({ graph }) {
     const y1 = a.cy
     const x2 = b.cx - R - 4
     const y2 = b.cy
-    const bend = Math.max(60, (x2 - x1) / 2)
     const mitre = e.mitre || []
     const full = `${mitre.length ? `${mitre.join(' ')} · ` : ''}${e.label || ''}`
-    const text = cut(`${mitre[0] ? `${mitre[0]} · ` : ''}${e.label || ''}`, LABEL_MAX)
-    const lx = x1 + 12
-    const ly = y1 - LABEL_H / 2 + nth * (LABEL_H + 6)
+    const tech = mitre[0] || ''
+    const text = cut(e.label || '', LABEL_MAX)
+    const labelW = tech.length * TECH_W + text.length * TEXT_W + (tech ? 8 : 0) + 20
+    // Past the node's name and callout, which are wider than its circle: a label never covers them.
+    const lx = a.cx + COL_W / 2 + 8
+    const ly = y1 - LABEL_H / 2 + nth * LABEL_STEP
     const key = `${e.from}->${e.to}-${i}`
+    // Each edge runs through its own label: from the node into the label's left end, then out of
+    // its right end to the target - so a label stacked below the node still reads as its edge's.
+    const my = ly + LABEL_H / 2
+    const ox = lx + labelW
+    // Half the run left: a fixed minimum hooked the curve back on itself when the target was near.
+    const bend = Math.max(12, (x2 - ox) / 2)
     lines.push(
-      <path
-        key={key}
-        className={`ag-edge ag-${level}`}
-        d={`M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`}
-        markerEnd={`url(#ag-arw-${level})`}
-      />,
+      <g key={key} className={`ag-${level}`}>
+        <path className={`ag-edge ag-${level}`} d={`M ${x1} ${y1} C ${x1 + 20} ${y1}, ${lx - 20} ${my}, ${lx} ${my}`} />
+        <path
+          className={`ag-edge ag-${level}`}
+          d={`M ${ox} ${my} C ${ox + bend} ${my}, ${x2 - bend} ${y2}, ${x2} ${y2}`}
+          markerEnd={`url(#ag-arw-${level})`}
+        />
+      </g>,
     )
     // Drawn after every line, so no line crosses a label.
     labels.push(
       <g key={key} className={`ag-label ag-${level}`}>
         <title>{full}</title>
-        <rect x={lx} y={ly} width={text.length * CHAR_W + 14} height={LABEL_H} rx="3" />
-        <text x={lx + 7} y={ly + LABEL_H / 2 + 4}>
-          {text}
+        {/* An opaque panel under the tint: some tints are translucent, and the line runs beneath. */}
+        <rect className="ag-label-bg" x={lx} y={ly} width={labelW} height={LABEL_H} rx={LABEL_H / 2} />
+        <rect x={lx} y={ly} width={labelW} height={LABEL_H} rx={LABEL_H / 2} />
+        <text x={lx + 10} y={ly + LABEL_H / 2 + 4}>
+          {tech && <tspan className="ag-tech">{tech}</tspan>}
+          {tech && ' '}
+          <tspan>{text}</tspan>
         </text>
       </g>,
     )
@@ -193,9 +221,9 @@ export default function AttackGraph({ graph }) {
           if (!p) return null
           const f = facts[n] || {}
           const kind = ICONS[f.kind] ? f.kind : /^\d{1,3}(\.\d{1,3}){3}$/.test(n) ? 'address' : 'host'
-          const pills = callouts(f)
-          const widths = pills.map((c) => c.text.length * PILL_CHAR_W + 16)
-          let px = p.cx - (widths.reduce((s, w) => s + w, 0) + 4 * (pills.length - 1)) / 2
+          const c = callout(f)
+          const cw = c ? c.text.length * PILL_CHAR_W + 20 : 0
+          const cy = p.cy + R + 30 // the bubble's top, under the name
           return (
             <g key={n} className={`ag-node ag-${ROLE[p.role]}`}>
               <title>{f.about ? `${n} - ${f.about}` : n}</title>
@@ -208,19 +236,22 @@ export default function AttackGraph({ graph }) {
               <text className="ag-name" x={p.cx} y={p.cy + R + 17}>
                 {cut(String(n), NAME_MAX)}
               </text>
-              {pills.map((c, k) => {
-                const x = px
-                px += widths[k] + 4
-                return (
-                  <g key={c.text} className={`ag-pill ${c.cls}`}>
-                    <title>{c.title}</title>
-                    <rect x={x} y={p.cy + R + 25} width={widths[k]} height="18" rx="9" />
-                    <text x={x + widths[k] / 2} y={p.cy + R + 38}>
-                      {c.text}
-                    </text>
-                  </g>
-                )
-              })}
+              {c && (
+                <g className={`ag-callout ${c.cls}`}>
+                  <title>{c.title}</title>
+                  {/* A rounded bubble with a tail pointing up at the node, the Microsoft attack-path
+                      picture's callout. */}
+                  <path
+                    d={`M ${p.cx - cw / 2 + 10} ${cy} H ${p.cx - 6} L ${p.cx} ${cy - 6} L ${p.cx + 6} ${cy}
+                        H ${p.cx + cw / 2 - 10} A 10 10 0 0 1 ${p.cx + cw / 2} ${cy + 10}
+                        A 10 10 0 0 1 ${p.cx + cw / 2 - 10} ${cy + 20} H ${p.cx - cw / 2 + 10}
+                        A 10 10 0 0 1 ${p.cx - cw / 2} ${cy + 10} A 10 10 0 0 1 ${p.cx - cw / 2 + 10} ${cy} Z`}
+                  />
+                  <text x={p.cx} y={cy + 14}>
+                    {c.text}
+                  </text>
+                </g>
+              )}
             </g>
           )
         })}

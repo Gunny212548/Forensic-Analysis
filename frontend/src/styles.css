@@ -661,22 +661,27 @@
   .ag-pivot .ag-icon { stroke: var(--warn); }
   .ag-sink .ag-icon { stroke: var(--info); }
   .ag-name { font-family: var(--mono); font-size: 12px; font-weight: 600; fill: var(--text); text-anchor: middle; }
-  .ag-pill text { font-size: 10.5px; font-weight: 600; text-anchor: middle; }
-  .ag-pill-feed rect { fill: var(--danger); }
-  .ag-pill-feed text { fill: var(--panel); }
-  .ag-pill-ext rect { fill: var(--warn-tint); stroke: var(--warn); }
-  .ag-pill-ext text { fill: var(--warn); }
+  /* The callout under a node: one filled bubble with a tail up to it (the attack-path picture). */
+  .ag-callout text { font-size: 10.5px; font-weight: 600; text-anchor: middle; fill: var(--panel); }
+  .ag-callout-feed path { fill: var(--danger); }
+  .ag-callout-ext path { fill: var(--warn); }
   .ag-edge { fill: none; stroke-width: 1.6; }
-  .ag-label rect { fill: var(--panel); stroke-width: 1; }
-  .ag-label text { font-family: var(--mono); font-size: 11px; }
-  .ag-critical.ag-edge, .ag-label.ag-critical rect { stroke: var(--danger); }
-  .ag-high.ag-edge, .ag-label.ag-high rect { stroke: var(--warn); }
-  .ag-medium.ag-edge, .ag-label.ag-medium rect { stroke: var(--info); }
-  .ag-low.ag-edge, .ag-label.ag-low rect { stroke: var(--muted); }
+  /* An edge's label: a capsule tinted in the edge's colour, the technique id in bold mono. */
+  .ag-label text { font-size: 11px; }
+  .ag-tech { font-family: var(--mono); font-weight: 600; }
+  .ag-critical.ag-edge { stroke: var(--danger); }
+  .ag-high.ag-edge { stroke: var(--warn); }
+  .ag-medium.ag-edge { stroke: var(--info); }
+  .ag-low.ag-edge { stroke: var(--muted); }
+  .ag-label.ag-critical rect { fill: var(--danger-tint); }
+  .ag-label.ag-high rect { fill: var(--warn-tint); }
+  .ag-label.ag-medium rect { fill: var(--info-tint); }
+  .ag-label.ag-low rect { fill: var(--subtle); }
+  .ag-label rect.ag-label-bg { fill: var(--panel); }
   .ag-label.ag-critical text, .ag-arrow.ag-critical path { fill: var(--danger); }
   .ag-label.ag-high text, .ag-arrow.ag-high path { fill: var(--warn); }
   .ag-label.ag-medium text, .ag-arrow.ag-medium path { fill: var(--info); }
-  .ag-label.ag-low text, .ag-arrow.ag-low path { fill: var(--muted); }
+  .ag-label.ag-low text, .ag-arrow.ag-low path { fill: var(--text-2); }
 
   /* Result-page workspace: sidebar tabs + content pane, instead of one long scroll */
   .ws { display: flex; gap: 20px; align-items: flex-start; }
