@@ -28,7 +28,7 @@ product has its own rules over six areas, every rule names its behaviour and the
 saying why it is a finding, and its line comes from the case's own evidence (legitimate
 members only) or TRW - no number set on one customer applied to another. Palo Alto and Check
 Point have theirs, Windows its sign-in, lateral-movement, host, beaconing and feed rules (gotchas
-#65-#70, `specs/windows_rules.md` stories 5a-5e) and Microsoft Defender's own verdicts (gotcha #76,
+#65-#70, #77, #78, `specs/windows_rules.md` stories 5a-5g) and Microsoft Defender's own verdicts (gotcha #76,
 `specs/windows_defender_rules.md` story 5f - a product's verdict is an in-house rule, any other single
 event is SigmaHQ's). **SigmaHQ's Windows rules run beside ours since 2026-10-29** (story 6,
 `specs/sigma_windows.md`, gotcha #79): a pinned commit converted at image build, high / critical as
@@ -371,7 +371,11 @@ analysis never does. Dependencies are pinned exactly and the Dockerfile builds
 the bundle in its own `node:22-slim` stage rather than copying the host's
 `static/`, so an image can never ship a stale bundle and the output stays
 reproducible - which matters because the output is evidence. Verified: the
-in-image build produced a byte-identical bundle hash to the host build.
+in-image build produced a byte-identical bundle hash to the host build. The
+SigmaHQ rules follow the same rule since 2026-10-29: the image's `sigma` stage
+fetches a pinned commit's archive (checked by SHA-256) and converts it with
+pySigma into `/opt/sigma/windows_rules.json`; the app never imports pySigma
+(gotcha #79). The archive build and a git checkout gave the same file byte for byte.
 
 **Look and feel follow the SENTRY-IR Figma (since 2026-09-29).** The palette
 in `styles.css` `:root` was sampled from the rendered frames (light
@@ -932,8 +936,10 @@ Two more checks, each for its own layer:
   (gotcha #60): event XML from the committed samples; with `--evtx` (lab folder outside the repo,
   copied into the container) every .evtx record counted against its chunk header and compared item
   by item with Windows' own `.ToXml()` rendering. Check Point Log Exporter: `tests/check_checkpoint_le.py`.
-  **Fails on main since story 6 (2026-10-29, not fixed yet):** the Winlogbeat sample's "12 failures then
-  a sign-in" expects exactly WIN-BRUTE-1 + WIN-AUTH-1, and SigmaHQ's `SIGMA-d99b79d2-...` fires on it too.
+  It failed from story 6 (2026-10-29) to 2026-10-30: the Winlogbeat sample holds a 1102 (the Security
+  log cleared), and SigmaHQ's "Security Eventlog Cleared" rightly fired beside WIN-BRUTE-1 + WIN-AUTH-1;
+  the check now asserts the in-house rules and SigmaHQ's apart. **Run every `tests/check_*.py` before a
+  rule change is merged** - story 6 ran the rule and flow checks but not this one.
 - **Detection accuracy** - `tests/gen_checkpoint_quarter.py <outdir>` (seeded): three months of
   Check Point Log Exporter records with attacks I1-I6 buried in an office's traffic and a
   `ground_truth.csv` for every non-benign row. Upload the zip, then score findings and the AI's
@@ -1073,6 +1079,15 @@ line-drawing rule binds `$above` / `$minimum` / `$note` (`lines.evidence_line`, 
 follow `RULE_ID_PATTERN`. Every rule needs its behaviour's document read (D14), a `RULE_META`
 entry, a place in `areas.py`, and a case in `tests/check_firewall_rules.py`.
 
+**SigmaHQ's rules are not written here** (`specs/sigma_windows.md`, gotcha #79). They are
+SigmaHQ's, converted at image build: `rules_sigma.py` hands the high / critical ones to
+`apply_rules` as `SIGMA-<uuid>` Windows product rules, `sigma.apply_marks` runs the rest as
+marks. A single Windows event that SigmaHQ covers is not a new in-house rule (W-D1) - unless it is
+a product's own verdict (WIN-MAL-2), in which case add SigmaHQ's twin to `sigma.TWINS`. **A new
+SigmaHQ commit is a new pin**: `SIGMA_COMMIT` and the archive's `--checksum` in the Dockerfile,
+then `tests/check_sigma.py` (its `KNOWN_DIFFER` re-measured, never widened silently) and the
+baseline's `sigma` sections re-taken and said so.
+
 The generic rules live in `rules.py` as `(rule_id, SQL)` pairs — each is one
 `INSERT INTO findings SELECT ...` over `raw_events`. Correlation rules join
 against a `GROUP BY ... HAVING` subquery. Conventions: `R1xxx` single-event
@@ -1095,7 +1110,8 @@ category, false positives and the ADS sections. `python
 tests/check_rule_meta.py` fails until the metadata exists and its
 techniques match the SQL - run it with the parity check.
 
-Current set: **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
+Current set (in-house; SigmaHQ's 1,492 high / critical Windows rules run beside them,
+`SIGMA-<uuid>`): **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
 CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **Windows** WIN-BRUTE-1..3,
 WIN-AUTH-1 (gotcha #65), WIN-LAT-1..3, WIN-HOST-1..2 (gotcha #66), WIN-MAL-1, WIN-INTEL-1..2
 (gotcha #67), WIN-BRUTE-4, WIN-LAT-4 (gotcha #68), WIN-MAL-2 Defender detection, WIN-HOST-3 Defender

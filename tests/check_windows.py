@@ -254,8 +254,14 @@ def check_json(lab: Path | None, scratch: Path, run, win, query) -> None:
     check(m["status"] == "ready" and (w.get("events"), w.get("unreadable")) == (14, 1)
           and m["mapping"]["json"]["unparseable"] == 1,
           f"14 events, the broken line kept as a row and counted ({w.get('events')}, {w.get('unreadable')})")
-    check(m.get("rules_matched") == {"WIN-BRUTE-1": 12, "WIN-AUTH-1": 1},
-          f"12 failures then a sign-in from one address: WIN-BRUTE-1, WIN-AUTH-1 ({m.get('rules_matched')})")
+    ours = {r: n for r, n in (m.get("rules_matched") or {}).items() if not r.startswith("SIGMA-")}
+    check(ours == {"WIN-BRUTE-1": 12, "WIN-AUTH-1": 1},
+          f"12 failures then a sign-in from one address: WIN-BRUTE-1, WIN-AUTH-1 ({ours})")
+    # The sample's 1102 (mallory clears the Security log) is SigmaHQ's "Security Eventlog Cleared"
+    # (specs/sigma_windows.md) - a single event, not an in-house rule's (W-D1).
+    sigma = {r: n for r, n in (m.get("rules_matched") or {}).items() if r.startswith("SIGMA-")}
+    check(sigma == {"SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1},
+          f"...and the cleared Security log is SigmaHQ's Security Eventlog Cleared ({sigma})")
     row = query(m["case_id"], "SELECT e.ts, e.srcip, w.data['Status'] FROM raw_events e JOIN win_events w "
                 "USING (row_id) WHERE w.event_id = 4625 ORDER BY row_id LIMIT 1")[0]
     check(str(row[0]) == "2026-03-01 08:00:00.123456" and row[1:] == ("203.0.113.7", "0xc000006d"),
