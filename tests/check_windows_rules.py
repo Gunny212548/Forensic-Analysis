@@ -372,6 +372,18 @@ def main() -> int:
     check(dict(seq).get(4624) == 1 and dict(seq).get(4688, 0) >= 6,
           f"WIN-LAT-1 flags the logon and the processes of its session ({seq})")
     con.close()
+    # The attack path goes to the computer a logon was logged on, and WS023's address is WS023 -
+    # its own Sysmon and its computer account say so - so W7 / W8 read as one pivot.
+    keys = [f["key"] for f in w7] + [f["key"] for f in per["WIN-LAT-2"] if f["srcip"] == "10.20.10.33"]
+    graph = db.build_graph(cid, keys=keys)
+    pairs = {(e["from"], e["to"]) for e in graph["edges"]}
+    nodes = {n["id"]: n for n in graph["nodes"]}
+    check({("ws023.mekong.local", "rds01.mekong.local"), ("ws023.mekong.local", "sql01.mekong.local")} <= pairs
+          and "10.20.10.33" not in nodes and nodes["ws023.mekong.local"]["about"] == "host · 10.20.10.33",
+          f"the attack path runs from WS023 to the computers it reached ({sorted(pairs)})")
+    check(all(e["accounts"] for e in graph["edges"]) and "adm.backup" in
+          next(e for e in graph["edges"] if e["to"] == "rds01.mekong.local")["accounts"],
+          "each edge names the account it used")
     from app.services import products
     fw = {d["product"]: {a["area"]: a for a in d["areas"]} for d in products.matrix(
         ["paloalto"], __import__("app.services.rules", fromlist=["RULE_PRODUCT"]).RULE_PRODUCT)}

@@ -202,7 +202,8 @@ def main() -> int:
         check(bool(body.get("risk")), "...and the risk ranking")
         # IAI-61: each node says what the evidence says about it - an address internal or external
         # (RFC 1918, not ipaddress.is_private, which calls the RFC 5737 attackers private), else
-        # an account or a host; never a role nobody recorded.
+        # an account or a host (with the addresses its own Sysmon gives it); never a role nobody
+        # recorded.
         nodes = body.get("graph", {}).get("nodes") or []
         ok = bool(nodes)
         for n in nodes:
@@ -212,7 +213,8 @@ def main() -> int:
                 ok &= n.get("kind") == "address" and n.get("external") is (not internal) and \
                     n.get("about", "").startswith("internal address" if internal else "external address")
             else:
-                ok &= n.get("kind") in ("account", "host") and n.get("about") == n.get("kind")
+                ok &= n.get("kind") in ("account", "host") and \
+                    (n.get("about") or "").split(" · ")[0] == n.get("kind")
         check(ok, f"every node names its kind and, for an address, internal or external ({nodes[:3]})")
         check(c.get("/api/cases/nope/flow").status_code == 404, "/flow of an unknown case is 404")
         check(c.get("/api/cases/nope/graph").status_code == 404, "/graph of an unknown case is 404")

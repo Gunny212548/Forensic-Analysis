@@ -835,6 +835,15 @@ def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) ->
 
     Returns the {nodes, edges} shape the frontend already renders. With
     `keys`, only those finding groups are drawn (_kept_sql).
+
+    A row with no destination address went *to the computer that logged it*
+    (`hostname`: a Windows logon's Computer, a syslog line's host), so that
+    computer is the edge's target and the account rides on the edge
+    (`accounts`, "as ..." in the label); only a row with neither - an Entra
+    sign-in - still points at the account. An address is drawn as its host
+    when the case's Windows events tie it to that one computer
+    (_host_addresses, gotcha #80): RDS01's 10.20.0.40 opening FS01 is then
+    RDS01 -> FS01, the pivot it is, not two unrelated nodes.
     """
     if not db_path(case_id).exists() or keys == []:
         return {"nodes": [], "edges": []}
@@ -843,21 +852,25 @@ def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) ->
     listed: dict[str, str] = {}
     try:
         kept = _kept_sql(con, keys)
+        own = _host_addresses(con)
         rows = con.execute(
             f"""
-            SELECT r.srcip                          AS src,
-                   coalesce(r.dstip, r.username)    AS dst,
-                   f.rid,
-                   max(f.lvl)                       AS lvl,
-                   count(*)                         AS n,
-                   arg_min(f.mitre, r.row_id)               AS mitre
-            FROM findings f
-            JOIN raw_events r USING (row_id)
-            WHERE r.srcip IS NOT NULL
-              AND coalesce(r.dstip, r.username) IS NOT NULL
-              AND r.srcip <> coalesce(r.dstip, r.username){kept}
-            GROUP BY r.srcip, coalesce(r.dstip, r.username), f.rid
-            ORDER BY 1, 2, 3
+            SELECT src, dst, dst_host, rid, username,
+                   max(lvl), count(*), arg_min(mitre, row_id), min(row_id)
+            FROM (
+                SELECT coalesce(hs.host, r.srcip)                           AS src,
+                       coalesce(hd.host, r.dstip, r.hostname, r.username)  AS dst,
+                       hd.host IS NOT NULL OR (r.dstip IS NULL AND r.hostname IS NOT NULL) AS dst_host,
+                       f.rid, r.username, f.lvl, f.mitre, r.row_id
+                FROM findings f
+                JOIN raw_events r USING (row_id)
+                LEFT JOIN host_addr hs ON hs.addr = r.srcip
+                LEFT JOIN host_addr hd ON hd.addr = r.dstip
+                WHERE r.srcip IS NOT NULL{kept}
+            )
+            WHERE dst IS NOT NULL AND src <> dst
+            GROUP BY src, dst, dst_host, rid, username
+            ORDER BY 1, 2, 4, 5 NULLS FIRST
             """
         ).fetchall()
         # Which feeds list each address, for the node's line under its name (IAI-61).
@@ -868,18 +881,37 @@ def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) ->
     # Several rules commonly fire on the same pair (a port scan is also a
     # burst of blocks); merge them into one edge rather than drawing
     # parallel lines between the same two nodes.
-    pairs: dict[tuple[str, str], list[dict]] = {}
-    for src, dst, rid, lvl, n, mitre in rows:
-        pairs.setdefault((src, dst), []).append(
-            {"rid": rid, "lvl": lvl, "n": n, "mitre": list(mitre or [])}
-        )
+    pairs: dict[tuple[str, str], dict[str, dict]] = {}
+    accounts_of: dict[tuple[str, str], dict[str, dict[str, int]]] = {}
+    hosts = set(own.values())
+    for src, dst, dst_host, rid, user, lvl, n, mitre, first in rows:
+        if dst_host:
+            hosts.add(dst)
+        h = pairs.setdefault((src, dst), {}).setdefault(
+            rid, {"rid": rid, "lvl": lvl, "n": 0, "mitre": list(mitre or []), "first": first})
+        h["lvl"] = max(h["lvl"], lvl)
+        h["n"] += n
+        if first < h["first"]:
+            h["mitre"], h["first"] = list(mitre or []), first
+        if user and user != dst:
+            # Sysmon writes DOMAIN\user, a 4769 user@REALM, the Security log the bare name: one
+            # account, shown in the spelling most of its events use.
+            name = user.rsplit("\\", 1)[-1]
+            spellings = accounts_of.setdefault((src, dst), {}).setdefault(name.split("@")[0].lower(), {})
+            spellings[name] = spellings.get(name, 0) + n
 
     edges = []
-    for (src, dst), hits in pairs.items():
-        hits.sort(key=lambda h: (-h["lvl"], -h["n"]))
+    for (src, dst), by_rule in pairs.items():
+        hits = sorted(by_rule.values(), key=lambda h: (-h["lvl"], -h["n"]))
         parts = [f"{RULE_LABELS.get(h['rid'], h['rid'])} x{h['n']}" for h in hits[:2]]
         if len(hits) > 2:
             parts.append(f"+{len(hits) - 2} more")
+        named = [(min(s.items(), key=lambda x: (-x[1], x[0]))[0], sum(s.values()))
+                 for s in accounts_of.get((src, dst), {}).values()]
+        accounts = [a for a, _ in sorted(named, key=lambda a: (-a[1], a[0]))]
+        label = " / ".join(parts)
+        if accounts:
+            label += f" · as {accounts[0]}" + (f" +{len(accounts) - 1} accounts" if len(accounts) > 1 else "")
         mitre: list[str] = []
         for h in hits:
             for m in h["mitre"]:
@@ -888,12 +920,15 @@ def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) ->
         edges.append({
             "from": src,
             "to": dst,
-            "label": " / ".join(parts),
+            "label": label,
             "mitre": mitre[:4],
             "lvl": hits[0]["lvl"],
             "level": level_of(hits[0]["lvl"]),
             "count": sum(h["n"] for h in hits),
             "rules": [h["rid"] for h in hits],
+            # A spray's edge holds hundreds: the ten with most events, and how many there were.
+            "accounts": accounts[:10],
+            "account_count": len(accounts),
         })
 
     # Most severe first, so if a busy case overflows the edge budget it is
@@ -906,10 +941,55 @@ def build_graph(case_id: str, limit: int = 14, keys: list[str] | None = None) ->
         for n in (e["from"], e["to"]):
             if n not in names:
                 names.append(n)
-    accounts = {e["to"] for e in edges}
+    targets = {e["to"] for e in edges}
+    addresses: dict[str, list[str]] = {}
+    for addr, host in sorted(own.items()):
+        addresses.setdefault(host, []).append(addr)
     nodes = [{"id": n, "label": n, "type": "ip" if _IP_LIKE.match(n) else "entity",
-              **node_facts(n, n in accounts, listed.get(n))} for n in names]
+              **node_facts(n, n in targets and n not in hosts, listed.get(n), addresses.get(n))}
+             for n in names]
     return {"nodes": nodes, "edges": edges}
+
+
+def _host_addresses(con) -> dict[str, str]:
+    """address -> the computer it belongs to, as the Windows events say:
+      - the computer's own Sysmon 3, its end of a connection - SourceIp when it opened it
+        (Initiated true), DestinationIp when it took it;
+      - the computer's own account (NAME$) signing in (4624) or asking for a TGT (4768) from
+        the address - Windows computers do so from boot on, every day - when a computer of that
+        name logged events in the case.
+    Only an address one computer claims: a DHCP address two hosts held in turn stays an address,
+    and so does a loopback. Also left in the connection as `host_addr`, for build_graph's join;
+    a case with no Windows events has none."""
+    con.execute("CREATE OR REPLACE TEMP TABLE host_addr (addr VARCHAR, host VARCHAR)")
+    if con.execute("SELECT count(*) FROM duckdb_tables() WHERE table_name = 'win_events'").fetchone()[0]:
+        con.execute(
+            """
+            INSERT INTO host_addr
+            WITH own AS (
+                SELECT CASE WHEN lower(trim(w.data['Initiated'])) = 'true' THEN r.srcip ELSE r.dstip END AS addr,
+                       r.hostname AS host
+                FROM raw_events r
+                JOIN win_events w USING (row_id)
+                WHERE r.action = 'network_connection' AND r.hostname IS NOT NULL
+                UNION ALL
+                SELECT r.srcip, h.hostname
+                FROM raw_events r
+                JOIN win_events w USING (row_id)
+                JOIN (SELECT DISTINCT hostname FROM raw_events WHERE hostname IS NOT NULL) h
+                  ON lower(split_part(h.hostname, '.', 1)) = lower(rtrim(r.username, '$'))
+                WHERE r.username LIKE '%$'
+                  AND ((w.event_id = 4624 AND r.action = 'auth_success')
+                       OR (w.event_id = 4768 AND trim(w.data['Status']) = '0x0'))
+            )
+            SELECT addr, min(host)
+            FROM own
+            WHERE addr IS NOT NULL AND addr NOT IN ('-', '::1', '0.0.0.0', '::') AND addr NOT LIKE '127.%'
+            GROUP BY addr
+            HAVING count(DISTINCT host) = 1
+            """
+        )
+    return dict(con.execute("SELECT addr, host FROM host_addr").fetchall())
 
 
 # RFC 1918's private blocks, loopback and link-local. Not ipaddress.is_private: that also counts
@@ -918,11 +998,13 @@ _INTERNAL = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "1
                                                 "127.0.0.0/8", "169.254.0.0/16")]
 
 
-def node_facts(name: str, is_target: bool, listed_by: str | None) -> dict:
+def node_facts(name: str, is_account: bool, listed_by: str | None,
+               addresses: list[str] | None = None) -> dict:
     """What the attack graph says about a node (IAI-61): only what the evidence does - an address
-    internal or external and the feeds listing it, or an account / host name. `kind` picks its
-    icon, `external` / `listed_by` its callouts, `about` its tooltip. No role such as "domain
-    controller": there is no asset inventory to say so (CLAUDE.md, *Decisions*)."""
+    internal or external and the feeds listing it, or an account / host name, a host with the
+    addresses its own logs give it. `kind` picks its icon, `external` / `listed_by` its callouts,
+    `about` its tooltip. No role such as "domain controller": there is no asset inventory to say
+    so (CLAUDE.md, *Decisions*)."""
     if _IP_LIKE.match(name):
         try:
             external = not any(ipaddress.ip_address(name) in net for net in _INTERNAL)
@@ -931,9 +1013,11 @@ def node_facts(name: str, is_target: bool, listed_by: str | None) -> dict:
         about = "external address" if external else "internal address"
         return {"kind": "address", "external": external, "listed_by": listed_by,
                 "about": f"{about} · listed by {listed_by}" if listed_by else about}
-    # A non-address source is a workstation name (a 4776's); a target is the account signed in to.
-    kind = "account" if is_target else "host"
-    return {"kind": kind, "external": False, "listed_by": None, "about": kind}
+    # A non-address source is a workstation name (a 4776's); a host target is the computer that
+    # logged the event; any other target is the account signed in to.
+    kind = "account" if is_account else "host"
+    about = f"{kind} · {', '.join(addresses)}" if addresses else kind
+    return {"kind": kind, "external": False, "listed_by": None, "about": about}
 
 
 # Roles an entity can play in a finding. Scored separately because a
