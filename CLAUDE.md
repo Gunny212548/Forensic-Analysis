@@ -175,7 +175,8 @@ GET  /api/rules[/{rid}]                      rule metadata: Sigma fields + ADS
 GET  /api/cases/{id}/graph                   the Attack path step: db.build_graph +
                                              risk_scores of the confirmed groups;
                                              empty, with `undecided`, until every
-                                             suggestion is decided (gotcha #10)
+                                             suggestion is decided (gotcha #10);
+                                             edges to the computer reached (#80)
 POST /api/cases/{id}/analyze                 db.build_graph (SQL) of the confirmed
                                              groups + SQL top-N distinct → the
                                              LLM (Ollama now) for the narrative,
@@ -427,11 +428,21 @@ Microsoft attack-path picture: "three columns, the attack-path look")**: column
 heads (SOURCES / PIVOTS / SINKS), round nodes coloured by role with an icon for
 the node's kind (address, host, account), the name underneath and callouts
 (*On threat feed*, *External*), curved edges in the colour of their highest
-finding's level, technique labels in outlined boxes; every colour a token
+finding's level, technique labels in capsules tinted by level (cut at 34
+characters, the whole label its tooltip); every colour a token
 (`.ag-*` in styles.css). A node says only what the evidence does
 (`db.node_facts`): internal is RFC 1918 / loopback / link-local - not
 `ipaddress.is_private`, which also calls the RFC 5737 documentation ranges the
 synthetic attackers use private - and no role such as "domain controller".
+**What a node is (2026-10-30, gotcha #80):** an edge goes to the address it
+reached, else to the computer that logged the event (a Windows logon's Computer),
+and only when a row has neither to the account; the account rides on the edge
+(`accounts`, "· as adm.hd +4 accounts" at the end of the label). An address is
+drawn as its host when the case's own Windows events tie it to that one computer
+(its Sysmon 3, its `NAME$` sign-in / TGT), so a pivot reads as one node: the
+mockup chain `198.51.100.66 -> rds01 -> fs01 / sql01`. The risk ranking under
+the graph still counts the address and each `DOMAIN\user` spelling apart - it
+feeds the narrative's prompt and was left alone.
 
 Two things the rewrite changed on purpose:
 - **`escapeHtml()` is gone.** The old page concatenated `innerHTML`, so every
@@ -921,6 +932,8 @@ Two more checks, each for its own layer:
   (gotcha #60): event XML from the committed samples; with `--evtx` (lab folder outside the repo,
   copied into the container) every .evtx record counted against its chunk header and compared item
   by item with Windows' own `.ToXml()` rendering. Check Point Log Exporter: `tests/check_checkpoint_le.py`.
+  **Fails on main since story 6 (2026-10-29, not fixed yet):** the Winlogbeat sample's "12 failures then
+  a sign-in" expects exactly WIN-BRUTE-1 + WIN-AUTH-1, and SigmaHQ's `SIGMA-d99b79d2-...` fires on it too.
 - **Detection accuracy** - `tests/gen_checkpoint_quarter.py <outdir>` (seeded): three months of
   Check Point Log Exporter records with attacks I1-I6 buried in an office's traffic and a
   `ground_truth.csv` for every non-benign row. Upload the zip, then score findings and the AI's
@@ -938,7 +951,15 @@ Two more checks, each for its own layer:
   (gotcha #70): a sprayer's own `...$`, a fleet-wide beacon; story 5f (gotcha #76): Defender detections
   and their outcome (medium only when remediated), a lone 1011, turned off / back on, tamper protection,
   exclusions vs a routine 5007; story 5g (gotcha #77): a deployment tool's two-day service not flagged - and with `--winevents "D:/logtest/window test/WinEvents.log"` the
-  user's file (3 suggestions, nothing else).
+  user's file (3 suggestions, nothing else). Also the attack path (gotcha #80): W7 / W8 drawn from
+  `ws023` to `rds01` / `sql01`, WS023's address as WS023, every edge naming its account.
+- **A chain to look at** - `D:/mockup-logs/bruteforce-pivot/gen_bruteforce_pivot.py <outdir>` (outside
+  the repo; imports `tests/gen_windows_domain.py`'s writers, seed 20260917): three weeks of Mekong's
+  ordinary work and, on 2026-09-17, RDP guessing from 198.51.100.66 onto RDS01, the success, then RDP
+  to FS01 and PsExec to SQL01 from it - one zip (`out/bruteforce-pivot-2026-09.zip`, 21,801 events)
+  and `ground_truth.csv` (475 attack events). Measured: 13 suggestions, all the chain's (WIN-BRUTE-2,
+  WIN-AUTH-1, WIN-LAT-1 x2, WIN-LAT-2, WIN-LAT-4, 7 SigmaHQ high), nothing of the ordinary work; not
+  WIN-BRUTE-1 - the guesser tries five names, so it is a spray. Not in the parity baseline.
 - **The user's blind Windows quarter** - `D:\logtest\blind-windows` (`gen_windows_blind.py`, seed
   20260401, Kinnaree Textiles, K1-K15, `out/answer_key/`). **Its key has been read** (gotcha #70): it
   measures fixes now, not the rule set; a fair blind test needs another seed whose key nobody reads.
