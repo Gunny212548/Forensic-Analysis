@@ -2136,6 +2136,24 @@
    }
   }
  ],
+ "Security.evtx": {
+  "flagged": 48,
+  "md5": "7d599db8332e58f0a2ad4b4d0a0e5d47",
+  "rows": 31578,
+  "rules": {
+   "WIN-AUTH-1": 36,
+   "WIN-BRUTE-1": 12
+  },
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 0,
+   "marks": {
+    "SIGMA-0badd08f-c6a3-4630-90d3-6875cca440be": 59,
+    "SIGMA-e9faba72-4974-4ab2-a4c5-46e25ad59e9b": 12
+   },
+   "rules": {}
+  }
+ },
  "Sysmon13_MachineAccount_Password_Hash_Changed_via_LsarSetSecret.evtx": {
   "flagged": 0,
   "md5": "74342cb695d47c5df598fafb9b40207f",
