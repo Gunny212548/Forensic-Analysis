@@ -195,6 +195,9 @@
   .raw-cell { font-family: var(--mono); font-size: 11px; }
   .events-table td { white-space: nowrap; }
   .events-scroll { max-height: calc(100vh - 140px); overflow: auto; }
+  /* The end of the loaded lines: what is coming, or that nothing more is. Sticky, so
+     it stays in view however far the table is scrolled sideways. */
+  .events-end { position: sticky; left: 0; padding: 10px 8px; font-size: 12px; color: var(--muted); min-height: 1px; }
   .events-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); white-space: nowrap; }
   /* Layer C facts on an event: neutral on purpose - a fact, not a severity. */
   .context-chip { display: inline-block; font-size: 11px; color: var(--muted); background: var(--subtle);

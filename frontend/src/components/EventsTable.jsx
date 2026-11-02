@@ -1,48 +1,87 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getEvents } from '../api.js'
 import { LEVEL_EN, SEV_CLASS, fmtNum } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
 import ProfilePanel from './ProfilePanel.jsx'
 
-const PAGE_SIZE = 100
+const PAGE_SIZE = 200
 
-/** Paginated, server-side. A case can hold 65k+ rows and 25k findings, so
- *  the client never pulls the whole table - the offset lives here and every
- *  page is its own query. FR-11.2: every event of the case by default, the
- *  rule matches one click away. `order` "time" is the Timeline step: every
- *  event by event time, then row, and the rule matches too (file order is "row",
- *  where the matches come most severe first). */
+/** Server-side pages, loaded as the table's own box is scrolled (the user,
+ *  2026-11-02: a box that scrolls needs no Next button). A case can hold 65k+
+ *  rows and 25k findings, so the client never asks for the whole table at once -
+ *  each PAGE_SIZE more lines are one query, appended when the end of the box
+ *  comes near. FR-11.2: every event of the case by default, the rule matches
+ *  one click away. `order` "time" is the Timeline step: every event by event
+ *  time, then row, and the rule matches too (file order is "row", where the
+ *  matches come most severe first). */
 export default function EventsTable({ caseId, order = 'row' }) {
   const [flagged, setFlagged] = useState(false)
-  const [offset, setOffset] = useState(0)
+  // The last answer's counts and bounds, and every line loaded so far.
   const [data, setData] = useState(null)
+  const [rows, setRows] = useState([])
+  const [more, setMore] = useState(false) // a further page is on its way
   const [error, setError] = useState('')
   // The behaviour profile open above the table, if any: { kind, value }.
   const [profile, setProfile] = useState(null)
   // The event-time window applied: { since, until }, GMT+7, '' = open at that end.
   const [win, setWin] = useState({ since: '', until: '' })
   const [winError, setWinError] = useState('')
-
-  const load = useCallback(async () => {
-    setError('')
-    try {
-      setData(await getEvents(caseId, { limit: PAGE_SIZE, offset, flagged, order, ...win }))
-    } catch (err) {
-      setError(err.message)
-    }
-  }, [caseId, offset, flagged, order, win])
+  // Bumped whenever what is shown changes, so a page still on its way for the
+  // view before is dropped instead of appended to the new one.
+  const view = useRef(0)
+  const busy = useRef(false)
+  const box = useRef(null)
+  const end = useRef(null)
 
   useEffect(() => {
-    load()
-  }, [load])
+    const id = ++view.current
+    busy.current = false
+    setData(null)
+    setRows([])
+    setMore(false)
+    setError('')
+    getEvents(caseId, { limit: PAGE_SIZE, offset: 0, flagged, order, ...win })
+      .then((d) => {
+        if (id !== view.current) return
+        setData(d)
+        setRows(d.events)
+      })
+      .catch((err) => id === view.current && setError(err.message))
+  }, [caseId, flagged, order, win])
+
+  const loadMore = useCallback(async () => {
+    if (!data || busy.current || error || rows.length >= data.total) return
+    const id = view.current
+    busy.current = true
+    setMore(true)
+    try {
+      const d = await getEvents(caseId, { limit: PAGE_SIZE, offset: rows.length, flagged, order, ...win })
+      if (id !== view.current) return
+      setData(d)
+      setRows((r) => r.concat(d.events))
+    } catch (err) {
+      if (id === view.current) setError(err.message)
+    } finally {
+      if (id === view.current) {
+        busy.current = false
+        setMore(false)
+      }
+    }
+  }, [caseId, flagged, order, win, data, error, rows.length])
+
+  // The end of the list coming within 600px of the box's bottom asks for the next
+  // page - and again at once if the box is still not full, until it is or all is in.
+  useEffect(() => {
+    if (!box.current || !end.current) return undefined
+    const seen = new IntersectionObserver((entries) => entries[0].isIntersecting && loadMore(), {
+      root: box.current,
+      rootMargin: '0px 0px 600px 0px',
+    })
+    seen.observe(end.current)
+    return () => seen.disconnect()
+  }, [loadMore])
 
   const showProfile = (kind, value) => setProfile({ kind, value })
-
-  function showFlagged(on) {
-    setFlagged(on)
-    setOffset(0)
-    setData(null)
-  }
 
   // Read from the form at submit, like the login page: the inputs are uncontrolled,
   // and `key` gives them fresh defaults when the window is cleared.
@@ -59,15 +98,11 @@ export default function EventsTable({ caseId, order = 'row' }) {
     }
     setWinError('')
     setWin({ since, until })
-    setOffset(0)
-    setData(null)
   }
 
   function clearWindow() {
     setWinError('')
     setWin({ since: '', until: '' })
-    setOffset(0)
-    setData(null)
   }
 
   const windowed = !!(win.since || win.until)
@@ -76,10 +111,10 @@ export default function EventsTable({ caseId, order = 'row' }) {
 
   const toggle = (
     <div className="ov-filters">
-      <button type="button" className={`chip-btn${flagged ? '' : ' active'}`} onClick={() => showFlagged(false)}>
+      <button type="button" className={`chip-btn${flagged ? '' : ' active'}`} onClick={() => setFlagged(false)}>
         All events
       </button>
-      <button type="button" className={`chip-btn${flagged ? ' active' : ''}`} onClick={() => showFlagged(true)}>
+      <button type="button" className={`chip-btn${flagged ? ' active' : ''}`} onClick={() => setFlagged(true)}>
         Flagged only
       </button>
       {/* The event-time window (GMT+7, as every time on the page); both ends inclusive. */}
@@ -110,59 +145,43 @@ export default function EventsTable({ caseId, order = 'row' }) {
     : ''
 
   let body
-  if (error) body = <Empty>Could not load: {error}</Empty>
+  if (error && !rows.length) body = <Empty>Could not load: {error}</Empty>
   else if (!data) body = <Empty>Loading...</Empty>
-  else if (!data.events.length) {
+  else if (!rows.length) {
     body = (
       <Empty>
-        {offset > 0
-          ? 'No more events'
-          : windowed
-            ? `No ${flagged ? 'flagged ' : ''}events${between}`
-            : flagged
-              ? 'The rule engine flagged nothing in this file'
-              : 'No events in this file'}
+        {windowed
+          ? `No ${flagged ? 'flagged ' : ''}events${between}`
+          : flagged
+            ? 'The rule engine flagged nothing in this file'
+            : 'No events in this file'}
       </Empty>
     )
   } else {
-    const from = data.offset + 1
-    const to = data.offset + data.count
-    const hasPrev = data.offset > 0
-    const hasNext = to < data.total
+    const all = rows.length >= data.total
     body = (
       <>
         <Empty style={{ paddingBottom: 8 }}>
           {/* Flagged: a line per rule match - an event two rules matched is two lines
               (gotcha #6), so the lines outnumber the events flagged. */}
           {flagged
-            ? `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} rule matches on ${fmtNum(data.flagged_count)} of ${fmtNum(data.total_rows)} events${between}, ${order === 'time' ? 'in time order' : 'most severe first'}`
-            : `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} events${between} (${fmtNum(data.flagged_count)} flagged)`}
+            ? `Showing 1-${fmtNum(rows.length)} of ${fmtNum(data.total)} rule matches on ${fmtNum(data.flagged_count)} of ${fmtNum(data.total_rows)} events${between}, ${order === 'time' ? 'in time order' : 'most severe first'}`
+            : `Showing 1-${fmtNum(rows.length)} of ${fmtNum(data.total)} events${between} (${fmtNum(data.flagged_count)} flagged)`}
           {/* A window can only hold an event whose time was read (db.time_window). */}
           {windowed ? ' - events with no readable time are left out' : ''}
+          {all ? '' : ' - scroll the table for more'}
         </Empty>
-        {/* One line a row, the box scrolls both ways (styles.css .events-scroll). */}
-        <div className="events-scroll">
+        {/* One line a row, the box scrolls both ways (styles.css .events-scroll);
+            reaching its end loads the next lines. */}
+        <div className="events-scroll" ref={box}>
           {flagged ? (
-            <FlaggedRows events={data.events} onProfile={showProfile} />
+            <FlaggedRows events={rows} onProfile={showProfile} />
           ) : (
-            <AllRows events={data.events} onProfile={showProfile} />
+            <AllRows events={rows} onProfile={showProfile} />
           )}
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button
-            className="secondary"
-            disabled={!hasPrev}
-            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-          >
-            &larr; Previous
-          </button>
-          <button
-            className="secondary"
-            disabled={!hasNext}
-            onClick={() => setOffset(offset + PAGE_SIZE)}
-          >
-            Next &rarr;
-          </button>
+          <div className="events-end" ref={end}>
+            {more ? 'Loading more...' : error ? `Could not load more: ${error}` : all ? 'End of the list' : ''}
+          </div>
         </div>
       </>
     )
