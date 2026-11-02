@@ -7,7 +7,8 @@ hash-chained line in AUTH_DIR/audit/accounts.jsonl, written before the change
 
 from fastapi import APIRouter, Body, HTTPException, Request
 
-from ..services import auth, authz, hashchain
+from .. import config
+from ..services import auth, authz, google_login, hashchain
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -21,7 +22,9 @@ def _admin(request: Request) -> str:
 
 
 def _view(user: dict) -> dict:
-    return {**auth.public(user), "created_at": user.get("created_at"), "created_by": user.get("created_by")}
+    # How the account signs in - never Google's `sub` itself.
+    return {**auth.public(user), "created_at": user.get("created_at"), "created_by": user.get("created_by"),
+            "has_password": auth.has_password(user), "google": bool(user.get("google_sub"))}
 
 
 @router.get("")
@@ -31,7 +34,10 @@ def list_users(request: Request):
             "roles": list(authz.ROLES),
             # What each role may do - the page shows it beside the role picker.
             "permissions": {r: sorted(authz.PERMISSIONS[r]) for r in authz.ROLES},
-            "min_password": auth.MIN_PASSWORD}
+            "min_password": auth.MIN_PASSWORD,
+            # Whose people may sign in with Google and get an account by doing so -
+            # removing one of them does not keep them out, disabling does.
+            "google_domains": list(config.GOOGLE_ALLOWED_DOMAINS) if google_login.enabled() else []}
 
 
 # Sync: scrypt (~50 ms) runs in FastAPI's threadpool, not on the event loop.

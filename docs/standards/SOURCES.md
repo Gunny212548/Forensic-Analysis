@@ -120,6 +120,16 @@ All read on the web (no saved copy); quotes are in the spec and `winevent.py`.
 
 Not obtained: Splunk Add-on for Windows docs (HTTP 403) - its classic text layout is observed only.
 
+### Sign in with Google (read 2026-11-02 with the web fetcher, `specs/google_login.md`)
+
+| Document | Version | Copy | What was checked |
+|---|---|---|---|
+| OpenID Connect Core 1.0 | incorporating errata set 2, 2023-12-15 | web: openid.net/specs/openid-connect-core-1_0.html | §3.1.2.1 request parameters (`openid` scope, `code`, exact redirect URI, `state` bound to a browser cookie, `nonce` with sufficient entropy); §3.1.2.7 (validate per RFC 6749 §4.1.2, §10.12); §3.1.3.7 all 13 steps - step 6: a token "received via direct communication between the Client and the Token Endpoint" may have its issuer validated by TLS "in place of checking the token signature". §15.5.2 not read |
+| RFC 7636, PKCE | Sep 2015 | web: rfc-editor.org/rfc/rfc7636 | §4.1 verifier 43-128 unreserved characters (32 random octets base64url recommended); §4.2 S256, "MUST use S256" when capable; §4.3 `code_challenge`, `code_challenge_method`; §4.5 `code_verifier` in the token request |
+| RFC 6749, OAuth 2.0 | Oct 2012 | web: rfc-editor.org/rfc/rfc6749 | §10.12 the client "MUST implement CSRF protection for its redirection URI", `state` non-guessable and kept where only the client and the user agent reach it. The section's opening was not read verbatim |
+| Google, OpenID Connect (Google Identity) | developers.google.com, read 2026-11-02 | /identity/openid-connect/openid-connect | Endpoints (`accounts.google.com/o/oauth2/v2/auth`, `oauth2.googleapis.com/token`); `iss` "always https://accounts.google.com or accounts.google.com"; a token from Google over HTTPS with the client secret needs no further validation; `hd` parameter is a UI hint - "validate that the returned ID token has an hd claim value that matches"; no `hd` claim = not a hosted-domain account; `email_verified`; "Don't use the email field as a unique identifier... use the sub field"; `state` must be checked. Google's own validation-step list was summarised by the fetcher, not read verbatim |
+| Google, Using OAuth 2.0 for Web Server Applications | developers.google.com, read 2026-11-02 | /identity/protocols/oauth2/web-server | `prompt=select_account`; redirect URIs registered, scheme / case / trailing slash must match, `http://localhost` for testing. Its redirect-URI validation table (HTTPS, no raw IP, public suffix) was summarised by the fetcher, not read verbatim - check it when registering |
+
 ### The sentences the design rests on
 
 - **SP 800-86** - "The process for performing digital forensics comprises the following basic

@@ -54,6 +54,21 @@ MTTC_TARGET_HOURS = float(os.environ.get("MTTC_TARGET_HOURS", "4"))
 # helpdesk URL. Empty shows the instruction without a link.
 IT_CONTACT_URL = os.environ.get("IT_CONTACT_URL", "")
 
+# Sign in with Google (specs/google_login.md, gotcha #82): OpenID Connect's
+# authorization code flow with PKCE, the server talking to Google itself. Off
+# unless all four are set. PUBLIC_URL is the address analysts open (no trailing
+# slash) - the redirect URI registered at Google is PUBLIC_URL +
+# /api/auth/google/callback and must match it exactly, so it is not guessed
+# from the request (behind a proxy that would read http://...).
+# GOOGLE_ALLOWED_DOMAINS: the Google Workspace domains whose people may sign
+# in, comma separated; one who has no account yet gets one as an analyst.
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_ALLOWED_DOMAINS = tuple(sorted({d.strip().lower().lstrip("@")
+                                       for d in os.environ.get("GOOGLE_ALLOWED_DOMAINS", "").split(",")
+                                       if d.strip()}))
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")
+
 # FR-2.2: 10 GB per file, measured after decompression (see routers/upload.py).
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024 * 1024)))  # 10GB
 # FR-2.2: refuse an upload unless the data disk has this many times its size

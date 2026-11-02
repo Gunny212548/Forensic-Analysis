@@ -73,6 +73,12 @@ export default function Users() {
   }
   if (!data) return <div className="empty">{error ? `Could not load the accounts: ${error}` : 'Loading...'}</div>
 
+  // Sign in with Google (specs/google_login.md): who may, and how each account does.
+  const domains = data.google_domains || []
+  const inGoogleDomain = (email) => domains.some((d) => email.toLowerCase().endsWith('@' + d))
+  const signsIn = (u) =>
+    u.google && u.has_password ? 'Google or password' : u.google ? 'Google' : u.has_password ? 'Password' : 'No way to sign in yet'
+
   return (
     <section className="page ov">
       <div className="top-bar">
@@ -87,6 +93,12 @@ export default function Users() {
 
       <div className="panel">
         <h2>Accounts</h2>
+        {domains.length > 0 && (
+          <div className="cell-sub">
+            Anyone at {domains.join(', ')} can sign in with Google; the first time, they get an analyst account.
+            Disable an account to keep them out - a removed one comes back at their next sign-in.
+          </div>
+        )}
         <div className="table-scroll">
           <table className="ov-table">
             <thead>
@@ -106,6 +118,7 @@ export default function Users() {
                     <td>
                       <div>{u.name}</div>
                       <div className="cell-sub mono">{u.email}</div>
+                      <div className="cell-sub">{signsIn(u)}</div>
                     </td>
                     <td>
                       <select
@@ -184,7 +197,11 @@ export default function Users() {
                       )}
                       {removing === u.email && (
                         <div className="lc-form">
-                          <span>Remove {u.email}? Their sessions end; the decisions they recorded stay.</span>
+                          <span>
+                            Remove {u.email}? Their sessions end; the decisions they recorded stay.
+                            {inGoogleDomain(u.email) &&
+                              ' They can still sign in with Google and get a new analyst account - Disable keeps them out.'}
+                          </span>
                           <button
                             className="rv-btn rv-reject"
                             type="button"

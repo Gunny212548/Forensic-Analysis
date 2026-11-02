@@ -26,6 +26,13 @@ def on_startup():
             "%s found in DATA_DIR (%s) - accounts now live in AUTH_DIR (%s) and these are "
             "not read; move them there or delete them", ", ".join(stray), config.DATA_DIR,
             config.AUTH_DIR)
+    google = {"GOOGLE_CLIENT_ID": config.GOOGLE_CLIENT_ID, "GOOGLE_CLIENT_SECRET": config.GOOGLE_CLIENT_SECRET,
+              "GOOGLE_ALLOWED_DOMAINS": config.GOOGLE_ALLOWED_DOMAINS, "PUBLIC_URL": config.PUBLIC_URL}
+    missing = [k for k, v in google.items() if not v]
+    if missing and len(missing) < len(google):
+        # Half set up is off, not a guess at the rest (specs/google_login.md).
+        logging.getLogger("forensic").warning(
+            "Sign in with Google is off: %s not set", ", ".join(missing))
     legacy = storage.ensure_root()
     if legacy:
         # Cases in the pre-2026-10-14 flat layout are invisible until moved
@@ -76,7 +83,10 @@ app.include_router(users_router.router)
 # Everything under /api needs a signed-in user except what the login page
 # itself calls. The page and its bundle stay public - they hold no data, and
 # the login form is part of them.
-PUBLIC_API = {"/api/health", "/api/auth/login", "/api/auth/config"}
+# Sign in with Google's two steps are the browser's way in, so they are open too
+# (routers/auth.py; specs/google_login.md).
+PUBLIC_API = {"/api/health", "/api/auth/login", "/api/auth/config",
+              "/api/auth/google/start", "/api/auth/google/callback"}
 # What a signed-in account may call whatever its role: who it is, and signing out.
 SELF_API = {"/api/auth/me", "/api/auth/logout"}
 

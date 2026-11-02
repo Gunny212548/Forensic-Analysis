@@ -273,7 +273,8 @@ def audit_path() -> Path:
 
 
 def audit(event: str, *, account: str | None, client: str | None,
-          attempted: str | None = None) -> None:
+          attempted: str | None = None, method: str | None = None,
+          reason: str | None = None) -> None:
     """One hash-chained line per sign-in event (ISO/IEC 27001 A.8.15, like the
     review and custody logs). Never the password. An address that matches no
     account is recorded as a short digest, not as typed: people paste a
@@ -282,6 +283,10 @@ def audit(event: str, *, account: str | None, client: str | None,
     A failure to write is logged and swallowed - an unwritable audit file must
     not lock every analyst out of an internal tool - but it is not silent."""
     entry = {"event": event, "account": account, "client": client}
+    if method:
+        entry["method"] = method  # "google"; a password sign-in carries none, as before
+    if reason:
+        entry["reason"] = reason
     if account is None and attempted is not None:
         # Keyed: a bare SHA-256 of a pasted password is a dictionary lookup
         # away for whoever reads this file. The same input still gives the
@@ -396,6 +401,52 @@ def reset_password(actor: str, email: str, password: str) -> None:
         _audit_account(actor, "password_reset", email)
         users[email] = {**users[email], "password": hash_password(password)}
         save_users(users)
+
+
+# --- Sign in with Google (specs/google_login.md) -----------------------------
+
+GOOGLE_ACTOR = "google-sign-in"  # who the account log says made an account Google created
+_NO_PASSWORD = "!"  # not a scrypt$ hash: _check_hash refuses every password against it
+
+
+def has_password(user: dict) -> bool:
+    return str(user.get("password") or "").startswith("scrypt$")
+
+
+def google_account(email: str, name: str, sub: str) -> dict:
+    """The account a verified Google sign-in belongs to - the caller has already
+    checked the domain. Made as an analyst with no password when there is none
+    (the user's choice, 2026-11-02: the whole domain may sign in). Bound to
+    Google's `sub` the first time: Google says the email is not a unique id
+    (a Workspace address can be given to someone else later), so a different
+    `sub` behind the same address is refused. AccountError carries a reason code."""
+    email = normalize_email(email)
+    if "@" not in email or len(email) > MAX_EMAIL or not sub:
+        raise AccountError("bad_token")
+    with _accounts_lock:
+        users = load_users()
+        user = users.get(email)
+        if user is None:
+            user = {"email": email, "name": (name or "").strip()[:200], "role": DEFAULT_ROLE,
+                    # Unique per account so a session's binding (_password_version) is too.
+                    "password": _NO_PASSWORD + secrets.token_hex(16), "google_sub": sub,
+                    "created_at": _now(), "created_by": GOOGLE_ACTOR}
+            _audit_account(GOOGLE_ACTOR, "account_created", email, role=DEFAULT_ROLE,
+                           name=user["name"], method="google")
+            users[email] = user
+            save_users(users)
+            return user
+        if user.get("disabled"):
+            raise AccountError("disabled")
+        bound = user.get("google_sub")
+        if bound and not hmac.compare_digest(str(bound).encode(), str(sub).encode()):
+            raise AccountError("google_mismatch")
+        if not bound:
+            _audit_account(GOOGLE_ACTOR, "account_changed", email, changes={"google": [False, True]})
+            user = {**user, "google_sub": sub}
+            users[email] = user
+            save_users(users)
+        return user
 
 
 def remove_account(actor: str, email: str) -> None:

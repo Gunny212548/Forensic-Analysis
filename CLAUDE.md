@@ -111,6 +111,8 @@ data/customers/{company_id}/db/{case_id}.duckdb   (gotcha #40)
   escalations findings an attack-path pattern raised, and which pattern
 
 POST /api/auth/login | logout, GET /me        session cookie (see *Login*);
+GET  /api/auth/google/start | callback       Sign in with Google (gotcha #82), open
+                                             without a session, answer with redirects;
 GET  /api/auth/config                        login + config + health are the
                                              only routes open without a session
 GET  /api/upload/check?size=                 FR-2.2 pre-flight: 413/507 before
@@ -292,6 +294,12 @@ anything. The page and its bundle stay public; they hold no data.
   through `/api/auth/me` (`frontend/src/permissions.js`) but the server is the gate. Accounts are
   managed on the Users page (admin only, `routers/users.py`), every change hash-chained to
   `AUTH_DIR/audit/accounts.jsonl`; the last admin cannot be removed or demoted.
+- **Sign in with Google since 2026-11-02 (`specs/google_login.md`, gotcha #82)**, beside the
+  password, not instead of it: OpenID Connect code flow + PKCE run by the server (stdlib, no
+  dependency, nothing loaded from Google by the page). Anyone whose ID token's `hd` claim is in
+  `GOOGLE_ALLOWED_DOMAINS` may sign in, and gets an analyst account (no password) the first time -
+  the user's choice, so **disable, not remove**, keeps someone out. Off unless `GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET`, `GOOGLE_ALLOWED_DOMAINS` and `PUBLIC_URL` are all set (`.env.example`).
 - **The review actor comes from the session, not the request body.** It used
   to be whatever name the browser sent (typed once, kept in localStorage as
   `analyst-name`), which let any client write any name into an audit log
@@ -564,6 +572,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #40 One store per customer under `customers/<id>/`; `case_dir()` is the only answer to "where is this case"; cross-customer merge is 409.
 - #41 Login accounts live in `AUTH_DIR`, apart from customer data; docker-compose deliberately does not set it.
 - #47 Sign-in throttled per account (not per address), audit-logged, and bound to the password hash.
+- #82 Sign in with Google (specs/google_login.md): the `hd` claim not the parameter, bound to `sub` not the email, redirect URI from `PUBLIC_URL`, the ID token straight from Google's token endpoint (OIDC §3.1.3.7 step 6); the whole domain may sign in, so removing an account is not a ban - disable is.
 - #48 Work is queued, durable and bounded (`jobs.py`); manifests are written atomically. **One process only.**
 - #58 Ingest: question on the project (hash-chained log), provenance / declared time off the screen since 2026-10-27 (the user: too much, then not needed; `PUT /provenance` still takes them), a declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
@@ -915,6 +924,9 @@ Two more checks, each for its own layer:
   computers and sources), a forged custody log); needs the container (`static/`).
   Run it in a throwaway container with `AUTH_DIR` on a scratch path - in the live
   one its test accounts land in the real `users.json`. Gotchas #49 / #50 / #73.
+- **Sign in with Google** - `tests/check_google_login.py [repo]` (gotcha #82): PKCE / state / nonce,
+  every ID-token check, the domain, `sub` binding, who is made and as what, the audit lines - against a
+  stand-in for Google's token endpoint, so no network and no Google account; needs `static/`.
 - **Authorisation** - `tests/check_authz.py [repo]` (ADR-3, gotcha #51, IAI-14): the permission
   table per role, every case route answering 403 exactly where `authz.can` says no, the Users
   routes, wrong-typed account changes refused; deleting a case and a customer (gotcha #74).
