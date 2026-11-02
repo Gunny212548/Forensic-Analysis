@@ -194,16 +194,28 @@
      the column heads stay put (EventsTable `.events-scroll`). */
   .raw-cell { font-family: var(--mono); font-size: 11px; }
   .events-table td { white-space: nowrap; }
-  .events-scroll { max-height: calc(100vh - 140px); overflow: auto; }
-  /* The end of the loaded lines: what is coming, or that nothing more is. Sticky, so
-     it stays in view however far the table is scrolled sideways. */
-  .events-end { position: sticky; left: 0; padding: 10px 8px; font-size: 12px; color: var(--muted); min-height: 1px; }
+  .events-scroll { max-height: calc(100vh - 140px); overflow: auto; overflow-anchor: none; }
   .events-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); white-space: nowrap; }
+  /* A virtual list (useVirtualRows, VirtualBody): the box's scrollbar is every row,
+     only the rows in view are drawn, and spacers stand for the rest - so every row
+     is exactly one line high, or the scrollbar and the rows drift apart. */
+  .vpad td { padding: 0; border: 0; }
+  /* Every row exactly as tall as the hook measures: a fixed cell height and line
+     height, and what sits inside a cell kept within that line - with the default
+     line height a mono cell, a chip or a button made rows 37.5-38.6 px and the
+     rows drifted from the scrollbar a row every few dozen. */
+  .vlist tbody tr:not(.vpad) > td { height: 37px; padding-top: 0; padding-bottom: 0; line-height: 20px;
+    vertical-align: middle; }
+  .fe-table.vlist tbody tr:not(.vpad) > td { height: 27px; line-height: 16px; }
+  .vlist .context-chip, .vlist .mitre-tag, .vlist .sev-tag, .vlist .link-btn {
+    margin-top: 0; margin-bottom: 0; line-height: 14px; vertical-align: middle; }
+  .vwait td { color: var(--muted); font-size: 12px; }
   /* Layer C facts on an event: neutral on purpose - a fact, not a severity. */
   .context-chip { display: inline-block; font-size: 11px; color: var(--muted); background: var(--subtle);
     border-radius: 999px; padding: 1px 8px; margin: 1px 4px 1px 0; white-space: nowrap; }
-  /* SigmaHQ marks under an event type (EventsTable SigmaMarks): links to the rule, no button look. */
-  .sigma-marks { display: flex; flex-wrap: nowrap; gap: 3px; margin-top: 3px; }
+  /* SigmaHQ marks beside an event type (EventsTable SigmaMarks): links to the rule, no
+     button look - on the event's own line, so every row of the list is one line high. */
+  .sigma-marks { display: inline-flex; flex-wrap: nowrap; gap: 3px; margin-left: 8px; vertical-align: middle; }
   /* The rule's whole title on one line, like the rest of the row. */
   .sigma-mark { text-decoration: none; white-space: nowrap; }
   .sigma-mark:hover, .sigma-mark:focus-visible { text-decoration: underline; }

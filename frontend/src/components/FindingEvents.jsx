@@ -1,66 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback } from 'react'
 import { getFindingEvents } from '../api.js'
 import { fmtNum } from '../format.js'
 import { Empty } from './common.jsx'
-import { useLoadOnScroll } from './useLoadOnScroll.js'
-
-const PAGE = 200
+import VirtualBody from './VirtualBody.jsx'
+import { useVirtualRows } from './useVirtualRows.js'
 
 /** The events behind one finding, each with the file it came from (FR-4.1):
- *  how a finding is traced back to its source. Loaded when it is opened, from
- *  the server a page at a time - a finding can stand for tens of thousands of
- *  rows - and, like the Timeline's table, the next page comes as the box is
- *  scrolled: one event a line, every record whole, no Load more button (the
- *  user, 2026-11-02: the source events must show every event). */
+ *  how a finding is traced back to its source. One scrolling box whose scrollbar
+ *  stands for every event of the finding from the start - a finding can stand for
+ *  tens of thousands of rows, so only those in view are drawn and their server
+ *  pages fetched as they come into view (useVirtualRows); one event a line, every
+ *  record whole (the user, 2026-11-02: scroll to any event, no load more). */
 export default function FindingEvents({ caseId, findingKey }) {
-  const [rows, setRows] = useState([])
-  const [total, setTotal] = useState(null)
-  const [sha, setSha] = useState('')
-  const [error, setError] = useState('')
-  const [more, setMore] = useState(false)
-  const busy = useRef(false)
-  const box = useRef(null)
-  const end = useRef(null)
-
-  const load = useCallback(
-    async (offset) => {
-      busy.current = true
-      setMore(true)
-      try {
-        const r = await getFindingEvents(caseId, findingKey, { limit: PAGE, offset })
-        setRows((prev) => (offset ? [...prev, ...r.rows] : r.rows))
-        setTotal(r.total)
-        setSha(r.evidence_sha256 || '')
-        setError('')
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        busy.current = false
-        setMore(false)
-      }
-    },
+  const fetchPage = useCallback(
+    (offset, limit) => getFindingEvents(caseId, findingKey, { limit, offset }),
     [caseId, findingKey],
   )
+  const v = useVirtualRows(fetchPage, (r) => r.rows, `${caseId}|${findingKey}`, { rowHeight: 28 })
+  const sha = v.meta?.evidence_sha256 || ''
 
-  useEffect(() => {
-    load(0)
-  }, [load])
-
-  const loadMore = useCallback(() => {
-    if (busy.current || error || total === null || rows.length >= total) return
-    load(rows.length)
-  }, [load, error, total, rows.length])
-  useLoadOnScroll(box, end, loadMore)
-
-  if (error && !rows.length) return <Empty>{error}</Empty>
-  if (total === null) return <div className="fe muted">Loading events...</div>
-  const all = rows.length >= total
+  if (v.error && !v.meta) return <Empty>{v.error}</Empty>
+  if (!v.meta) return <div className="fe muted">Loading events...</div>
 
   return (
     <div className="fe">
-      {/* One event a line, the box scrolls both ways (styles.css .events-scroll). */}
-      <div className="events-scroll fe-scroll" ref={box}>
-        <table className="ov-table fe-table events-table">
+      {/* One event a line; the box scrolls both ways and its scrollbar is the whole list. */}
+      <div className="events-scroll fe-scroll" ref={v.box} onScroll={v.onScroll}>
+        <table className="ov-table fe-table events-table vlist">
           <thead>
             <tr>
               <th>Row</th>
@@ -74,9 +40,11 @@ export default function FindingEvents({ caseId, findingKey }) {
               <th>Event</th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map((e) => (
-              <tr key={e.row_id}>
+          <VirtualBody
+            v={v}
+            cols={7}
+            row={(e, i, ref) => (
+              <tr key={i} ref={ref} data-i={i}>
                 <td className="mono muted">{e.row_id}</td>
                 {/* The whole time, seconds and zone - two events a second apart are two steps. */}
                 <td className="mono">{e.ts || e.ts_raw || ''}</td>
@@ -90,16 +58,13 @@ export default function FindingEvents({ caseId, findingKey }) {
                 {/* The whole record on one line - the box scrolls sideways to it. */}
                 <td className="mono raw-cell">{e.raw || ''}</td>
               </tr>
-            ))}
-          </tbody>
+            )}
+          />
         </table>
-        <div className="events-end" ref={end}>
-          {more ? 'Loading more...' : error ? `Could not load more: ${error}` : all ? 'End of the list' : ''}
-        </div>
       </div>
       <div className="fe-foot">
-        Showing {fmtNum(rows.length)} of {fmtNum(total)} events
-        {all ? '' : ' - scroll the list for more'}
+        {fmtNum(v.total)} events
+        {v.error ? ` - could not load some of them: ${v.error}` : ''}
         {sha && (
           <>
             {' '}
