@@ -213,6 +213,19 @@ that fails at run time is listed with its error on the case, the rest go on.
   session's own PowerShell - and five more). The Security log needs administrator rights and there is
   no Sysmon here: of 2,878 rules 350 had events, so this says nothing about the Sysmon / Security rules'
   noise. That measurement still needs a real export with both.
+- **This PC's Security log (2026-11-02)**, exported as administrator: 31,578 events over five days
+  (2026-10-28 - 11-02), one standalone workstation, its owner the only user. Every runnable SigmaHQ
+  Security rule ran - 166 of 169 (93 high / critical): **0 SigmaHQ suggestions**, two informational
+  rules mark 71 events (User Logoff 59, VSSAudit source registration 12). 9.7 s for the case. What it
+  cannot say: no domain, no remote sign-in (4624 types 5 / 2 only), and process creation is not audited
+  by default (25 4688s, all at boot), so the Security rules saw a quiet machine. The Sysmon rules -
+  2,253 of the 2,878 - are still unmeasured on real data.
+  In-house, the same file gave two suggestions: WIN-BRUTE-1 (12 of 18 failed sign-ins, the owner's
+  account, logon type 2, wrong password `0xC000006A`; the failing process Chrome's password-manager
+  re-authentication or the lock screen's svchost) and WIN-AUTH-1 after it, which itself says "this
+  account had signed in from this source before the failures began (likely the owner)". With 8
+  legitimate episodes the rule draws no line (under 20 members, Q67), so every episode of two or more
+  failures goes to the analyst - as designed.
 
 ## Not in this story
 
@@ -253,3 +266,101 @@ commit is a new pin, its baseline re-taken).
 - **Q133 - real benign data.** No large real Windows export has been run: may a Security / System
   / PowerShell export of this PC (or one you choose) be used to measure the noise before 6b ships?
   It is your data; it stays outside the repo. Recommended: yes, before 6b is deployed.
+
+## Story 6d - process creation from Security 4688 (design, 2026-11-02, awaiting approval)
+
+**Why.** The taxonomy maps `process_creation` to Sysmon 1 only (S-D2), so 1,425 runnable SigmaHQ rules -
+half the bundle - judge nothing on a host that audits process creation (4688) but has no Sysmon, which
+is the usual customer export. The user chose this as the next Windows work while the Sysmon noise round
+waits (2026-11-02).
+
+**What was read.**
+- Sigma taxonomy appendix 2.1.0: `process_creation` is EventID 1 of Sysmon; 4688 appears nowhere; "The
+  field names follow the field names used in Sysmon events".
+- SigmaHQ's own `tests/thor.yml` (commit 05d1031, the pinned one): `process_creation` also as
+  `EventID: 4688`, service `security`, with `fieldmappings: Image: NewProcessName, ParentImage:
+  ParentProcessName` - the mapping SigmaHQ ships for THOR / SPARK.
+- Microsoft, event 4688 (archived Windows 10 page): the items `NewProcessName` (full path of the new
+  process), `ParentProcessName` (version 2, Windows 10, "Creator Process Name"), `CommandLine` ("By
+  default Process Command Line field is empty" - a group policy adds it); process ids hexadecimal;
+  `MandatoryLabel` a SID, not Sysmon's `IntegrityLevel` word.
+- DuckDB 2.0, NULL Values / Boolean Type / Logical Operators: any comparison with NULL is NULL; `NULL
+  AND false` is false, `NULL OR true` is true, `NOT NULL` is NULL; WHERE keeps only rows that are
+  true; `coalesce` is the exception. Not on those pages, measured on 2.0.0: `ILIKE ... ESCAPE`, `=
+  ... COLLATE NOCASE`, `regexp_matches`, `IN (...)` and `lower` of NULL are NULL.
+
+**Measured with a prototype** (scratch script over the app's pipeline, the bundle unchanged): the
+1,425 rules run over each case's 4688 rows under the map below, every matched row classed by the
+dataset's ground truth.
+
+| | 4688 rows | rules run | high / critical rows: attack / look-alike / plain | other levels (marks) |
+|---|---|---|---|---|
+| Kinnaree (key read) | 7,641 | 1,220 | 45 / **0** / **0** - K1, K4, K5, K10, K12, K15 | 24 attack, 236 look-alike (PDQ 123, WinRM 73) |
+| Mekong | 11,150 | 1,220 | 6 / **0** / **0** - W4, W7, W10 | 13 attack, 73 look-alike |
+| Brute force -> pivot | 2,595 | 1,220 | 2 / 0 / **0** - C2, C4 | 12 attack, 19 plain |
+| `windows-security.log` (attack_data) | 4 | 1,220 | the lsass dump via comsvcs, 4 rules | - |
+| This PC's Security | 25 (no command line) | 1,220 | nothing | nothing |
+
+In the three generated sets every 4688 has a Sysmon 1 twin (same host, process id, image, time): of
+Kinnaree's 7,641 pairs the account agrees in 6,696; the other 945 are all SYSTEM processes - 4688 names
+the computer account (`APP01$`), Sysmon `NT AUTHORITY\SYSTEM` - so running both would put one process
+under two suggestions.
+
+### Proposed decisions
+
+**S-D10 - the map is SigmaHQ's own (Q134).** On a Security 4688: `Image` <- `NewProcessName`,
+`ParentImage` <- `ParentProcessName` (thor.yml), `CommandLine` <- `CommandLine` (same item name). An
+empty item is unknown (NULL), never an empty string: "not audited" must not read as "no argument".
+Every other Sysmon field (`OriginalFileName`, `Hashes`, `ParentCommandLine`, `User`, `IntegrityLevel`,
+...) is unknown on a 4688. No value is translated (no `MandatoryLabel` SID -> `IntegrityLevel` word,
+no hex -> decimal id): no document maps them.
+
+**S-D11 - a rule runs on a 4688 only where its answer cannot depend on what 4688 lacks (Q135).**
+- A rule whose condition is plain three-valued logic (no `coalesce`, `IS NULL`, `IS DISTINCT`): on
+  every 4688. With the unknown fields NULL, the condition is true only when it would be true whatever
+  their values (the truth tables above), so an unknown field can lose a match - a renamed binary its
+  `OriginalFileName` would have caught - but never make one. **1,094 rules**: 493 whose every field
+  4688 holds and 601 that also name a field it lacks.
+- A rule that uses `coalesce` / `IS NULL` - the dialect's `NOT COALESCE(filter, FALSE)`, where an unknown
+  filter field lets the event through: only on a 4688 that holds every field the rule uses (126 rules -
+  most need a command line, so they judge nothing where the policy is off).
+- The rest - such a rule on a field 4688 never has - do not run on 4688: **205 rules**, each listed with
+  the field.
+- Total: **1,220 of 1,425 rules on 4688, 680 of them high / critical**; today 0.
+
+**S-D12 - Sysmon first, 4688 where Sysmon is not (Q136).** A 4688 is read only when its host has no
+Sysmon 1 in the case at that time (outside the span from the host's first to its last Sysmon event).
+One process is then one event and one suggestion, the SYSTEM split above cannot happen, and a host whose
+Sysmon was installed part-way keeps its 4688 from before. Not chosen: both (duplicate rows; 945 of
+Kinnaree's would open a second suggestion), or 4688 only when the case has no Sysmon at all (a mixed
+estate loses its unmonitored hosts).
+
+**S-D13 - said on the case (Q137).** The case's SigmaHQ record adds the 4688 count read, how many had
+no command line ("process command line not audited - rules on CommandLine judged N events as unknown"),
+and the 205 rules not run on 4688 with the field each needs. The Ingest step's SigmaHQ line shows the
+first two. Findings and marks are unchanged in form: their event is the 4688.
+
+**Not in 6d.** A field 4688 does not carry; 4688's `User` (the Sysmon field) - `ACCOUNT` keeps reading
+the subject as today; a SigmaHQ commit change (the bundle and its pin stay; the map is applied at run
+time in `sigma.py`).
+
+### Build and checks (6d)
+- `sigma.py`: `logs_cte` unions the 4688 rows for a `process_creation` rule per S-D10..12; the record of
+  S-D13 in `apply_marks`.
+- `tests/check_windows.py`: the attack_data 4688 sample raises "Process Memory Dump Via Comsvcs.DLL"
+  from its 4688; a `coalesce` rule skips a 4688 without a command line; a host with Sysmon gives no 4688
+  match; a host without keeps it.
+- `tests/check_windows_rules.py` on Mekong with its Sysmon files removed: no plain or look-alike event
+  raises a SigmaHQ suggestion. `check_sigma.py` unchanged (its samples are Sysmon). Parity: the Windows
+  entries with 4688 and no Sysmon change their `sigma` section - re-taken and listed.
+
+### Questions (6d)
+- **Q134 - the map (S-D10).** SigmaHQ's thor.yml map plus `CommandLine`, an empty item unknown, nothing
+  translated? Recommended: yes.
+- **Q135 - which rules (S-D11).** 1,220 rules by the three-valued rule above, 205 listed as not run?
+  The stricter choice - only rules whose every field 4688 holds - is 619 rules (383 high / critical).
+  Recommended: 1,220.
+- **Q136 - Sysmon first (S-D12).** 4688 only where the host's Sysmon does not cover that time?
+  Recommended: yes.
+- **Q137 - on the case (S-D13).** The 4688 counts and the 205 rules on the SigmaHQ record, two
+  figures on the Ingest step? Recommended: yes.
