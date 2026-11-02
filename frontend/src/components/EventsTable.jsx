@@ -10,7 +10,8 @@ const PAGE_SIZE = 100
  *  the client never pulls the whole table - the offset lives here and every
  *  page is its own query. FR-11.2: every event of the case by default, the
  *  rule matches one click away. `order` "time" is the Timeline step: every
- *  event by event time, then row (file order is "row"). */
+ *  event by event time, then row, and the rule matches too (file order is "row",
+ *  where the matches come most severe first). */
 export default function EventsTable({ caseId, order = 'row' }) {
   const [flagged, setFlagged] = useState(false)
   const [offset, setOffset] = useState(0)
@@ -31,6 +32,8 @@ export default function EventsTable({ caseId, order = 'row' }) {
   useEffect(() => {
     load()
   }, [load])
+
+  const showProfile = (kind, value) => setProfile({ kind, value })
 
   function showFlagged(on) {
     setFlagged(on)
@@ -70,13 +73,19 @@ export default function EventsTable({ caseId, order = 'row' }) {
     body = (
       <>
         <Empty style={{ paddingBottom: 8 }}>
+          {/* Flagged: a line per rule match - an event two rules matched is two lines
+              (gotcha #6), so the lines outnumber the events flagged. */}
           {flagged
-            ? `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} findings (raw rows in the file: ${fmtNum(data.total_rows)})`
+            ? `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} rule matches on ${fmtNum(data.flagged_count)} of ${fmtNum(data.total_rows)} events, ${order === 'time' ? 'in time order' : 'most severe first'}`
             : `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} events (${fmtNum(data.flagged_count)} flagged)`}
         </Empty>
-        {/* All events: one line a row, the box scrolls both ways (styles.css .events-scroll). */}
-        <div className={flagged ? 'table-scroll' : 'events-scroll'}>
-          {flagged ? <FlaggedRows events={data.events} /> : <AllRows events={data.events} onProfile={(kind, value) => setProfile({ kind, value })} />}
+        {/* One line a row, the box scrolls both ways (styles.css .events-scroll). */}
+        <div className="events-scroll">
+          {flagged ? (
+            <FlaggedRows events={data.events} onProfile={showProfile} />
+          ) : (
+            <AllRows events={data.events} onProfile={showProfile} />
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           <button
@@ -139,12 +148,7 @@ function AllRows({ events, onProfile }) {
       <thead>
         <tr>
           <th>time</th>
-          <th title="The computer or device that wrote this record - a Windows event's Computer, a syslog line's host, a FortiGate's devname. Not the destination.">
-            host
-          </th>
-          <th>source</th>
-          <th>destination</th>
-          <th>account</th>
+          <WhoHeads />
           <th>event</th>
           <th>verdict</th>
           <th>application</th>
@@ -158,28 +162,7 @@ function AllRows({ events, onProfile }) {
             {/* ts is the parsed GMT+7 event time; ts_raw is the source text,
                 shown only when nothing parsed (CLAUDE.md gotcha #21). */}
             <td>{e.ts || e.ts_raw || ''}</td>
-            {/* The machine that logged it (raw_events.hostname); empty where the log has none. */}
-            <td className="mono">{e.hostname || ''}</td>
-            <td>
-              {/* Opens the address's or account's behaviour profile above the table. */}
-              {e.srcip ? (
-                <button type="button" className="link-btn mono" onClick={() => onProfile('source', e.srcip)}>
-                  {e.srcip}
-                </button>
-              ) : (
-                ''
-              )}
-            </td>
-            <td>{e.dstip || ''}</td>
-            <td>
-              {e.username ? (
-                <button type="button" className="link-btn mono" onClick={() => onProfile('account', e.username)}>
-                  {e.username}
-                </button>
-              ) : (
-                ''
-              )}
-            </td>
+            <WhoCells e={e} onProfile={onProfile} />
             {/* Layer A: the event type, named by the server (db.EVENT_TYPES)
                 so the table and the MCP tools use the same words. */}
             <td>
@@ -199,7 +182,7 @@ function AllRows({ events, onProfile }) {
                 </span>
               ))}
             </td>
-            {/* In full, wrapped - no tooltip copy of it any more. */}
+            {/* The whole record on one line - the box scrolls sideways to it. */}
             <td className="raw-cell">{e.raw || ''}</td>
           </tr>
         ))}
@@ -208,28 +191,76 @@ function AllRows({ events, onProfile }) {
   )
 }
 
-function FlaggedRows({ events }) {
+/** Where an event happened and who was in it - the same four columns in both tables. */
+function WhoHeads() {
   return (
-    <table>
+    <>
+      <th title="The computer or device that wrote this record - a Windows event's Computer, a syslog line's host, a FortiGate's devname. Not the destination.">
+        host
+      </th>
+      <th>source</th>
+      <th>destination</th>
+      <th>account</th>
+    </>
+  )
+}
+
+function WhoCells({ e, onProfile }) {
+  return (
+    <>
+      {/* The machine that logged it (raw_events.hostname); empty where the log has none. */}
+      <td className="mono">{e.hostname || ''}</td>
+      <td>
+        {/* Opens the address's or account's behaviour profile above the table. */}
+        {e.srcip ? (
+          <button type="button" className="link-btn mono" onClick={() => onProfile('source', e.srcip)}>
+            {e.srcip}
+          </button>
+        ) : (
+          ''
+        )}
+      </td>
+      <td>{e.dstip || ''}</td>
+      <td>
+        {e.username ? (
+          <button type="button" className="link-btn mono" onClick={() => onProfile('account', e.username)}>
+            {e.username}
+          </button>
+        ) : (
+          ''
+        )}
+      </td>
+    </>
+  )
+}
+
+/** One line per rule match: the event's time, where and who, then what the rule said. */
+function FlaggedRows({ events, onProfile }) {
+  return (
+    <table className="events-table">
       <thead>
         <tr>
           <th>time</th>
+          <WhoHeads />
           <th>rule</th>
           <th>level</th>
           <th>description</th>
           <th>mitre</th>
+          <th>raw message</th>
         </tr>
       </thead>
       <tbody>
         {events.map((e, i) => (
           <tr key={`${e.row_id}-${e.rid}-${i}`}>
             <td>{e.ts || e.ts_raw || ''}</td>
-            <td>{e.rid || ''}</td>
+            <WhoCells e={e} onProfile={onProfile} />
+            <td className="mono">{e.rid || ''}</td>
             <td className={SEV_CLASS[e.level] || ''}>{LEVEL_EN[e.level] || ''}</td>
             <td>{e.descr || ''}</td>
             <td>
               <MitreTags list={e.mitre} />
             </td>
+            <td className="raw-cell">{e.raw || ''}</td>
           </tr>
         ))}
       </tbody>

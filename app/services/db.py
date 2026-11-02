@@ -263,13 +263,23 @@ FINDING_COLS = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username", "hostnam
                 "rid", "lvl", "descr", "mitre"]
 
 
-def list_findings(case_id: str, limit: int, offset: int) -> list[dict]:
+def list_findings(case_id: str, limit: int, offset: int, order: str = "severity") -> dict:
+    """One page of rule matches - one line per event a rule matched, so an event two
+    rules matched is two lines (gotcha #6) - and how many lines there are in all.
+    {"total": n, "rows": [...]}. The total counts lines, not distinct events: paging
+    on the distinct-event count stopped before the last lines whenever an event had
+    two matches. `order` "time" is the Timeline step (event time); "severity" the
+    most severe first. The rule id breaks the last tie, so a page boundary never
+    moves between two requests (gotcha #37's total-order rule)."""
     if not db_path(case_id).exists():
-        return []
+        return {"total": 0, "rows": []}
+    sort = ("r.ts NULLS LAST, r.row_id, f.rid" if order == "time"
+            else "f.lvl DESC, r.ts NULLS LAST, r.row_id, f.rid")
     con = connect(case_id, read_only=True)
     try:
+        total = con.execute("SELECT count(*) FROM findings f JOIN raw_events r USING (row_id)").fetchone()[0]
         rows = con.execute(
-            FINDING_SELECT + " ORDER BY f.lvl DESC, r.ts NULLS LAST, r.row_id LIMIT ? OFFSET ?",
+            FINDING_SELECT + f" ORDER BY {sort} LIMIT ? OFFSET ?",
             [limit, offset],
         ).fetchall()
         out = [dict(zip(FINDING_COLS, r)) for r in rows]
@@ -278,7 +288,7 @@ def list_findings(case_id: str, limit: int, offset: int) -> list[dict]:
             # Rendered with its zone like every other time the UI shows
             # (gotcha #21); it used to go out as a bare ISO string.
             row["ts"] = _fmt_ts(row["ts"]) or None
-        return out
+        return {"total": total, "rows": out}
     finally:
         con.close()
 

@@ -189,6 +189,27 @@ def main() -> int:
         check(c.get(f"/api/cases/{Z}/events", params={"order": "bogus"}).status_code == 422,
               "an unknown order is refused")
 
+        print("flagged only: every rule match reachable, in time order on the Timeline")
+        # gen_usecase's auth log has events two rules matched (R2000 + R2009): the
+        # pager used to stop at the distinct-event count and hide the last lines.
+        for order in ("time", "row"):
+            seen, off, d = [], 0, {}
+            while True:
+                d = c.get(f"/api/cases/{Z}/events", params={"only_flagged": "true", "order": order,
+                                                           "limit": 7, "offset": off}).json()
+                seen += [(e["row_id"], e["rid"]) for e in d["events"]]
+                off += 7
+                if off >= d["total"]:
+                    break
+            check(d["total"] > d["flagged_count"] and len(seen) == d["total"] == len(set(seen)),
+                  f"order={order}: {len(seen)} of {d['total']} rule matches paged, on {d['flagged_count']} events")
+            if order == "time":
+                ts = [t for t in (c.get(f"/api/cases/{Z}/events", params={
+                    "only_flagged": "true", "order": "time", "limit": 1000}).json()["events"]) if t["ts"]]
+                check([t["ts"] for t in ts] == sorted(t["ts"] for t in ts), "...by event time")
+                check(all(k in ts[0] for k in ("hostname", "srcip", "dstip", "username", "raw")),
+                      "...each with where, who and the record")
+
         print("evidence problem")
         custody.record(F, "integrity_failed", EMAIL, sha256="0" * 64, expected="1" * 64, purpose="test")
         ing = step(flow(F), "ingest")

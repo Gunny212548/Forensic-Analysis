@@ -310,7 +310,8 @@ async def get_case_events(
     only_flagged: bool = True,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    # "time" for the Timeline step (event time, then row); "row" is file order.
+    # "time" for the Timeline step (event time, then row); "row" is file order -
+    # for the flagged lines, most severe first.
     order: str = Query("row", pattern="^(row|time)$"),
 ):
     manifest = storage.load_manifest(case_id)
@@ -319,8 +320,10 @@ async def get_case_events(
 
     total_rows, flagged = db.counts(case_id)
     if only_flagged:
-        events = db.list_findings(case_id, limit, offset)
-        total = flagged
+        # `total` is the number of rule-match lines (what is paged through);
+        # `flagged_count` stays the number of distinct events flagged.
+        page = db.list_findings(case_id, limit, offset, order="time" if order == "time" else "severity")
+        events, total = page["rows"], page["total"]
     else:
         events = db.list_raw(case_id, limit, offset, order=order)
         total = total_rows
