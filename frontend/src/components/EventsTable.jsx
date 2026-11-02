@@ -3,6 +3,7 @@ import { getEvents } from '../api.js'
 import { LEVEL_EN, SEV_CLASS, fmtNum } from '../format.js'
 import { Empty, MitreTags } from './common.jsx'
 import ProfilePanel from './ProfilePanel.jsx'
+import { useLoadOnScroll } from './useLoadOnScroll.js'
 
 const PAGE_SIZE = 200
 
@@ -69,17 +70,8 @@ export default function EventsTable({ caseId, order = 'row' }) {
     }
   }, [caseId, flagged, order, win, data, error, rows.length])
 
-  // The end of the list coming within 600px of the box's bottom asks for the next
-  // page - and again at once if the box is still not full, until it is or all is in.
-  useEffect(() => {
-    if (!box.current || !end.current) return undefined
-    const seen = new IntersectionObserver((entries) => entries[0].isIntersecting && loadMore(), {
-      root: box.current,
-      rootMargin: '0px 0px 600px 0px',
-    })
-    seen.observe(end.current)
-    return () => seen.disconnect()
-  }, [loadMore])
+  // The end of the list coming near the box's bottom asks for the next page.
+  useLoadOnScroll(box, end, loadMore)
 
   const showProfile = (kind, value) => setProfile({ kind, value })
 
