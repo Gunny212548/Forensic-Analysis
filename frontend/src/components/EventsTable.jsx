@@ -134,7 +134,7 @@ function SigmaMarks({ marks }) {
 
 function AllRows({ events, onProfile }) {
   return (
-    <table>
+    <table className="events-table">
       <thead>
         <tr>
           <th>time</th>
@@ -198,9 +198,8 @@ function AllRows({ events, onProfile }) {
                 </span>
               ))}
             </td>
-            <td className="raw-cell" title={e.raw || ''}>
-              {e.raw || ''}
-            </td>
+            {/* In full, wrapped - no tooltip copy of it any more. */}
+            <td className="raw-cell">{e.raw || ''}</td>
           </tr>
         ))}
       </tbody>
