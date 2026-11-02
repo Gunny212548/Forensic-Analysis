@@ -210,6 +210,35 @@ def main() -> int:
                 check(all(k in ts[0] for k in ("hostname", "srcip", "dstip", "username", "raw")),
                       "...each with where, who and the record")
 
+        print("a time window (since / until, GMT+7, both ends inclusive to the precision written)")
+        every = c.get(f"/api/cases/{Z}/events", params={"only_flagged": "false", "order": "time",
+                                                       "limit": 1000}).json()
+        timed = [e for e in every["events"] if e["ts"]]
+        sec = lambda e: e["ts"][:19]  # "YYYY-MM-DD HH:MM:SS" of "...+07:00"
+        mid = sec(timed[len(timed) // 2])
+        ev = lambda **p: c.get(f"/api/cases/{Z}/events", params={"only_flagged": "false", "order": "time",
+                                                                  "limit": 1000, **p})
+        got = ev(since=mid.replace(" ", "T"), until=mid.replace(" ", "T")).json()
+        want = [e["row_id"] for e in timed if sec(e) == mid]
+        check([e["row_id"] for e in got["events"]] == want and got["total"] == len(want) and got["windowed"],
+              f"one second, {mid}: {len(want)} events, the whole second kept")
+        day = mid[:10]
+        got = ev(since=day, until=day).json()
+        want = [e["row_id"] for e in timed if e["ts"][:10] == day]
+        check([e["row_id"] for e in got["events"]] == want, f"a whole day, {day}: {len(want)} events")
+        got = ev(since=mid.replace(" ", "T")).json()
+        check(got["total"] == sum(1 for e in timed if sec(e) >= mid)
+              and got["ts_first"] == every["ts_first"] and got["ts_last"] == every["ts_last"],
+              "open-ended, and the case's own first / last time still reported")
+        fl = c.get(f"/api/cases/{Z}/events", params={"only_flagged": "true", "order": "time", "limit": 1000,
+                                                     "since": day, "until": day}).json()
+        check(all(e["ts"][:10] == day for e in fl["events"]) and fl["flagged_count"] <= got["total"] + len(timed),
+              "flagged only keeps the window")
+        check(all(ev(since=bad).status_code == 422 for bad in ("yesterday", f"{day}T05:10:00+07:00", "2026-02-30")),
+              "not a date, an offset (never guessed) and an impossible date are refused")
+        check(ev(since=f"{day}T23:59:59", until=f"{day}T00:00:00").json()["total"] == 0,
+              "a reversed window holds nothing")
+
         print("evidence problem")
         custody.record(F, "integrity_failed", EMAIL, sha256="0" * 64, expected="1" * 64, purpose="test")
         ing = step(flow(F), "ingest")

@@ -161,6 +161,37 @@ def counts(case_id: str) -> tuple[int, int]:
         con.close()
 
 
+def time_window(since=None, until=None, col: str = "ts") -> tuple[str, list]:
+    """(SQL condition, params) for an event-time window: `since` inclusive, `until`
+    exclusive - routers/cases.py has already turned the analyst's inclusive "To"
+    into the next second or minute. Both are naive GMT+7 datetimes, the zone every
+    event was stored in (gotcha #21). An event with no readable time is in no window.
+    `col` is a fixed column name from the callers here, never input."""
+    where, params = [], []
+    if since is not None:
+        where.append(f"{col} >= ?")
+        params.append(since)
+    if until is not None:
+        where.append(f"{col} < ?")
+        params.append(until)
+    return (" AND ".join(where) or "TRUE"), params
+
+
+def window_counts(case_id: str, since=None, until=None) -> tuple[int, int]:
+    """(events, distinct flagged events) inside a time window - counts() for a window."""
+    if not db_path(case_id).exists():
+        return 0, 0
+    cond, params = time_window(since, until, "r.ts")
+    con = connect(case_id, read_only=True)
+    try:
+        total = con.execute(f"SELECT count(*) FROM raw_events r WHERE {cond}", params).fetchone()[0]
+        flagged = con.execute(f"SELECT count(DISTINCT f.row_id) FROM findings f JOIN raw_events r "
+                              f"USING (row_id) WHERE {cond}", params).fetchone()[0]
+        return total, flagged
+    finally:
+        con.close()
+
+
 def ts_range(case_id: str) -> tuple[str, str]:
     """(earliest, latest) event time of a processed case, rendered GMT+7.
 
@@ -263,24 +294,28 @@ FINDING_COLS = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username", "hostnam
                 "rid", "lvl", "descr", "mitre"]
 
 
-def list_findings(case_id: str, limit: int, offset: int, order: str = "severity") -> dict:
+def list_findings(case_id: str, limit: int, offset: int, order: str = "severity",
+                  since=None, until=None) -> dict:
     """One page of rule matches - one line per event a rule matched, so an event two
     rules matched is two lines (gotcha #6) - and how many lines there are in all.
     {"total": n, "rows": [...]}. The total counts lines, not distinct events: paging
     on the distinct-event count stopped before the last lines whenever an event had
     two matches. `order` "time" is the Timeline step (event time); "severity" the
     most severe first. The rule id breaks the last tie, so a page boundary never
-    moves between two requests (gotcha #37's total-order rule)."""
+    moves between two requests (gotcha #37's total-order rule). `since` / `until`:
+    the event-time window (time_window)."""
     if not db_path(case_id).exists():
         return {"total": 0, "rows": []}
     sort = ("r.ts NULLS LAST, r.row_id, f.rid" if order == "time"
             else "f.lvl DESC, r.ts NULLS LAST, r.row_id, f.rid")
+    cond, params = time_window(since, until, "r.ts")
     con = connect(case_id, read_only=True)
     try:
-        total = con.execute("SELECT count(*) FROM findings f JOIN raw_events r USING (row_id)").fetchone()[0]
+        total = con.execute("SELECT count(*) FROM findings f JOIN raw_events r USING (row_id) "
+                            f"WHERE {cond}", params).fetchone()[0]
         rows = con.execute(
-            FINDING_SELECT + f" ORDER BY {sort} LIMIT ? OFFSET ?",
-            [limit, offset],
+            FINDING_SELECT + f" WHERE {cond} ORDER BY {sort} LIMIT ? OFFSET ?",
+            [*params, limit, offset],
         ).fetchall()
         out = [dict(zip(FINDING_COLS, r)) for r in rows]
         for row in out:
@@ -361,14 +396,16 @@ _EVENT_COLS = ["row_id", "ts", "ts_raw", "srcip", "dstip", "dstport", "username"
                "action", "verdict", "app", "risk", "raw"]
 
 
-def list_raw(case_id: str, limit: int, offset: int, order: str = "row") -> list[dict]:
+def list_raw(case_id: str, limit: int, offset: int, order: str = "row",
+             since=None, until=None) -> list[dict]:
     """One page of events, each with its event type (`event`, layer A) and its
-    layer C facts (`context`)."""
+    layer C facts (`context`); inside an event-time window when one is given."""
     if not db_path(case_id).exists():
         return []
+    cond, params = time_window(since, until)
     con = connect(case_id, read_only=True)
     try:
-        return _events(con, "TRUE", [], order, limit, offset)
+        return _events(con, cond, params, order, limit, offset)
     finally:
         con.close()
 

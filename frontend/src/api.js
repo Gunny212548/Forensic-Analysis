@@ -162,8 +162,12 @@ export async function getProfile(caseId, kind, value) {
   )
 }
 
-export async function getEvents(caseId, { limit, offset, flagged = true, order = 'row' }) {
+/** `since` / `until`: an event-time window in GMT+7, YYYY-MM-DDTHH:MM[:SS] - both
+ *  inclusive to the precision written (routers/cases.py _when). */
+export async function getEvents(caseId, { limit, offset, flagged = true, order = 'row', since = '', until = '' }) {
   const q = new URLSearchParams({ limit, offset, only_flagged: flagged, order })
+  if (since) q.set('since', since)
+  if (until) q.set('until', until)
   return jsonOrThrow(
     await fetch(`/api/cases/${encodeURIComponent(caseId)}/events?${q}`),
     'Could not load events',

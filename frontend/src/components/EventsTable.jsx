@@ -19,15 +19,18 @@ export default function EventsTable({ caseId, order = 'row' }) {
   const [error, setError] = useState('')
   // The behaviour profile open above the table, if any: { kind, value }.
   const [profile, setProfile] = useState(null)
+  // The event-time window applied: { since, until }, GMT+7, '' = open at that end.
+  const [win, setWin] = useState({ since: '', until: '' })
+  const [winError, setWinError] = useState('')
 
   const load = useCallback(async () => {
     setError('')
     try {
-      setData(await getEvents(caseId, { limit: PAGE_SIZE, offset, flagged, order }))
+      setData(await getEvents(caseId, { limit: PAGE_SIZE, offset, flagged, order, ...win }))
     } catch (err) {
       setError(err.message)
     }
-  }, [caseId, offset, flagged, order])
+  }, [caseId, offset, flagged, order, win])
 
   useEffect(() => {
     load()
@@ -41,6 +44,36 @@ export default function EventsTable({ caseId, order = 'row' }) {
     setData(null)
   }
 
+  // Read from the form at submit, like the login page: the inputs are uncontrolled,
+  // and `key` gives them fresh defaults when the window is cleared.
+  function applyWindow(e) {
+    e.preventDefault()
+    // With step=1 the browser drops ":00" seconds from the value; put them back, or
+    // "To 10:15:00" would be read as the whole minute (routers/cases.py _when).
+    const full = (v) => (v && v.length === 16 ? `${v}:00` : v)
+    const since = full(e.currentTarget.elements.since.value)
+    const until = full(e.currentTarget.elements.until.value)
+    if (since && until && since > until) {
+      setWinError('"From" is after "To"')
+      return
+    }
+    setWinError('')
+    setWin({ since, until })
+    setOffset(0)
+    setData(null)
+  }
+
+  function clearWindow() {
+    setWinError('')
+    setWin({ since: '', until: '' })
+    setOffset(0)
+    setData(null)
+  }
+
+  const windowed = !!(win.since || win.until)
+  const first = toLocalInput(data?.ts_first)
+  const last = toLocalInput(data?.ts_last)
+
   const toggle = (
     <div className="ov-filters">
       <button type="button" className={`chip-btn${flagged ? '' : ' active'}`} onClick={() => showFlagged(false)}>
@@ -49,8 +82,32 @@ export default function EventsTable({ caseId, order = 'row' }) {
       <button type="button" className={`chip-btn${flagged ? ' active' : ''}`} onClick={() => showFlagged(true)}>
         Flagged only
       </button>
+      {/* The event-time window (GMT+7, as every time on the page); both ends inclusive. */}
+      <form className="time-window" onSubmit={applyWindow} key={`${win.since}|${win.until}`}>
+        <span className="tw-field">
+          <label htmlFor="tw-since">From</label>
+          <input id="tw-since" name="since" type="datetime-local" step="1" defaultValue={win.since}
+                 min={first} max={last} />
+        </span>
+        <span className="tw-field">
+          <label htmlFor="tw-until">To</label>
+          <input id="tw-until" name="until" type="datetime-local" step="1" defaultValue={win.until}
+                 min={first} max={last} />
+        </span>
+        <span className="cell-sub">GMT+7</span>
+        <button type="submit" className="secondary">Filter</button>
+        {windowed && (
+          <button type="button" className="secondary" onClick={clearWindow}>
+            Clear
+          </button>
+        )}
+        {winError && <span className="status-line err">{winError}</span>}
+      </form>
     </div>
   )
+  const between = windowed
+    ? ` between ${win.since ? win.since.replace('T', ' ') : 'the first event'} and ${win.until ? win.until.replace('T', ' ') : 'the last'}`
+    : ''
 
   let body
   if (error) body = <Empty>Could not load: {error}</Empty>
@@ -60,9 +117,11 @@ export default function EventsTable({ caseId, order = 'row' }) {
       <Empty>
         {offset > 0
           ? 'No more events'
-          : flagged
-            ? 'The rule engine flagged nothing in this file'
-            : 'No events in this file'}
+          : windowed
+            ? `No ${flagged ? 'flagged ' : ''}events${between}`
+            : flagged
+              ? 'The rule engine flagged nothing in this file'
+              : 'No events in this file'}
       </Empty>
     )
   } else {
@@ -76,8 +135,10 @@ export default function EventsTable({ caseId, order = 'row' }) {
           {/* Flagged: a line per rule match - an event two rules matched is two lines
               (gotcha #6), so the lines outnumber the events flagged. */}
           {flagged
-            ? `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} rule matches on ${fmtNum(data.flagged_count)} of ${fmtNum(data.total_rows)} events, ${order === 'time' ? 'in time order' : 'most severe first'}`
-            : `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} events (${fmtNum(data.flagged_count)} flagged)`}
+            ? `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} rule matches on ${fmtNum(data.flagged_count)} of ${fmtNum(data.total_rows)} events${between}, ${order === 'time' ? 'in time order' : 'most severe first'}`
+            : `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} events${between} (${fmtNum(data.flagged_count)} flagged)`}
+          {/* A window can only hold an event whose time was read (db.time_window). */}
+          {windowed ? ' - events with no readable time are left out' : ''}
         </Empty>
         {/* One line a row, the box scrolls both ways (styles.css .events-scroll). */}
         <div className="events-scroll">
@@ -116,6 +177,14 @@ export default function EventsTable({ caseId, order = 'row' }) {
       {body}
     </>
   )
+}
+
+/** "2020-11-03 22:50:18.511369+07:00" (how the API writes a time) as a
+ *  datetime-local value, "2020-11-03T22:50:18" - the zone is GMT+7 on both sides. */
+function toLocalInput(ts) {
+  if (!ts) return undefined
+  const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/.exec(ts)
+  return m ? `${m[1]}T${m[2]}` : undefined
 }
 
 /** SigmaHQ rules that mark this event without making it a suggestion - medium and below,

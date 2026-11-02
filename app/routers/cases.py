@@ -1,6 +1,6 @@
 import asyncio
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -313,20 +313,28 @@ async def get_case_events(
     # "time" for the Timeline step (event time, then row); "row" is file order -
     # for the flagged lines, most severe first.
     order: str = Query("row", pattern="^(row|time)$"),
+    # An event-time window, GMT+7 like every stored time: YYYY-MM-DD[THH:MM[:SS]].
+    # Both ends inclusive to the precision given - "to 10:15" keeps 10:15:59.
+    since: str | None = None,
+    until: str | None = None,
 ):
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
+    lo, hi = _when(since, "since"), _when(until, "until", upper=True)
 
-    total_rows, flagged = db.counts(case_id)
+    # Inside a window the counts are the window's (an event with no readable time is in none).
+    total_rows, flagged = (db.window_counts(case_id, lo, hi) if lo or hi else db.counts(case_id))
     if only_flagged:
         # `total` is the number of rule-match lines (what is paged through);
         # `flagged_count` stays the number of distinct events flagged.
-        page = db.list_findings(case_id, limit, offset, order="time" if order == "time" else "severity")
+        page = db.list_findings(case_id, limit, offset, order="time" if order == "time" else "severity",
+                                since=lo, until=hi)
         events, total = page["rows"], page["total"]
     else:
-        events = db.list_raw(case_id, limit, offset, order=order)
+        events = db.list_raw(case_id, limit, offset, order=order, since=lo, until=hi)
         total = total_rows
+    first, last = db.ts_range(case_id)
 
     return {
         "case_id": case_id,
@@ -337,7 +345,35 @@ async def get_case_events(
         "flagged_count": flagged,
         "limit": limit,
         "offset": offset,
+        # The case's first and last event time - the bounds of the filter on the page.
+        "ts_first": first or None,
+        "ts_last": last or None,
+        "windowed": bool(lo or hi),
     }
+
+
+_WHEN = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2})(:\d{2})?(\.\d{1,6})?)?$")
+
+
+def _when(text: str | None, name: str, upper: bool = False):
+    """A naive GMT+7 datetime from YYYY-MM-DD[THH:MM[:SS[.ffffff]]], or None. With
+    `upper`, the first instant after it at the precision written, so the end of the
+    window can be exclusive (db.time_window) and still keep the whole minute or day
+    the analyst named. An offset is refused rather than guessed (gotcha #21)."""
+    if text is None or not text.strip():
+        return None
+    m = _WHEN.match(text.strip())
+    if not m:
+        raise HTTPException(422, f"{name} must be YYYY-MM-DD, or YYYY-MM-DDTHH:MM[:SS], in GMT+7")
+    try:
+        when = datetime.fromisoformat(text.strip().replace(" ", "T"))
+    except ValueError:
+        raise HTTPException(422, f"{name} is not a real date or time")
+    if not upper:
+        return when
+    step = (timedelta(microseconds=1) if m.group(4) else timedelta(seconds=1) if m.group(3)
+            else timedelta(minutes=1) if m.group(2) else timedelta(days=1))
+    return when + step
 
 
 @router.get("/{case_id}/findings/events")
