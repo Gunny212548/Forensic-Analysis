@@ -74,7 +74,8 @@ export default function EventsTable({ caseId, order = 'row' }) {
             ? `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} findings (raw rows in the file: ${fmtNum(data.total_rows)})`
             : `Showing ${fmtNum(from)}-${fmtNum(to)} of ${fmtNum(data.total)} events (${fmtNum(data.flagged_count)} flagged)`}
         </Empty>
-        <div className="table-scroll">
+        {/* All events: one line a row, the box scrolls both ways (styles.css .events-scroll). */}
+        <div className={flagged ? 'table-scroll' : 'events-scroll'}>
           {flagged ? <FlaggedRows events={data.events} /> : <AllRows events={data.events} onProfile={(kind, value) => setProfile({ kind, value })} />}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
