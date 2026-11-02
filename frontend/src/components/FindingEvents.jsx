@@ -48,6 +48,9 @@ export default function FindingEvents({ caseId, findingKey }) {
             <tr>
               <th>Row</th>
               <th>Time</th>
+              <th title="The computer or device that wrote this record - a Windows event's Computer, a syslog line's host, a FortiGate's devname. Not the target.">
+                Host
+              </th>
               <th>Source → target</th>
               <th>Account</th>
               <th>File</th>
@@ -59,6 +62,7 @@ export default function FindingEvents({ caseId, findingKey }) {
               <tr key={e.row_id}>
                 <td className="mono muted">{e.row_id}</td>
                 <td className="mono">{shortTs(e.ts) || e.ts_raw || ''}</td>
+                <td className="mono">{e.hostname || ''}</td>
                 <td className="mono">
                   {e.srcip || '—'}
                   {e.dstip ? ` → ${e.dstip}` : ''}

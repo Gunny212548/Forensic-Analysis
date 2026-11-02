@@ -253,11 +253,14 @@ def escalation_paths(case_id: str) -> list[dict]:
 
 
 FINDING_SELECT = """
-SELECT r.row_id, r.ts, r.ts_raw, r.srcip, r.dstip, r.username, r.raw,
+SELECT r.row_id, r.ts, r.ts_raw, r.srcip, r.dstip, r.username, r.hostname, r.raw,
        f.rid, f.lvl, f.descr, f.mitre
 FROM findings f
 JOIN raw_events r USING (row_id)
 """
+# FINDING_SELECT's columns, in its order. `hostname` is the machine that wrote the record.
+FINDING_COLS = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username", "hostname", "raw",
+                "rid", "lvl", "descr", "mitre"]
 
 
 def list_findings(case_id: str, limit: int, offset: int) -> list[dict]:
@@ -269,9 +272,7 @@ def list_findings(case_id: str, limit: int, offset: int) -> list[dict]:
             FINDING_SELECT + " ORDER BY f.lvl DESC, r.ts NULLS LAST, r.row_id LIMIT ? OFFSET ?",
             [limit, offset],
         ).fetchall()
-        cols = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username", "raw",
-                "rid", "lvl", "descr", "mitre"]
-        out = [dict(zip(cols, r)) for r in rows]
+        out = [dict(zip(FINDING_COLS, r)) for r in rows]
         for row in out:
             row["level"] = level_of(row["lvl"])
             # Rendered with its zone like every other time the UI shows
@@ -303,11 +304,9 @@ def finding_rows(case_id: str, key: str, limit: int, offset: int = 0) -> dict:
             FINDING_SELECT + where + " ORDER BY r.row_id LIMIT ? OFFSET ?",
             [rid, src, user, limit, offset],
         ).fetchall()
-        cols = ["row_id", "ts", "ts_raw", "srcip", "dstip", "username", "raw",
-                "rid", "lvl", "descr", "mitre"]
         out = []
         for r in rows:
-            row = dict(zip(cols, r))
+            row = dict(zip(FINDING_COLS, r))
             row["level"] = level_of(row.pop("lvl"))
             row["ts"] = _fmt_ts(row["ts"]) or None
             row["mitre"] = list(row["mitre"] or [])
