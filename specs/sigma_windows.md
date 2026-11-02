@@ -232,7 +232,7 @@ that fails at run time is listed with its error on the case, the rest go on.
 Entra / Linux / firewall SigmaHQ rules; correlation rules (SigmaHQ has none); the Sysmon `Hashes`
 item split into `md5` / `sha1` / `imphash` (rules on those fields read NULL - counted, listed);
 Security 4688 under `process_creation` (the taxonomy maps the category to Sysmon 1 only; a host
-with 4688 and no Sysmon runs none of those rules - stated on the case); SigmaHQ updates (a new
+with 4688 and no Sysmon runs none of those rules - stated on the case; **story 6d below, 2026-11-02**); SigmaHQ updates (a new
 commit is a new pin, its baseline re-taken).
 
 ## Stories
@@ -267,7 +267,9 @@ commit is a new pin, its baseline re-taken).
   / PowerShell export of this PC (or one you choose) be used to measure the noise before 6b ships?
   It is your data; it stays outside the repo. Recommended: yes, before 6b is deployed.
 
-## Story 6d - process creation from Security 4688 (design, 2026-11-02, awaiting approval)
+## Story 6d - process creation from Security 4688 (2026-11-02)
+
+Status: **Approved 2026-11-02 - Q134-Q137 as recommended**; built on branch `sigma-4688` (gotcha #81).
 
 **Why.** The taxonomy maps `process_creation` to Sysmon 1 only (S-D2), so 1,425 runnable SigmaHQ rules -
 half the bundle - judge nothing on a host that audits process creation (4688) but has no Sysmon, which

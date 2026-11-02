@@ -151,6 +151,19 @@ export function Sigma({ sigma }) {
               (marks on the timeline)
             </td>
           </tr>
+          {sigma.security_4688 && (
+            <tr>
+              <th>Security 4688</th>
+              <td>
+                {fmtNum(sigma.security_4688.read)} process creations read where no Sysmon covers the host ·{' '}
+                {fmtNum(sigma.security_4688.no_command_line)} without a command line
+                <div className="muted">
+                  read by SigmaHQ's process creation rules (SigmaHQ's own map); a command line not audited is
+                  unknown, never empty
+                </div>
+              </td>
+            </tr>
+          )}
           {sigma.errors?.length > 0 && (
             <tr>
               <th>Failed</th>

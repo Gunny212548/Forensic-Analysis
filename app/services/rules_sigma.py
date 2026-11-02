@@ -14,7 +14,15 @@ _SUGGEST = [r for r in sigma.bundle()["rules"] if sigma.suggests(r)]
 
 RULES: list[tuple[str, str]] = [(r["rid"], sigma.finding_sql(r)) for r in _SUGGEST]
 FROM_GENERIC: list = []
-PREPARE: dict = {}
+
+
+def _prepare_4688(con):
+    """A process creation rule also reads Security 4688 (story 6d): the rows, once per case."""
+    sigma.prepare_4688(con)
+    return None, None
+
+
+PREPARE = {r["rid"]: _prepare_4688 for r in _SUGGEST if sigma.scope_4688(r) is not None}
 ENTITY = tuple(r["rid"] for r in _SUGGEST)
 LEVEL = {r["rid"]: r["level"] for r in _SUGGEST}
 LABELS = {r["rid"]: r["title"] for r in _SUGGEST}

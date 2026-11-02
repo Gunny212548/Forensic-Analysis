@@ -27,6 +27,7 @@ import csv
 import os
 import subprocess
 import sys
+import zipfile
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -310,6 +311,33 @@ def main() -> int:
     for inc, rids in expect.items():
         check(rids <= found[inc], f"{inc} found by {sorted(rids)} ({sorted(found[inc])})")
     check(not wrong, f"no plain or look-alike event flagged ({dict(wrong)})")
+    sec_4688 = (man.get("sigma") or {}).get("security_4688") or {}
+    check(sec_4688.get("events") and sec_4688.get("read") == 0,
+          f"every host has Sysmon 1: no 4688 read, one process is one event (story 6d S-D12) ({sec_4688})")
+
+    # Story 6d: the same quarter with its Sysmon logs left out - the customer who audits process
+    # creation (4688) and runs no Sysmon. SigmaHQ's process creation rules read 4688; none of their
+    # suggestions may land on a plain or look-alike event.
+    sec_zip = out / "mekong-security-only.zip"
+    with zipfile.ZipFile(sec_zip, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(out.glob("*-Security.xml")):
+            z.write(f, f.name)
+    _, sman, scon = run(sec_zip, "zip")
+    sfound, swrong = defaultdict(set), defaultdict(int)
+    for rid, host, ch, rec in scon.execute(
+            "SELECT f.rid, upper(split_part(w.computer, '.', 1)), w.channel, w.record_id "
+            "FROM findings f JOIN win_events w USING (row_id) WHERE f.rid LIKE 'SIGMA-%'").fetchall():
+        label, inc = truth.get((host, ch, str(rec)), ("plain", "-"))
+        if label == "attack":
+            sfound[inc].add(rid)
+        elif label != "btp":
+            swrong[(rid, label)] += 1
+    scon.close()
+    rec = (sman.get("sigma") or {}).get("security_4688") or {}
+    check(rec.get("events") and rec.get("read") == rec.get("events"),
+          f"no Sysmon: every 4688 read ({rec.get('read')} of {rec.get('events')})")
+    check({"W4", "W7", "W10"} <= set(sfound), f"SigmaHQ from 4688 alone finds W4, W7, W10 ({sorted(sfound)})")
+    check(not swrong, f"...and no SigmaHQ suggestion on a plain or look-alike event ({dict(swrong)})")
     w3 = con.execute("SELECT count(DISTINCT row_id) FROM findings WHERE rid = 'WIN-BRUTE-4'").fetchone()[0]
     check(w3 >= 150, f"WIN-BRUTE-4 flags most of W3's 246 failures, measured 156 ({w3})")
     b5 = (man.get("lines") or {}).get("WIN-BRUTE-4", {})

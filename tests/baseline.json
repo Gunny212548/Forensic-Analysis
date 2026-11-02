@@ -1045,7 +1045,8 @@
    "commit": "05d1031f537e830b76da53bae2400c5814c89165",
    "flagged": 6,
    "marks": {
-    "SIGMA-0f63e1ef-1eb9-4226-9d54-8927ca08520a": 1
+    "SIGMA-0f63e1ef-1eb9-4226-9d54-8927ca08520a": 1,
+    "SIGMA-c75309a3-59f8-4a8d-9c2c-4c927ad50555": 1
    },
    "rules": {
     "SIGMA-51e33403-2a37-4d66-a574-1fda1782cc31": 1,
@@ -1459,7 +1460,8 @@
    "flagged": 2,
    "marks": {
     "SIGMA-12ba6a38-adb3-4d6b-91ba-a7fb248e3199": 2,
-    "SIGMA-4f86b304-3e02-40e3-aa5d-e88a167c9617": 1
+    "SIGMA-4f86b304-3e02-40e3-aa5d-e88a167c9617": 1,
+    "SIGMA-63332011-f057-496c-ad8d-d2b6afb27f96": 1
    },
    "rules": {
     "SIGMA-35ba1d85-724d-42a3-889f-2e2362bcaf23": 1,
@@ -6439,14 +6441,15 @@
   "rules": {},
   "sigma": {
    "commit": "05d1031f537e830b76da53bae2400c5814c89165",
-   "flagged": 1,
+   "flagged": 2,
    "marks": {
     "SIGMA-678dfc63-fefb-47a5-a04c-26bcf8cc9f65": 1,
     "SIGMA-8eef149c-bd26-49f2-9e5a-9b00e3af499b": 1,
     "SIGMA-def8b624-e08f-4ae1-8612-1ba21190da6b": 1
    },
    "rules": {
-    "SIGMA-192a0330-c20b-4356-90b6-7b7049ae0b87": 1
+    "SIGMA-192a0330-c20b-4356-90b6-7b7049ae0b87": 1,
+    "SIGMA-c8da0dfd-4ed0-4b68-962d-13c9c884384e": 1
    }
   }
  },
@@ -6553,18 +6556,31 @@
   },
   "sigma": {
    "commit": "05d1031f537e830b76da53bae2400c5814c89165",
-   "flagged": 0,
+   "flagged": 1,
    "marks": {
     "SIGMA-0badd08f-c6a3-4630-90d3-6875cca440be": 21
    },
-   "rules": {}
+   "rules": {
+    "SIGMA-ff23ffbc-3378-435e-992f-0624dcf93ab4": 1
+   }
   }
  },
  "windows-security.log": {
   "flagged": 0,
   "md5": "222a710ea671c23629b1201b9015d91c",
   "rows": 4,
-  "rules": {}
+  "rules": {},
+  "sigma": {
+   "commit": "05d1031f537e830b76da53bae2400c5814c89165",
+   "flagged": 4,
+   "marks": {},
+   "rules": {
+    "SIGMA-646ea171-dded-4578-8a4d-65e9822892e3": 4,
+    "SIGMA-b2815d0d-7481-4bf0-9b6c-a4c48a94b349": 2,
+    "SIGMA-cf879ffb-793a-4753-9a14-bc8f37cc90df": 2,
+    "SIGMA-ffa6861c-4461-4f59-8a41-578c39f3f23e": 4
+   }
+  }
  },
  "windows-sysmon.log": {
   "flagged": 0,

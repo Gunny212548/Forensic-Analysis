@@ -86,6 +86,80 @@ def check(ok: bool, what: str) -> None:
 
 
 
+def _event(channel: str, provider: str, event_id: int, when: str, host: str, data: dict, version: int = 2) -> str:
+    items = "".join(f"<Data Name='{k}'>{v}</Data>" for k, v in data.items())
+    return (f"<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='{provider}'/>"
+            f"<EventID>{event_id}</EventID><Version>{version}</Version><TimeCreated SystemTime='{when}'/>"
+            f"<Channel>{channel}</Channel><Computer>{host}</Computer></System><EventData>{items}</EventData></Event>")
+
+
+def check_sigma_4688(scratch: Path, run, query) -> None:
+    """Story 6d (specs/sigma_windows.md S-D10..S-D13): SigmaHQ's process creation rules on Security 4688
+    where the host's Sysmon 1 is not - the map, the unknown fields, Sysmon first, the case's record."""
+    from app.services import sigma
+    print("SigmaHQ process creation on Security 4688 (story 6d)")
+    comsvcs = "SIGMA-646ea171-dded-4578-8a4d-65e9822892e3"   # Process Memory Dump Via Comsvcs.DLL (high)
+    svchost = "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d"   # Uncommon Svchost Parent Process (medium)
+    dump = r"rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump 624 C:\Temp\l.dmp full"
+    sec, sysmon = ("Security", "Microsoft-Windows-Security-Auditing"), ("Microsoft-Windows-Sysmon/Operational",
+                                                                          "Microsoft-Windows-Sysmon")
+
+    def p4688(when, host, image, cmd, parent=r"C:\Windows\System32\cmd.exe", version=2):
+        data = {"SubjectUserName": "alice", "SubjectDomainName": "EXAMPLE", "NewProcessName": image,
+                "CommandLine": cmd}
+        if version >= 2:
+            data["ParentProcessName"] = parent
+        return _event(*sec, 4688, when, host, data, version)
+
+    def s1(when, host, image, cmd):
+        return _event(*sysmon, 1, when, host, {"Image": image, "CommandLine": cmd, "User": r"EXAMPLE\alice",
+                                               "ParentImage": r"C:\Windows\System32\cmd.exe"})
+
+    rundll = r"C:\Windows\System32\rundll32.exe"
+    events = [
+        # ws10: no Sysmon - its 4688 is read.
+        p4688("2026-03-02T01:00:00Z", "ws10.example.test", rundll, dump),
+        # ...an svchost under svchost with no command line (the policy off): the rule's filter on the
+        # command line is unknown, so the rule does not judge it.
+        p4688("2026-03-02T01:00:05Z", "ws10.example.test", r"C:\Windows\System32\svchost.exe", "",
+              parent=r"C:\Windows\System32\svchost.exe"),
+        # ws11: Sysmon 1 from 01:00 to 02:00 - the same dump at 01:30 is Sysmon's, its 4688 not read;
+        # at 03:00, after Sysmon's last event, the 4688 is read.
+        s1("2026-03-02T01:00:00Z", "ws11.example.test", r"C:\Windows\System32\whoami.exe", "whoami"),
+        s1("2026-03-02T01:30:00Z", "ws11.example.test", rundll, dump),
+        p4688("2026-03-02T01:30:00Z", "ws11.example.test", rundll, dump),
+        s1("2026-03-02T02:00:00Z", "ws11.example.test", r"C:\Windows\System32\whoami.exe", "whoami"),
+        p4688("2026-03-02T03:00:00Z", "ws11.example.test", rundll, dump),
+    ]
+    src = scratch / "sigma-4688.xml"
+    src.write_text("<Events>\n" + "\n".join(events) + "\n</Events>\n", encoding="utf-8")
+    m = run(src)
+    rows = query(m["case_id"], "SELECT upper(split_part(w.computer, '.', 1)), w.channel, w.event_id, "
+                 "w.time_created FROM findings f JOIN win_events w USING (row_id) WHERE f.rid = ? "
+                 "ORDER BY 1, 4, 2", [comsvcs])
+    want = [("WS10", "Security", 4688, "2026-03-02T01:00:00Z"),
+            ("WS11", "Microsoft-Windows-Sysmon/Operational", 1, "2026-03-02T01:30:00Z"),
+            ("WS11", "Security", 4688, "2026-03-02T03:00:00Z")]
+    check(rows == want, "the comsvcs dump from 4688 on a host without Sysmon and after its Sysmon ends; "
+          f"inside Sysmon's span only Sysmon's event ({rows})")
+    marks = query(m["case_id"], "SELECT count(*) FROM sigma_marks WHERE rid = ?", [svchost])[0][0]
+    check(marks == 0, f"no command line is unknown: a rule filtering on it does not judge the 4688 ({marks})")
+    r = sigma.by_rid()[svchost]
+    naive = query(m["case_id"], "WITH logs AS (SELECT 'C:\\Windows\\System32\\svchost.exe' AS \"Image\", "
+                  "'C:\\Windows\\System32\\svchost.exe' AS \"ParentImage\", CAST(NULL AS VARCHAR) AS \"CommandLine\") "
+                  f"SELECT count(*) FROM logs WHERE {sigma.condition(r)}")[0][0]
+    check(naive == 1, "...which it would match were the unknown command line let through (NOT COALESCE)")
+    rec = (m.get("sigma") or {}).get("security_4688") or {}
+    check({k: rec.get(k) for k in ("events", "read", "covered_by_sysmon", "no_command_line", "rules")}
+          == {"events": 4, "read": 3, "covered_by_sysmon": 1, "no_command_line": 1, "rules": 1220},
+          f"the case's record: 4 4688s, 3 read, 1 left to Sysmon, 1 without a command line, 1,220 rules ({rec})")
+    check(len(rec.get("not_run") or []) == 205 and all(x["fields"] for x in rec["not_run"]),
+          f"205 rules not run on 4688, each with the field it needs ({len(rec.get('not_run') or [])})")
+    m = run(SAMPLES / "windows-security.log")
+    got = {r for r in (m.get("rules_matched") or {}) if r.startswith("SIGMA-")}
+    check(comsvcs in got, f"attack_data's lsass dump (4688 only) raises Process Memory Dump Via Comsvcs.DLL ({sorted(got)})")
+
+
 def check_evtx(lab: Path, run, win, query) -> None:
     """W2 on the lab folder (Q43 - kept outside the repo): EVTX-ATTACK-SAMPLES
     (GPL-3.0) and this machine's System log exported twice, as .evtx (`wevtutil
@@ -496,8 +570,13 @@ def main() -> int:
     ids = dict(query(m["case_id"], "SELECT event_id, count(*) FROM win_events GROUP BY 1"))
     check(ids == {4625: 50, 4776: 50, 4648: 50, 4688: 36, 4624: 21, 4634: 21, 4672: 3, 4719: 1},
           f"every event ID counted as in the capture ({ids})")
-    check(m.get("rules_matched") == {"WIN-BRUTE-2": 100},
-          f"the spray fires WIN-BRUTE-2 - 50 attempts, a 4625 and a 4776 each ({m.get('rules_matched')})")
+    ours = {r: n for r, n in (m.get("rules_matched") or {}).items() if not r.startswith("SIGMA-")}
+    check(ours == {"WIN-BRUTE-2": 100},
+          f"the spray fires WIN-BRUTE-2 - 50 attempts, a 4625 and a 4776 each ({ours})")
+    # Story 6d: the capture's own 4688 of PurpleSharp.exe is SigmaHQ's "HackTool - PurpleSharp Execution".
+    sigma = {r: n for r, n in (m.get("rules_matched") or {}).items() if r.startswith("SIGMA-")}
+    check(sigma == {"SIGMA-ff23ffbc-3378-435e-992f-0624dcf93ab4": 1},
+          f"...and the tool's own 4688 is SigmaHQ's HackTool - PurpleSharp Execution ({sigma})")
     acts = dict(query(m["case_id"], "SELECT coalesce(action, '-'), count(*) FROM raw_events GROUP BY 1"))
     check(acts.get("auth_failed") == 50 and acts.get("ntlm_validation") == 50,
           "4625 is a sign-in failure; 4776 typed, not counted as one (Q41)")
@@ -570,6 +649,7 @@ def main() -> int:
         check_evtx(Path(args.evtx), run, win, query)
     check_splunk(Path(args.evtx) if args.evtx else None, scratch, run, win, query)
     check_json(Path(args.evtx) if args.evtx else None, scratch, run, win, query)
+    check_sigma_4688(scratch, run, query)
 
     print()
     print(f"{len(FAILED)} FAILED" if FAILED else "WINDOWS OK")
