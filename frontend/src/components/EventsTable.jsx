@@ -138,6 +138,9 @@ function AllRows({ events, onProfile }) {
       <thead>
         <tr>
           <th>time</th>
+          <th title="The computer or device that wrote this record - a Windows event's Computer, a syslog line's host, a FortiGate's devname. Not the destination.">
+            host
+          </th>
           <th>source</th>
           <th>destination</th>
           <th>account</th>
@@ -154,6 +157,8 @@ function AllRows({ events, onProfile }) {
             {/* ts is the parsed GMT+7 event time; ts_raw is the source text,
                 shown only when nothing parsed (CLAUDE.md gotcha #21). */}
             <td>{e.ts || e.ts_raw || ''}</td>
+            {/* The machine that logged it (raw_events.hostname); empty where the log has none. */}
+            <td className="mono">{e.hostname || ''}</td>
             <td>
               {/* Opens the address's or account's behaviour profile above the table. */}
               {e.srcip ? (
