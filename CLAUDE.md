@@ -37,18 +37,17 @@ still run on every other product's rows. A suggestion is keyed on the entity its
 explains every suggestion and never decides** (gotcha #72), **no cap** - in the background once the case is ready (gotchas #64,
 #71; the user, 2026-10-26: "ทุก Finding ที่เจอต้องได้รับการ review จาก AI"). **Every step must cite a
 standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
-revisions 1-4 on branch `IAI-92-identify-logsource`; most of what follows still
-describes the code before that direction.
+(on `main` since IAI-92 was merged; the case page is its six steps, gotcha #52).
 
 Formats exercised against real data so far: VMware ESXi `auth.log`,
 Palo Alto CSV exports, Check Point SmartLog CSV exports, Check Point Log Exporter
 records in a ManageEngine EventLog Analyzer export (gotcha #59), Windows Security and
 Sysmon event XML, .evtx, Splunk WinEventLog text and Winlogbeat / NXLog JSON (lab captures, gotcha #60), Entra ID sign-in
 CSV exports and their Azure Monitor JSON export (gotcha #39). Every file is
-identified before it is read (gotcha #53, IAI-92 - on its branch): a documented
+identified before it is read (gotcha #53, IAI-92, merged): a documented
 format is read through its profile, anything else is kept as evidence and not
-analysed - **nothing is guessed**. On `main` the decoder still guesses columns a
-file has no profile for (gotcha #7 shows what that costs).
+analysed - **nothing is guessed** (gotcha #7 shows what guessing columns cost).
+A manifest from before IAI-92 can still say its columns were guessed.
 
 It started as a spinoff of a separate project (`D:\Wazuh\wazuh-docker`'s
 `forensic-webapp`, which fed uploaded logs through a real Wazuh manager).
@@ -69,11 +68,11 @@ POST /api/upload
 
 pipeline.process_case  (services/pipeline.py)
   CSV  → fast path: DuckDB reads + decodes the file itself. The column
-         mapping is resolved once from the header - from a log source
-         profile when one matches (logsources.py, gotcha #27), else guessed by
-         decode.match_column - and baked into one INSERT ... SELECT
-         read_csv(...). No row ever crosses into Python. The manifest's
-         `mapping` says which, and the case page shows it.
+         mapping is resolved once from the header - from the log source
+         profile identify.py matched (logsources.py, gotcha #27; a file no
+         profile documents is refused before this, gotcha #53) - and baked
+         into one INSERT ... SELECT read_csv(...). No row ever crosses into
+         Python. The manifest's `mapping` says which, and the case page shows it.
   else → Python path: parsers.iter_rows() generator → decode.decode() →
          staging CSV → DuckDB bulk-loads it (needed for .log regex
          decoding and JSON; also the fallback if a CSV header maps to
@@ -768,8 +767,8 @@ single batch-5 call is ~1,500 tokens for one suggestion; running two requests at
 **The narrative LLM is local now (2026-10-12): `LLM_PROVIDER=ollama`,
 `OLLAMA_MODEL=qwen2.5:7b-instruct`, then `qwen3.5:9b` from 2026-10-14 (see
 below)** on the host's Ollama
-(`host.docker.internal:11434`). Settings in force (`.env` overrides; the
-`docker-compose.yml` defaults are still the qwen2.5 ones):
+(`host.docker.internal:11434`). Settings in force (`.env`; since 2026-11-02 the
+`docker-compose.yml`, `.env.example` and `config.py` defaults are the same - ollama, qwen3.5:9b):
 `OLLAMA_MAX_EVENTS_FOR_ANALYSIS` 50, `OLLAMA_MAX_COMPLETION_TOKENS` 3000,
 `OLLAMA_MAP_COMPLETION_TOKENS` 1200, `OLLAMA_TEMPERATURE` 0 and
 `OLLAMA_SEED` 42 (config defaults - gotcha #37); `config.py` swaps these in
@@ -808,7 +807,7 @@ case: a lead, not a verdict - see the re-run below.
 
 **Switched to qwen3.5:9b on 2026-10-14** (`.env`: `OLLAMA_MODEL=qwen3.5:9b`,
 `OLLAMA_MAX_COMPLETION_TOKENS=3000`, `OLLAMA_MAP_COMPLETION_TOKENS=1200`;
-docker-compose's own defaults still say qwen2.5 / 2400 / 600). Measured
+the defaults in docker-compose / config.py followed on 2026-11-02). Measured
 after the switch:
 - **Re-run of the benchmark (3 more runs): 1 unsupported stage
   (Execution) and 5 invented ids** (T1076 - a deprecated RDP id -,

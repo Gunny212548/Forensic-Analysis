@@ -84,14 +84,16 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 # no rate limit and no per-minute output-token reservation - so every knob
 # that exists to survive Groq's OTPM cap is bypassed for it (see
 # analysis._chat / _is_local). Defaults to the legacy ANALYSIS_PROVIDER value
-# so an existing deployment behaves exactly as before.
-LLM_PROVIDER = (os.environ.get("LLM_PROVIDER") or ANALYSIS_PROVIDER or "groq").strip().lower()
+# so an existing deployment behaves exactly as before. With neither set it is
+# the local model, in use since 2026-10-12 (case data never leaves the machine).
+LLM_PROVIDER = (os.environ.get("LLM_PROVIDER") or ANALYSIS_PROVIDER or "ollama").strip().lower()
 
 # Ollama runs on the Docker *host*, not in this container, so the default is
 # the host gateway name Docker Desktop resolves. Verified reachable from the
 # container without any compose network change.
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434").rstrip("/")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b-instruct")
+# qwen3.5:9b since 2026-10-14 (CLAUDE.md's local model benchmark).
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:9b")
 # Ollama's NATIVE chat endpoint, not its OpenAI-compatible /v1 one, and the
 # reason is not style: /v1/chat/completions has no way to set the context
 # window, ignores an "options" block if you send one anyway, and silently
@@ -131,10 +133,12 @@ MAX_COMPLETION_TOKENS = int(os.environ.get("MAX_COMPLETION_TOKENS", "950"))
 # pays no per-minute tax, so both were re-swept against qwen2.5:7b-instruct
 # (see CLAUDE.md gotcha #5). Result: 50 events / 2400 tokens still returns a
 # complete object, and one call takes ~30-60s instead of a minute of waiting
-# for budget. These apply ONLY when LLM_PROVIDER=ollama.
+# for budget. These apply ONLY when LLM_PROVIDER=ollama. qwen3.5:9b writes
+# more: 3000 / 1200 since 2026-10-14 - at a 600-token map cap 3 of 5 Palo Alto
+# batches were cut off (CLAUDE.md, "Map-reduce needs the bigger map cap").
 OLLAMA_MAX_EVENTS_FOR_ANALYSIS = int(os.environ.get("OLLAMA_MAX_EVENTS_FOR_ANALYSIS", "50"))
-OLLAMA_MAX_COMPLETION_TOKENS = int(os.environ.get("OLLAMA_MAX_COMPLETION_TOKENS", "2400"))
-OLLAMA_MAP_COMPLETION_TOKENS = int(os.environ.get("OLLAMA_MAP_COMPLETION_TOKENS", "600"))
+OLLAMA_MAX_COMPLETION_TOKENS = int(os.environ.get("OLLAMA_MAX_COMPLETION_TOKENS", "3000"))
+OLLAMA_MAP_COMPLETION_TOKENS = int(os.environ.get("OLLAMA_MAP_COMPLETION_TOKENS", "1200"))
 # Reproducible narrative (grounding.py): greedy decoding with a fixed seed, so
 # the same case, model and prompt give the same text - an evidence report
 # that changes on every click cannot be cited. Verified on Ollama 0.34.1:
