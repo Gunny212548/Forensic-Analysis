@@ -88,7 +88,7 @@ def build(case_id: str, manifest: dict) -> dict:
         _attack_events(findings, unreviewed, steps["attack-events"])
         _attack_timeline(findings, unreviewed, confirmed, steps["attack-timeline"])
         _attack_path(findings, unreviewed, confirmed, steps["attack-path"])
-        _report(findings, unreviewed, steps["report"])
+        _report(findings, unreviewed, steps["report"], manifest)
 
     ordered = [steps[i] for i in STEP_IDS]
     recommended = next((s["id"] for s in ordered if s["state"] in (ACTIVE, BLOCKED, NOT_STARTED)),
@@ -186,13 +186,22 @@ def _attack_path(findings: list[dict], unreviewed: list[dict], confirmed: list[d
         step.update(state=DONE, reason="No attack event was confirmed - there is no path to draw")
 
 
-def _report(findings: list[dict], unreviewed: list[dict], step: dict) -> None:
+def _report(findings: list[dict], unreviewed: list[dict], step: dict, manifest: dict | None = None) -> None:
     step.update(total=len(findings), remaining=len(unreviewed))
     if not findings:
         step.update(state=ACTIVE, reason="No findings - nothing to report beyond the exports")
     elif unreviewed:
         step.update(state=BLOCKED, reason=f"Gate closed: {len(unreviewed)} "
                                           f"{'suggestion' if len(unreviewed) == 1 else 'suggestions'} not decided")
+    elif not (manifest or {}).get("project_id"):
+        step.update(state=ACTIVE, reason="Gate open - the written report is made per project; "
+                                         "move this case into one to make it")
     else:
-        step.update(state=ACTIVE, reason="Gate open - exports and the AI narrative available; the written "
-                                         "report is not built yet")
+        # The draft is the project's (specs/forensic_report.md R-D1); imported here, report.py
+        # reads this module's STEPS.
+        from . import report
+        made = report.drafts(manifest["company_id"], manifest["project_id"])
+        step.update(state=ACTIVE, reason=(
+            f"Gate open - report draft {made[-1]['version']} made on the project's page"
+            if made else "Gate open - the report draft is made on the project's page, "
+                         "once every case of the project is decided"))
