@@ -134,6 +134,17 @@ GET  .../projects/{pj}/timeline | graph      the investigation across its cases:
                                              cases' graphs and risk joined (P4);
                                              both empty, with `undecided`, while any
                                              suggestion of its cases is not decided
+GET  .../projects/{pj}/report                the report gate, drafts and finals with
+                                             their SHA-256 (specs/forensic_report.md)
+POST .../projects/{pj}/report/draft          a Word draft (case:analyze): only when every
+                                             suggestion is decided and the question
+                                             written; the AI's Thai summary, the attack
+                                             path PNG + SVG the page sends (gotcha #83)
+POST .../projects/{pj}/report/final          the analyst's final back (.docx / .pdf),
+                                             never required, also on a Closed project
+GET  .../projects/{pj}/report/files/{name}   download a draft or a final
+GET/POST /api/settings/report-skeleton[/{sha}] admin: the Word skeleton drafts are filled
+                                             into; refused if it links outside the file
 GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
 GET  /api/cases/{id}/findings                collapsed findings + computed
                                              confidence + review status + FD id +
@@ -257,7 +268,10 @@ inside the case's customer store. Shared, because none of it is customer
 data: `intel/` threat-intel feed files (see gotcha #17) · `tmp/` staging ·
 `mcp/access.jsonl` hash-chained log of every MCP tool call (gotcha #38) ·
 `deleted/customers.jsonl` hash-chained record of every customer deleted - metadata only,
-because the customer's own store went with it (gotcha #74).
+because the customer's own store went with it (gotcha #74) · `report/` the report skeletons,
+`<sha256>.docx` each, and their hash-chained `log.jsonl` (provider configuration, never in git).
+A project's report drafts and finals are the customer's: `customers/<id>/reports/<pj-id>/`, each
+one a line of the project's hash-chained log (gotcha #83).
 **Login accounts are not in `DATA_DIR` at all** (gotcha #41): `users.json` +
 `session_secret` live in `AUTH_DIR` (`/auth`, its own Docker volume
 `forensic-auth`; see *Login* below).
@@ -590,6 +604,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 **Exports**
 - #32 ATT&CK Navigator layer (format 4.5).
 - #34 STIX 2.1 bundle (and why `stix2-validator` rejects every bundle).
+- #83 Report drafts (specs/forensic_report.md, IAI-72/73): the system writes an editable Word draft per project from an uploaded skeleton; a skeleton's `INCLUDEPICTURE` fields fetched another organisation's logos - every linked field / external relationship refused; an element out of ECMA-376 order hangs Word on a hidden repair dialog; the AI's Thai summary is checked (address, machine, dotted account, time against its cited `F<n>`), not trusted.
 
 **Method**
 - #18 Measure before optimising: time a stage first; corpus wall-clock spread is host I/O.
@@ -924,6 +939,11 @@ Two more checks, each for its own layer:
   computers and sources), a forged custody log); needs the container (`static/`).
   Run it in a throwaway container with `AUTH_DIR` on a scratch path - in the live
   one its test accounts land in the real `users.json`. Gotchas #49 / #50 / #73.
+- **Report drafts** - `tests/check_report.py [repo] [--scratch DIR]` (gotcha #83, 65 checks): the
+  skeleton's refusals, the gate, a draft's every section from the confirmed groups only (no other
+  customer's data), the attack path PNG + SVG twin, versions kept, finals, the summary check - a
+  skeleton built in code and a stand-in model, no Ollama. `tests/bench_report_summary.py <case>` measures
+  the real model's Thai summary on a project in the store (~12 s, runs identical).
 - **Sign in with Google** - `tests/check_google_login.py [repo]` (gotcha #82): PKCE / state / nonce,
   every ID-token check, the domain, `sub` binding, who is made and as what, the audit lines - against a
   stand-in for Google's token endpoint, so no network and no Google account; needs `static/`.
