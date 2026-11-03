@@ -4,7 +4,8 @@ The system writes a **draft** - an editable Word file the analyst finishes in Wo
 R-D3). One per project (R-D1), made only when every suggestion of every case is decided
 (R-D2; the question is not required since 2026-11-03), from the skeleton the administrator uploaded (R-D11). Every
 section is filled from records the system already keeps, from the confirmed groups only
-(gotcha #10); the Executive Summary is the local model's draft (R-D10, report_summary.py).
+(gotcha #10); the Executive Summary and the recommendations are the local model's draft
+(R-D10, report_summary.py).
 
 Each draft is a new version, kept in the customer's store and never overwritten; its
 SHA-256, its skeleton's SHA-256, who and when go on the project's hash-chained log (R-D4).
@@ -225,7 +226,7 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
         {"name": "Forensic Analyzer", "value": "รุ่นของโปรแกรมยังไม่ถูกบันทึก (ดูหัวข้อ 8)"},
         {"name": "SigmaHQ rules", "value": ", ".join(f"commit {c}" for c in sigma_commits) or "ไม่ได้ใช้"},
         {"name": "Threat intelligence feeds", "value": "; ".join(feeds) or "ไม่มี"},
-        {"name": "AI (ร่างบทสรุปผู้บริหาร, อธิบายข้อเสนอ - ไม่ตัดสิน)", "value": summary.get("model") or "-"},
+        {"name": "AI (ร่างบทสรุปผู้บริหารและข้อเสนอแนะ, อธิบายข้อเสนอ - ไม่ตัดสิน)", "value": summary.get("model") or "-"},
     ]
 
     # Attack timeline, path, findings
@@ -310,11 +311,13 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
     limitations.append("ยังไม่มีการบันทึกสมมติฐานทางเลือกและช่วงที่ไม่มีหลักฐานระหว่างขั้นการโจมตีในระบบ "
                        "- ผู้วิเคราะห์ต้องเขียนในหัวข้อ 5")
     limitations = list(dict.fromkeys(limitations))
-    recommendations = []
-    for m in cases:
-        a = storage.load_analysis(m["case_id"]) or {}
-        recommendations += [r for r in a.get("recommendations") or [] if isinstance(r, str)]
-    recommendations = list(dict.fromkeys(recommendations))
+    # Section 9: the report's AI drafts them from the confirmed groups, in the summary's call
+    # (2026-11-03, the user chose "A" - each case's AI narrative read suggestions not decided).
+    recommendations = [f"{r['text']} [{', '.join(labels.get(x, x) for x in r['refs'])}]"
+                       for r in summary.get("recommendations") or []]
+    for w in summary.get("recommendation_warnings") or []:
+        why = " และ".join(report_summary.thai(p) for p in w["problems"])
+        recommendations.append(f"[ระบบตัดข้อเสนอนี้ออก เพราะ{why} - ข้อความเดิม: {w.get('text')}]")
 
     versions = [{"date_be": _date_be(datetime.fromisoformat(e["ts"]).astimezone(TZ), full=True),
                  "editor": e.get("actor_name") or e.get("actor"), "version": e.get("version"),
@@ -476,6 +479,8 @@ def make_draft(company_id: str, project_id: str, actor: dict, *, details: str = 
             "attack_path_svg_sha256": hashlib.sha256(svg).hexdigest() if svg else None,
             "summary": {"model": summary.get("model"), "kept": len(summary.get("paragraphs") or []),
                         "refused": len(summary.get("warnings") or []), "error": summary.get("error"),
+                        "recommendations": len(summary.get("recommendations") or []),
+                        "recommendations_refused": len(summary.get("recommendation_warnings") or []),
                         "seconds": summary.get("seconds")},
         })
 

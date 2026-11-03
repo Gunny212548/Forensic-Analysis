@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { getAnalysis, getCase, getFindings, getFlow, getGraph, getIngest, runAnalysis } from '../api.js'
+import { useCallback, useEffect, useState } from 'react'
+import { getCase, getFindings, getFlow, getGraph, getIngest } from '../api.js'
 import { useAccess } from '../permissions.js'
 import { LEVEL_EN, fmtNum, fmtTime, shortTs, statusOf } from '../format.js'
 import { Empty, SeverityPill } from '../components/common.jsx'
@@ -17,15 +17,7 @@ import { Detection, Lines, Periods, Sigma } from '../components/Period.jsx'
 import Veris from '../components/Veris.jsx'
 import DeleteCase from '../components/DeleteCase.jsx'
 import ReportPanel from '../components/ReportPanel.jsx'
-import {
-  AnalysisMeta,
-  AnalysisProgress,
-  ChainFlow,
-  ChainStages,
-  Recommendations,
-  RiskTables,
-  Timeline,
-} from '../components/analysis.jsx'
+import { RiskTables } from '../components/analysis.jsx'
 
 /** The case page: one case as six steps (specs/case_flow_design.md), at
  *  #/case/<id>/<step>. It replaced the Reports / Attack Graph / Timeline pages,
@@ -33,135 +25,8 @@ import {
  *  pages had, moved rather than rewritten; what a step's state is comes from
  *  the server (GET /flow), never from this page. */
 
-// A queued map-reduce job runs for minutes (about one model call a minute),
-// so the page polls rather than holding one request open. 4s is often enough
-// to see a batch tick over and cheap enough to leave running.
+// While a file is processed the page polls its manifest; 4s is cheap enough to leave running.
 const POLL_MS = 4000
-
-// The server stops reporting a job that has not written progress for 15
-// minutes and answers the poll with the older analysis or a 404 instead. A
-// map call can outlast that window and the job then reappears, so an empty
-// poll is not the end of the job - but after a minute of them the progress on
-// screen is no longer confirmed by anything, and the panel says so.
-const STALL_POLLS = 15
-
-/** Split any /analyze or /analysis body into the three things the page
- *  renders: a finished report, a running job, a failure reason.
- *
- *  Both in-progress answers are 2xx, so the HTTP code says nothing - the body
- *  does. When a job is running the server returns either the OLD finished
- *  analysis (fully renderable, just stale) or a stub whose arrays are empty
- *  and whose `summary` is a progress sentence. `_meta` is written by the
- *  analysis pipeline and never by the job view, so it is what tells the two
- *  apart; rendering the stub as a report is exactly the bug this avoids. */
-export function readAnalysis(body) {
-  if (!body) return { report: null, job: null, failed: '' }
-  const status = body.analysis_status
-  if (status === 'failed') {
-    return { report: null, job: null, failed: body.summary || 'The analysis failed' }
-  }
-  if (status === 'running') {
-    // `already_running` sits on the envelope, not the job record, but it is
-    // about the job - carry it along so the progress panel can say so.
-    const job = body.analysis_job
-      ? { ...body.analysis_job, already_running: !!body.already_running }
-      : null
-    return { report: body._meta ? body : null, job, failed: '' }
-  }
-  // "ready", or a pre-map-reduce body with no status at all: unchanged.
-  return { report: body, job: null, failed: '' }
-}
-
-/** The AI analysis of one case: the cached narrative, a running job and its
- *  polling, and starting one. `onSettled` is called when a run ends, so the
- *  step bar can be asked again. */
-function useAnalysis(caseId, ready, onSettled) {
-  const [analysis, setAnalysis] = useState(null)
-  const [job, setJob] = useState(null)
-  const [jobFailed, setJobFailed] = useState('')
-  const [stalled, setStalled] = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [analyzeError, setAnalyzeError] = useState('')
-
-  // One place decides what a body means, so the POST answer and every poll
-  // answer are treated identically.
-  const apply = useCallback((body) => {
-    const { report, job: next, failed } = readAnalysis(body)
-    // A running job with no cached analysis must not blank a report that is
-    // already on screen (the poll body simply has nothing better to offer).
-    if (report) setAnalysis(report)
-    setJob(next)
-    setJobFailed(failed)
-    setStalled(false)
-  }, [])
-
-  useEffect(() => {
-    if (!ready) return undefined
-    let alive = true
-    getAnalysis(caseId)
-      .then((a) => alive && apply(a))
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [caseId, ready, apply])
-
-  // Polls only while a job is in flight; torn down on unmount and as soon as a
-  // poll comes back ready/failed, which clears `job`. Depends on the boolean,
-  // not the job object, so a progress update does not restart the timer.
-  const polling = !!job
-  const emptyPolls = useRef(0)
-  useEffect(() => {
-    if (!polling) return undefined
-    let alive = true
-    emptyPolls.current = 0
-    const t = setInterval(async () => {
-      let body = null
-      try {
-        body = await getAnalysis(caseId)
-      } catch {
-        // network blip - treated like an empty answer, the next tick retries
-      }
-      if (!alive) return
-      if (body) {
-        emptyPolls.current = 0
-        apply(body)
-      } else {
-        emptyPolls.current += 1
-        if (emptyPolls.current >= STALL_POLLS) setStalled(true)
-      }
-    }, POLL_MS)
-    return () => {
-      alive = false
-      clearInterval(t)
-      onSettled?.()
-    }
-  }, [polling, caseId, apply, onSettled])
-
-  const analyze = useCallback(
-    async (force) => {
-      setAnalyzing(true)
-      setAnalyzeError('')
-      setJobFailed('')
-      try {
-        // 200 = the narrative (small case). 202 = a map-reduce job was queued
-        // instead; the polling effect above takes it from here.
-        apply(await runAnalysis(caseId, force))
-      } catch (err) {
-        // 429 is normal operation with a rate-limited provider and says how
-        // long to wait (CLAUDE.md gotcha #5). Show the wait, never auto-retry.
-        const wait = err.retryAfter ? ` Try again in about ${err.retryAfter} s.` : ''
-        setAnalyzeError(err.status === 429 ? `${err.message}${wait}` : err.message)
-      } finally {
-        setAnalyzing(false)
-        onSettled?.()
-      }
-    },
-    [caseId, apply, onSettled],
-  )
-
-  return { analysis, job, jobFailed, stalled, analyzing, analyzeError, analyze }
-}
 
 export default function CaseFlow({ caseId, stepId }) {
   const [manifest, setManifest] = useState(null)
@@ -203,7 +68,6 @@ export default function CaseFlow({ caseId, stepId }) {
     if (!stepId && flow?.recommended) window.location.replace(stepHref(caseId, flow.recommended))
   }, [stepId, flow, caseId])
 
-  const ai = useAnalysis(caseId, ready, reload)
   const step = flow?.steps.find((s) => s.id === stepId)
   const [statusLabel] = statusOf(manifest?.status)
 
@@ -258,7 +122,7 @@ export default function CaseFlow({ caseId, stepId }) {
           {!(ready && ['ingest', 'attack-events'].includes(step.id)) && (
             <div className={`step-reason step-${step.state}`}>{step.reason}</div>
           )}
-          <StepBody step={step} caseId={caseId} manifest={manifest} ready={ready} ai={ai} reload={reload} />
+          <StepBody step={step} caseId={caseId} manifest={manifest} ready={ready} reload={reload} />
           <div className="step-standards">
             Standards:{' '}
             {step.standards.map((s, i) => (
@@ -499,10 +363,7 @@ function IngestRecord({ caseId, status, reload, children }) {
   )
 }
 
-function StepBody({ step, caseId, manifest, ready, ai, reload }) {
-  const cite = (key) => {
-    window.location.hash = `#/finding/${caseId}/${encodeURIComponent(key)}`
-  }
+function StepBody({ step, caseId, manifest, ready, reload }) {
   if (!manifest) return null
   if (step.id !== 'ingest' && !ready && manifest.status !== 'failed') {
     return <Empty>This step opens once the file has been processed (see Ingest).</Empty>
@@ -552,17 +413,11 @@ function StepBody({ step, caseId, manifest, ready, ai, reload }) {
     case 'attack-path':
       return <GraphAndRisk caseId={caseId} />
     case 'report':
-      // The step issues the report (the user, 2026-11-03): the draft first; the exports
-      // and the AI narrative of this case fold underneath.
-      return (
-        <>
-          <ReportStep caseId={caseId} manifest={manifest} />
-          <Section icon="findings" title="AI narrative of this case" defaultOpen={false}
-                   sub="Shown on this page only - its recommendations start the draft's section 9">
-            <AnalyseStep ai={ai} cite={cite} />
-          </Section>
-        </>
-      )
+      // The step issues the report (the user, 2026-11-03): the draft first, the exports fold
+      // underneath. The case's AI narrative left the page the same day (the user chose "A"): it
+      // repeated the report's summary and the attack timeline, and read suggestions not decided;
+      // the report's AI now drafts the recommendations too (specs/forensic_report.md R-D10).
+      return <ReportStep caseId={caseId} manifest={manifest} />
     default:
       return null
   }
@@ -647,60 +502,6 @@ function GraphAndRisk({ caseId }) {
       )}
       <div className="section-label">Risk ranking</div>
       <RiskTables risk={data.risk || {}} />
-    </>
-  )
-}
-
-function AnalyseStep({ ai, cite }) {
-  const { analysis, job, jobFailed, stalled, analyzing, analyzeError, analyze } = ai
-  const { can, why } = useAccess() // an analyst's or a manager's (IAI-14)
-  return (
-    <>
-      <div className="meta-line" style={{ marginTop: 0 }}>
-        The narrative is written by an AI model from the computed findings. It is not evidence: every claim
-        cites the findings it rests on.
-      </div>
-      {analyzing && <Empty style={{ paddingTop: 14 }}>Analysing with AI... (this can take up to a minute)</Empty>}
-      {/* A queued job keeps any older analysis on screen below it - still valid,
-          only possibly stale. */}
-      {!analyzing && job && <AnalysisProgress job={job} stale={!!analysis} stalled={stalled} />}
-      {!analyzing && jobFailed && <Empty style={{ paddingTop: 14 }}>Analysis failed: {jobFailed}</Empty>}
-      {!analyzing && analyzeError && <Empty style={{ paddingTop: 14 }}>{analyzeError}</Empty>}
-      <div className="lc-actions">
-        <button
-          className="secondary"
-          disabled={analyzing || !!job || !can('case:analyze')}
-          title={why('case:analyze')}
-          onClick={() => analyze(!!analysis)}
-        >
-          {job ? 'Analysing...' : analysis ? 'Re-analyse' : 'Analyse with AI'}
-        </button>
-      </div>
-      {!analyzing && analysis && (
-        <>
-          <div className="ws-overview-summary" style={{ marginTop: 14 }}>{analysis.summary || ''}</div>
-          {analysis.attack_chain?.length > 0 && (
-            <>
-              <div className="ws-overview-mini"><ChainFlow chain={analysis.attack_chain} /></div>
-              <div className="section-label">Attack chain</div>
-              <ChainStages chain={analysis.attack_chain} onCite={cite} />
-            </>
-          )}
-          {analysis.timeline?.length > 0 && (
-            <>
-              <div className="section-label">Timeline</div>
-              <Timeline items={analysis.timeline} onCite={cite} />
-            </>
-          )}
-          {analysis.recommendations?.length > 0 && (
-            <>
-              <div className="section-label">Recommendations</div>
-              <Recommendations items={analysis.recommendations} />
-            </>
-          )}
-          <AnalysisMeta meta={analysis._meta} />
-        </>
-      )}
     </>
   )
 }

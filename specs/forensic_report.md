@@ -143,6 +143,13 @@ skeleton missing a required tag, naming it.
   paragraphs kept, 1 refused with its reason.
   When the confirmed groups are too many for the model's window (2026-11-03, 526 of them), the
   rules with most groups are summed up as one fact each, cited in the draft as "<rule> ทั้ง N รายการ".
+  **The recommendations of section 9 come from the same call** (2026-11-03, the user chose "A"
+  over keeping each case's AI narrative): 3 to 6 actions, each citing the groups that call for it
+  and checked the way a paragraph is; a refused one is shown with its reason. The case page's
+  "AI narrative of this case" was removed - it repeated the summary and the attack timeline, read
+  the top suggestions whether decided or not, and could be made before the decisions. Its API
+  (`/analyze`), MCP tool and `bench_llm.py` stay. Measured: Test 4 recommendations in 25.6 s,
+  Bigfish / Product 1 (526 groups) 6 in 33.4 s, none refused.
 - **R-D11 - the skeleton is uploaded on the Settings page** (Q-R2, the user 2026-11-03), by an
   admin, never committed to git - it carries the provider's letterhead and the repo is pushed.
   Kept in the shared part of `DATA_DIR` (`report/`, beside `intel/`: provider configuration,
@@ -175,7 +182,7 @@ Each section names its source in the system and the standard it answers (all mar
 | 6 | Attack path | the graph as an image (the same SVG, rasterised) + a table of edges: from, to, technique, account, events (`projects.graph`) | SP 800-86 §6.4.4 |
 | 7 | Findings | per confirmed group: FD id, rule (in-house or SigmaHQ with author), level, entity, first / last event, event count, Admiralty grade, the analyst's decision and note; rejected groups listed with their reason | ACPO 6.5.4; Sigma 2.1.0 |
 | 8 | Limitations | files not analysed and why; rules n/a per product; coverage gaps; inferred times (`year-inferred`, `timezone-unconfirmed`); conversions (zone, profile mapping); silent periods; missing provenance | ACPO 6.3, 6.5.3 |
-| 9 | Recommendations | analyst-written, with the AI narrative's list as a starting draft; a "logging improvements" sub-list seeded from Limitations | SP 800-86 §3.4, §6.5 |
+| 9 | Recommendations | analyst-written, from the report AI's draft (R-D10: same call, same confirmed groups, same check - since 2026-11-03; it was each case's AI narrative, which read suggestions not decided); a "logging improvements" sub-list seeded from Limitations | SP 800-86 §3.4, §6.5 |
 | App. ก | Evidence register | every item, full SHA-256, custody log lines | RFC 3227 §4 |
 | App. ข | Rules that ran | id, title, level, source (in-house / SigmaHQ commit), techniques | Sigma 2.1.0 |
 | App. ค | Decision log | every decision: time, account, group, decision, reason | review log, gotcha #31 |

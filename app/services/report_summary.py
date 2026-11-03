@@ -1,4 +1,8 @@
-"""The report draft's Executive Summary, drafted by the local model (specs/forensic_report.md R-D10).
+"""The report draft's Executive Summary and recommendations, drafted by the local model
+(specs/forensic_report.md R-D10). The recommendations (section 9) came from each case's AI
+narrative until 2026-11-03; that narrative read suggestions not decided and was made before the
+decisions, so the user chose to drop it from the case page and draft them here, from the same
+confirmed groups and under the same check.
 
 Thai prose for readers with no IT background, written from the project's **confirmed groups
 only** - the same input as the attack timeline and the attack path (gotcha #10). The model
@@ -24,7 +28,11 @@ from . import llm, rule_meta
 
 MAX_PARAGRAPHS = 6
 PARAGRAPH_MAX = 600      # characters - a short paragraph an executive reads in one go
-COMPLETION_TOKENS = 1600  # Thai takes several tokens a word; measured, see the module test
+# Thai takes several tokens a word. 1,600 for the summary alone (measured: 671 used on 526
+# findings); the recommendations were added to the same answer on 2026-11-03.
+COMPLETION_TOKENS = 2400
+MAX_RECOMMENDATIONS = 6
+RECOMMENDATION_MAX = 300  # characters - one action, one or two sentences
 MAX_REFS = 8              # a paragraph's citations: the model listed hundreds and ran out of tokens
 # The facts handed over, in characters. The model's window is OLLAMA_NUM_CTX (16,384) tokens,
 # shared with the system prompt and the answer; a 526-finding project's one-line-each facts were
@@ -34,7 +42,7 @@ FACT_BUDGET = 24_000
 # Measured on that project once summed up: 6,477 characters of facts + the system prompt were 3,305
 # prompt tokens (~2.2 characters a token). Past FACT_LIMIT the facts and the answer no longer fit
 # the window, so the model is not asked at all.
-FACT_LIMIT = 30_000
+FACT_LIMIT = 28_000      # ~12,700 tokens + the system prompt + COMPLETION_TOKENS < 16,384
 
 SYSTEM = """You write the Executive Summary of a digital forensics report, in Thai.
 
@@ -57,7 +65,14 @@ Write 3 to 5 paragraphs:
    (for example whether data left the organisation, if no finding shows it).
 Every paragraph lists in "refs" the findings it rests on, and only those. Name an address,
 machine or time only if a cited finding holds it. Use the machine's short name (rds01, not
-rds01.mekong.local)."""
+rds01.mekong.local).
+
+Then write 3 to 6 recommendations, in Thai, for the organisation: each one concrete action
+that the confirmed findings call for (for example: change the password of an account a finding
+shows was used, restrict remote sign-in to a machine a finding shows was reached), one or two
+sentences, with "refs" naming the findings that call for it. Recommend only what those
+findings show a need for; name an address, machine or account only if a cited finding holds it.
+No product or vendor names."""
 
 
 def _hhmm(ts: str | None) -> str | None:
@@ -196,8 +211,20 @@ def schema(refs: list[str]) -> dict:
                     "required": ["text", "refs"],
                 },
             },
+            "recommendations": {
+                "type": "array", "minItems": 1, "maxItems": MAX_RECOMMENDATIONS,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "maxLength": RECOMMENDATION_MAX},
+                        "refs": {"type": "array", "minItems": 1, "maxItems": MAX_REFS,
+                                 "items": {"type": "string", "enum": refs}},
+                    },
+                    "required": ["text", "refs"],
+                },
+            },
         },
-        "required": ["paragraphs"],
+        "required": ["paragraphs", "recommendations"],
     }
 
 
@@ -310,10 +337,12 @@ async def _ask(prompt: str, sch: dict) -> tuple[dict, dict]:
 
 
 def draft(question: str | None, groups: list[dict], edges: list[dict]) -> dict:
-    """{paragraphs: [{text, refs}], warnings, error, model, seconds, usage}. Never raises:
-    a draft is made with or without the AI's summary."""
+    """{paragraphs: [{text, refs}], warnings, recommendations: [{text, refs}],
+    recommendation_warnings, error, model, seconds, usage, labels}. Never raises: a draft is
+    made with or without the AI's text. A recommendation is checked as a paragraph is."""
     out = {"paragraphs": [], "warnings": [], "error": None, "model": config.LLM_MODEL,
-           "seconds": None, "usage": None, "labels": {}}
+           "seconds": None, "usage": None, "labels": {}, "recommendations": [],
+           "recommendation_warnings": []}
     if not groups:
         out["error"] = "no confirmed finding to summarise"
         return out
@@ -340,6 +369,13 @@ def draft(question: str | None, groups: list[dict], edges: list[dict]) -> dict:
             out["warnings"].append({"text": p.get("text"), "refs": p.get("refs"), "problems": problems})
         else:
             out["paragraphs"].append({"text": (p.get("text") or "").strip(), "refs": p.get("refs")})
+    for r in answer.get("recommendations") or []:
+        problems = ground(r, known)
+        if problems:
+            out["recommendation_warnings"].append({"text": r.get("text"), "refs": r.get("refs"),
+                                                   "problems": problems})
+        else:
+            out["recommendations"].append({"text": (r.get("text") or "").strip(), "refs": r.get("refs")})
     if not out["paragraphs"] and not out["error"]:
         out["error"] = "every paragraph the model wrote named something its findings do not hold"
     return out

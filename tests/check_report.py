@@ -162,6 +162,9 @@ def fake_summary(question, groups, edges):
                            {"text": "ย่อหน้าที่อ้างกลุ่ม", "refs": ["G1"]}],
             "labels": {"G1": "R2000 ทั้ง 2 รายการ"},
             "warnings": [{"text": "ย่อหน้าที่ผิด", "refs": ["F1"], "problems": ["names the account adm.hu"]}],
+            "recommendations": [{"text": "เปลี่ยนรหัสผ่านบัญชี adm.hd", "refs": ["F1", "G1"]}],
+            "recommendation_warnings": [{"text": "ข้อเสนอที่ผิด", "refs": ["F2"],
+                                         "problems": ["names the address 203.0.113.9, which no cited finding holds"]}],
             "error": None, "model": "stand-in", "seconds": 0.1, "usage": None}
 
 
@@ -246,6 +249,8 @@ gate = analyst.get(BASE).json()["gate"]
 check("every suggestion decided, no question written: the gate is open",
       gate["open"] is True and not any("question" in x for x in gate["reasons"]))
 investigation.save(c1, {"question": "Who entered RDS01 and where did they go?"}, "manager@x.test")
+# A case's AI narrative cached from before (it read suggestions not decided): never in the draft.
+storage.save_analysis(c1, {"summary": "x", "recommendations": ["NARRATIVE-RECOMMENDATION"]})
 check("the gate stays open once a question is written", analyst.get(BASE).json()["gate"]["open"] is True)
 
 print("R-D0 / R-D3 / R-D10: the draft")
@@ -266,6 +271,12 @@ check("customer, project, version and question are filled in",
       all(s in txt for s in ("Acme Holdings", "RDP intrusion", "0.1", "Who entered RDS01")))
 check("the AI's paragraph carries its references", "สรุปเหตุการณ์ทดสอบ [F1, F2]" in txt)
 check("a G reference reads as its rule and count", "ย่อหน้าที่อ้างกลุ่ม [R2000 ทั้ง 2 รายการ]" in txt)
+check("section 9 holds the report AI's recommendation with its references",
+      "RECOMMENDATIONS: เปลี่ยนรหัสผ่านบัญชี adm.hd [F1, R2000 ทั้ง 2 รายการ]" in txt)
+check("a refused recommendation is shown with its reason in Thai",
+      "ระบบตัดข้อเสนอนี้ออก เพราะอ้างถึงหมายเลข IP 203.0.113.9" in txt and "ข้อเสนอที่ผิด" in txt)
+check("a case's cached AI narrative is not read into the draft (2026-11-03, the user chose A)",
+      "NARRATIVE-RECOMMENDATION" not in txt)
 check("a refused paragraph is shown with its reason, in Thai, and its text",
       "อ้างถึงบัญชี adm.hu" in txt and "names the account" not in txt and "ย่อหน้าที่ผิด" in txt)
 conf = re.findall(r"CONF F\d+[^|]*\|[^|]*\|", txt)
@@ -286,7 +297,8 @@ check("nothing in it is protected from editing", b"documentProtection" not in z.
 check("the draft's log line names its skeleton and pictures",
       line.get("skeleton_sha256") == hashlib.sha256(good).hexdigest()
       and line.get("attack_path_png_sha256") == hashlib.sha256(PNG).hexdigest()
-      and line.get("summary", {}).get("refused") == 1)
+      and line.get("summary", {}).get("refused") == 1
+      and line["summary"].get("recommendations") == 1 and line["summary"].get("recommendations_refused") == 1)
 
 r = analyst.post(f"{BASE}/draft", data={"details": "second"})
 check("a second draft is 0.2 and keeps 0.1", r.status_code == 200 and r.json()["version"] == "0.2"
@@ -395,13 +407,29 @@ check("an address none of G1's findings holds is still refused",
       any("198.51.100.9" in p for p in G({"text": "จาก 198.51.100.9", "refs": ["G1"]}, mk)))
 check("G1 is not read as a machine", G({"text": "ตามข้อ G1", "refs": ["G1"]}, mk) == [])
 check("few findings stay one line each", list(known["refs"]) == ["S", "F1", "F2"] and known["labels"] == {})
-check(f"a paragraph cites at most {report_summary.MAX_REFS}",
-      report_summary.schema(["F1"])["properties"]["paragraphs"]["items"]["properties"]["refs"]["maxItems"]
-      == report_summary.MAX_REFS)
+sch = report_summary.schema(["F1"])["properties"]
+check(f"a paragraph and a recommendation each cite at most {report_summary.MAX_REFS}",
+      sch["paragraphs"]["items"]["properties"]["refs"]["maxItems"] == report_summary.MAX_REFS
+      == sch["recommendations"]["items"]["properties"]["refs"]["maxItems"])
+check("the model must answer recommendations too, from the same references",
+      report_summary.schema(["F1"])["required"] == ["paragraphs", "recommendations"]
+      and sch["recommendations"]["items"]["properties"]["refs"]["items"]["enum"] == ["F1"])
 wide = [{**g, "rid": f"SIGMA-{i}"} for i, g in enumerate(many)]   # 401 rules, one finding each
 _ask = report_summary._ask
 report_summary._ask = lambda *a: (_ for _ in ()).throw(AssertionError("the model was asked"))
 out = real_draft(None, wide, [])
+report_summary.llm._preflight = lambda: None
+
+
+async def _answer(prompt, sch):
+    return ({"paragraphs": [{"text": "จาก 198.51.100.66 บัญชี adm.hd", "refs": ["F1"]}],
+             "recommendations": [{"text": "ปิดการเข้าถึงจาก 198.51.100.66", "refs": ["F1"]},
+                                 {"text": "ตรวจเครื่อง web99", "refs": ["F1"]}]}, {"finish": "stop"})
+report_summary._ask = _answer
+two = real_draft("q", groups, [])
+check("a recommendation is checked as a paragraph is: one kept, one refused for its machine",
+      [r["text"] for r in two["recommendations"]] == ["ปิดการเข้าถึงจาก 198.51.100.66"]
+      and any("web99" in p for w in two["recommendation_warnings"] for p in w["problems"]))
 report_summary._ask = _ask
 check("facts that cannot fit are not sent: the draft says why instead",
       out["error"] and "do not fit" in out["error"] and not out["paragraphs"])

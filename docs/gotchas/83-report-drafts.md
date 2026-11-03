@@ -46,3 +46,8 @@ The traps:
    accounts; a paragraph citing it may name any of them - and a paragraph cites at most 8.
    Measured after: 6,477 characters, 3,305 prompt tokens, 23.7 s, 3 paragraphs kept, 1 refused.
    Past `FACT_LIMIT` the model is not asked and the draft says why.
+9. **The recommendations came from a narrative that read undecided suggestions.** Section 9 was
+   filled from each case's cached AI narrative, whose events are `db.top_distinct_findings` - the
+   top 50 suggestions, rejected and undecided included - and which could be made before any
+   decision. Since 2026-11-03 the report's own call drafts them from the confirmed groups under the
+   same check (`report_summary.ground`); the case page no longer shows the narrative.
