@@ -39,7 +39,8 @@ def main():
     g = projects.graph(m["company_id"], m["project_id"])
     if t["undecided"]:
         sys.exit(f"{t['undecided']} suggestions not decided - no draft")
-    question = (storage.load_project(m["company_id"], m["project_id"]) or {}).get("question")
+    q = (storage.load_project(m["company_id"], m["project_id"]) or {}).get("question")
+    question = q.get("question") if isinstance(q, dict) else q
     groups, edges = t["findings"], g["graph"]["edges"]
     print(f"{len(groups)} confirmed groups, {len(edges)} edges, model {rs.config.LLM_MODEL}")
     texts = []
