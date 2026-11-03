@@ -597,6 +597,12 @@
   .lc-form { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-width: 640px; }
   .lc-form textarea { min-height: 54px; }
   .lc-error { margin-top: 6px; color: var(--danger); }
+  /* The report draft form and the off-screen copy of the attack path it takes its
+     picture from (components/ReportPanel.jsx) - off-screen, not hidden: a hidden
+     element's computed visibility would go into the picture. */
+  .report-form { max-width: 720px; }
+  .report-form label { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+  .report-graph-source { position: absolute; left: -100000px; top: 0; pointer-events: none; }
   .rv-chain-warn { color: var(--warn); }
   .rv-admiralty { font-family: var(--mono); font-size: 11px; padding: 0 5px; border: 1px solid var(--line);
     border-radius: 3px; cursor: help; color: var(--text-2); }

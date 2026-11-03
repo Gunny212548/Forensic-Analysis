@@ -428,3 +428,60 @@ export async function removeUser(email) {
 export async function getAccountAudit() {
   return jsonOrThrow(await fetch('/api/users/audit'), 'Could not load the account history')
 }
+
+// --- The forensic report (specs/forensic_report.md, IAI-72 / IAI-73) ---------
+
+/** The report skeleton on Settings (admin): current, history, the tags it may use. */
+export async function getReportSkeleton() {
+  return jsonOrThrow(await fetch('/api/settings/report-skeleton'), 'Could not load the report skeleton')
+}
+
+/** Upload a skeleton. A refusal comes back as an Error whose `problems` names every reason. */
+export async function uploadReportSkeleton(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const resp = await fetch('/api/settings/report-skeleton', { method: 'POST', body: form })
+  checkSession(resp)
+  let body = null
+  try {
+    body = await resp.json()
+  } catch {
+    // an empty body is still a failure to report
+  }
+  if (!resp.ok) {
+    const d = body && body.detail
+    const err = new Error((d && (d.message || (typeof d === 'string' ? d : ''))) || 'Could not upload the skeleton')
+    err.problems = (d && d.problems) || []
+    err.status = resp.status
+    throw err
+  }
+  return body
+}
+
+/** A project's report: its gate, every draft and final with its digest. */
+export async function getReport(companyId, projectId) {
+  return jsonOrThrow(await fetch(projectUrl(companyId, projectId, '/report')), 'Could not load the report')
+}
+
+/** Make a draft. `fields` are the form's text fields; png / svg the attack path picture (Blobs). */
+export async function makeReportDraft(companyId, projectId, fields, png, svg) {
+  const form = new FormData()
+  for (const [k, v] of Object.entries(fields)) form.append(k, v || '')
+  if (png) form.append('png', png, 'attack-path.png')
+  if (svg) form.append('svg', svg, 'attack-path.svg')
+  return jsonOrThrow(await fetch(projectUrl(companyId, projectId, '/report/draft'), { method: 'POST', body: form }),
+    'Could not make the draft')
+}
+
+/** Upload the analyst's final (.docx / .pdf) against a draft version - never required. */
+export async function uploadReportFinal(companyId, projectId, version, file) {
+  const form = new FormData()
+  form.append('version', version)
+  form.append('file', file)
+  return jsonOrThrow(await fetch(projectUrl(companyId, projectId, '/report/final'), { method: 'POST', body: form }),
+    'Could not upload the final')
+}
+
+export function reportFileUrl(companyId, projectId, name) {
+  return projectUrl(companyId, projectId, `/report/files/${encodeURIComponent(name)}`)
+}

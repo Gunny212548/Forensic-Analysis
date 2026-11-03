@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createUser, getAccountAudit, listUsers, removeUser, resetUserPassword, updateUser } from '../api.js'
 import { fmtTime } from '../format.js'
 import { ROLE_NAMES, useAccess } from '../permissions.js'
+import ReportSkeleton from '../components/ReportSkeleton.jsx'
 
 /** Settings - Users (IAI-14, Q59): accounts and their roles, for an
  *  administrator. Every change is checked by the server (the last enabled
@@ -283,6 +284,8 @@ export default function Users() {
           </tbody>
         </table>
       </div>
+
+      <ReportSkeleton />
 
       <div className="panel">
         <h2>

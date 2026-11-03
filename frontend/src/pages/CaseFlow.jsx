@@ -742,7 +742,19 @@ function ReportStep({ caseId, manifest }) {
           - findings as sightings of ATT&amp;CK techniques, for a threat-intel platform or SIEM
         </div>
       )}
-      <Empty style={{ paddingTop: 14 }}>The final written report is not built yet (IAI-72, IAI-73).</Empty>
+      {/* The written report is one per investigation (specs/forensic_report.md R-D1). */}
+      {manifest.project_id ? (
+        <div className="meta-line">
+          The written report is made per project, from every case in it:{' '}
+          <a href={`#/customers/${encodeURIComponent(manifest.company_id)}/projects/${encodeURIComponent(manifest.project_id)}`}>
+            open {manifest.project_name || 'the project'} - Report
+          </a>
+        </div>
+      ) : (
+        <Empty style={{ paddingTop: 14 }}>
+          The written report is made per project - move this case into one (Customers) to make it.
+        </Empty>
+      )}
     </>
   )
 }

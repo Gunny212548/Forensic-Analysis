@@ -5,6 +5,7 @@ import {
 } from '../api.js'
 import AttackGraph from '../components/AttackGraph.jsx'
 import AttackTimelineView from '../components/AttackTimelineView.jsx'
+import ReportPanel from '../components/ReportPanel.jsx'
 import { RiskTables } from '../components/analysis.jsx'
 import { ago, fmtNum, fmtTime, severityBucket } from '../format.js'
 import { SeverityPill, StatusBadge } from '../components/common.jsx'
@@ -219,6 +220,7 @@ function ProjectView({ customer, project, cases, onChange }) {
           events add up to, read-only - decisions are made in each case's Attack events. */}
       <ProjectTimeline project={project} />
       <ProjectPath project={project} />
+      <ReportPanel project={project} />
     </section>
   )
 }
