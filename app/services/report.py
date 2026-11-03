@@ -1,8 +1,8 @@
 """The forensic report draft of a project (specs/forensic_report.md, IAI-72 / IAI-73).
 
 The system writes a **draft** - an editable Word file the analyst finishes in Word (R-D0,
-R-D3). One per project (R-D1), made only when every suggestion of every case is decided and
-the question is written (R-D2), from the skeleton the administrator uploaded (R-D11). Every
+R-D3). One per project (R-D1), made only when every suggestion of every case is decided
+(R-D2; the question is not required since 2026-11-03), from the skeleton the administrator uploaded (R-D11). Every
 section is filled from records the system already keeps, from the confirmed groups only
 (gotcha #10); the Executive Summary is the local model's draft (R-D10, report_summary.py).
 
@@ -140,8 +140,7 @@ def gate(company_id: str, project_id: str) -> dict:
         reasons.append("the project holds no processed case")
     if t["undecided"]:
         reasons.append(f"{t['undecided']} suggestion(s) not decided")
-    if not question_text(project):
-        reasons.append("the investigation's question is not written")
+    # The question is not part of the gate (the user, 2026-11-03): a draft without one says "-".
     if report_skeleton.current() is None:
         reasons.append("no report skeleton uploaded (Settings)")
     return {"open": not reasons, "reasons": reasons, "undecided": t["undecided"],

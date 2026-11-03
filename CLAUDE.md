@@ -137,8 +137,8 @@ GET  .../projects/{pj}/timeline | graph      the investigation across its cases:
 GET  .../projects/{pj}/report                the report gate, drafts and finals with
                                              their SHA-256 (specs/forensic_report.md)
 POST .../projects/{pj}/report/draft          a Word draft (case:analyze): only when every
-                                             suggestion is decided and the question
-                                             written; the AI's Thai summary, the attack
+                                             suggestion is decided (the question is not
+                                             required); the AI's Thai summary, the attack
                                              path PNG + SVG the page sends (gotcha #83)
 POST .../projects/{pj}/report/final          the analyst's final back (.docx / .pdf),
                                              never required, also on a Closed project

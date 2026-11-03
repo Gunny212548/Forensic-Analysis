@@ -67,9 +67,10 @@ skeleton missing a required tag, naming it.
 - **R-D1 - one report per project** (D6: a project is one investigation). The sample covers
   several companies over months in one document, which is a project here.
 - **R-D2 - a draft only when the gate is open**: every suggestion of every case in the project
-  decided (gotcha #10, the user 2026-10-28) and the project's question written (D8). No draft
-  before that - an undecided suggestion is not proven, and a draft gets forwarded. Confirmed
-  by the user 2026-11-03 (Q-R8: "ไม่ได้ ต้องตัดสินครบก่อน").
+  decided (gotcha #10, the user 2026-10-28). No draft before that - an undecided suggestion is
+  not proven, and a draft gets forwarded. Confirmed by the user 2026-11-03 (Q-R8: "ไม่ได้
+  ต้องตัดสินครบก่อน"). The project's question is **not** part of the gate (the user, 2026-11-03,
+  after the first test on 8091: "ไม่จำเป็นใส่"): a draft without one shows "-" where it goes.
 - **R-D3 - the draft is a Word file (.docx)** - editable, as R-D0 requires. Built from the
   user's own .docx template when there is one, so the letterhead, styles, header, footer and
   page numbering are exactly theirs; otherwise the layout is rebuilt in `python-docx` from the

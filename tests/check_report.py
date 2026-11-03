@@ -228,7 +228,7 @@ check("an unknown or malformed skeleton id is 404",
       and admin.get("/api/settings/report-skeleton/..%2Fx").status_code == 404)
 check("the skeleton log is hash-chained and intact", hashchain.verify(report_skeleton.log_path())["intact"])
 
-print("R-D2: a draft only once every suggestion is decided and the question written")
+print("R-D2: a draft only once every suggestion is decided - the question is not required")
 r = analyst.post(f"{BASE}/draft")
 check(f"suggestions not decided: refused (409, {r.status_code})",
       r.status_code == 409 and "not decided" in r.json()["detail"])
@@ -239,11 +239,11 @@ for k in keys:
     if action == "reject":
         body.update(reason_code="misinterpretation", note="backup job")
     assert analyst.post(f"/api/cases/{c1}/review", json=body).status_code == 200
-r = analyst.post(f"{BASE}/draft")
-check(f"every suggestion decided but no question: refused (409, {r.status_code})",
-      r.status_code == 409 and "question" in r.json()["detail"])
+gate = analyst.get(BASE).json()["gate"]
+check("every suggestion decided, no question written: the gate is open",
+      gate["open"] is True and not any("question" in x for x in gate["reasons"]))
 investigation.save(c1, {"question": "Who entered RDS01 and where did they go?"}, "manager@x.test")
-check("the gate is open now", analyst.get(BASE).json()["gate"]["open"] is True)
+check("the gate stays open once a question is written", analyst.get(BASE).json()["gate"]["open"] is True)
 
 print("R-D0 / R-D3 / R-D10: the draft")
 r = analyst.post(f"{BASE}/draft", data={"details": "first draft", "author_position": "Forensic Analyst",
