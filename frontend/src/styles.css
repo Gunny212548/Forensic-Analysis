@@ -611,7 +611,6 @@
   .rp-latest-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .rp-kicker { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .rp-version { font-size: 20px; font-weight: 600; color: var(--text); }
-  .rp-details { color: var(--text); }
   .rp-actions { margin-top: 6px; gap: 10px; }
   .rp-actions button, .rp-row-actions button { padding: 9px 18px; }
   .rp-finals { font-size: 13px; }

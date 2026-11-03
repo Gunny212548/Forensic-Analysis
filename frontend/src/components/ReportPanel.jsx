@@ -182,7 +182,8 @@ export default function ReportPanel({ project, fromCase = false }) {
                   <span className="rp-version mono">{latest.version}</span>
                   <span className="cell-sub">{fmtTime(latest.ts)} · {latest.actor_name || latest.actor}</span>
                 </div>
-                {latest.details && <div className="rp-details">{latest.details}</div>}
+                {/* Not the typed "what changed": it is the Thai draft's change-log text, and the
+                    page is English (the user, 2026-11-03) - it is in the file's change log. */}
                 <div className="cell-sub">{aiLine(latest)}</div>
                 <div className="lc-actions rp-actions">
                   <a className="btn-primary" href={reportFileUrl(co, pj, latest.file)} download>
@@ -206,7 +207,7 @@ export default function ReportPanel({ project, fromCase = false }) {
                 <label className="rp-field">
                   <span>
                     What changed in {data.next_version}{' '}
-                    <span className="cell-sub">- written into the Word draft&apos;s change log, so in its language (Thai)</span>
+                    <span className="cell-sub">- goes into the Word draft&apos;s change log only (the draft is written in Thai)</span>
                   </span>
                   <input type="text" name="details" maxLength={500}
                          placeholder={latest ? 'e.g. corrected after review' : 'e.g. first draft for review'} />
@@ -252,7 +253,6 @@ export default function ReportPanel({ project, fromCase = false }) {
                         <th>Version</th>
                         <th>Made</th>
                         <th>By</th>
-                        <th>What changed</th>
                         <th>AI</th>
                         <th>Finals</th>
                         <th />
@@ -264,7 +264,6 @@ export default function ReportPanel({ project, fromCase = false }) {
                           <td className="mono" title={`SHA-256 ${d.sha256}`}>{d.version}</td>
                           <td className="cell-sub">{fmtTime(d.ts)}</td>
                           <td>{d.actor_name || d.actor}</td>
-                          <td>{d.details || <span className="muted">—</span>}</td>
                           <td className="cell-sub">{aiLine(d).replace(/^AI: /, '')}</td>
                           <td><FinalsOf co={co} pj={pj} finals={finalsOf(d.version)} /></td>
                           <td className="rp-row-actions">
@@ -275,7 +274,7 @@ export default function ReportPanel({ project, fromCase = false }) {
                       ))}
                       {!earlier.length && (
                         <tr>
-                          <td colSpan={7} className="empty">Only the latest draft so far</td>
+                          <td colSpan={6} className="empty">Only the latest draft so far</td>
                         </tr>
                       )}
                     </tbody>
