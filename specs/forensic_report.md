@@ -124,9 +124,22 @@ skeleton missing a required tag, naming it.
   nothing about cause unless a confirmed group shows it. In the draft every paragraph is
   highlighted yellow under a line naming the model and saying the analyst must edit it
   (R-D7); the analyst removes both. A failed or refused draft leaves the section's yellow
-  "to be written" line and says why - the draft is still made. **Not measured yet:** Thai prose
-  quality and time of qwen3.5:9b; measured on `D:/mockup-logs/bruteforce-pivot` (its 13
-  suggestions, all confirmed) against its `ground_truth.csv` chain, before this is built on.
+  "to be written" line and says why - the draft is still made. A paragraph the check refuses
+  is shown in the draft as a yellow note with its reason and its text, so the analyst can
+  correct it rather than rewrite it.
+  **Measured 2026-11-03** (`tests/bench_report_summary.py`, qwen3.5:9b, the bruteforce-pivot
+  project in the live store: 13 confirmed groups, 3 edges): ~12 s and 453 completion tokens a
+  draft (22 s cold), runs byte-identical. Plain, readable Thai. Found and fixed on the way:
+  (1) the model turned a SigmaHQ rule's Persistence tag into a motive ("to keep access") -
+  tactics are no longer handed over; (2) a correct opening paragraph citing only F1 was
+  refused for naming the end time - the whole span is a fact `S` of its own and its ends are
+  always accepted, a minute either side for rounding; (3) "10.20.0.40" read as the times
+  10:20 / 00:40 - addresses are removed before times are checked; (4) the model wrote
+  "adm.hu" for adm.hd - dotted account names are now checked, and that paragraph is refused.
+  **Not caught by any check:** one kept paragraph ends with an inference ("which confirms the
+  attacker had full control of the system") - gotcha #13 says prompt wording does not fix
+  this; the yellow highlight and the analyst's edit are what cover it. Final: 3 of 4
+  paragraphs kept, 1 refused with its reason.
 - **R-D11 - the skeleton is uploaded on the Settings page** (Q-R2, the user 2026-11-03), by an
   admin, never committed to git - it carries the provider's letterhead and the repo is pushed.
   Kept in the shared part of `DATA_DIR` (`report/`, beside `intel/`: provider configuration,
