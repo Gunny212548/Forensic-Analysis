@@ -122,7 +122,7 @@ def _case_facts(case_id: str) -> dict:
     tactics: Counter = Counter()
     for f in collapsed:
         by_rule.setdefault(f["rid"], Counter())[state.get(f["key"], {}).get("status", review.UNREVIEWED)] += 1
-        for t in rule_meta.tactics_of(f.get("mitre") or []):
+        for t in rule_meta.finding_tactics(f.get("rid"), f.get("mitre") or []):
             tactics[t] += 1
 
     entities = []

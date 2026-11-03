@@ -162,13 +162,14 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
     # Executive Summary + its figures
     exec_summary = [f"{p['text']} [{', '.join(p['refs'])}]" for p in summary.get("paragraphs") or []]
     for w in summary.get("warnings") or []:
-        exec_summary.append(f"[ระบบตัดย่อหน้านี้ออก เพราะ {'; '.join(w['problems'])} - ข้อความเดิม: {w.get('text')}]")
+        why = " และ".join(report_summary.thai(p) for p in w["problems"])
+        exec_summary.append(f"[ระบบตัดย่อหน้านี้ออก เพราะ{why} - ข้อความเดิม: {w.get('text')}]")
     if summary.get("error"):
         exec_summary.append(f"[AI ร่างไม่ได้ ({summary['error']}) - ผู้วิเคราะห์ต้องเขียนเอง]")
     firsts = [f["ts_first"] for f in groups if f.get("ts_first")]
     lasts = [f.get("ts_last") or f.get("ts_first") for f in groups if f.get("ts_first")]
     first, last = (min(firsts), max(lasts)) if firsts else (None, None)
-    reached = {ta for f in groups for ta in rule_meta.tactics_of(f.get("mitre"))}
+    reached = {ta for f in groups for ta in rule_meta.finding_tactics(f.get("rid"), f.get("mitre"))}
     tactics = ", ".join(n for tid, _ta, n in rule_meta.TACTIC_ORDER if tid in reached) or "-"
     suggestions = sum(len(case_views.findings_view(m["case_id"], m, assign_ids=False)) for m in cases)
 
@@ -228,7 +229,7 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
     confirmed = []
     for n, f in enumerate(groups, 1):
         ref = f"F{n}"
-        ta = rule_meta.tactics_of(f.get("mitre"))
+        ta = rule_meta.finding_tactics(f.get("rid"), f.get("mitre"))
         names = {tid: name for tid, _x, name in rule_meta.TACTIC_ORDER}
         timeline.append({"ref": ref, "time": (f.get("ts_first") or "-")[:19],
                          "tactic": ", ".join(names.get(x, x) for x in ta) or "-",

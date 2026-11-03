@@ -140,7 +140,7 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
         f["ai_state"] = triage.state_of(case_id, manifest, f["key"], ai_items, ai_failed)
         f["ai_error"] = ai_failed.get(f["key"]) if f["ai_state"] == "failed" else None
         # Its ATT&CK tactics, in ATT&CK's order - the Attack timeline's stages.
-        f["tactics"] = rule_meta.tactics_of(f.get("mitre"))
+        f["tactics"] = rule_meta.finding_tactics(f.get("rid"), f.get("mitre"))
         # The detection area its rule belongs to (areas.py) - Attack events groups by it.
         f["area"] = areas.AREA_OF.get(f["rid"])
     return findings

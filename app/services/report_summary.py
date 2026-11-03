@@ -186,6 +186,27 @@ def ground(paragraph: dict, known: dict) -> list[str]:
     return problems
 
 
+# ground()'s reasons as the Thai draft states them - the reasons stay English on the project
+# log and in the bench; only the document a Thai reader gets is in Thai.
+_THAI = [
+    (re.compile(r"cites no finding"), "ไม่ได้อ้างอิงข้อค้นพบใดเลย"),
+    (re.compile(r"names the address (\S+?)(?:, which .*)?$"), "อ้างถึงหมายเลข IP {} ซึ่งไม่มีในข้อค้นพบที่อ้างอิง"),
+    (re.compile(r"names the machine (\S+?)(?:, which .*)?$"),
+     "อ้างถึงเครื่อง {} ซึ่งไม่มีในข้อค้นพบหรือเส้นทางการโจมตีที่อ้างอิง"),
+    (re.compile(r"names the account (\S+?)(?:, which .*)?$"), "อ้างถึงบัญชี {} ซึ่งไม่มีในข้อค้นพบที่อ้างอิง"),
+    (re.compile(r"names the time (\S+?)(?:, outside .*)?$"), "อ้างถึงเวลา {} ซึ่งอยู่นอกช่วงเวลาของข้อค้นพบที่อ้างอิง"),
+]
+
+
+def thai(problem: str) -> str:
+    """One of ground()'s reasons in Thai; a reason it does not know is kept as written."""
+    for pattern, text in _THAI:
+        m = pattern.fullmatch(problem)
+        if m:
+            return text.format(*m.groups())
+    return problem
+
+
 async def _ask(prompt: str, sch: dict) -> tuple[dict, dict]:
     payload = {
         "model": config.LLM_MODEL,

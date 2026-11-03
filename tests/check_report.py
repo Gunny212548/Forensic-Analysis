@@ -262,8 +262,8 @@ txt = text_of(data)
 check("customer, project, version and question are filled in",
       all(s in txt for s in ("Acme Holdings", "RDP intrusion", "0.1", "Who entered RDS01")))
 check("the AI's paragraph carries its references", "สรุปเหตุการณ์ทดสอบ [F1, F2]" in txt)
-check("a refused paragraph is shown with its reason and text",
-      "names the account adm.hu" in txt and "ย่อหน้าที่ผิด" in txt)
+check("a refused paragraph is shown with its reason, in Thai, and its text",
+      "อ้างถึงบัญชี adm.hu" in txt and "names the account" not in txt and "ย่อหน้าที่ผิด" in txt)
 conf = re.findall(r"CONF F\d+[^|]*\|[^|]*\|", txt)
 check("section 7.1 lists the two confirmed groups as F1, F2",
       len(conf) == 2 and "CONF F1" in txt and "CONF F2" in txt)
@@ -363,6 +363,31 @@ check("the span's ends are accepted whatever is cited, a minute either side",
 check("an address is not read as a time", G({"text": "จาก 10.20.0.40", "refs": ["F2"]}, known) == [])
 check("a machine on a confirmed path may be named", G({"text": "ไปยัง sql01", "refs": ["F2"]}, known) == [])
 check("a paragraph citing nothing is refused", G({"text": "x", "refs": []}, known) == ["cites no finding"])
+reasons = (G({"text": "จาก 203.0.113.9 บัญชี adm.hu เวลา 02:45 ไปยัง web99", "refs": ["F1"]}, known)
+           + ["cites no finding"])
+th = [report_summary.thai(p) for p in reasons]
+check(f"every reason the check gives has its Thai wording ({len(reasons)})",
+      len(reasons) == 5 and not any(p == t for p, t in zip(reasons, th))
+      and "203.0.113.9" in th[0] and all("อ้างถึง" in t or "ไม่ได้อ้างอิง" in t for t in th))
+check("a reason it does not know is kept as written", report_summary.thai("something new") == "something new")
+
+print("Tactics: a SigmaHQ finding takes its rule's own tactics (2026-11-03)")
+from app.services import rule_meta, rules_sigma, sigma  # noqa: E402
+by_rid = sigma.by_rid()
+multi = next((rid for rid in rules_sigma.ENTITY
+              if len({t.lower().split(".")[0] for t in by_rid[rid]["techniques"]}) > 1
+              and by_rid[rid].get("tactics")), None)
+if multi is None:
+    check("the SigmaHQ bundle is here (no suggesting rule loaded - check skipped)", False)
+else:
+    own = {rule_meta._TAG_ALIAS.get(x, x) for x in (y.replace("-", "_") for y in by_rid[multi]["tactics"])}
+    check(f"{multi[:20]}...: its finding reaches its own tactics only",
+          set(rule_meta.finding_tactics(multi, by_rid[multi]["techniques"])) == own)
+    t1059 = [rid for rid in rules_sigma.ENTITY if by_rid[rid]["techniques"] == ["T1059"]]
+    check("T1059 alone is Execution, as ATT&CK files it (it reached 11 tactics)",
+          not t1059 or rule_meta.tactics_of(["T1059"]) == ["execution"])
+check("an in-house finding keeps its techniques' tactics",
+      rule_meta.finding_tactics("WIN-AUTH-1", ["T1078"]) == rule_meta.tactics_of(["T1078"]))
 
 print(f"\n{'FAILED: ' + str(failures) if failures else 'all ok'}")
 sys.exit(1 if failures else 0)

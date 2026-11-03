@@ -95,6 +95,15 @@ def tactics_of(techniques: list[str] | None) -> list[str]:
     return sorted(found, key=lambda t: _TACTIC_RANK.get(t, len(TACTIC_ORDER)))
 
 
+def finding_tactics(rid: str | None, techniques: list[str] | None) -> list[str]:
+    """The ATT&CK tactics of one finding, in ATT&CK's order. A SigmaHQ rule's finding takes the
+    tactics its rule declares (its author's own tags); any other finding its techniques' tactics.
+    A technique-wide map would hand a SigmaHQ finding every tactic some other rule paired with
+    the technique (T1059 reached 11 tactics on the bruteforce-pivot chain - 2026-11-03)."""
+    own = _SIGMA_RULE_TACTICS.get(rid or "")
+    return list(own) if own else tactics_of(techniques)
+
+
 AUTH_SOURCES = ["openssh-sshd", "entra-signin"]
 FIREWALL_SOURCES = ["paloalto-traffic", "checkpoint-smartconsole", "fortigate-traffic"]
 PALOALTO_SOURCES = ["paloalto-traffic"]
@@ -1285,19 +1294,34 @@ def problems() -> list[str]:
 
 
 # SigmaHQ's suggesting rules (specs/sigma_windows.md S-D6): metadata from the rule itself. Their
-# techniques' tactics come from the rules' own tags (attack.credential-access -> credential_access),
-# the union over every SigmaHQ rule naming the technique, added only for a technique the table
-# above does not already map.
+# finding's tactics are its rule's own tags (attack.credential-access -> credential_access,
+# finding_tactics). For the technique-wide table (the Navigator layer, the narrative's stage check)
+# a technique takes the tactic of the SigmaHQ rules that tag it and one tactic only - a pair no
+# reading can get wrong (75 of the 122 techniques; none of them paired with two tactics, measured
+# 2026-11-03) - else the union over the rules tagging that technique alone; only for a technique
+# the table above does not already map. A rule tagging several techniques does not say which
+# tactic goes with which: taking its tags gave T1059 eleven tactics (ATT&CK files it under
+# Execution). ATT&CK v20 renamed Defense Evasion to Stealth; SigmaHQ's tag is read at its place.
+_TAG_ALIAS = {"stealth": "defense_evasion"}
+_SIGMA_PAIRS: dict[str, set] = {}
 _SIGMA_TACTICS: dict[str, set] = {}
+_SIGMA_RULE_TACTICS: dict[str, list[str]] = {}
 for _rid in rules_sigma.ENTITY:
     _r = sigma.by_rid()[_rid]
     RULE_META[_rid] = {"id": _r["id"], "title": _r["title"], "status": _r["status"],
                        "techniques": _r["techniques"], "category": _r["logsource"].get("category")
                        or _r["logsource"].get("service"), "log_sources": WINDOWS_SOURCES,
                        "falsepositives": _r.get("falsepositives") or [], "origin": "SigmaHQ"}
-    _tac = {x.replace("-", "_") for x in _r.get("tactics") or []} & set(_TACTIC_RANK)
-    for _t in _r["techniques"]:
-        _SIGMA_TACTICS.setdefault(_t.lower().split(".")[0], set()).update(_tac)
+    _tac = {_TAG_ALIAS.get(x, x) for x in (y.replace("-", "_") for y in _r.get("tactics") or [])}
+    _tac &= set(_TACTIC_RANK)
+    _SIGMA_RULE_TACTICS[_rid] = sorted(_tac, key=_TACTIC_RANK.get)
+    _families = {_t.lower().split(".")[0] for _t in _r["techniques"]}
+    if len(_families) == 1:
+        _fam = _families.pop()
+        _SIGMA_TACTICS.setdefault(_fam, set()).update(_tac)
+        if len(_tac) == 1:
+            _SIGMA_PAIRS.setdefault(_fam, set()).update(_tac)
 for _key, _tac in _SIGMA_TACTICS.items():
+    _tac = _SIGMA_PAIRS.get(_key) or _tac
     if _key not in TACTICS and _tac:
         TACTICS[_key] = sorted(_tac, key=_TACTIC_RANK.get)
