@@ -51,3 +51,11 @@ The traps:
    top 50 suggestions, rejected and undecided included - and which could be made before any
    decision. Since 2026-11-03 the report's own call drafts them from the confirmed groups under the
    same check (`report_summary.ground`); the case page no longer shows the narrative.
+10. **docxtpl renders without escaping by default.** An "&" in any value was dropped - "MITRE ATT&CK"
+    came out "MITRE ATT" in section 3 of every draft, and a "<" would have broken the file. `render(ctx,
+    autoescape=True)`; InlineImage is markup-safe. Found 2026-11-03 while scanning a draft for English.
+11. **The draft's own words are Thai** (the user, 2026-11-03: mixed languages): `report_th.py` gives tactic
+    names, in-house rule titles, steps, areas, formats, n/a and skip reasons and the AI's failure in Thai,
+    with the standard's English term in brackets. SigmaHQ titles stay their authors' ("กฎ SigmaHQ: ...");
+    proper names (machines, files, accounts, brands, standards and their section titles) as written.
+    `check_report.py` fails when a new in-house rule, tactic, step, area or n/a reason has no Thai.

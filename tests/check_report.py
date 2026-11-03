@@ -8,6 +8,7 @@ Ollama - and cases are made in storage with findings written straight into their
 """
 import argparse
 import hashlib
+import html
 import io
 import os
 import re
@@ -436,6 +437,37 @@ check("a recommendation is checked as a paragraph is: one kept, one refused for 
 report_summary._ask = _ask
 check("facts that cannot fit are not sent: the draft says why instead",
       out["error"] and "do not fit" in out["error"] and not out["paragraphs"])
+
+print("The draft's own words in Thai, the English term in brackets (the user, 2026-11-03)")
+from app.services import report_th, rule_meta  # noqa: E402
+plain = html.unescape(txt)
+check("an '&' in a value survives the render (MITRE ATT&CK came out 'MITRE ATT')",
+      "MITRE ATT&CK" in plain and "ATTCK" not in plain)
+check("a tactic reads Thai (English)", report_th.tactic("credential_access", "Credential Access")
+      == "การขโมยหรือเดารหัสผ่าน (Credential Access)")
+check("Stealth (Defense Evasion) gets no brackets inside brackets",
+      report_th.tactic("defense_evasion", "Stealth (Defense Evasion)")
+      == "การหลบเลี่ยงการตรวจจับ (Stealth / Defense Evasion)")
+check("an in-house rule reads Thai (English), its product said once",
+      report_th.rule("WIN-BRUTE-1", "Windows: password guessing") == "Windows: การเดารหัสผ่าน (password guessing)")
+check("a SigmaHQ rule keeps its author's title, marked as SigmaHQ's",
+      report_th.rule("SIGMA-x", "PsExec Service Child Process", "SigmaHQ") == "กฎ SigmaHQ: PsExec Service Child Process")
+check("every in-house rule has its Thai title",
+      not [r for r, m in rule_meta.RULE_META.items()
+           if m.get("origin") != "SigmaHQ" and m.get("status") != "deprecated" and r not in report_th.RULE])
+check("every ATT&CK tactic has its Thai name",
+      all(tid in report_th.TACTIC for tid, _t, _n in rule_meta.TACTIC_ORDER))
+check("every step and detection area has its Thai name",
+      all(st["title"] in report_th.STEP for st in __import__("app.services.case_flow", fromlist=["x"]).STEPS)
+      and all(a["name"] in report_th.AREA for a in __import__("app.services.areas", fromlist=["x"]).AREAS))
+check("every reason an area has no rule has its Thai",
+      all(r in report_th.NOT_APPLICABLE for r in __import__("app.services.products", fromlist=["x"]).NOT_APPLICABLE.values()))
+check("a file's format reads Thai", report_th.read_as("Windows event log (event XML)") == "บันทึกเหตุการณ์ Windows (event XML)"
+      and report_th.read_as("unknown format") == "unknown format")
+check("the AI's failure reads Thai, its technical cause kept",
+      report_th.ai_error("JSONDecodeError: x").startswith("คำตอบของโมเดล AI ถูกตัดก่อนจบ")
+      and "JSONDecodeError: x" in report_th.ai_error("JSONDecodeError: x"))
+check("the draft gives the in-house rule's Thai title", report_th.RULE["R2000"] in plain)
 
 print("Tactics: a SigmaHQ finding takes its rule's own tactics (2026-11-03)")
 from app.services import rule_meta, rules_sigma, sigma  # noqa: E402

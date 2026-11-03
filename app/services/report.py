@@ -19,8 +19,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import (case_flow, case_views, custody, hashchain, intel, projects, report_skeleton,
-               report_summary, review, rule_meta, storage)
+from . import (case_flow, case_views, custody, hashchain, intel, products, projects, report_skeleton,
+               report_summary, report_th, review, rule_meta, storage)
 
 TZ = timezone(timedelta(hours=7))
 THAI_MONTHS = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม",
@@ -123,10 +123,17 @@ def _entity(f: dict) -> str:
 
 
 def _title(rid: str) -> str:
+    """The rule's title as the Thai draft gives it (report_th: Thai with the English in brackets
+    for ours, SigmaHQ's own title for theirs)."""
     try:
-        return rule_meta.describe(rid)["title"]
+        english = rule_meta.describe(rid)["title"]
     except KeyError:
         return rid
+    return report_th.rule(rid, english, rule_meta.RULE_META.get(rid, {}).get("origin"))
+
+
+def _product(pid: str | None) -> str:
+    return (products.PRODUCTS.get(pid or "") or {}).get("name") or pid or "-"
 
 
 # ---------------------------------------------------------------- the gate
@@ -170,12 +177,12 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
         why = " และ".join(report_summary.thai(p) for p in w["problems"])
         exec_summary.append(f"[ระบบตัดย่อหน้านี้ออก เพราะ{why} - ข้อความเดิม: {w.get('text')}]")
     if summary.get("error"):
-        exec_summary.append(f"[AI ร่างไม่ได้ ({summary['error']}) - ผู้วิเคราะห์ต้องเขียนเอง]")
+        exec_summary.append(f"[AI ร่างไม่ได้ เพราะ{report_th.ai_error(summary['error'])} - ผู้วิเคราะห์ต้องเขียนเอง]")
     firsts = [f["ts_first"] for f in groups if f.get("ts_first")]
     lasts = [f.get("ts_last") or f.get("ts_first") for f in groups if f.get("ts_first")]
     first, last = (min(firsts), max(lasts)) if firsts else (None, None)
     reached = {ta for f in groups for ta in rule_meta.finding_tactics(f.get("rid"), f.get("mitre"))}
-    tactics = ", ".join(n for tid, _ta, n in rule_meta.TACTIC_ORDER if tid in reached) or "-"
+    tactics = ", ".join(report_th.tactic(tid, n) for tid, _ta, n in rule_meta.TACTIC_ORDER if tid in reached) or "-"
     suggestions = sum(len(case_views.findings_view(m["case_id"], m, assign_ids=False)) for m in cases)
 
     # Evidence
@@ -198,12 +205,13 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
             evidence.append({
                 "name": mem.get("name") if len(members) == 1 and mem.get("name") == m.get("original_filename")
                 else f"{mem.get('name')} (ใน {m.get('original_filename')})",
-                "product": p.get("product") or ", ".join(m.get("products") or []) or "-",
+                "product": _product(p.get("product")) if p.get("product")
+                else ", ".join(_product(x) for x in m.get("products") or []) or "-",
                 "first": (p.get("first") or "-")[:19], "last": (p.get("last") or "-")[:19],
                 "silent_days": f"{gaps} วัน" if gaps else "-",
                 "size": _size(mem.get("bytes")), "sha256": ev.get("sha256") or "-",
                 "sha256_short": (ev.get("sha256") or "-")[:16],
-                "read_as": ((mem.get("mapping") or {}).get("name")) or "ไม่ได้อ่าน (เก็บเป็นหลักฐาน)",
+                "read_as": report_th.read_as((mem.get("mapping") or {}).get("name")),
                 "rows_read": f"{mem.get('rows') or 0:,}",
                 "rows_not_read": f"{((mem.get('mapping') or {}).get('coverage') or {}).get('not_loaded') or 0:,}",
                 "verified": _local(verified), "received": _local(ev.get("recorded_at")),
@@ -214,7 +222,7 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
     used: dict[str, list[str]] = {}
     for step in case_flow.STEPS:
         for s in step["standards"]:
-            used.setdefault(f"{s['source']}", []).append(f"{step['title']} ({s['ref']})")
+            used.setdefault(f"{s['source']}", []).append(f"{report_th.step(step['title'])}: {s['ref']}")
     standards = [{"name": n, "used_for": "; ".join(v)} for n, v in used.items()]
     sigma_commits = sorted({((m.get("sigma") or {}).get("provenance") or {}).get("commit") for m in cases} - {None})
     feeds = []
@@ -223,9 +231,9 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
             if p.is_file() and p.suffix in intel.FEED_SUFFIXES:
                 feeds.append(f"{p.name} ({hashlib.sha256(p.read_bytes()).hexdigest()[:16]})")
     tools = [
-        {"name": "Forensic Analyzer", "value": "รุ่นของโปรแกรมยังไม่ถูกบันทึก (ดูหัวข้อ 8)"},
-        {"name": "SigmaHQ rules", "value": ", ".join(f"commit {c}" for c in sigma_commits) or "ไม่ได้ใช้"},
-        {"name": "Threat intelligence feeds", "value": "; ".join(feeds) or "ไม่มี"},
+        {"name": "โปรแกรมวิเคราะห์ (Forensic Analyzer)", "value": "รุ่นของโปรแกรมยังไม่ถูกบันทึก (ดูหัวข้อ 8)"},
+        {"name": "กฎตรวจจับของ SigmaHQ", "value": ", ".join(f"รุ่น (commit) {c}" for c in sigma_commits) or "ไม่ได้ใช้"},
+        {"name": "ฐานข้อมูลข่าวกรองภัยคุกคาม (threat intelligence feeds)", "value": "; ".join(feeds) or "ไม่มี"},
         {"name": "AI (ร่างบทสรุปผู้บริหารและข้อเสนอแนะ, อธิบายข้อเสนอ - ไม่ตัดสิน)", "value": summary.get("model") or "-"},
     ]
 
@@ -235,7 +243,7 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
     for n, f in enumerate(groups, 1):
         ref = f"F{n}"
         ta = rule_meta.finding_tactics(f.get("rid"), f.get("mitre"))
-        names = {tid: name for tid, _x, name in rule_meta.TACTIC_ORDER}
+        names = {tid: report_th.tactic(tid, name) for tid, _x, name in rule_meta.TACTIC_ORDER}
         timeline.append({"ref": ref, "time": (f.get("ts_first") or "-")[:19],
                          "tactic": ", ".join(names.get(x, x) for x in ta) or "-",
                          "finding": f"{f.get('fd') + ' ' if f.get('fd') else ''}{_title(f['rid'])}",
@@ -279,10 +287,10 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
             except KeyError:
                 d = {"title": f["rid"], "level": f.get("level"), "techniques": f.get("mitre") or []}
             origin = rule_meta.RULE_META.get(f["rid"], {}).get("origin")
-            rules[f["rid"]] = {"id": f["rid"], "title": d.get("title") or f["rid"],
+            rules[f["rid"]] = {"id": f["rid"], "title": report_th.rule(f["rid"], d.get("title") or f["rid"], origin),
                                "level": LEVEL_TH.get(d.get("level"), d.get("level") or "-"),
-                               "source": f"SigmaHQ ({d.get('author') or 'author not named'})"
-                               if origin == "SigmaHQ" else "in-house",
+                               "source": f"SigmaHQ (ผู้เขียน: {d.get('author') or 'ไม่ระบุ'})"
+                               if origin == "SigmaHQ" else "พัฒนาเอง (in-house)",
                                "techniques": ", ".join(d.get("techniques") or f.get("mitre") or []) or "-"}
 
     # Limitations (ACPO 6.3, 6.5.3) and what better logging would have shown
@@ -291,7 +299,8 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
         for s in m.get("skipped_members") or []:
             name = s.get("name") if isinstance(s, dict) else s
             why = s.get("reason") if isinstance(s, dict) else None
-            limitations.append(f"{name} (ใน {m.get('original_filename')}) ไม่ได้วิเคราะห์" + (f": {why}" if why else ""))
+            limitations.append(f"{name} (ใน {m.get('original_filename')}) ไม่ได้วิเคราะห์"
+                               + (f" เพราะ{report_th.skipped(why)}" if why else ""))
         for p in m.get("periods") or []:
             if p.get("gap_days"):
                 limitations.append(f"{p.get('item')}: ไม่มีเหตุการณ์ {p['gap_days']} วันในช่วงที่หลักฐานครอบคลุม")
@@ -304,10 +313,11 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
         for prod in m.get("detection") or []:
             for a in prod.get("areas") or []:
                 if a.get("status") == "n/a":
-                    limitations.append(f"{prod.get('name')} - {a.get('name')}: ไม่มีกฎตรวจจับ ({a.get('reason')})")
-                    logging.append(f"{prod.get('name')} - {a.get('name')}: {a.get('reason')}")
+                    area, why = report_th.area(a.get("name") or ""), report_th.not_applicable(a.get("reason"))
+                    limitations.append(f"{prod.get('name')} - {area}: ไม่มีกฎตรวจจับ เพราะ{why}")
+                    logging.append(f"{prod.get('name')} - {area}: {why}")
     limitations.append("รุ่นของโปรแกรมวิเคราะห์ยังไม่ถูกบันทึกในห่วงโซ่การครอบครอง จึงระบุได้เฉพาะรุ่นของกฎ SigmaHQ "
-                       "และ AI model")
+                       "และโมเดล AI")
     limitations.append("ยังไม่มีการบันทึกสมมติฐานทางเลือกและช่วงที่ไม่มีหลักฐานระหว่างขั้นการโจมตีในระบบ "
                        "- ผู้วิเคราะห์ต้องเขียนในหัวข้อ 5")
     limitations = list(dict.fromkeys(limitations))
@@ -454,7 +464,9 @@ def make_draft(company_id: str, project_id: str, actor: dict, *, details: str = 
     tpl = DocxTemplate(str(report_skeleton.path(skeleton["sha256"])))
     ctx["attack_path_image"] = (InlineImage(tpl, io.BytesIO(png), width=Mm(160)) if png else
                                 "[ไม่ได้แนบภาพเส้นทางการโจมตี - ผู้วิเคราะห์ใส่เองได้จากหน้า Attack path]")
-    tpl.render(ctx)
+    # Escaped: without it an "&" in any value was dropped ("MITRE ATT&CK" came out "MITRE ATT",
+    # measured 2026-11-03) and a "<" would break the document. InlineImage is markup-safe.
+    tpl.render(ctx, autoescape=True)
     buf = io.BytesIO()
     tpl.save(buf)
     data = buf.getvalue()

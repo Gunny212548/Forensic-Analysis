@@ -172,7 +172,7 @@ skeleton missing a required tag, naming it.
   skeleton uploaded = the Report step says so and no draft can be made. The first skeleton is
   the one built from the user's template (shown 2026-11-03); the build script is not shipped -
   later changes are made in Word and uploaded.
-- **R-D8 - Thai text, English technical terms** (as the template); event times GMT+7
+- **R-D8 - Thai text, English technical terms in brackets** (the user, 2026-11-03: "Thai + English in brackets" - `report_th.py`); event times GMT+7
   `YYYY-MM-DD HH:MM:SS`, document dates in Buddhist era as the template writes them.
 
 ## Body sections (approved by the user, 2026-11-03)

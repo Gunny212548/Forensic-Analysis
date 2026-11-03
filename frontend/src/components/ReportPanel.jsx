@@ -204,7 +204,10 @@ export default function ReportPanel({ project, fromCase = false }) {
             <form key={latest?.version || 'none'} ref={formRef} className="rp-make" onSubmit={makeDraft}>
               <div className="rp-make-row">
                 <label className="rp-field">
-                  What changed in {data.next_version}
+                  <span>
+                    What changed in {data.next_version}{' '}
+                    <span className="cell-sub">- written into the Word draft&apos;s change log, so in its language (Thai)</span>
+                  </span>
                   <input type="text" name="details" maxLength={500}
                          placeholder={latest ? 'e.g. corrected after review' : 'e.g. first draft for review'} />
                 </label>
