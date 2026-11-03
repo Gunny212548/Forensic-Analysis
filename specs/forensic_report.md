@@ -141,6 +141,8 @@ skeleton missing a required tag, naming it.
   attacker had full control of the system") - gotcha #13 says prompt wording does not fix
   this; the yellow highlight and the analyst's edit are what cover it. Final: 3 of 4
   paragraphs kept, 1 refused with its reason.
+  When the confirmed groups are too many for the model's window (2026-11-03, 526 of them), the
+  rules with most groups are summed up as one fact each, cited in the draft as "<rule> ทั้ง N รายการ".
 - **R-D11 - the skeleton is uploaded on the Settings page** (Q-R2, the user 2026-11-03), by an
   admin, never committed to git - it carries the provider's letterhead and the repo is pushed.
   Kept in the shared part of `DATA_DIR` (`report/`, beside `intel/`: provider configuration,

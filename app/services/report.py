@@ -160,7 +160,11 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
     refs = {f["key"] + "|" + f["case_id"]: f"F{n}" for n, f in enumerate(groups, 1)}
 
     # Executive Summary + its figures
-    exec_summary = [f"{p['text']} [{', '.join(p['refs'])}]" for p in summary.get("paragraphs") or []]
+    # A G reference sums up one rule's many findings (report_summary.FACT_BUDGET): the reader is
+    # told which rule and how many, and finds them in section 7 by the rule id.
+    labels = summary.get("labels") or {}
+    exec_summary = [f"{p['text']} [{', '.join(labels.get(r, r) for r in p['refs'])}]"
+                    for p in summary.get("paragraphs") or []]
     for w in summary.get("warnings") or []:
         why = " และ".join(report_summary.thai(p) for p in w["problems"])
         exec_summary.append(f"[ระบบตัดย่อหน้านี้ออก เพราะ{why} - ข้อความเดิม: {w.get('text')}]")

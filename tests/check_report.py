@@ -158,11 +158,14 @@ calls = []
 
 def fake_summary(question, groups, edges):
     calls.append((question, len(groups)))
-    return {"paragraphs": [{"text": "สรุปเหตุการณ์ทดสอบ", "refs": ["F1", "F2"]}],
+    return {"paragraphs": [{"text": "สรุปเหตุการณ์ทดสอบ", "refs": ["F1", "F2"]},
+                           {"text": "ย่อหน้าที่อ้างกลุ่ม", "refs": ["G1"]}],
+            "labels": {"G1": "R2000 ทั้ง 2 รายการ"},
             "warnings": [{"text": "ย่อหน้าที่ผิด", "refs": ["F1"], "problems": ["names the account adm.hu"]}],
             "error": None, "model": "stand-in", "seconds": 0.1, "usage": None}
 
 
+real_draft = report_summary.draft
 report_summary.draft = fake_summary   # make_draft resolves it at call time
 BASE = f"/api/companies/{CO}/projects/{PJ}/report"
 
@@ -262,6 +265,7 @@ txt = text_of(data)
 check("customer, project, version and question are filled in",
       all(s in txt for s in ("Acme Holdings", "RDP intrusion", "0.1", "Who entered RDS01")))
 check("the AI's paragraph carries its references", "สรุปเหตุการณ์ทดสอบ [F1, F2]" in txt)
+check("a G reference reads as its rule and count", "ย่อหน้าที่อ้างกลุ่ม [R2000 ทั้ง 2 รายการ]" in txt)
 check("a refused paragraph is shown with its reason, in Thai, and its text",
       "อ้างถึงบัญชี adm.hu" in txt and "names the account" not in txt and "ย่อหน้าที่ผิด" in txt)
 conf = re.findall(r"CONF F\d+[^|]*\|[^|]*\|", txt)
@@ -370,6 +374,37 @@ check(f"every reason the check gives has its Thai wording ({len(reasons)})",
       len(reasons) == 5 and not any(p == t for p, t in zip(reasons, th))
       and "203.0.113.9" in th[0] and all("อ้างถึง" in t or "ไม่ได้อ้างอิง" in t for t in th))
 check("a reason it does not know is kept as written", report_summary.thai("something new") == "something new")
+
+print("R-D10: many findings are summed up per rule so the facts fit the model's window (2026-11-03)")
+many = [{"rid": "WIN-BRUTE-1", "srcip": f"203.0.113.{i % 200}", "username": f"user{i}",
+         "ts_first": f"2026-04-{1 + i % 28:02d} 0{i % 10}:00:00+07:00",
+         "ts_last": f"2026-04-{1 + i % 28:02d} 0{i % 10}:30:00+07:00", "cnt": 10 + i, "descr": "d" * 300}
+        for i in range(400)]
+many.sort(key=lambda g: g["ts_first"])
+many.append({"rid": "WIN-LAT-1", "srcip": "10.50.1.30", "username": "adm.x", "ts_first": "2026-05-01 03:00:00+07:00",
+             "ts_last": "2026-05-01 03:05:00+07:00", "cnt": 3, "descr": "rdp"})
+text, mk = report_summary.facts(None, many, [])
+check(f"400 findings of one rule fit the budget ({len(text)} <= {report_summary.FACT_BUDGET} characters)",
+      len(text) <= report_summary.FACT_BUDGET)
+check("the rule is one line G1, the lone finding keeps its own number F401",
+      list(mk["refs"]) == ["S", "G1", "F401"])
+check("G1's label names the rule and how many", mk["labels"] == {"G1": "WIN-BRUTE-1 ทั้ง 400 รายการ"})
+check("a paragraph citing G1 may name any of its sources and accounts",
+      G({"text": "จาก 203.0.113.199 บัญชี user7", "refs": ["G1"]}, mk) == [])
+check("an address none of G1's findings holds is still refused",
+      any("198.51.100.9" in p for p in G({"text": "จาก 198.51.100.9", "refs": ["G1"]}, mk)))
+check("G1 is not read as a machine", G({"text": "ตามข้อ G1", "refs": ["G1"]}, mk) == [])
+check("few findings stay one line each", list(known["refs"]) == ["S", "F1", "F2"] and known["labels"] == {})
+check(f"a paragraph cites at most {report_summary.MAX_REFS}",
+      report_summary.schema(["F1"])["properties"]["paragraphs"]["items"]["properties"]["refs"]["maxItems"]
+      == report_summary.MAX_REFS)
+wide = [{**g, "rid": f"SIGMA-{i}"} for i, g in enumerate(many)]   # 401 rules, one finding each
+_ask = report_summary._ask
+report_summary._ask = lambda *a: (_ for _ in ()).throw(AssertionError("the model was asked"))
+out = real_draft(None, wide, [])
+report_summary._ask = _ask
+check("facts that cannot fit are not sent: the draft says why instead",
+      out["error"] and "do not fit" in out["error"] and not out["paragraphs"])
 
 print("Tactics: a SigmaHQ finding takes its rule's own tactics (2026-11-03)")
 from app.services import rule_meta, rules_sigma, sigma  # noqa: E402

@@ -38,3 +38,11 @@ The traps:
    (`summarise=None`); binding `report_summary.draft` as a default argument froze it at import.
 7. **A PNG header is not a PNG.** A broken body behind `\x89PNG` passed the magic check and crashed the
    render (500); the picture is parsed with python-docx's own reader first (400).
+8. **One fact line per finding does not fit the model's window.** A 526-finding project (the blind
+   Windows quarter, all confirmed) gave 153,085 characters of facts against a 16,384-token window:
+   the model saw a cut prompt, listed refs until its 1,600 tokens ran out, and the draft said
+   `JSONDecodeError: Unterminated string` (57 s). Over `FACT_BUDGET` (24,000 characters) the rules
+   with most findings are summed up as one line `G<n>` each - count, span, busiest sources and
+   accounts; a paragraph citing it may name any of them - and a paragraph cites at most 8.
+   Measured after: 6,477 characters, 3,305 prompt tokens, 23.7 s, 3 paragraphs kept, 1 refused.
+   Past `FACT_LIMIT` the model is not asked and the draft says why.

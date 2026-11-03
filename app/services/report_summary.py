@@ -25,6 +25,16 @@ from . import llm, rule_meta
 MAX_PARAGRAPHS = 6
 PARAGRAPH_MAX = 600      # characters - a short paragraph an executive reads in one go
 COMPLETION_TOKENS = 1600  # Thai takes several tokens a word; measured, see the module test
+MAX_REFS = 8              # a paragraph's citations: the model listed hundreds and ran out of tokens
+# The facts handed over, in characters. The model's window is OLLAMA_NUM_CTX (16,384) tokens,
+# shared with the system prompt and the answer; a 526-finding project's one-line-each facts were
+# 153,085 characters and the model saw a cut-off prompt (measured 2026-11-03). Over this budget the
+# rules with most findings are summed up as one line each (G<n>), largest first.
+FACT_BUDGET = 24_000
+# Measured on that project once summed up: 6,477 characters of facts + the system prompt were 3,305
+# prompt tokens (~2.2 characters a token). Past FACT_LIMIT the facts and the answer no longer fit
+# the window, so the model is not asked at all.
+FACT_LIMIT = 30_000
 
 SYSTEM = """You write the Executive Summary of a digital forensics report, in Thai.
 
@@ -33,8 +43,9 @@ Thai, short sentences, no jargon: say "ทดลองรหัสผ่าน�
 address as "หมายเลข IP" once. Keep technique ids, rule ids and field names out of the text.
 
 You are given the investigation's question, the span of all findings (reference S) and the
-findings an analyst has CONFIRMED, each with a reference F1, F2, ... in time order, plus the
-paths the attacker took between machines. These are facts. You restate them; you do not
+findings an analyst has CONFIRMED, each with a reference F1, F2, ... in time order (or, when
+there are many of one kind, one line G1, G2, ... summing them up), plus the paths the attacker
+took between machines. These are facts. You restate them; you do not
 judge, grade, guess motives or name a cause no finding shows - say what was done, never why.
 Never call anything "likely" or "probably" an attack - the analyst decided.
 
@@ -65,10 +76,66 @@ def _title(rid: str) -> str:
         return rid
 
 
+def _single(ref: str, g: dict, descr: int = 300) -> str:
+    first, last = g.get("ts_first"), g.get("ts_last")
+    return (f"{ref}: {(first or '?')[:19]} to {(last or '?')[:19]} (GMT+7) | {_title(g['rid'])} | "
+            f"source {g.get('srcip') or '-'} | account {g.get('username') or '-'} | "
+            f"{g.get('cnt') or 0} events" + (f" | {(g.get('descr') or '')[:descr]}" if descr else ""))
+
+
+def _top(members: list[dict], field: str, n: int = 5) -> str:
+    events: dict[str, int] = {}
+    for g in members:
+        if g.get(field):
+            events[g[field]] = events.get(g[field], 0) + (g.get("cnt") or 0)
+    ranked = sorted(events.items(), key=lambda kv: (-kv[1], kv[0]))
+    shown = ", ".join(f"{k} ({v} events)" for k, v in ranked[:n]) or "-"
+    return shown + (f" and {len(ranked) - n} more" if len(ranked) > n else "")
+
+
+def _many(ref: str, rid: str, members: list[dict]) -> str:
+    first = min(g["ts_first"] for g in members if g.get("ts_first"))
+    last = max(g.get("ts_last") or g["ts_first"] for g in members if g.get("ts_first"))
+    return (f"{ref}: {first[:19]} to {last[:19]} (GMT+7) | {_title(rid)} | {len(members)} confirmed "
+            f"findings of this one kind, {sum(g.get('cnt') or 0 for g in members)} events | "
+            f"sources {_top(members, 'srcip')} | accounts {_top(members, 'username')}")
+
+
+def _plan(groups: list[dict]) -> tuple[set[str], int]:
+    """Which rules are summed up (G lines) and how long a single finding's description may be,
+    so that the facts fit FACT_BUDGET. Largest rule first; descriptions dropped last."""
+    counts: dict[str, int] = {}
+    for g in groups:
+        counts[g["rid"]] = counts.get(g["rid"], 0) + 1
+    order = sorted((r for r, c in counts.items() if c > 1), key=lambda r: (-counts[r], r))
+
+    def size(summed: set[str], descr: int) -> int:
+        n = sum(len(_single("F000", g, descr)) for g in groups if g["rid"] not in summed)
+        return n + 400 * len(summed)       # a G line is ~300 characters
+    summed: set[str] = set()
+    for rid in [None, *order]:
+        if rid:
+            summed.add(rid)
+        if size(summed, 300) <= FACT_BUDGET:
+            return summed, 300
+    return summed, 0
+
+
 def facts(question: str | None, groups: list[dict], edges: list[dict]) -> tuple[str, dict]:
-    """The prompt's facts and, per reference, the strings a paragraph citing it may name."""
+    """The prompt's facts and, per reference, the strings a paragraph citing it may name.
+
+    A finding is one line F<n> - n its place in time order, the number section 7 gives it -
+    unless the facts would not fit the model's window (FACT_BUDGET): then the rules with most
+    findings are one line each, G<n>, naming how many findings, their span and their busiest
+    sources and accounts. A paragraph citing G<n> may name any source or account of its
+    findings. known["labels"] says what a G reference stands for in the draft."""
     lines = [f"Question of the investigation: {question or '(none written)'}", ""]
     allowed: dict[str, dict] = {}
+    labels: dict[str, str] = {}
+    summed, descr = _plan(groups)
+    if summed:
+        lines += [f"There are {len(groups)} confirmed findings. Findings of the same kind are "
+                  "summed up as one line G1, G2, ...; the others are one line each, F<n>.", ""]
     # The whole span as a fact of its own: a paragraph saying "from 02:04 to 02:58" rests on
     # it, not on the first and last finding alone (measured: a correct opening paragraph
     # citing only F1 was refused for naming the end time).
@@ -79,17 +146,27 @@ def facts(question: str | None, groups: list[dict], edges: list[dict]) -> tuple[
                      f"{max(lasts)[:19]} (GMT+7), {len(groups)} findings")
         allowed["S"] = {"names": set(), "first": min(firsts), "last": max(lasts), "text": lines[-1].lower()}
     lines += ["", "Confirmed findings:"]
+    # No tactics: a SigmaHQ rule's tags list a dozen of them, and the model turned
+    # "persistence" into a motive no finding shows ("to keep access") - measured.
+    done: set[str] = set()
     for n, g in enumerate(groups, 1):
-        ref = f"F{n}"
-        names = {x for x in (g.get("srcip"), g.get("username")) if x}
+        rid = g["rid"]
+        if rid in summed:
+            if rid in done:
+                continue
+            done.add(rid)
+            ref = f"G{len(done)}"
+            members = [x for x in groups if x["rid"] == rid]
+            lines.append(_many(ref, rid, members))
+            first = min(x["ts_first"] for x in members if x.get("ts_first"))
+            last = max(x.get("ts_last") or x["ts_first"] for x in members if x.get("ts_first"))
+            labels[ref] = f"{rid} ทั้ง {len(members)} รายการ"
+        else:
+            ref, members = f"F{n}", [g]
+            lines.append(_single(ref, g, descr))
+            first, last = g.get("ts_first"), g.get("ts_last")
+        names = {x for m in members for x in (m.get("srcip"), m.get("username")) if x}
         names |= {_short(x) for x in names}
-        first, last = g.get("ts_first"), g.get("ts_last")
-        # No tactics: a SigmaHQ rule's tags list a dozen of them, and the model turned
-        # "persistence" into a motive no finding shows ("to keep access") - measured.
-        lines.append(
-            f"{ref}: {(first or '?')[:19]} to {(last or '?')[:19]} (GMT+7) | {_title(g['rid'])} | "
-            f"source {g.get('srcip') or '-'} | account {g.get('username') or '-'} | "
-            f"{g.get('cnt') or 0} events | {(g.get('descr') or '')[:300]}")
         allowed[ref] = {"names": {x.lower() for x in names}, "first": first, "last": last,
                         "text": lines[-1].lower()}
     if edges:
@@ -100,7 +177,7 @@ def facts(question: str | None, groups: list[dict], edges: list[dict]) -> tuple[
                          f"{e.get('count') or 0} events | rules {', '.join(e.get('rules') or [])}")
     paths = {(_short(e.get("from")).lower(), _short(e.get("to")).lower(), tuple(e.get("rules") or []))
              for e in edges}
-    return "\n".join(lines), {"refs": allowed, "paths": paths}
+    return "\n".join(lines), {"refs": allowed, "paths": paths, "labels": labels}
 
 
 def schema(refs: list[str]) -> dict:
@@ -113,7 +190,7 @@ def schema(refs: list[str]) -> dict:
                     "type": "object",
                     "properties": {
                         "text": {"type": "string", "maxLength": PARAGRAPH_MAX},
-                        "refs": {"type": "array", "minItems": 1,
+                        "refs": {"type": "array", "minItems": 1, "maxItems": MAX_REFS,
                                  "items": {"type": "string", "enum": refs}},
                     },
                     "required": ["text", "refs"],
@@ -165,7 +242,7 @@ def ground(paragraph: dict, known: dict) -> list[str]:
             continue
         if h in path_hosts:
             continue   # a machine on a confirmed path between two cited findings' ends
-        if re.fullmatch(r"(f|fd|t|ta)\d+", h):
+        if re.fullmatch(r"(f|fd|g|t|ta)\d+", h):
             continue   # a citation or an id, not a machine
         problems.append(f"names the machine {host}, which no cited finding or path holds")
     for acc in _ACCOUNT.findall(text):
@@ -207,6 +284,10 @@ def thai(problem: str) -> str:
     return problem
 
 
+class CutOff(Exception):
+    """The model's answer ended before its JSON did."""
+
+
 async def _ask(prompt: str, sch: dict) -> tuple[dict, dict]:
     payload = {
         "model": config.LLM_MODEL,
@@ -219,18 +300,29 @@ async def _ask(prompt: str, sch: dict) -> tuple[dict, dict]:
     async with llm._client() as client:
         body = await llm._chat(client, payload)
     content, finish = llm._content_of(body)
-    return json.loads(content), {"finish": finish, **(body.get("usage") or {})}
+    usage = {"finish": finish, **(body.get("usage") or {})}
+    try:
+        return json.loads(content), usage
+    except json.JSONDecodeError as exc:
+        raise CutOff(f"the answer is not whole JSON (finish {finish}, prompt "
+                     f"{usage.get('prompt_tokens')} tokens, answer {usage.get('completion_tokens')}): "
+                     f"{exc}") from exc
 
 
 def draft(question: str | None, groups: list[dict], edges: list[dict]) -> dict:
     """{paragraphs: [{text, refs}], warnings, error, model, seconds, usage}. Never raises:
     a draft is made with or without the AI's summary."""
     out = {"paragraphs": [], "warnings": [], "error": None, "model": config.LLM_MODEL,
-           "seconds": None, "usage": None}
+           "seconds": None, "usage": None, "labels": {}}
     if not groups:
         out["error"] = "no confirmed finding to summarise"
         return out
     text, known = facts(question, groups, edges)
+    out["labels"] = known["labels"]
+    if len(text) > FACT_LIMIT:   # never hand the model a prompt it would see cut off
+        out["error"] = (f"{len(groups)} confirmed findings of {len(known['refs'])} kinds do not fit "
+                        f"the model's window ({len(text)} characters of facts)")
+        return out
     refs = list(known["refs"])
     started = time.monotonic()
     try:
