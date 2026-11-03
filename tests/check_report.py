@@ -303,6 +303,14 @@ for name, files, why in (
         ("an outside link in the SVG", {"png": ("g.png", io.BytesIO(PNG), "image/png"),
                                         "svg": ("g.svg", io.BytesIO(SVG.replace(b"<circle", b'<image href="https://x/y.png"/><circle')),
                                                 "image/svg+xml")}, "outside"),
+        ("a style that imports from outside", {"png": ("g.png", io.BytesIO(PNG), "image/png"),
+                                               "svg": ("g.svg", io.BytesIO(SVG.replace(
+                                                   b"<circle", b"<style>@import url(https://x/y.css);</style><circle")),
+                                                   "image/svg+xml")}, "outside"),
+        ("a fill from another site", {"png": ("g.png", io.BytesIO(PNG), "image/png"),
+                                      "svg": ("g.svg", io.BytesIO(SVG.replace(
+                                          b"<circle", b'<circle fill="url(https://x/p.svg#g)"/><circle')),
+                                          "image/svg+xml")}, "outside"),
         ("an SVG without its PNG", {"svg": ("g.svg", io.BytesIO(SVG), "image/svg+xml")}, "PNG")):
     r = analyst.post(f"{BASE}/draft", files=files)
     check(f"{name}: refused (400, {r.status_code})", r.status_code == 400 and why in r.json()["detail"])

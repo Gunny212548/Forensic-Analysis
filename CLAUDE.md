@@ -939,7 +939,7 @@ Two more checks, each for its own layer:
   computers and sources), a forged custody log); needs the container (`static/`).
   Run it in a throwaway container with `AUTH_DIR` on a scratch path - in the live
   one its test accounts land in the real `users.json`. Gotchas #49 / #50 / #73.
-- **Report drafts** - `tests/check_report.py [repo] [--scratch DIR]` (gotcha #83, 65 checks): the
+- **Report drafts** - `tests/check_report.py [repo] [--scratch DIR]` (gotcha #83, 67 checks): the
   skeleton's refusals, the gate, a draft's every section from the confirmed groups only (no other
   customer's data), the attack path PNG + SVG twin, versions kept, finals, the summary check - a
   skeleton built in code and a stand-in model, no Ollama. `tests/bench_report_summary.py <case>` measures

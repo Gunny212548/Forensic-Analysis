@@ -372,7 +372,8 @@ def check_svg(data: bytes | None) -> None:
     for bad in (b"<script", b"<foreignobject", b"javascript:", b"<!entity", b"<iframe"):
         if bad in low:
             raise BadInput(f"the attack path SVG holds {bad.decode()} - refused")
-    if re.search(rb"""(?:href|src)\s*=\s*["'](?!#|data:)""", low):
+    if re.search(rb"""(?:href|src)\s*=\s*["'](?!#|data:)""", low) or b"@import" in low \
+            or re.search(rb"""url\(\s*["']?(?!#|data:)""", low):
         raise BadInput("the attack path SVG refers to something outside itself - refused")
 
 
