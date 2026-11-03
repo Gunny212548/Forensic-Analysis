@@ -1,5 +1,6 @@
 import asyncio
 import re
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Request
@@ -304,6 +305,28 @@ async def merge_cases_route(request: Request, body: dict = Body(...)):
 
 
 
+_EVENT_FACTS: "OrderedDict[tuple, object]" = OrderedDict()
+_EVENT_FACTS_MAX = 256
+
+
+def _cached(case_id: str, what: tuple, compute):
+    """`compute()` once per case file and question: keyed on the DuckDB file's size and
+    modification time, so a re-process (a new file) is asked again."""
+    try:
+        st = db.db_path(case_id).stat()
+    except OSError:
+        return compute()
+    key = (case_id, st.st_mtime_ns, st.st_size, *what)
+    if key in _EVENT_FACTS:
+        _EVENT_FACTS.move_to_end(key)
+        return _EVENT_FACTS[key]
+    value = compute()
+    _EVENT_FACTS[key] = value
+    while len(_EVENT_FACTS) > _EVENT_FACTS_MAX:
+        _EVENT_FACTS.popitem(last=False)
+    return value
+
+
 @router.get("/{case_id}/events")
 async def get_case_events(
     case_id: str,
@@ -324,7 +347,10 @@ async def get_case_events(
     lo, hi = _when(since, "since"), _when(until, "until", upper=True)
 
     # Inside a window the counts are the window's (an event with no readable time is in none).
-    total_rows, flagged = (db.window_counts(case_id, lo, hi) if lo or hi else db.counts(case_id))
+    # Cached per case file: the table fetches a page per screenful as it scrolls, and these
+    # full-table scans gave the same answer every time (code review, 2026-11-03).
+    total_rows, flagged = _cached(case_id, ("counts", lo, hi),
+                                  lambda: db.window_counts(case_id, lo, hi) if lo or hi else db.counts(case_id))
     if only_flagged:
         # `total` is the number of rule-match lines (what is paged through);
         # `flagged_count` stays the number of distinct events flagged.
@@ -334,7 +360,7 @@ async def get_case_events(
     else:
         events = db.list_raw(case_id, limit, offset, order=order, since=lo, until=hi)
         total = total_rows
-    first, last = db.ts_range(case_id)
+    first, last = _cached(case_id, ("ts_range",), lambda: db.ts_range(case_id))
 
     return {
         "case_id": case_id,

@@ -72,7 +72,7 @@ LOOPS = {
     "tools": ("t", "{{ t.name }} | {{ t.value }}"),
     "attack_timeline": ("s", "{{ s.ref }} | {{ s.time }} | {{ s.finding }} | {{ s.src }}"),
     "edges": ("x", "{{ x.src }} -> {{ x.dst }} | {{ x.technique }}"),
-    "confirmed": ("f", "CONF {{ f.ref }} | {{ f.rule }} | {{ f.entity }} | {{ f.note }}"),
+    "confirmed": ("f", "CONF {{ f.ref }} | {{ f.rule }} | {{ f.entity }} | {{ f.note }} | FROM {{ f.first }}"),
     "rejected": ("f", "REJ {{ f.rule }} | {{ f.entity }} | {{ f.reason }}"),
     "rules": ("r", "{{ r.id }} | {{ r.title }} | {{ r.source }}"),
     "decisions": ("d", "{{ d.actor }} | {{ d.decision }} | {{ d.reason }}"),
@@ -486,6 +486,72 @@ else:
           not t1059 or rule_meta.tactics_of(["T1059"]) == ["execution"])
 check("an in-house finding keeps its techniques' tactics",
       rule_meta.finding_tactics("WIN-AUTH-1", ["T1078"]) == rule_meta.tactics_of(["T1078"]))
+shared = {k for k, v in rule_meta._SIGMA_SHARED.items() if v}
+check(f"a technique only multi-technique SigmaHQ rules tag still maps to a tactic ({len(shared)} such)",
+      all(k in rule_meta.TACTICS and rule_meta.TACTICS[k] for k in shared))
+
+print("Code review, 2026-11-03")
+check("section 7 gives a group's date, not its time of day alone", "FROM 2026-09-17 02:04:13" in plain)
+W = report_summary._within
+check("a time across midnight is inside 23:58 - 00:03", W("00:01", "2026-09-17 23:58:00", "2026-09-18 00:03:00")
+      and not W("12:00", "2026-09-17 23:58:00", "2026-09-18 00:03:00"))
+check("a span of days holds every time of day (a G line's months)",
+      W("03:15", "2026-04-01 14:00:00", "2026-06-30 08:00:00"))
+check("a same-day span still refuses a time outside it",
+      not W("02:45", "2026-09-17 02:04:13", "2026-09-17 02:30:40") and W("02:31", "2026-09-17 02:04:13", "2026-09-17 02:30:40"))
+check("IPv4, Win32, SHA256, x64 and an FD id are not machines",
+      G({"text": "IPv4 Win32 SHA256 x64 FD-2026-0003 KB5034441", "refs": ["F1"]}, known) == [])
+check("a machine no finding holds is still refused", any("web99" in p for p in G({"text": "web99", "refs": ["F1"]}, known)))
+for label, svg in (("an onload handler", b'<svg xmlns="http://www.w3.org/2000/svg" onload="x()"><g/></svg>'),
+                   ("a prefixed script", b'<svg xmlns="http://www.w3.org/2000/svg"><s:script xmlns:s="x">y</s:script></svg>'),
+                   ("an external DOCTYPE", b'<?xml version="1.0"?><!DOCTYPE svg SYSTEM "http://h/x.dtd"><svg xmlns="http://www.w3.org/2000/svg"/>')):
+    try:
+        report.check_svg(svg)
+        check(f"an SVG with {label} is refused", False)
+    except report.BadInput:
+        check(f"an SVG with {label} is refused", True)
+try:
+    report.check_svg(SVG)
+    check("the plain SVG still passes", True)
+except report.BadInput:
+    check("the plain SVG still passes", False)
+split = (b'<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> INCLUDE</w:instrText></w:r>'
+         b'<w:r><w:instrText>PICTURE "http://x/logo.png"</w:instrText></w:r>'
+         b'<w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>logo</w:t></w:r>'
+         b'<w:r><w:fldChar w:fldCharType="end"/></w:r>')
+check("a field instruction split over two runs is read whole and refused",
+      any(report_skeleton._LINKED_FIELD.search(i) for i in report_skeleton._instructions(split)))
+check("a page-number field is not taken for a linked one",
+      not any(report_skeleton._LINKED_FIELD.search(i) for i in report_skeleton._instructions(
+          b'<w:fldChar w:fldCharType="begin"/><w:instrText> PAGE </w:instrText><w:fldChar w:fldCharType="end"/>')))
+from app import main as app_main  # noqa: E402
+check("a 200 MB final is refused from Content-Length, before the body is read",
+      app_main._refuse_oversized_body(f"/api/companies/{CO}/projects/{PJ}/report/final", str(200 * 1024 * 1024))
+      is not None
+      and app_main._refuse_oversized_body(f"/api/companies/{CO}/projects/{PJ}/report/final", "1000") is None
+      and app_main._refuse_oversized_body("/api/settings/report-skeleton", str(50 * 1024 * 1024)) is not None)
+real_timeline = report.projects.timeline
+
+
+def changing_summary(question, groups, edges):
+    # A decision changes while the model writes: the timeline now has one group fewer.
+    report.projects.timeline = lambda co, pj: {**real_timeline(co, pj),
+                                               "findings": real_timeline(co, pj)["findings"][1:]}
+    return fake_summary(question, groups, edges)
+
+
+try:
+    report.make_draft(CO, PJ, {"email": "analyst@x.test", "name": "A"}, summarise=changing_summary)
+    check("a decision changed while the AI wrote: the draft is refused, not made with wrong F<n>", False)
+except report.NotReady as exc:
+    check("a decision changed while the AI wrote: the draft is refused, not made with wrong F<n>",
+          "changed while the draft" in str(exc))
+finally:
+    report.projects.timeline = real_timeline
+waiting = storage.create_case("late.log", "log", 1, company_id=CO, project=pj)["case_id"]
+gt = report.gate(CO, PJ)
+check("a case of the project still queued closes the gate, named", not gt["open"]
+      and any("not processed" in x and "late.log" in x for x in gt["reasons"]))
 
 print(f"\n{'FAILED: ' + str(failures) if failures else 'all ok'}")
 sys.exit(1 if failures else 0)

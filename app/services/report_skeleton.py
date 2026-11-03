@@ -122,6 +122,34 @@ def sample_context(template) -> dict:
     return ctx
 
 
+_FIELD_TOKEN = re.compile(rb'<w:fldChar\b[^>]*w:fldCharType="(begin|separate|end)"|<w:instrText\b[^>]*>([^<]*)<')
+
+
+def _instructions(body: bytes) -> list[bytes]:
+    """Each complex field's whole instruction. Word splits one instruction over several
+    <w:instrText> runs ("INCLUDE" + "PICTURE ..."), so a run read alone hid the field -
+    code review, 2026-11-03. Text is gathered from a field's begin to its separate (or end),
+    a nested field's into its own instruction."""
+    done: list[bytes] = []
+    stack: list[list[bytes]] = []
+    for kind, text in _FIELD_TOKEN.findall(body):
+        if kind == b"begin":
+            stack.append([])
+        elif kind in (b"separate", b"end"):
+            if stack:
+                parts = stack.pop()
+                if parts:
+                    done.append(b"".join(parts))
+                if kind == b"separate":
+                    stack.append([])      # the result part: nothing more to gather for it
+        elif stack:
+            stack[-1].append(text)
+        else:
+            done.append(text)             # an instruction outside any begin: read as it is
+    done += [b"".join(p) for p in stack if p]
+    return done
+
+
 def check(data: bytes) -> tuple[list[str], set[str]]:
     """(problems, tags used). No problem = the skeleton may be used."""
     problems: list[str] = []
@@ -137,7 +165,7 @@ def check(data: bytes) -> tuple[list[str], set[str]]:
     for n in sorted(names):
         if n.startswith("word/") and n.endswith(".xml"):
             body = z.read(n)
-            for instr in re.findall(rb"<w:instrText[^>]*>([^<]*)<", body) + re.findall(rb'w:instr="([^"]*)"', body):
+            for instr in _instructions(body) + re.findall(rb'w:instr="([^"]*)"', body):
                 m = _LINKED_FIELD.search(instr)
                 if m:
                     problems.append(f"{n} has a {m.group(1).decode()} field - it loads something from "

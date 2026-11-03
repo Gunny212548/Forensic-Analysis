@@ -146,6 +146,13 @@ def gate(company_id: str, project_id: str) -> dict:
     reasons = []
     if not t["cases"]:
         reasons.append("the project holds no processed case")
+    # A case still queued, processing, failed or refused for integrity would be left out of the
+    # draft without a word - the same rule as closing the project (gotcha #75).
+    not_ready = [m for m in projects.cases_of(company_id, project_id) if m.get("status") != "ready"]
+    if not_ready:
+        m = not_ready[0]
+        reasons.append(f"{len(not_ready)} case(s) not processed ({m.get('original_filename')}, "
+                       f"{m.get('status')}) - wait, re-process or delete")
     if t["undecided"]:
         reasons.append(f"{t['undecided']} suggestion(s) not decided")
     # The question is not part of the gate (the user, 2026-11-03): a draft without one says "-".
@@ -157,15 +164,18 @@ def gate(company_id: str, project_id: str) -> dict:
 
 # ---------------------------------------------------------------- the context
 def context(company_id: str, project_id: str, actor: dict, people: dict, version: str,
-            details: str, now: datetime, summary: dict) -> dict:
+            details: str, now: datetime, summary: dict, *, t: dict | None = None,
+            g: dict | None = None) -> dict:
+    """The skeleton's tags. `t` / `g` are the timeline and graph the summary was written from,
+    so its F<n> are section 7's (make_draft passes them; computed here otherwise)."""
     project = storage.load_project(company_id, project_id)
     company = storage.load_company(company_id) or {}
-    t = projects.timeline(company_id, project_id)
-    g = projects.graph(company_id, project_id)
+    t = t or projects.timeline(company_id, project_id)
+    g = g or projects.graph(company_id, project_id)
     groups = t["findings"]
-    cases = [m for m in storage.list_manifests(company_id) if m.get("project_id") == project_id
-             and m.get("status") == "ready"]
-    refs = {f["key"] + "|" + f["case_id"]: f"F{n}" for n, f in enumerate(groups, 1)}
+    # The cases the timeline read (projects._analysed), each one's suggestions read once.
+    cases = projects._analysed(company_id, project_id)
+    views = {m["case_id"]: case_views.findings_view(m["case_id"], m, assign_ids=False) for m in cases}
 
     # Executive Summary + its figures
     # A G reference sums up one rule's many findings (report_summary.FACT_BUDGET): the reader is
@@ -183,7 +193,7 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
     first, last = (min(firsts), max(lasts)) if firsts else (None, None)
     reached = {ta for f in groups for ta in rule_meta.finding_tactics(f.get("rid"), f.get("mitre"))}
     tactics = ", ".join(report_th.tactic(tid, n) for tid, _ta, n in rule_meta.TACTIC_ORDER if tid in reached) or "-"
-    suggestions = sum(len(case_views.findings_view(m["case_id"], m, assign_ids=False)) for m in cases)
+    suggestions = sum(len(v) for v in views.values())
 
     # Evidence
     evidence, all_first, all_last = [], [], []
@@ -252,7 +262,8 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
         rv = f.get("review") or {}
         confirmed.append({"ref": ref, "fd": f.get("fd") or "-", "rule": f"{f['rid']} {_title(f['rid'])}",
                           "level": LEVEL_TH.get(f.get("level"), f.get("level") or "-"), "entity": _entity(f),
-                          "first": (f.get("ts_first") or "-")[11:19], "last": (f.get("ts_last") or "-")[11:19],
+                          # The date too: a group may run over several days (it read 02:04 - 05:10).
+                          "first": (f.get("ts_first") or "-")[:19], "last": (f.get("ts_last") or "-")[:19],
                           "events": f"{f.get('cnt') or 0:,}",
                           "admiralty": (f.get("admiralty") or {}).get("code") or "-",
                           "note": DECISION_TH.get(rv.get("status"), rv.get("status") or "-")
@@ -264,14 +275,14 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
 
     rejected, decisions, rules = [], [], {}
     for m in cases:
-        for f in case_views.findings_view(m["case_id"], m, assign_ids=False):
+        for f in views[m["case_id"]]:
             rv = f.get("review") or {}
             if rv.get("status") == review.REJECTED:
                 rejected.append({"fd": f.get("fd") or "-", "rule": f"{f['rid']} {_title(f['rid'])}",
                                  "entity": _entity(f),
                                  "reason": REASON_TH.get(rv.get("reason_code"), rv.get("reason_code") or "-")
                                  + (f" - {rv.get('note')}" if rv.get("note") else "")})
-        fd_of = {f["key"]: f.get("fd") for f in case_views.findings_view(m["case_id"], m, assign_ids=False)}
+        fd_of = {f["key"]: f.get("fd") for f in views[m["case_id"]]}
         for e in review.log(m["case_id"]):
             if e.get("kind") != "review":
                 continue
@@ -354,7 +365,6 @@ def context(company_id: str, project_id: str, actor: dict, people: dict, version
         "confirmed": confirmed, "rejected": rejected, "limitations": limitations,
         "recommendations": recommendations, "logging_improvements": list(dict.fromkeys(logging)),
         "rules": list(rules.values()), "decisions": decisions,
-        "_refs": refs,
     }
 
 
@@ -386,9 +396,16 @@ def check_svg(data: bytes | None) -> None:
     if not (head.startswith(b"<svg") or head.startswith(b"<?xml")) or b"<svg" not in data[:4000].lower():
         raise BadInput("the attack path drawing is not an SVG")
     low = data.lower()
-    for bad in (b"<script", b"<foreignobject", b"javascript:", b"<!entity", b"<iframe"):
+    for bad in (b"<script", b"<foreignobject", b"javascript:", b"<!entity", b"<iframe", b"<!doctype",
+                b"<?xml-stylesheet"):
         if bad in low:
             raise BadInput(f"the attack path SVG holds {bad.decode()} - refused")
+    # An event handler (<svg onload=...>) or a prefixed element (<s:script>) ran past the list
+    # above - code review, 2026-11-03. The page's own export writes neither.
+    if re.search(rb"<[^>]*\son[a-z]+\s*=", low):
+        raise BadInput("the attack path SVG holds an event handler (on...=) - refused")
+    if re.search(rb"<[a-z0-9_.-]+:(?:script|foreignobject|iframe|handler)\b", low):
+        raise BadInput("the attack path SVG holds a prefixed script element - refused")
     if re.search(rb"""(?:href|src)\s*=\s*["'](?!#|data:)""", low) or b"@import" in low \
             or re.search(rb"""url\(\s*["']?(?!#|data:)""", low):
         raise BadInput("the attack path SVG refers to something outside itself - refused")
@@ -457,10 +474,16 @@ def make_draft(company_id: str, project_id: str, actor: dict, *, details: str = 
     t = projects.timeline(company_id, project_id)
     gr = projects.graph(company_id, project_id)
     summary = (summarise or report_summary.draft)(question_text(project), t["findings"], gr["graph"]["edges"])
+    # The model takes 10-60 s. A decision changed meanwhile would leave the summary citing F<n>
+    # that section 7 numbers differently, or a group no longer confirmed: refuse, make it again.
+    again = gate(company_id, project_id)
+    before = [(f["case_id"], f["key"]) for f in t["findings"]]
+    now_confirmed = [(f["case_id"], f["key"]) for f in projects.timeline(company_id, project_id)["findings"]]
+    if not again["open"] or now_confirmed != before:
+        raise NotReady("a decision or a case changed while the draft was being made - make it again")
     now = datetime.now(TZ)
     version = next_version(company_id, project_id)
-    ctx = context(company_id, project_id, actor, people or {}, version, details, now, summary)
-    ctx.pop("_refs", None)
+    ctx = context(company_id, project_id, actor, people or {}, version, details, now, summary, t=t, g=gr)
     tpl = DocxTemplate(str(report_skeleton.path(skeleton["sha256"])))
     ctx["attack_path_image"] = (InlineImage(tpl, io.BytesIO(png), width=Mm(160)) if png else
                                 "[ไม่ได้แนบภาพเส้นทางการโจมตี - ผู้วิเคราะห์ใส่เองได้จากหน้า Attack path]")

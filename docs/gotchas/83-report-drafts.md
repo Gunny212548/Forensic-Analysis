@@ -59,3 +59,13 @@ The traps:
     with the standard's English term in brackets. SigmaHQ titles stay their authors' ("กฎ SigmaHQ: ...");
     proper names (machines, files, accounts, brands, standards and their section titles) as written.
     `check_report.py` fails when a new in-house rule, tactic, step, area or n/a reason has no Thai.
+12. **Code review of 2026-11-03, all fixed:** the gate now waits for every case of the project to be
+    processed (a queued or failed case was left out of the draft without a word); the report uploads are
+    refused from Content-Length in `main.py` before Starlette spools them (gotcha #25); a decision changed
+    while the model writes refuses the draft (its F<n> would not be section 7's), and `context()` reads the
+    same timeline / graph; the summary check compares a time of day across midnight and across days (a
+    G line's months refused every time but one) and no longer takes IPv4 / Win32 / SHA256 / an FD id for a
+    machine; an SVG with `on...=`, a prefixed `<x:script>` or a DOCTYPE is refused; a skeleton field split
+    over several `<w:instrText>` runs is read whole; section 7 gives the date; a technique only
+    multi-technique SigmaHQ rules tag keeps the tactics they share. The events route caches its totals per
+    case file (`_cached`), since a scroll fetches a page per screenful.

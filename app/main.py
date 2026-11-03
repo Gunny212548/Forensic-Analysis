@@ -1,4 +1,5 @@
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from .routers import rules as rules_router
 from .routers import upload as upload_router
 from .routers import users as users_router
 from . import config
-from .services import auth, authz, jobs, storage
+from .services import auth, authz, jobs, report, report_skeleton, storage
 
 
 def on_startup():
@@ -116,7 +117,31 @@ async def require_login(request: Request, call_next):
             refused = _refuse_oversized_upload(request)
             if refused:
                 return refused
+        if request.method == "POST":
+            refused = _refuse_oversized_body(path, request.headers.get("content-length", ""))
+            if refused:
+                return refused
     return await call_next(request)
+
+
+# The report's uploads (routers/report.py), refused from Content-Length before Starlette spools
+# the body to disk - the handler's own limit comes too late for that (gotcha #25; code review,
+# 2026-11-03: a 10 GB POST to report/final was written to temp disk before its 413).
+_MB = 1024 * 1024
+BODY_LIMITS = [
+    (re.compile(r"^/api/companies/[^/]+/projects/[^/]+/report/final$"), report.FINAL_MAX + _MB),
+    (re.compile(r"^/api/companies/[^/]+/projects/[^/]+/report/draft$"), 2 * report.IMAGE_MAX + _MB),
+    (re.compile(r"^/api/settings/report-skeleton$"), report_skeleton.MAX_BYTES + _MB),
+]
+
+
+def _refuse_oversized_body(path: str, length: str) -> JSONResponse | None:
+    if not length.isdigit():
+        return None   # no declared size: the handler's own limit still applies
+    for pattern, limit in BODY_LIMITS:
+        if pattern.match(path) and int(length) > limit:
+            return JSONResponse({"detail": f"the request is over {limit // _MB} MB"}, status_code=413)
+    return None
 
 
 # Added after require_login, so it wraps it: the headers go on the 401s too.

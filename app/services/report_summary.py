@@ -22,6 +22,7 @@ import asyncio
 import json
 import re
 import time
+from datetime import datetime, timedelta
 
 from .. import config
 from . import llm, rule_meta
@@ -230,6 +231,10 @@ def schema(refs: list[str]) -> dict:
 
 _IP = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _HOST = re.compile(r"\b[a-z][a-z-]*\d+[a-z0-9-]*\b", re.I)    # rds01, ws023, web-02
+# Words that look like a machine name to _HOST but are not one (code review, 2026-11-03: "IPv4",
+# "Win32", "SHA256", "x64", an FD id "FD-2026-0003" were refused as machines no finding holds).
+_NOT_A_MACHINE = re.compile(r"ipv[46]|win(32|64)|sha(1|256|384|512)|md5|x(64|86)|utf-?(8|16)|aes\d+|tls\d*|"
+                            r"rfc\d+|cve-[\d-]+|fd-[\d-]+|kb\d+|ntlmv?\d|smbv?\d|http\d?")
 _TIME = re.compile(r"\b([01]?\d|2[0-3])[:.]([0-5]\d)\b")
 # A dotted Windows / Entra account name (adm.hd) - measured: the model wrote "adm.hu".
 _ACCOUNT = re.compile(r"(?<![\w.])[a-z][a-z0-9_-]*\.[a-z][a-z0-9_-]*(?![\w.])", re.I)
@@ -240,14 +245,30 @@ def _minutes(hhmm: str) -> int:
     return int(h) * 60 + int(m)
 
 
+def _when(ts: str | None) -> datetime | None:
+    try:
+        return datetime.fromisoformat((ts or "").strip()[:19].replace("T", " "))
+    except ValueError:
+        return None
+
+
 def _within(t: str, first: str | None, last: str | None) -> bool:
-    """A time the text names lies in [first, last], a minute either side for rounding
-    (02:57:54 written as 02:58)."""
-    a, b = _hhmm(first), _hhmm(last) or _hhmm(first)
-    if not a:
+    """A time of day the text names (it carries no date) falls in [first, last], a minute
+    either side for rounding (02:57:54 written as 02:58). Across midnight the window wraps;
+    a span of a day or more holds every time of day. Code review, 2026-11-03: comparing
+    HH:MM alone refused 00:01 in 23:58-00:03 and every time but one of a G line's months."""
+    a = _when(first)
+    b = _when(last) or a
+    if a is None:
         return False
-    lo, hi, x = _minutes(a) - 1, _minutes(b) + 1, _minutes(t)
-    return lo <= x <= hi if hi >= lo else x in (lo + 1,)
+    if b < a:
+        a, b = b, a
+    if b - a >= timedelta(days=1) - timedelta(minutes=2):
+        return True
+    lo, hi, x = (a.hour * 60 + a.minute - 1) % 1440, (b.hour * 60 + b.minute + 1) % 1440, _minutes(t)
+    if a.date() == b.date() and lo <= hi:
+        return lo <= x <= hi
+    return x >= lo or x <= hi
 
 
 def ground(paragraph: dict, known: dict) -> list[str]:
@@ -269,8 +290,8 @@ def ground(paragraph: dict, known: dict) -> list[str]:
             continue
         if h in path_hosts:
             continue   # a machine on a confirmed path between two cited findings' ends
-        if re.fullmatch(r"(f|fd|g|t|ta)\d+", h):
-            continue   # a citation or an id, not a machine
+        if re.fullmatch(r"(f|fd|g|t|ta)\d+", h) or _NOT_A_MACHINE.fullmatch(h):
+            continue   # a citation, an id or a technical word, not a machine
         problems.append(f"names the machine {host}, which no cited finding or path holds")
     for acc in _ACCOUNT.findall(text):
         a = acc.lower()

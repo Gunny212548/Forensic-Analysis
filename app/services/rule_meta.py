@@ -1306,6 +1306,7 @@ _TAG_ALIAS = {"stealth": "defense_evasion"}
 _SIGMA_PAIRS: dict[str, set] = {}
 _SIGMA_TACTICS: dict[str, set] = {}
 _SIGMA_RULE_TACTICS: dict[str, list[str]] = {}
+_SIGMA_SHARED: dict[str, set] = {}
 for _rid in rules_sigma.ENTITY:
     _r = sigma.by_rid()[_rid]
     RULE_META[_rid] = {"id": _r["id"], "title": _r["title"], "status": _r["status"],
@@ -1321,7 +1322,16 @@ for _rid in rules_sigma.ENTITY:
         _SIGMA_TACTICS.setdefault(_fam, set()).update(_tac)
         if len(_tac) == 1:
             _SIGMA_PAIRS.setdefault(_fam, set()).update(_tac)
+    elif _tac:
+        for _fam in _families:   # what every multi-technique rule tagging it agrees on
+            _SIGMA_SHARED[_fam] = _SIGMA_SHARED[_fam] & _tac if _fam in _SIGMA_SHARED else set(_tac)
 for _key, _tac in _SIGMA_TACTICS.items():
     _tac = _SIGMA_PAIRS.get(_key) or _tac
+    if _key not in TACTICS and _tac:
+        TACTICS[_key] = sorted(_tac, key=_TACTIC_RANK.get)
+# Last, a technique only multi-technique rules tag (code review, 2026-11-03: it had lost every
+# tactic, so the Navigator layer dropped it and a narrative stage on it read as unsupported):
+# the tactics all those rules share, none if they share none - never their union.
+for _key, _tac in _SIGMA_SHARED.items():
     if _key not in TACTICS and _tac:
         TACTICS[_key] = sorted(_tac, key=_TACTIC_RANK.get)
