@@ -299,6 +299,9 @@ check("the draft's log line names its skeleton and pictures",
       and line.get("attack_path_png_sha256") == hashlib.sha256(PNG).hexdigest()
       and line.get("summary", {}).get("refused") == 1
       and line["summary"].get("recommendations") == 1 and line["summary"].get("recommendations_refused") == 1)
+check("the log line keeps the cover-page names given, so the page offers them again",
+      line.get("people") == {"author_position": "Forensic Analyst", "approver_name": "Manager Person",
+                             "approver_position": "Lead"})
 
 r = analyst.post(f"{BASE}/draft", data={"details": "second"})
 check("a second draft is 0.2 and keeps 0.1", r.status_code == 200 and r.json()["version"] == "0.2"

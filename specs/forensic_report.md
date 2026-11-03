@@ -99,6 +99,14 @@ skeleton missing a required tag, naming it.
   coordinator = chosen from the accounts (manager / admin for the approver) on the draft form,
   or left blank for the analyst to fill in Word; position typed there and remembered per
   account. No new role.
+  As built: typed on the page, folded under "Names on the cover page" and offered again from
+  the last draft's log line (`people`).
+- **The Report section's layout** (the user, 2026-11-03: the form-first layout was hard to use;
+  chose "newest draft first" and "near the top"): on the project page it sits right under the
+  header and Cases, above the attack timeline and path. Inside: the gate only when it blocks;
+  the latest draft with Download and Upload final (the file picker uploads at once); "What
+  changed" and Make draft on one line, the names folded; earlier versions and every final
+  folded in one table.
 - **R-D7 - fact and opinion apart** (ACPO 6.5.4): every factual line cites its FD id / event;
   text the AI drafted is marked "AI draft - reviewed by <analyst>" until edited; the analyst's
   own conclusions are under headings that say they are opinion.

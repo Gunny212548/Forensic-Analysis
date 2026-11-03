@@ -216,11 +216,14 @@ function ProjectView({ customer, project, cases, onChange }) {
         </div>
       </div>
 
+      {/* The report near the top (the user, 2026-11-03): making and downloading it needs no
+          scrolling past the timeline and the path below. */}
+      <ReportPanel project={project} />
+
       {/* The whole investigation (specs/projects.md P4): what every case's confirmed
           events add up to, read-only - decisions are made in each case's Attack events. */}
       <ProjectTimeline project={project} />
       <ProjectPath project={project} />
-      <ReportPanel project={project} />
     </section>
   )
 }

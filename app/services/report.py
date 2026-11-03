@@ -474,6 +474,8 @@ def make_draft(company_id: str, project_id: str, actor: dict, *, details: str = 
             "action": "report_draft", "actor": actor["email"], "actor_name": actor.get("name"),
             "version": version, "file": name, "sha256": sha, "bytes": len(data),
             "skeleton_sha256": skeleton["sha256"], "details": (details or "")[:500],
+            # The cover-page names, so the page offers them again for the next draft.
+            "people": {k: v for k, v in (people or {}).items() if v},
             "confirmed": len(t["findings"]),
             "attack_path_png_sha256": hashlib.sha256(png).hexdigest() if png else None,
             "attack_path_svg_sha256": hashlib.sha256(svg).hexdigest() if svg else None,

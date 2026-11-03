@@ -603,6 +603,29 @@
   .report-form { max-width: 720px; }
   .report-form label { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
   .report-graph-source { position: absolute; left: -100000px; top: 0; pointer-events: none; }
+  /* The Report section, newest draft first (the user's choice, 2026-11-03). */
+  .rp { display: flex; flex-direction: column; gap: 14px; }
+  .rp .rv-gate { margin-bottom: 0; }
+  .rp-latest { border: 1px solid var(--panel-border); border-left: 3px solid var(--ok); border-radius: 4px;
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; background: var(--panel); }
+  .rp-latest-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .rp-kicker { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .rp-version { font-size: 20px; font-weight: 600; color: var(--text); }
+  .rp-details { color: var(--text); }
+  .rp-actions { margin-top: 6px; gap: 10px; }
+  .rp-actions button, .rp-row-actions button { padding: 9px 18px; }
+  .rp-finals { font-size: 13px; }
+  .rp-none { padding: 6px 0; }
+  .rp-make { display: flex; flex-direction: column; gap: 8px; max-width: 900px; }
+  .rp-make-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .rp-make-row .rp-field { flex: 1 1 360px; }
+  .rp-make-row button { align-self: flex-end; }
+  .rp-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-2); }
+  .rp-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; padding-top: 8px; }
+  .rp-fold > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); padding: 4px 0; }
+  .rp-fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .rp-note { max-width: 760px; }
+  .rp-row-actions { display: flex; gap: 10px; align-items: center; white-space: nowrap; }
   .rv-chain-warn { color: var(--warn); }
   .rv-admiralty { font-family: var(--mono); font-size: 11px; padding: 0 5px; border: 1px solid var(--line);
     border-radius: 3px; cursor: help; color: var(--text-2); }
