@@ -10,7 +10,7 @@ import { exportSvg } from './svgExport.js'
  *  The system makes a draft - a Word file the analyst finishes in Word - only once every
  *  suggestion of the project is decided and the question is written (R-D2). Each draft is
  *  a new version with its SHA-256; the analyst's final may be uploaded back (R-D4). */
-export default function ReportPanel({ project }) {
+export default function ReportPanel({ project, fromCase = false }) {
   const { can, why } = useAccess()
   const co = project.company_id
   const pj = project.project_id
@@ -92,9 +92,11 @@ export default function ReportPanel({ project }) {
   const finals = data?.finals || []
   const edges = graph?.graph?.edges || []
   return (
-    <Section icon="report" tone={drafts.length ? 'ok' : 'muted'} title="Report"
-             sub={!data ? '' : `${drafts.length} ${drafts.length === 1 ? 'draft' : 'drafts'}`
-               + ` · ${finals.length} ${finals.length === 1 ? 'final' : 'finals'} uploaded`}>
+    <Section icon="report" tone={drafts.length ? 'ok' : 'muted'}
+             title={fromCase ? `Report of ${project.name || 'the project'}` : 'Report'}
+             sub={(fromCase ? 'One report per project, from every case in it · ' : '')
+               + (!data ? '' : `${drafts.length} ${drafts.length === 1 ? 'draft' : 'drafts'}`
+               + ` · ${finals.length} ${finals.length === 1 ? 'final' : 'finals'} uploaded`)}>
       <div className="cp-section-body">
         {error && <div className="lc-error">{error}</div>}
         {done && <div className="status-line">{done}</div>}

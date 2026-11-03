@@ -202,6 +202,5 @@ def _report(findings: list[dict], unreviewed: list[dict], step: dict, manifest: 
         from . import report
         made = report.drafts(manifest["company_id"], manifest["project_id"])
         step.update(state=ACTIVE, reason=(
-            f"Gate open - report draft {made[-1]['version']} made on the project's page"
-            if made else "Gate open - the report draft is made on the project's page, "
-                         "once every case of the project is decided"))
+            f"Report draft {made[-1]['version']} made - the next is made here"
+            if made else "Make the report draft here, once every case of the project is decided"))

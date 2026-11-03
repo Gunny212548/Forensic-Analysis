@@ -16,6 +16,7 @@ import Reprocess, { Method } from '../components/Reprocess.jsx'
 import { Detection, Lines, Periods, Sigma } from '../components/Period.jsx'
 import Veris from '../components/Veris.jsx'
 import DeleteCase from '../components/DeleteCase.jsx'
+import ReportPanel from '../components/ReportPanel.jsx'
 import {
   AnalysisMeta,
   AnalysisProgress,
@@ -551,11 +552,15 @@ function StepBody({ step, caseId, manifest, ready, ai, reload }) {
     case 'attack-path':
       return <GraphAndRisk caseId={caseId} />
     case 'report':
+      // The step issues the report (the user, 2026-11-03): the draft first; the exports
+      // and the AI narrative of this case fold underneath.
       return (
         <>
           <ReportStep caseId={caseId} manifest={manifest} />
-          <div className="section-label">Narrative drafted by the AI</div>
-          <AnalyseStep ai={ai} cite={cite} />
+          <Section icon="findings" title="AI narrative of this case" defaultOpen={false}
+                   sub="Shown on this page only - its recommendations start the draft's section 9">
+            <AnalyseStep ai={ai} cite={cite} />
+          </Section>
         </>
       )
     default:
@@ -700,61 +705,41 @@ function AnalyseStep({ ai, cite }) {
   )
 }
 
+/** The Report step issues the report (the user, 2026-11-03). One report per investigation
+ *  (specs/forensic_report.md R-D1), so the draft made here is the project's, from every case
+ *  in it - the same one the project page shows. Its gate (every suggestion of every case
+ *  decided, the question written) is ReportPanel's; the case's exports fold below it. */
 function ReportStep({ caseId, manifest }) {
-  const [data, setData] = useState(null)
-  useEffect(() => {
-    let alive = true
-    getFindings(caseId)
-      .then((d) => alive && setData(d))
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [caseId])
-  const s = data?.review_summary || {}
-  const unreviewed = s.Unreviewed || 0
   return (
     <>
-      {data && (
-        <div className={`rv-gate ${data.ready_for_report ? 'ok' : 'blocked'}`}>
-          {data.ready_for_report ? (
-            'Every suggestion is decided - the report gate is open.'
-          ) : (
-            <>
-              {unreviewed} suggestion{unreviewed === 1 ? '' : 's'} not decided - a final report waits for them.{' '}
-              <a href={stepHref(caseId, 'attack-events')}>Go to Attack events</a>
-            </>
-          )}
-        </div>
-      )}
-      <Veris caseId={caseId} />
-      {manifest.flagged_count > 0 && (
-        <div className="meta-line">
-          {/* Same-origin link, so the session cookie goes with it. */}
-          <a href={`/api/cases/${encodeURIComponent(caseId)}/attack-layer`} download>
-            Download ATT&amp;CK Navigator layer
-          </a>{' '}
-          - this case&apos;s techniques, scored by severity, for the MITRE ATT&amp;CK Navigator
-          <br />
-          <a href={`/api/cases/${encodeURIComponent(caseId)}/stix`} download>
-            Download STIX 2.1 bundle
-          </a>{' '}
-          - findings as sightings of ATT&amp;CK techniques, for a threat-intel platform or SIEM
-        </div>
-      )}
-      {/* The written report is one per investigation (specs/forensic_report.md R-D1). */}
       {manifest.project_id ? (
-        <div className="meta-line">
-          The written report is made per project, from every case in it:{' '}
-          <a href={`#/customers/${encodeURIComponent(manifest.company_id)}/projects/${encodeURIComponent(manifest.project_id)}`}>
-            open {manifest.project_name || 'the project'} - Report
-          </a>
-        </div>
+        <ReportPanel
+          project={{ company_id: manifest.company_id, project_id: manifest.project_id, name: manifest.project_name }}
+          fromCase
+        />
       ) : (
         <Empty style={{ paddingTop: 14 }}>
-          The written report is made per project - move this case into one (Customers) to make it.
+          A report is made for a project, from every case in it - move this case into one (Customers) first.
         </Empty>
       )}
+      <Section icon="threat-intel" title="Exports of this case" defaultOpen={false}
+               sub="VERIS classification, ATT&CK Navigator layer, STIX 2.1 bundle">
+        <Veris caseId={caseId} />
+        {manifest.flagged_count > 0 && (
+          <div className="meta-line">
+            {/* Same-origin link, so the session cookie goes with it. */}
+            <a href={`/api/cases/${encodeURIComponent(caseId)}/attack-layer`} download>
+              Download ATT&amp;CK Navigator layer
+            </a>{' '}
+            - this case&apos;s techniques, scored by severity, for the MITRE ATT&amp;CK Navigator
+            <br />
+            <a href={`/api/cases/${encodeURIComponent(caseId)}/stix`} download>
+              Download STIX 2.1 bundle
+            </a>{' '}
+            - findings as sightings of ATT&amp;CK techniques, for a threat-intel platform or SIEM
+          </div>
+        )}
+      </Section>
     </>
   )
 }
