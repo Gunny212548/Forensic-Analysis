@@ -63,7 +63,7 @@ export default function Users() {
         <div className="top-bar">
           <div>
             <h1>Settings</h1>
-            <div className="subtitle">Accounts and roles</div>
+            <div className="subtitle">Accounts, roles and the report skeleton</div>
           </div>
         </div>
         <div className="panel empty">
@@ -84,9 +84,11 @@ export default function Users() {
     <section className="page ov">
       <div className="top-bar">
         <div>
-          <h1>Users</h1>
+          {/* The menu says Settings, and the page holds the report skeleton too (UX audit, 2026-11-04). */}
+          <h1>Settings</h1>
           <div className="subtitle">
-            {data.users.length} {data.users.length === 1 ? 'account' : 'accounts'} - who may use this tool, and as what
+            {data.users.length} {data.users.length === 1 ? 'account' : 'accounts'} and their roles · the report
+            skeleton
           </div>
         </div>
       </div>

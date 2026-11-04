@@ -199,7 +199,7 @@ export default function Upload({ user }) {
       })
       setUploadPct(1)
       setActiveCase(data.case_id)
-      setStatus({ msg: `Uploaded - case ${data.case_id} (${data.file_kind})`, cls: 'ok' })
+      setStatus({ msg: `Uploaded - ${data.case_id} (${data.file_kind})`, cls: 'ok' })
       setFile(null)
       setNote('')
       setNewCompany('')
@@ -313,6 +313,18 @@ export default function Upload({ user }) {
           )}
         </div>
 
+        {/* Above the file: the note is sent with the upload, so one typed after it was lost
+            without a word (UX audit, 2026-11-04). */}
+        <div>
+          <label htmlFor="note">Note (optional)</label>
+          <textarea
+            id="note"
+            placeholder="e.g. where the log came from, related tickets"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+
         <div className="panel dropzone-panel">
           <div
             className={`dropzone${dragging ? ' drag' : ''}`}
@@ -381,16 +393,6 @@ export default function Upload({ user }) {
               />
             </div>
           )}
-        </div>
-
-        <div>
-          <label htmlFor="note">Note (optional)</label>
-          <textarea
-            id="note"
-            placeholder="e.g. where the log came from, related tickets"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
         </div>
       </form>
 
