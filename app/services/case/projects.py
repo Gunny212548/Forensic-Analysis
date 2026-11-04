@@ -141,6 +141,19 @@ def _open_project(company_id: str, project_id: str, what: str) -> dict:
     return project
 
 
+def closed_reason(manifest: dict) -> str | None:
+    """Why a decision on this case may not change now: its project is Closed (gotcha #75 -
+    a project closes only once every suggestion is decided, so a change after it would leave
+    a Closed project with a suggestion not decided). None when the case may be decided."""
+    co, pj = manifest.get("company_id"), manifest.get("project_id")
+    if not (co and pj):
+        return None
+    project = storage.load_project(co, pj)
+    if project is None or storage.project_status(project) != storage.PROJECT_CLOSED:
+        return None
+    return f"project \"{project['name']}\" is closed - reopen it to change a decision"
+
+
 def rename(company_id: str, project_id: str, name: str, actor: str) -> dict:
     """A new name for the project, on it and on every case of it. Refused when another
     project of the customer already has that name (names are how upload finds one)."""

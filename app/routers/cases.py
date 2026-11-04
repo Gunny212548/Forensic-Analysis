@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from .. import config
 from ..services.access import auth, authz
 from ..services.ai import analysis, analysis_jobs, triage
-from ..services.case import case_delete, case_flow, case_views, investigation
+from ..services.case import case_delete, case_flow, case_views, investigation, projects
 from ..services.detection import profiles
 from ..services.findings import lifecycle, review
 from ..services.ingest import merge, provenance
@@ -447,6 +447,9 @@ async def get_case_findings(case_id: str):
         "findings": findings,
         "count": len(findings),
         "review_summary": counts,
+        # Set when the case's project is Closed: decisions are refused (409), so the page
+        # disables its buttons and says why.
+        "decisions_locked": projects.closed_reason(manifest),
         # The AI review's own state (docs/specs/ai_review_coverage.md): queued / running / done /
         # failed / off, with how many suggestions it has advised on.
         "ai_review": manifest.get("ai_review"),
@@ -545,18 +548,24 @@ async def record_review(case_id: str, request: Request, body: dict = Body(...)):
     if key not in {f["key"] for f in db.collapsed_findings(case_id)}:
         raise HTTPException(404, f"No finding '{key}' in this case")
 
-    try:
-        entry = review.record_review(
-            case_id,
-            finding_key=key,
-            action=(body.get("action") or "").strip(),
-            actor=request.state.user["email"],
-            reason_code=(body.get("reason_code") or "").strip(),
-            note=body.get("note") or "",
-            ai=triage.explanation_of(case_id, key),
-        )
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
+    # Under the project lock, the one closing takes: a decision cannot slip in between the close's
+    # "every suggestion decided" check and the project turning Closed, nor change one after it.
+    with storage.PROJECT_LOCK:
+        closed = projects.closed_reason(manifest)
+        if closed:
+            raise HTTPException(409, closed)
+        try:
+            entry = review.record_review(
+                case_id,
+                finding_key=key,
+                action=(body.get("action") or "").strip(),
+                actor=request.state.user["email"],
+                reason_code=(body.get("reason_code") or "").strip(),
+                note=body.get("note") or "",
+                ai=triage.explanation_of(case_id, key),
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
     return entry
 
 

@@ -125,12 +125,23 @@ check(f"and by name (409, {r.status_code})", r.status_code == 409)
 check("no case was made", len(projects.cases_of(CO, PJ)) == 2)
 r = manager.post("/api/cases/merge", json={"case_ids": [c1, busy]})
 check(f"nor merged into it (409, {r.status_code})", r.status_code == 409 and "closed" in r.json()["detail"])
+# UX audit 2026-11-04: an Undo on a Closed project was taken (200) and left it Closed with a
+# suggestion not decided.
+k1 = db.collapsed_findings(c1)[0]["key"]
+r = manager.post(f"/api/cases/{c1}/review", json={"finding_key": k1, "action": "unreview"})
+check(f"nor a decision changed in it (409, {r.status_code})", r.status_code == 409 and "closed" in r.json()["detail"])
+check("so every suggestion stays decided",
+      all(f["review"]["status"] != "Unreviewed" for f in manager.get(f"/api/cases/{c1}/findings").json()["findings"]))
+check("and the findings say why their buttons are off",
+      "closed" in (manager.get(f"/api/cases/{c1}/findings").json().get("decisions_locked") or ""))
 
 print("P1: reopening")
 check("an analyst may not reopen (403)", analyst.post(f"/api/companies/{CO}/projects/{PJ}/reopen").status_code == 403)
 r = manager.post(f"/api/companies/{CO}/projects/{PJ}/reopen")
 check("a manager reopens it", r.status_code == 200 and r.json()["status"] == "open" and "closed_at" not in r.json())
 check("and it takes evidence again", upload(manager, company_id=CO, project_id=PJ).status_code == 200)
+check("and decisions again", manager.post(f"/api/cases/{c1}/review", json={"finding_key": k1, "action": "accept"}).status_code == 200
+      and manager.get(f"/api/cases/{c1}/findings").json().get("decisions_locked") is None)
 log = storage.project_log_path(CO, PJ)
 check("every change is in the project's hash-chained log",
       [e["action"] for e in projects.history(CO, PJ)] == ["closed", "reopened"]

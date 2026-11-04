@@ -385,24 +385,24 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
             </div>
           </form>
         ) : (
-          <div className="rv-actions" title={why('finding:review')}>
+          <div className="rv-actions" title={why('finding:review') || data.decisions_locked || undefined}>
             <button
               className="rv-btn rv-accept"
-              disabled={busy || !mayReview}
+              disabled={busy || !mayReview || !!data.decisions_locked}
               onClick={() => submit(f.key, 'accept')}
             >
               Accept
             </button>
             <button
               className="rv-btn rv-modify"
-              disabled={busy || !mayReview}
+              disabled={busy || !mayReview || !!data.decisions_locked}
               onClick={() => submit(f.key, 'modify')}
             >
               Modified
             </button>
             <button
               className="rv-btn rv-reject"
-              disabled={busy || !mayReview}
+              disabled={busy || !mayReview || !!data.decisions_locked}
               onClick={() => setRejecting(f.key)}
             >
               Reject
@@ -410,13 +410,15 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
             {st !== 'Unreviewed' && (
               <button
                 className="rv-btn rv-undo"
-                disabled={busy || !mayReview}
+                disabled={busy || !mayReview || !!data.decisions_locked}
                 onClick={() => submit(f.key, 'unreview')}
               >
                 Undo
               </button>
             )}
             {!mayReview && <span className="cell-sub">{why('finding:review')}</span>}
+            {/* The project is Closed: the server refuses a change (409), so say it before a click. */}
+            {mayReview && data.decisions_locked && <span className="cell-sub">{data.decisions_locked}</span>}
           </div>
         )}
       </div>
