@@ -884,7 +884,12 @@
 
 /* Deleting a case (DeleteCase.jsx): the confirmation sits in the header. */
 button.danger { background: var(--danger); border-color: var(--danger); color: var(--on-solid); }
-button.danger-outline { color: var(--danger); border-color: var(--danger-border); white-space: nowrap; }
+/* The button that opens a delete (case, customer, project) reads as an ordinary secondary button
+   and turns red only under the pointer: in red it outshone the page's real actions (UX audit,
+   2026-11-04). The red is kept for the confirming button, button.danger. */
+button.danger-outline { white-space: nowrap; }
+button.danger-outline:hover:not(:disabled),
+button.danger-outline:focus-visible { color: var(--danger); border-color: var(--danger-border); }
 .delete-case { max-width: 420px; padding: 12px 14px; border: 1px solid var(--danger-border);
   background: var(--danger-tint); border-radius: 8px; font-size: 13px; display: grid; gap: 8px; }
 /* Labels are upper-cased elsewhere; the case id must be typed as it is shown. */
