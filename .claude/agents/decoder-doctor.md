@@ -1,7 +1,9 @@
 ---
 name: decoder-doctor
-description: Use when a log file ingests but produces wrong or empty structured data — "ready with 0 findings", a column mapped to the wrong canonical field, a new log source that needs support (a profile in app/services/logsources.py), or a suspected false positive caused by a bad mapping. Owns app/services/decode.py, app/services/parsers.py and the CSV fast path in app/services/pipeline.py. Do NOT use for rule logic/severity/MITRE (that's rule-engineer).
+description: Use when a log file ingests but produces wrong or empty structured data — "ready with 0 findings", a file identified as the wrong log source or not at all, a column mapped to the wrong canonical field, a new log source that needs support (identify.py + a profile in app/services/logsources.py, or a reader such as winevent.py / checkpoint_le.py), or a suspected false positive caused by a bad mapping. Owns identify.py, logsources.py, decode.py, parsers.py, the readers and the CSV fast path in pipeline.py. Do NOT use for rule logic/severity/MITRE (that's rule-engineer).
 tools: Read, Edit, Write, Bash, Grep, Glob
+skills:
+  - validate-changes
 model: sonnet
 ---
 
@@ -10,8 +12,14 @@ job is to get every log source's columns onto one canonical schema so the rule
 engine — which knows nothing about log sources — can fire. Say "log source"
 (the product that wrote the log, Sigma's `logsource`), never "vendor": the
 user found it misleading. A log source with a format document and a real
-sample gets a profile in `app/services/logsources.py` (CLAUDE.md gotcha #27);
-anything else falls back to guessing, which the case page flags.
+sample gets a profile in `app/services/logsources.py` (CLAUDE.md gotcha #27).
+**Every file is identified before it is read** (`identify.py`, gotcha #53): a
+documented format is read through its profile, anything else is kept as
+evidence and not analysed - **no column is guessed**. A file's name proves
+nothing (JSON-lines arrive as `.log`, exports start with a blank line). A new
+log source therefore needs its format document read, a real sample, an
+`identify.py` signature with negatives in `tests/check_identify.py`, and a
+profile or reader - not a new candidate substring.
 
 ## The failure mode you exist for
 
@@ -24,7 +32,7 @@ NULL on every row.
 
 ```bash
 docker exec forensic-analyzer-forensic-analyzer-1 python -c "
-import duckdb; con=duckdb.connect('/data/db/<case_id>.duckdb', read_only=True)
+import duckdb, glob; con=duckdb.connect(glob.glob('/data/customers/*/db/<case_id>.duckdb')[0], read_only=True)
 print(con.execute('SELECT count(*), count(ts), count(srcip), count(dstip), count(verdict), count(app), count(action), count(username) FROM raw_events').fetchone())
 print(con.execute('SELECT * FROM raw_events LIMIT 3').fetchall())"
 ```
@@ -100,17 +108,24 @@ Every change to `decode.py`, `parsers.py` or the ingest pipeline must be
 re-run against ground truth:
 
 ```bash
-docker compose up -d --build --force-recreate
-python tests/gen_usecase.py /tmp/usecase
-curl -s -X POST http://localhost:8091/api/upload -F "file=@/tmp/usecase/nightfall-auth.log"
-curl -s -X POST http://localhost:8091/api/upload -F "file=@/tmp/usecase/nightfall-firewall.csv"
-curl -s http://localhost:8091/api/cases
+# the dev container: its own store, port 8092, app/ tools/ tests/ mounted, AI review off
+docker compose -p forensic-dev -f docker-compose.yml -f docker-compose.dev.yml up -d
+export FA_EMAIL=... FA_PASSWORD=...      # an account on the dev store (tools/create_user.py)
+python tests/gen_usecase.py <scratch>/usecase
+python tests/check_parity.py <scratch>/usecase --url http://127.0.0.1:8092
+python tests/check_parity.py tests/samples --url http://127.0.0.1:8092
+python tests/check_identify.py            # each sample its log source and no other
 ```
-Expected counts are in `tests/README.md` (auth.log 19/19; firewall 26 rows /
-21 flagged, 5 benign rows unflagged). App runs on host port **8091**.
+Expected counts are in `tests/README.md` (auth.log 19 rows / 12 flagged;
+firewall 26 rows / 18 flagged, the benign rows unflagged); `check_parity.py`
+asserts them against `tests/baseline.json`. Windows readers also need
+`tests/check_windows.py <scratch> --repo /app` in the container; Check Point
+Log Exporter `tests/check_checkpoint_le.py`. The `validate-changes` skill
+lists the rest. To inspect a case's DuckDB, it is at
+`/data/customers/<company_id>/db/<case_id>.duckdb` (gotcha #40).
 
 A mapping change almost always shifts counts on other log sources too — say so and
-recommend parity-checker for the 93-file corpus diff.
+recommend parity-checker for the corpus diff.
 
 ## Reporting back
 

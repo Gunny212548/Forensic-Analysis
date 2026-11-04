@@ -11,29 +11,37 @@ re-reading everything you read.
 
 ## The codebase
 
-A standalone forensic log analyzer, no Wazuh dependency. FastAPI + DuckDB,
-~3k lines of Python. Read `CLAUDE.md` before anything else — it contains 20
-numbered "known gotchas", each one a real debugging session someone already
-paid for. **Citing the relevant gotcha number is part of a good report.**
+A standalone forensic log analyzer, no Wazuh dependency. FastAPI + DuckDB +
+a Vite/React UI. Read `CLAUDE.md` before anything else — its gotcha index
+(83+ numbered rules, the evidence in `docs/gotchas/NN-*.md`) is a list of real
+debugging sessions someone already paid for. **Citing the relevant gotcha
+number is part of a good report.** The detail behind CLAUDE.md's rules is in
+the project skills (`.claude/skills/`: case-api, frontend-ui,
+add-detection-rule, validate-changes, local-llm, sentry-ir-console).
 
 ```
-app/main.py              app wiring
+app/main.py              app wiring, the session middleware (PUBLIC_API)
 app/config.py            env / .env settings
-app/routers/             upload.py · cases.py · companies.py
+app/routers/             auth · upload · cases · companies · findings ·
+                         overview · report · rules · users
 app/services/
-  pipeline.py    process_case: CSV fast path (DuckDB reads+decodes itself)
-                 vs Python path (parsers -> decode -> staging CSV -> bulk load)
-  decode.py      log source columns -> one canonical schema
+  pipeline.py    process_case: identify -> CSV fast path (DuckDB reads +
+                 decodes itself) or Python path (parsers/readers -> decode ->
+                 staging CSV -> bulk load) -> products -> rules -> sigma marks
+  identify.py    every file identified before it is read (gotcha #53)
   logsources.py  documented column mappings per log source (gotcha #27)
-  parsers.py     iter_rows generator for .log / JSON
-  rules.py       RULES: list of (rule_id, SQL) + RULE_LABELS
-  db.py          schema, build_graph, source_profiles, risk_scores, _confidence
-  analysis.py    Groq prompt, salvage, normalize
+  decode.py      log source columns -> one canonical schema
+  parsers.py     iter_rows generator for .log / JSON; winevent.py, checkpoint_le.py readers
+  rules.py       generic RULES + appends rules_<product>.py; rules_sigma.py, sigma.py
+  lines.py       a rule's line from the case's own evidence or TRW (gotcha #62)
+  db.py          schema, build_graph, risk_scores, node_facts
+  triage.py      the AI's explanation of every suggestion (gotchas #64, #71, #72)
+  analysis.py    the narrative (Ollama), schema, grounding; report.py the drafts
   intel.py       offline IOC feeds -> per-case ioc table
   review.py      append-only analyst decisions (JSONL, outside the case DB)
-  storage.py     manifests, raw files, paths under DATA_DIR
-static/index.html        vanilla JS/CSS single page, no build step, no external JS
-tests/gen_usecase.py     synthetic incident with known-in-advance rule hits
+  storage.py     one store per customer under DATA_DIR (gotcha #40)
+frontend/src/            the UI source; static/ is its generated build
+tests/check_*.py         one check per layer (validate-changes skill)
 ```
 
 ## How to investigate here
@@ -53,16 +61,16 @@ tests/gen_usecase.py     synthetic incident with known-in-advance rule hits
   asserting from the source:
   ```bash
   docker exec forensic-analyzer-forensic-analyzer-1 python -c "
-  import duckdb; con=duckdb.connect('/data/db/<case_id>.duckdb', read_only=True)
+  import duckdb, glob; con=duckdb.connect(glob.glob('/data/customers/*/db/<case_id>.duckdb')[0], read_only=True)
   print(con.execute('SELECT count(*), count(ts), count(srcip), count(dstip), count(verdict), count(app), count(action), count(username) FROM raw_events').fetchone())
   print(con.execute('SELECT rid, count(*) FROM findings GROUP BY rid ORDER BY rid').fetchall())"
   ```
   Always `read_only=True`. On Windows/git-bash prefix `docker exec` with
   `MSYS_NO_PATHCONV=1`. App is on host port 8091.
 - **Read-only Bash only**: `cat`, `sed -n`, `grep`, `find`, `docker logs`,
-  `curl` on GET endpoints, read-only DuckDB. No writes, no `POST /analyze`
-  (it burns the one-analysis-per-minute Groq budget — see gotcha #5), no
-  `docker compose up`.
+  `curl` on GET endpoints, read-only DuckDB. No writes, no `POST /analyze`,
+  `/ai-review` or report draft (each runs the local model for minutes and
+  writes to the store), no `docker compose up`.
 
 ## Traps that make a naive reading wrong
 
@@ -93,8 +101,9 @@ tests/gen_usecase.py     synthetic incident with known-in-advance rule hits
    one.
 3. **Blast radius** — every call site and every mirrored location a change
    would have to touch (name both ingest paths where relevant, plus
-   `RULE_LABELS`, the SQL in `_ingest_csv_sql`, `static/index.html` if the API
-   shape moves).
+   `RULE_LABELS`, the SQL in `_ingest_csv_sql`, `frontend/src/api.js` and the
+   pages that read a field if the API shape moves, the MCP tools in
+   `app/mcp_server.py` that share a view).
 4. **Relevant gotchas** — by number, with why each applies.
 5. **Risks / unknowns** — what you could not verify and what you would need
    to. Say "I did not check X" plainly rather than implying coverage.

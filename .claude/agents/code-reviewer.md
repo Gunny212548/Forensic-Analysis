@@ -84,12 +84,13 @@ unconfirmed.
 
 ## Verify before asserting
 
-Read-only checks only. Never `POST /analyze` (it burns the one-per-minute Groq
-budget) and never `docker compose up` or edit files.
+Read-only checks only. Never `POST /analyze`, `/ai-review` or a report draft
+(each runs the local model for minutes and writes to the store), and never
+`docker compose up` or edit files.
 
 ```bash
 docker exec forensic-analyzer-forensic-analyzer-1 python -c "
-import duckdb; con=duckdb.connect('/data/db/<case_id>.duckdb', read_only=True)
+import duckdb, glob; con=duckdb.connect(glob.glob('/data/customers/*/db/<case_id>.duckdb')[0], read_only=True)
 print(con.execute('SELECT count(*), count(ts), count(srcip), count(dstip), count(verdict), count(app), count(action), count(username) FROM raw_events').fetchone())
 print(con.execute('SELECT rid, count(*) FROM findings GROUP BY rid ORDER BY rid').fetchall())"
 ```

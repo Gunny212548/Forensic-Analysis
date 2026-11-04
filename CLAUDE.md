@@ -55,6 +55,56 @@ That hit a hard limit: Wazuh has no decoder for arbitrary CSV exports, and
 even for formats it does support, real-world testing found it silently
 *missed* genuine attack events this project's own rule engine caught.
 
+
+## Where things live
+
+```
+app/              FastAPI app - main.py (session middleware, static mount), config.py,
+                  routers/ (one per area: auth, upload, cases, companies, findings,
+                  overview, report, rules, users), services/ (pipeline, identify,
+                  logsources, decode, parsers, winevent, rules + rules_<product>,
+                  sigma, lines, db, triage, analysis, report, storage, jobs, ...),
+                  data/windows (Windows message templates), mcp_server.py
+frontend/         Vite + React source; `npm run build` writes static/ (generated)
+tests/            check_*.py - one per layer; gen_*.py - seeded synthetic data with
+                  ground truth; bench_*.py - the local model; baseline.json - parity;
+                  samples/ - small real captures with their licences
+tools/            operator scripts: create_user, refresh_intel, prune_cases,
+                  backfill_custody, migrate_to_customers, sigma_build (image build),
+                  build_measurement_doc, export_win_templates.ps1
+docs/             gotchas/NN-*.md (one per gotcha), adr/, standards/ (SOURCES.md
+                  and the documents read), STANDARDS.md (pipeline step -> standard)
+specs/            one design per story, with its numbered decisions (Q.., D..);
+                  spike-sigma/ holds the SigmaHQ spike's scripts (ADR-006)
+figma-export/     the SENTRY-IR screens (SVG, text outlined)
+.claude/agents/   subagents - each names the skills it preloads
+.claude/skills/   project skills: the detail this file points to (below)
+```
+
+Not in git, on this PC only: `.env`, `static/`, `logtest/` (the Lotus Freight Check Point
+quarter, `tests/gen_checkpoint_quarter.py logtest` rebuilds it byte for byte), the FR and
+backlog PDFs, `.archify/`. Test corpora live outside the repo: `D:/forensic system/Logtest`,
+`D:/logtest`, `D:/mockup-logs`. **Paths are not moved to tidy up**: 83 gotchas, the specs,
+the tests and commit messages cite them.
+
+**Project skills** (`.claude/skills/<name>/SKILL.md`, loaded when the task needs them). The
+rules stay in this file; the measurements, tables and how-tos are in the skills:
+
+| skill | load before |
+|---|---|
+| `case-api` | adding or changing a route, a manifest key, login / roles / Google sign-in |
+| `frontend-ui` | any change under `frontend/` - the Overview's levels, look, tokens, attack graph |
+| `add-detection-rule` | writing or changing a rule (product, generic or a SigmaHQ pin) |
+| `validate-changes` | running tests, saying nothing regressed, updating the baseline, quoting a corpus figure |
+| `local-llm` | the Ollama model, its settings, cost on this PC, the benchmark |
+| `sentry-ir-console` | a Jira story, the Figma, a product decision's detail |
+
+**Subagents** (`.claude/agents/`, only when the user asks for one): code-analyst
+(read-only investigation), code-writer, code-reviewer, decoder-doctor (log sources,
+mapping, "0 findings"), rule-engineer, parity-checker, prompt-tuner (the prompts
+`analysis.py` / `triage.py` / the report summary send), frontend-dev, doc-keeper (keeps
+this file, the gotchas and the skills true).
+
 ## Architecture
 
 ```
@@ -109,149 +159,11 @@ data/customers/{company_id}/db/{case_id}.duckdb   (gotcha #40)
   findings    rule matches, joined back via row_id; lvl = Sigma level
               weight (gotcha #26)
   escalations findings an attack-path pattern raised, and which pattern
-
-POST /api/auth/login | logout, GET /me        session cookie (see *Login*);
-GET  /api/auth/google/start | callback       Sign in with Google (gotcha #82), open
-                                             without a session, answer with redirects;
-GET  /api/auth/config                        login + config + health are the
-                                             only routes open without a session
-GET  /api/upload/check?size=                 FR-2.2 pre-flight: 413/507 before
-                                             a byte is sent (gotcha #25)
-GET/POST /api/companies                      customers (FR-2.1 requires one)
-GET  /api/companies/summary                  Customers page: open/closed cases,
-                                             highest open severity, last
-                                             activity (overview.customers())
-GET  /api/companies/{id}/projects            the customer's projects with status and
-                                             what each holds, Open first (projects.py)
-POST .../projects/{pj}/close | reopen        manager / admin; close only when every
-                                             case is processed and every suggestion
-                                             decided (gotcha #75)
-PUT  .../projects/{pj}                       rename (on the project and every case)
-POST .../projects/{pj}/cases {case_id}       move a case into this project
-GET  .../projects/{pj}/deletion, DELETE ...  delete the project with its cases
-GET  .../projects/{pj}/timeline | graph      the investigation across its cases:
-                                             confirmed groups in time order; the
-                                             cases' graphs and risk joined (P4);
-                                             both empty, with `undecided`, while any
-                                             suggestion of its cases is not decided
-GET  .../projects/{pj}/report                the report gate, drafts and finals with
-                                             their SHA-256 (specs/forensic_report.md)
-POST .../projects/{pj}/report/draft          a Word draft (case:analyze): only when every
-                                             suggestion is decided (the question is not
-                                             required); the AI's Thai summary, the attack
-                                             path PNG + SVG the page sends (gotcha #83)
-POST .../projects/{pj}/report/final          the analyst's final back (.docx / .pdf),
-                                             never required, also on a Closed project
-GET  .../projects/{pj}/report/files/{name}   download a draft or a final
-GET/POST /api/settings/report-skeleton[/{sha}] admin: the Word skeleton drafts are filled
-                                             into; refused if it links outside the file
-GET  /api/cases/{id}/events?limit=&offset=   paginated SQL
-GET  /api/cases/{id}/findings                collapsed findings + computed
-                                             confidence + review status + FD id +
-                                             related findings (gotcha #49) + the
-                                             AI's advice + ATT&CK tactics + detection
-                                             area (the area list in its order too)
-DELETE /api/cases/{id}                       admin / manager: every file of the
-                                             case, recorded in the customer's
-                                             deleted/log.jsonl (specs/case_delete.md)
-GET  /api/companies/{id}/deletion            admin / manager: what deleting the
-DELETE /api/companies/{id}                   customer removes, then the customer with
-                                             every case, recorded in the shared
-                                             deleted/customers.jsonl (gotcha #74)
-GET  /api/cases/{id}/findings/events?key=    the events behind one finding, each
-                                             with its source file (gotcha #49)
-GET  /api/findings[?company_id=[&project_id=]] the Findings page: workflow findings
-                                             across cases, counts, open_count;
-                                             decision= / undecided_count (the badge,
-                                             #73); status=open = not Resolved (#51)
-POST /api/cases/{id}/review                  one analyst decision (appended)
-GET  /api/cases/{id}/review-log              full decision history
-GET  /api/cases/{id}/custody                 evidence digest + chain of custody,
-                                             hash chain checked on read
-POST /api/cases/{id}/verify                  re-hash the raw file now, log it
-GET  /api/cases/{id}/ingest                  question, provenance, method, warnings
-PUT  /api/cases/{id}/question | provenance   the investigation's question; one
-                                             item's provenance (gotcha #58)
-POST /api/cases/{id}/reprocess               run the pipeline again from raw/
-POST /api/cases/{id}/ai-review               "Review again": send the suggestions with no AI
-                                             advice yet to the model (gotcha #71)
-POST /api/cases/{id}/lifecycle               one status change / assignment on a
-                                             tracked finding (lifecycle.py)
-GET  /api/cases/{id}/stix                    STIX 2.1 bundle download; ready only
-GET  /api/cases/{id}/veris                   VERIS 1.4 record download; 409 if no
-                                             high/critical finding
-GET  /api/cases/{id}/attack-layer            ATT&CK Navigator layer (format 4.5)
-                                             download; 409 unless ready
-GET  /api/rules[/{rid}]                      rule metadata: Sigma fields + ADS
-                                             documentation (rule_meta.py)
-GET  /api/cases/{id}/graph                   the Attack path step: db.build_graph +
-                                             risk_scores of the confirmed groups;
-                                             empty, with `undecided`, until every
-                                             suggestion is decided (gotcha #10);
-                                             edges to the computer reached (#80)
-POST /api/cases/{id}/analyze                 db.build_graph (SQL) of the confirmed
-                                             groups + SQL top-N distinct → the
-                                             LLM (Ollama now) for the narrative,
-                                             decoded inside a per-case JSON
-                                             schema + grounding check (#37)
-MCP (stdio, read-only)                       app/mcp_server.py - 19 tools over the
-                                             same views; every call hash-chain
-                                             logged to mcp/access.jsonl (#38);
-                                             never assigns FD ids (#51)
-GET  /api/overview[?company_id=[&project_id=]] one customer, one project of it (#75),
-                                             or all; KPIs, detection areas (every suggestion,
-                                             undecided, the case holding most),
-                                             attention, suggestions by first-event
-                                             day, top entities (an account with its
-                                             computers and source addresses), urgent
-                                             findings (high / critical not decided),
-                                             activity, by_customer / by_project (each
-                                             one's own figures, areas and evidence),
-                                             coverage + attention_files, tactics (all
-                                             15), top_rules (10, with decisions);
-                                             MTTC still returned, not shown
-                                             (services/overview.py; per-case facts
-                                             cached on a fingerprint of DuckDB, review
-                                             log, custody log and id registry;
-                                             gotchas #50, #51, #73)
 ```
 
-**The Overview has three levels since 2026-10-28 (the user, gotchas #50, #75)** -
-`#/dashboard` (every customer), `#/dashboard/<co>` (one customer), `#/dashboard/<co>/<pj>`
-(one project). The first two are **overviews and nothing more**: three tiles (open cases of
-N, to review, customers - or the customer's open projects of N), the attention banner when
-something waits, and one table - **By customer**, or the customer's **Projects** - a row each
-with its suggestions per area, not decided of all, the worst not decided, (open) cases and an
-Evidence column (log source and period, days without events); a row opens the level below.
-Only a project's Overview has the details: the summary card, Evidence coverage, the
-detection areas, ATT&CK tactics reached (all 15), severity, top affected, Top rules (with the
-analysts' decisions), urgent findings, activity - the SIEM-style sections the user chose on
-2026-10-28; EPS, MTTx, a geo map and compliance were left out on purpose (gotcha #50). Cases
-in "No project" have no detail page: move them into one. What follows is the detail level:
-
-The Overview was redesigned on 2026-10-19 (gotcha #50) - an attention banner,
-a KPI strip (since 2026-10-27 the summary card's right column, SOCRadar layout), the
-detection-area cards (eight since 2026-10-26 - the host areas, gotcha #66), a per-day
-chart, top affected, urgent findings and recent activity. **Since 2026-10-27 it counts
-as the case page counts** (the user: the dashboard must match what a case shows):
-the big total is the suggestions not decided, an area card every suggestion in the
-area (and how many are not decided) and opens the case holding most of them, the
-chart suggestions by the day their first event happened over the whole span, the
-urgent list the high / critical findings not decided; no MTTC (gotchas #50, #73). The
-case table is no longer on it. No figure is a placeholder. "Top affected"
-ranks by accumulated risk score, not by case count: ranked by count, the
-benign admin account seen in every seeded case came out first (gotcha #16
-again). **The page always says whose data it shows (2026-10-15, the
-user's requirement):** the header names the customer, or every customer
-when unscoped; each top-affected row and activity line carries its
-customer; and top-affected is aggregated *per customer* - the same address
-in two customers' cases is two hosts, and used to add up into one row.
-A technique card stays *one* card and lists every customer it was seen in:
-the same technique is the same behaviour whoever it happened to. **An account on
-Top affected names where it was seen** (2026-10-27): "on" the computers whose logs
-hold its flagged events and "from" the source addresses - `NT AUTHORITY\SYSTEM` or a
-local `Administrator` is a different account on every computer (`db.account_origins`,
-a query of its own because `risk_scores()` feeds the narrative's prompt).
+The full route list - every `/api/*` route and what it returns -, the manifest's keys and the
+login detail are in the **`case-api`** skill; the Overview's three levels and what each figure
+counts are in **`frontend-ui`**.
 
 Storage layout under `DATA_DIR` (`/data`) - **one store per customer**
 since 2026-10-14 (gotcha #40). `customers/<company_id>/` holds everything
@@ -274,51 +186,17 @@ A project's report drafts and finals are the customer's: `customers/<id>/reports
 one a line of the project's hash-chained log (gotcha #83).
 **Login accounts are not in `DATA_DIR` at all** (gotcha #41): `users.json` +
 `session_secret` live in `AUTH_DIR` (`/auth`, its own Docker volume
-`forensic-auth`; see *Login* below).
+`forensic-auth`; see *Login and roles* below).
 
-A manifest now carries more than the upload: `company_id`/`company_name`
-(always set since FR-2.1), `project_id`/`project_name` (only when the case
-was uploaded into a project), `compression` (`gz`/`zip`/null), `size_bytes` (as
-uploaded) vs `uncompressed_bytes` (what the 10 GB limit is measured on),
-`members`/`skipped_members` for a zip (with each member's `row_id` range),
-`progress` while processing, `evidence` (SHA-256 of the raw file at
-acquisition, gotcha #28), `mapping` (gotcha #27) and `escalations`
-(gotcha #26). Cases uploaded before these existed simply lack the keys -
-read them with `.get()`.
-
-**Login (FR-1, IAI-13).** Every `/api/*` route needs a signed-in session except
-`/api/health`, `/api/auth/login` and `/api/auth/config` - enforced by one
-middleware in `app/main.py`, so a new router is protected without doing
-anything. The page and its bundle stay public; they hold no data.
-- Accounts are made by an administrator with `tools/create_user.py`
-  (add / list / remove) and kept in `AUTH_DIR/users.json`, apart from
-  customer data (gotcha #41); there is no sign-up page on purpose. Passwords are
-  stdlib `scrypt`, so auth added no dependency.
-- The session is an HMAC-signed cookie (`fa_session`, HttpOnly, 12h), not
-  server state. Every request re-reads the account, so **removing a user
-  ends their sessions at once**; what logout cannot do is revoke a copy of
-  the cookie taken before it expires - but a password reset does end them (gotcha #47).
-  Failed sign-ins are throttled and every sign-in event is audit-logged (gotcha #47).
-- **Roles since IAI-14 (2026-10-22, `specs/IAI-14_rbac.md`):** admin (everything the others may, plus
-  accounts - Q56's "accounts + read only" superseded by the user the same day),
-  manager (case work + customers and projects - create, close / reopen, rename, move a case -,
-  merge, assign, close / reopen findings, delete a case, a project or a customer), analyst (case
-  work, uploading into an existing project). One table,
-  `authz.PERMISSIONS`; deny by default; a route asks `authz.require`, the UI reads the same table
-  through `/api/auth/me` (`frontend/src/permissions.js`) but the server is the gate. Accounts are
-  managed on the Users page (admin only, `routers/users.py`), every change hash-chained to
-  `AUTH_DIR/audit/accounts.jsonl`; the last admin cannot be removed or demoted.
-- **Sign in with Google since 2026-11-02 (`specs/google_login.md`, gotcha #82)**, beside the
-  password, not instead of it: OpenID Connect code flow + PKCE run by the server (stdlib, no
-  dependency, nothing loaded from Google by the page). Anyone whose ID token's `hd` claim is in
-  `GOOGLE_ALLOWED_DOMAINS` may sign in, and gets an analyst account (no password) the first time -
-  the user's choice, so **disable, not remove**, keeps someone out. Off unless `GOOGLE_CLIENT_ID`,
-  `GOOGLE_CLIENT_SECRET`, `GOOGLE_ALLOWED_DOMAINS` and `PUBLIC_URL` are all set (`.env.example`).
-- **The review actor comes from the session, not the request body.** It used
-  to be whatever name the browser sent (typed once, kept in localStorage as
-  `analyst-name`), which let any client write any name into an audit log
-  (FR-7.6). Decisions recorded since carry the account's email; older ones
-  keep the name that was typed.
+**Login and roles (FR-1, IAI-13, IAI-14; detail in `case-api`).** Every `/api/*` route
+needs a signed-in session except `/api/health`, `/api/auth/login`, `/api/auth/config` and
+Google's start / callback - one middleware in `app/main.py`, so a new router is protected
+without doing anything. Accounts live in `AUTH_DIR/users.json`, apart from customer data
+(gotcha #41), made with `tools/create_user.py` or the Users page; there is no sign-up page.
+Roles admin / manager / analyst are one table, `authz.PERMISSIONS`, deny by default, asked by
+`authz.require` on the route - the server is the gate, the UI only reads it. Sign in with
+Google (gotcha #82) is off until its four settings are set. **The review actor comes from the
+session, never from the request body.**
 
 **Why DuckDB and not Elasticsearch:** this is batch forensic analysis for one
 analyst, not a real-time multi-tenant SIEM. DuckDB is embedded (no server to
@@ -333,174 +211,26 @@ ones as storage version 69, which no 1.x opens, so `db.connect` passes
 in 1.5.6 (checked: a Check Point case processed on 2.0, read back by 1.5.6) - going back
 strands nothing. Every check and the parity baseline gave the same answers on 2.0.
 
-The UI is a **Vite + React** app whose source is `frontend/` and whose build
-output is `static/` — which is generated, gitignored, and never edited by
-hand. `app/main.py` serves `static/index.html` at `/` and the bundle through
-the `/static` mount, so `vite.config.js` sets `base: '/static/'` to match.
+## UI rules (detail in the `frontend-ui` skill)
 
-```
-frontend/src/
-  App.jsx              session gate + hash router (#/dashboard, #/upload,
-                       #/finding/<case>/<key>, #/reports|attack-graph|timeline
-                       [/<case>[/<tab>]], and the menu routes of Sidebar.jsx);
-                       the old #/result/<case>[/<key>] redirects (gotcha #51);
-                       signed out -> #/login, and signing in always
-                       lands on the Overview (the user's call, 2026-10-16)
-  api.js               every call the UI makes, and nothing else
-  format.js            fmtBytes/fmtTime/shortTs + the status & severity maps
-  theme.js             light / dark, kept per browser in localStorage fa_theme
-  pages/               Overview (#/dashboard[/<co>[/<pj>]], three levels) ·
-                       Upload · Cases · CaseFlow (one
-                       case as six steps, #/case/<id>/<step>, gotcha #52) ·
-                       Findings · FindingDetail · Customers (Delete per row) ·
-                       CustomerDetail (also a project's page: close / reopen,
-                       rename, delete, move a case, timeline and path) ·
-                       Users (the Settings menu item, admin) · Login ·
-                       Placeholder (a menu page not built yet - none today)
-  components/          Sidebar (app shell, FR-0, theme button) · StepBar
-                       cards.jsx (summary card, area card, stat tile, folding
-                       section) · icons.jsx (stroke icons, inline SVG)
-                       EventsTable · ReviewPanel (Attack events, by area and
-                       rule) · AiReview · FindingEvents · RuleCard (Sigma/ADS)
-                       Evidence (custody) · Mapping (how each file was read) ·
-                       Period · Question · Reprocess · ProfilePanel · Veris ·
-                       DeleteCase · DeleteCustomer · AttackGraph ·
-                       AttackTimelineView (a case's and a project's) · analysis.jsx (chain/timeline/
-                       risk/meta, grounding warnings) · common.jsx (severity
-                       pill, status badge, MITRE tags). Workspace.jsx (left
-                       over from #/result) was removed on 2026-10-29; Lifecycle.jsx
-                       went with the status workflow's buttons (gotcha #73)
-```
-
-It replaced a hand-written 1,212-line `static/index.html`, whose URLs were
-kept unchanged so pasted case links survived the rewrite. Neither of its
-localStorage keys is read any more: `analyst-name` (the reviewer is the
-signed-in account, see *Login*) and `fa_recent_uploads` (since IAI-28 the
-Upload page's "My recent uploads" are the cases whose `evidence.recorded_by`
-is the signed-in account, from `GET /api/cases` - they follow the analyst
-across browsers, and a case that no longer exists cannot linger). The
-original was kept as `legacy/index.html.orig` until 2026-10-29; it is in git
-history now (`git show fb61af5:legacy/index.html.orig`).
-
-**What "no external JS" now means.** The old page took it literally: no build
-step and no dependency, because a vis-network CDN import had been removed
-after a physics simulation added interactivity nobody needed and read worse in
-a report. The constraint that actually matters is **nothing fetched at
-runtime**, and Vite satisfies it - every asset is bundled locally, so a case
-is still workable air-gapped (gotcha #17). The build needs the network; an
-analysis never does. Dependencies are pinned exactly and the Dockerfile builds
-the bundle in its own `node:22-slim` stage rather than copying the host's
-`static/`, so an image can never ship a stale bundle and the output stays
-reproducible - which matters because the output is evidence. Verified: the
-in-image build produced a byte-identical bundle hash to the host build. The
-SigmaHQ rules follow the same rule since 2026-10-29: the image's `sigma` stage
-fetches a pinned commit's archive (checked by SHA-256) and converts it with
-pySigma into `/opt/sigma/windows_rules.json`; the app never imports pySigma
-(gotcha #79). The archive build and a git checkout gave the same file byte for byte.
-
-**Look and feel follow the SENTRY-IR Figma (since 2026-09-29).** The palette
-in `styles.css` `:root` was sampled from the rendered frames (light
-`#EEF0F3` page, white panels, amber `#B36B00` as the only action colour - red since 2026-10-27, below), and
-the type is IBM Plex Sans / Plex Sans Thai / Plex Mono, bundled via
-`@fontsource` so the nothing-fetched-at-runtime rule above still holds.
-Plex Sans has no Thai glyphs, and most UI text is Thai, which is why the Thai
-cut is there too. Severity, review-status and job colours kept their meanings
-and were only re-mapped onto the Figma tokens. The attack graph kept a dark
-canvas until IAI-61 (2026-10-29) put it on the panel colours, below. The
-whole UI is in English, as the Figma is (since 2026-10-12, see *Decisions*).
-
-**The SOCRadar layout, light and dark (2026-10-27, the user's request).** The
-user asked for the whole app to look like SOCRadar's dark-web report and
-approved a mockup (claude.ai artifact "SENTRY-IR redesign"); it is built in
-steps: 1 tokens + theme button + menu, 2 shared summary card / area card /
-stat tile / collapsible section (`components/cards.jsx`, icons in `icons.jsx`),
-3 Overview, 4 the case page (all four done: a summary card above the steps -
-suggestions by the day their first event happened, how many the AI explained
-and the analyst decided - the steps as six boxes, and Attack events as one
-folding section per detection area with a block per rule, each suggestion
-keeping its whole card), 5 the other pages (Findings, Cases and Customers open
-on a row of stat tiles - Findings' critical / high tiles are its severity
-filter - and every panel and list head is the cards' shape). All five done
-2026-10-27. A section folds only when the analyst clicks; its head keeps its
-counts. Then, at the user's word ("too much"), the Ingest step became folding
-sections: Files read (a file whose reading needs attention - not analysed,
-columns guessed or missing, rows not loaded, time unreadable - is always shown,
-`Mapping.needsAttention`; the others fold under one line), question, custody and
-method open; periods, rules per product, lines and the events table folded
-(`lazy`: not fetched until opened). Attack events dropped its "N not decided",
-"final report cannot be issued" and "AI explaining N of M" lines, Ingest its
-"events read, digest verified" line - the summary card (polled while the AI
-runs) and the step box say it; the AI line returns only when explanations are
-missing, with Review again. **Say a figure once on a page** (the user). Light stays the default; dark is `[data-theme=dark]` on
-`<html>`, set by the button beside the brand (`theme.js`) and kept per browser
-in localStorage `fa_theme` - the OS setting is deliberately not followed (no
-look the analyst did not ask for). The action colour is red now (`--accent`,
-the user's choice over blue, knowing it sits near critical), so **`--accent`
-means "act here" only**: amber high severity and warnings, which used to share
-it, are `--warn` - give any new severity or warning colour `--warn`, never
-`--accent`, or every high reads as a button. A colour belongs in a token with a
-value under both themes; a literal hex in a rule is wrong in one of them.
-
-The attack graph is still a **static SVG** with no library
-(`components/AttackGraph.jsx`), and its layout keeps the old page's logic,
-because these diagrams get screenshotted into reports: nodes in columns by role
-(pure sources left, pure sinks right, anything with both in/out in the middle),
-and edge labels anchored just past the *source* node rather than at the edge
-midpoint — these graphs are usually many sources converging on one target, so
-every midpoint lands in the same spot and the labels pile up on top of each other.
-**Its look since IAI-61 (2026-10-29, the user's choice between the Figma and a
-Microsoft attack-path picture: "three columns, the attack-path look")**: column
-heads (SOURCES / PIVOTS / SINKS), round nodes coloured by role with an icon for
-the node's kind (address, host, account), the name underneath and callouts
-(*On threat feed*, *External*), curved edges in the colour of their highest
-finding's level, technique labels in capsules tinted by level (cut at 34
-characters, the whole label its tooltip); every colour a token
-(`.ag-*` in styles.css). A node says only what the evidence does
-(`db.node_facts`): internal is RFC 1918 / loopback / link-local - not
-`ipaddress.is_private`, which also calls the RFC 5737 documentation ranges the
-synthetic attackers use private - and no role such as "domain controller".
-**What a node is (2026-10-30, gotcha #80):** an edge goes to the address it
-reached, else to the computer that logged the event (a Windows logon's Computer),
-and only when a row has neither to the account; the account rides on the edge
-(`accounts`, "· as adm.hd +4 accounts" at the end of the label). An address is
-drawn as its host when the case's own Windows events tie it to that one computer
-(its Sysmon 3, its `NAME$` sign-in / TGT), so a pivot reads as one node: the
-mockup chain `198.51.100.66 -> rds01 -> fs01 / sql01`. The risk ranking under
-the graph still counts the address and each `DOMAIN\user` spelling apart - it
-feeds the narrative's prompt and was left alone.
-
-Two things the rewrite changed on purpose:
-- **`escapeHtml()` is gone.** The old page concatenated `innerHTML`, so every
-  filename, company name and rule description had to be escaped by hand. The
-  discipline was actually held - audited before porting, no gaps - but JSX
-  escapes text nodes for us, so the class of mistake is removed rather than
-  guarded.
-- **No `window.prompt()`/`alert()`.** Choosing a rejection reason used to mean
-  typing a number 1-N into a browser prompt, and the analyst name was another
-  prompt. Both are now inline: `reason_code` is a `<select>` fed by the API's
-  own `reason_codes`, with the confirm button disabled until one is chosen, so
-  FR-4.6 is enforced in the UI instead of discovered as a 400.
-
-**Never gate a form's submit button on React state that autofill feeds.**
-Chrome fills a saved account into the login fields without firing input
-events, so `Login.jsx`'s button - disabled until `email`/`password` state was
-non-empty - sat greyed out beside two visibly filled fields, and the analyst
-could not sign in (found 2026-10-05). The inputs are now uncontrolled and
-`submit()` reads `form.elements` at click time, which is after Chrome releases
-the autofilled values; an empty field is reported as an error instead.
-
-`npm run dev` in `frontend/` serves the UI with hot reload and proxies `/api`
-to the container on 8091, so the UI can be worked on against real cases.
-
-**Two instances on one machine log each other out.** Browsers do not scope
-cookies by port, so a host-run copy (`uvicorn` on e.g. 8097 with its own
-`DATA_DIR`) and the container on 8091 share one `fa_session` cookie on
-`localhost`. Signing in to either overwrites it with a token the other's
-secret rejects, and the other bounces to the login page on its next request -
-which looks exactly like a session bug and is not one (2026-10-05: the
-"logged out ~7s after login" was a sign-in on 8091 in another tab). Test the
-host copy on `127.0.0.1:<port>` instead, a different host name with its own
-cookie jar, or stop the container.
+- `frontend/` is the source; `static/` is its build output - generated, gitignored, never
+  edited by hand. 8091 serves the bundle built in its image, so a UI change shows there only
+  after `docker compose up -d --build --force-recreate` (or first through `npm run dev`).
+- **Nothing fetched at runtime**: every asset is bundled (fonts via `@fontsource`), so a case
+  is workable air-gapped (gotcha #17); dependencies are pinned exactly; the image builds the
+  bundle itself, so it never ships a stale one.
+- All UI text is English. The look is the SENTRY-IR Figma's tokens in the SOCRadar layout,
+  light by default, dark only by the button (`fa_theme`) - the OS setting is not followed.
+- **`--accent` (red) means "act here" only**; severity and warnings are `--warn`. Every colour
+  is a token with a value under both themes - a literal hex is wrong in one of them.
+- **Say a figure once on a page**, and the dashboard counts as the case page counts.
+- The attack graph is a **static SVG with no library** - it is screenshotted into reports:
+  columns by role, edge labels anchored past the source node, a node says only what the
+  evidence does (gotchas #10, #80).
+- No `window.prompt()` / `alert()`; never gate a submit button on React state that autofill
+  feeds (Chrome fills without input events).
+- Two instances on `localhost` share the `fa_session` cookie across ports and log each other
+  out - test a host copy on `127.0.0.1:<port>`.
 
 ## Known gotchas (discovered the hard way — don't re-debug these)
 
@@ -617,159 +347,19 @@ method written out - risk ranking, TP/BTP/FP, rule validation, escalation
 patterns). The user's requirement since 2026-10-12 is that every step cite
 one; update that table whenever a step changes.
 
-## SENTRY-IR console (requirements Sept 2026, being built)
+## Product decisions (the user's; detail in `sentry-ir-console`)
 
-The target UI is `figma-export/` (10 screens: login, Upload, Overview,
-Incidents (= the Findings page, see *Decisions*), Timeline, Customers,
-Attack-graph, Attck-map, Reports, Settings).
-Its text is **outlined to paths**, so `grep` finds nothing; render each SVG
-with headless Chrome (`--screenshot --window-size=1728,<height>`) and read the
-image. Use the SVG's own height - `Overview.svg` is 2346px tall and a
-1117px window silently cuts off its bottom half. On Windows pass the output
-and `file:///` paths with forward slashes (`cygpath -m`); backslashes are
-eaten on the way to Chrome and it renders "file couldn't be accessed". The
-agreed functional spec is `AI-Incident-Analysis-Reporting-FR.pdf`
-in the repo root (59 items, FR-0..FR-12); its HTML source was generated, not
-kept in the repo.
-
-**Work is tracked in Jira**, project `IAI` at
-https://titlenattapat.atlassian.net (epics = spec areas, stories labelled
-`IAT-FR-x.y`, six two-week sprints from 2026-09-29). Work the active sprint
-in rank order. When a story needs something a later sprint builds, split the
-dependent criterion into its own story in that sprint rather than leaving
-the story open: IAI-12's open-findings badge became **IAI-78** (Sprint 3) that way.
-
-Built in Sprint 1 (verified in Docker, 2026-09-29):
-- **IAI-12 app shell / IAI-13 login** - grouped sidebar, user + role +
-  logout, English per the Figma. Roles since IAI-14 (see *Login*).
-- **IAI-22/23/25/27 upload** - customer required, 10 GB after
-  decompression, 2.5x disk check, `.gz` streamed, `.zip` → one case,
-  separate upload / processing percentages.
-- **IAI-20 case list** - was the table on the Overview; since 2026-10-19 the Overview has
-  no case table (gotcha #50) and cases are reached from Customers or Findings. The Jira
-  story still says Overview.
-- **IAI-18/19 Customers** - a customer is added on the Upload page only
-  (see *Decisions*); the Customers page's one action is deleting a customer
-  (admin / manager, gotcha #74) and it shows, per
-  customer, open cases of total / closed /
-  highest open severity / last activity. FR-6.1 defines "open": since
-  2026-10-27 a case is open while a suggestion in it is not decided (gotcha #73;
-  from Sprint 3 it was "a high or critical finding not Resolved", IAI-79). Cases without a customer (pre-FR-2.1) are a "No customer" row
-  so the totals add up. A customer's name opens its **profile page**
-  (`#/customers/<id>`, `CustomerDetail.jsx`, 2026-10-15 at the user's
-  request, no story; laid out as a customer profile - header card, Profile
-  column, At a glance + cases - which the user chose over KPI tiles and
-  over a report-style page): onboarded date (`created_at`, i.e. the first
-  upload for it), uploaders, the log sources its files were read as, cases /
-  findings / flagged events / highest severity / AI analyses, and every
-  case. Frontend only - it reads
-  `/api/overview?company_id=` and `/api/cases?company_id=`. "Reports" is
-  shown as **AI analyses** on purpose: no report feature exists yet (IAI-55).
-- **Projects (2026-10-15, the user's request, no story).** A project is one
-  investigation of one customer, grouping the cases uploaded for it
-  (customer -> project -> case). Chosen on the Upload page under the
-  customer ("+ Add new project..." creates one, idempotent by name within
-  the customer, like customers); **required since 2026-10-28** (gotcha #75,
-  specs/projects.md P1 - the API refuses an upload naming none, so every
-  script names one); cases from before stay "No project". Stored in the customer's own store
-  (`customers/<id>/projects/<pj-id>.json`), so a project can only hold that
-  customer's cases: an upload naming another customer's project id is 409
-  and creates nothing. A merge keeps the project; sources of different
-  projects are refused. **Open / Closed** (P1): closes only when every case is
-  processed and every suggestion decided, reopens at any time (manager, admin),
-  takes no new case while Closed. Shown on the customer profile (Projects panel + a Project column),
-  on its own page `#/customers/<id>/projects/<pj-id>`, on the case header
-  and under the customer in the Overview / recent-uploads tables. Also
-  (specs/projects.md, gotcha #75): an Overview and a Findings filter per project
-  (P2), rename / move a case / delete a project (P3), and on the project page the
-  attack timeline and attack path across its cases (P4).
-- Not yet: **IAI-24 resumable chunked
-  upload** (Sprint 6). The upload is one request, so a dropped connection
-  restarts a 10 GB file from zero.
-
-Pages whose story has not come up render `pages/Placeholder.jsx` and appear
-dimmed in the menu (`ready: false` in `components/Sidebar.jsx`). Flip the flag
-when a page is built. Timeline, Attack Graph and Reports were flipped when `#/result`
-was retired (gotcha #51) and are steps of a case now; Settings is the Users page
-(IAI-14). No menu item is a placeholder today.
-
-Decisions the user made, which the Figma does not show:
-- **There is no "incident" - the finding is the only unit (2026-10-05).**
-  The spec and Figma had incidents as groups of findings; they were merged
-  into one concept. The unit is the collapsed finding of gotcha #19
-  (`rid|srcip|username`): it carries the review decision *and* the status
-  workflow. Grouping survives only as **related findings** (IAI-43/44), and
-  the old opening threshold decides which findings enter the workflow
-  (IAI-42). The brand line is "Finding Response Console"; ids are
-  `FD-YYYY-seq`. File names that say Incident (`figma-export/Incidents.svg`,
-  the FR PDF) are left as they are.
-- **Every datum comes from an upload.** No "New finding" button, no live
-  feed, no EDR/SIEM/email integrations, no ingest API key. The Figma's
-  source column (CrowdStrike, Splunk, Proofpoint...) becomes the log type.
-- **A customer is added only on the Upload page (2026-10-05)** - the
-  "+ Add new customer..." option of its customer select. The Customers page
-  has no "Add customer" button, although the Figma gives it one (its only
-  action is Delete, 2026-10-28). The
-  `POST /api/companies` route predates Sprint 1 and is kept; no page calls it.
-- Uploads up to **10 GB per file, measured after decompression**, with `.gz`
-  and `.zip` (a multi-file zip becomes one case, even with mixed formats),
-  resumable chunked upload, and percentage progress. All built except the
-  resumable upload (IAI-24). A `.gz` *inside* a zip is skipped and listed,
-  because its decompressed size could not be held to the budget. Known gap:
-  `/merge` looks for `raw/<id>.log`, so a line-log case uploaded as `.log.gz`
-  cannot be merged ("Raw file missing").
+- **There is no "incident"**: the collapsed finding (`rid|srcip|username`, gotcha #19) is the
+  only unit, ids `FD-YYYY-seq`; grouping survives only as related findings.
+- **Every datum comes from an upload** - no live feed, integration or ingest API key.
+- A customer is added only on the Upload page; every new case is in a project (gotcha #75).
+- Uploads up to 10 GB measured after decompression, `.gz` / `.zip` (a zip is one case);
+  the resumable upload (IAI-24) is not built.
+- **The analyst decides; the system and the AI only suggest** (gotchas #72, #73). The status
+  workflow and MTTC are off the screens; `lifecycle.py` stays for the audit trail.
 - Alerts, Threat Intel, Playbooks and Assets pages are cut.
-- **All UI text is English (2026-10-05; done 2026-10-12)** - the last Thai
-  strings (case page, review panel, analysis panel, events table, upload
-  history, `format.js`, `api.js`, the review reason codes) were translated,
-  not kept alongside. The only Thai left is `Sidebar.jsx`'s initials helper,
-  which skips Thai leading vowels in *users'* names. Times the app itself
-  records (upload, review, custody) render as `YYYY-MM-DD HH:MM:SS +07:00`
-  via `format.fmtTime` - they used to be a Thai-calendar date in the
-  browser's own zone. Code comments were always English.
-- Findings: created by the rule engine, related and admitted to the
-  workflow per gotcha #24, no time window (the whole case).
-- **Finding lifecycle (FR-4.1, 4.5, 4.7, 4.8)** - the rules below still hold in
-  `lifecycle.py` and its API, but **no screen moves a status or sets an assignee
-  since the Respond step went**; the pages follow the analyst's decision instead
-  (2026-10-27, gotcha #73). The Figma has status only
-  (Open → Investigating → Contained → Resolved) and nothing stopped an analyst
-  closing a finding without looking at it. The spec now requires:
-  - A new finding starts **Open with no assignee** - the system created it.
-  - To close: an assignee, and **the finding reviewed** (accept / modify /
-    reject). This reuses `review.py`
-    decisions keyed by `finding_key` (gotcha #19); it is not a second review
-    store.
-  - At close: a classification - true positive / benign true positive /
-    false positive - plus a written summary.
-  - A true positive must pass through Contained, with the containment actions
-    recorded. False and benign positives may close straight from
-    Investigating and are **excluded from MTTC**. Forcing them through
-    Contained would record a containment that never happened and skew the
-    metric.
-  - Every status change is timestamped. MTTC is creation → Contained.
-
-What the data forced onto the Figma, measured on the same corpus:
-- **ATT&CK map:** ~98% of findings are `T1071` (C2, 65,774) and `T1595`
-  (Reconnaissance, 28,889) - neither is among the Figma's 9 tactic columns,
-  nor is Discovery (`T1046`). Show the tactics actually found, out of the
-  Enterprise tactics (15 since ATT&CK v20). The Attack timeline step does exactly that since
-  2026-10-22: a row of chevrons, one per tactic its confirmed groups reach, in ATT&CK's order
-  (`rule_meta.TACTIC_ORDER`, `tactics_of`), each filtering the time-ordered list.
-- **Timeline "last 24h" is always empty:** uploaded events are months old
-  (Dec 2025 - Jun 2026 in the corpus). Timelines use the case's event-time
-  range. The Overview's chart counts suggestions by the day their first event
-  happened, over the whole span, as the case page does (2026-10-27; it was
-  findings by *creation* time, high / critical only).
-- **No asset inventory exists**, so "affected segments" and node roles such
-  as "domain controller" become risk-ranked hosts/accounts (`risk_scores()`)
-  and internal / external / IOC labels.
-- Most of the Figma's sample findings (PsExec, Kerberoasting, AMSI bypass,
-  web shell, phishing, OAuth consent, S3, USB) need EDR / Windows / mail /
-  cloud logs that no decoder reads.
-- The Figma has **no case-detail or review screen**, though both exist in the
-  app today (events, findings, AI narrative, review + export gate). The spec
-  keeps them as FR-11/FR-12; they need designing.
+- Work is tracked in Jira project `IAI` (https://titlenattapat.atlassian.net): the active
+  sprint in rank order, a dependent criterion split into a story of the later sprint.
 
 ## Environment / secrets
 
@@ -780,81 +370,8 @@ was later stopped for low memory - qwen3.5:9b, the 8091 container and the dev co
 are a lot for this PC; stop the dev container when not in use. `TRIAGE_ENABLED=0` turns the AI
 review off (every rule check sets it; the dev container has it off unless `DEV_TRIAGE_ENABLED=1`).
 
-**What the model costs on this PC (measured 2026-10-26, gotcha #71).** RTX 5050 Laptop, 8 GB VRAM:
-qwen3.5:9b loads 30 of 33 layers on the GPU (4.4 GB, KV 512 MB for one 16,384-token slot,
-`n_slots = 1`), ~35 tokens/s. The AI review writes ~300 tokens a suggestion: **~9 s a suggestion at
-`TRIAGE_BATCH` 5** - Mekong 61 in ~10 min, the blind quarter's 526 in ~80 min. A batch of 10 or 15
-is cut off at the 3,000-token cap and falls back to single calls (~32 s a suggestion) - keep 5. A
-single batch-5 call is ~1,500 tokens for one suggestion; running two requests at once
-(`OLLAMA_NUM_PARALLEL`) is proposed, not measured - it changes the user's Ollama settings, so ask.
-
-**The narrative LLM is local now (2026-10-12): `LLM_PROVIDER=ollama`,
-`OLLAMA_MODEL=qwen2.5:7b-instruct`, then `qwen3.5:9b` from 2026-10-14 (see
-below)** on the host's Ollama
-(`host.docker.internal:11434`). Settings in force (`.env`; since 2026-11-02 the
-`docker-compose.yml`, `.env.example` and `config.py` defaults are the same - ollama, qwen3.5:9b):
-`OLLAMA_MAX_EVENTS_FOR_ANALYSIS` 50, `OLLAMA_MAX_COMPLETION_TOKENS` 3000,
-`OLLAMA_MAP_COMPLETION_TOKENS` 1200, `OLLAMA_TEMPERATURE` 0 and
-`OLLAMA_SEED` 42 (config defaults - gotcha #37); `config.py` swaps these in
-for the Groq values. Also pulled on the host: `gemma4:12b-it-qat`,
-`gemma4:e4b`, `qwen2.5:7b-instruct`. Consequences:
-- **Gotcha #5's limits are Groq's** (1000 OTPM, 950 max_tokens, one
-  analysis a minute, 429 + Retry-After). They do not bind a local model.
-  The local settings are graded by `tests/bench_llm.py` against
-  gen_usecase's ground truth (below and #37), but the events / token
-  numbers were **not** swept the way #5 swept Groq's - that is still open.
-- A 7B model is weaker: on the ESXi case it wrote an attack chain with
-  Execution / Defense Evasion / Discovery stages no finding supports.
-- **Thinking models need `"think": false`** (`analysis._to_ollama`).
-  qwen3.5 and gemma4 reason before answering and that reasoning counts
-  against `num_predict`: gemma4:12b spent all 2400 tokens thinking and
-  returned empty content (502, finish `length`) on both runs. The prompt's
-  `/no_think` is a Qwen convention the others ignore. Non-thinking models
-  accept the flag (checked on qwen2.5).
-
-**Local model benchmark (2026-10-12, `tests/bench_llm.py`, 3 runs each,
-thinking off).** gen_usecase's two files zipped into one case, graded
-against tests/README.md's ground truth:
-
-| model | ok | avg s | expected stages hit (of 6) | unsupported stages | invented ATT&CK ids |
-|---|---|---|---|---|---|
-| qwen2.5:7b-instruct (in use until 2026-10-14) | 3/3 | 21 | 2.0 | 5 | 3 |
-| **qwen3.5:9b** | 3/3 | 54 | 3.0 | **0** | **0** |
-| gemma4:e4b | 3/3 | 19 | **4.3** | 3 | 4 (T1021.001 RDP) |
-| gemma4:12b-it-qat | 3/3 | 93 | 3.7 | 1 | 2 (T1073.003) |
-
-All named the four planted entities every run and none put the benign
-10.10.1.9 into the chain. qwen3.5:9b never invented a stage or a technique
-*in these three runs* - but it overruns the 6-entry timeline cap (up to 13)
-and used up to 2,164 of the 2,400 completion tokens. n=3 on one synthetic
-case: a lead, not a verdict - see the re-run below.
-
-**Switched to qwen3.5:9b on 2026-10-14** (`.env`: `OLLAMA_MODEL=qwen3.5:9b`,
-`OLLAMA_MAX_COMPLETION_TOKENS=3000`, `OLLAMA_MAP_COMPLETION_TOKENS=1200`;
-the defaults in docker-compose / config.py followed on 2026-11-02). Measured
-after the switch:
-- **Re-run of the benchmark (3 more runs): 1 unsupported stage
-  (Execution) and 5 invented ids** (T1076 - a deprecated RDP id -,
-  T1552.004, T1059), all completions under 1,900 tokens. So over 6 runs
-  qwen3.5 is clearly better on *stages* than qwen2.5 but not on technique
-  ids. The likely cause is the schema itself: `"mitre": [... REQUIRED, infer
-  from context if the underlying events didn't already have one]` asks the
-  model to invent. **Fixed the same day (gotcha #37):** the schema now
-  allows only the ids and stages the evidence carries, and the re-run gave
-  0 unsupported stages, 0 invented ids and three byte-identical runs in
-  33 s.
-- Three real cases, single call: all `stop`, 1,282-1,488 tokens, 42-49 s,
-  no unsupported stage; on ESXi it called 10.9.3.91 a legitimate internal
-  host (source profiles at work); on the monsoon zip it called 10.8.1.50 an
-  "external actor" (the RFC1918 soft spot of #5, still there).
-- **Map-reduce needs the bigger map cap.** The Palo Alto case (1,516
-  groups) runs 5 batches + 1 reduce. At the old 600 map tokens 3 of 5
-  batches ended `length` and the final chain gained Collection / Defense
-  Evasion; at 1,200 every batch ended `stop` (529-631 tokens each - just
-  over 600) and the chain was Reconnaissance / C2 / Exfiltration. 154 s
-  for the whole case.
-- Case data no longer leaves the machine for the narrative - which also
-  settles the confidentiality question NIST AI RMF GOVERN raises.
+**What the model costs on this PC, the benchmark of the local models, why qwen3.5:9b and
+the settings in force are in the `local-llm` skill.**
 
 `.env` (gitignored) holds `LLM_PROVIDER`, `OLLAMA_MODEL`, and for the Groq
 path `GROQ_API_KEY`, `GROQ_MODEL` (`qwen/qwen3.8-27b`) and optionally
@@ -880,7 +397,11 @@ docker logs forensic-analyzer-forensic-analyzer-1 --tail 50
 docker exec -i forensic-analyzer-forensic-analyzer-1 \
     python -m app.mcp_server --actor you@example.com
 
-cd frontend && npm ci && npm run build   # UI only, straight into ../static
+cd frontend && npm ci && npm run build   # UI only, straight into ../static - the HOST's static/:
+                                         # 8091 does not mount it and serves the bundle built
+                                         # in its image, so a UI change shows there only after
+                                         # `docker compose up -d --build --force-recreate`
+                                         # (or see it first through `npm run dev`)
 cd frontend && npm run dev               # hot reload, /api proxied to 8091
 
 # dev container: app/ tools/ tests/ mounted, uvicorn --reload (~1 s after a save),
@@ -899,7 +420,7 @@ curl -s -b /tmp/fa.jar -X POST "http://localhost:8091/api/cases/{id}/analyze?for
 
 # poke a case's DuckDB directly
 docker exec forensic-analyzer-forensic-analyzer-1 python -c "
-import duckdb; con=duckdb.connect('/data/db/{case_id}.duckdb', read_only=True)
+import duckdb, glob; con=duckdb.connect(glob.glob('/data/customers/*/db/{case_id}.duckdb')[0], read_only=True)
 print(con.execute('SELECT rid, count(*) FROM findings GROUP BY rid').fetchall())"
 ```
 
@@ -907,379 +428,29 @@ Runs on host port **8091** (the older Wazuh-based `forensic-webapp` uses
 8090 — don't collide if both are up). On Windows/git-bash, absolute
 Unix-style paths in `docker exec`/`docker cp` need `MSYS_NO_PATHCONV=1`.
 
-## Validating changes
+## Validating changes (detail in the `validate-changes` skill)
 
-`tests/gen_usecase.py` generates a synthetic attack scenario whose every rule hit is
-known in advance (see `tests/README.md` for the expected counts). Run it
-after touching `decode.py`, `rules.py`, or the ingest pipeline - it catches
-both missed detections and false positives, and it is how the R2001 MITRE
-mis-tag below was found.
+- After touching `decode.py`, `rules.py` or the ingest pipeline: `python tests/gen_usecase.py
+  <dir>` then `python tests/check_parity.py <dir>` (expected counts in `tests/README.md`), then
+  the corpus. `check_parity.py` is stdlib only, needs `FA_EMAIL` / `FA_PASSWORD`, uploads to
+  customer "Parity check", and is run against the dev container (`--url
+  http://127.0.0.1:8092`) with the AI review off - with it on, a hundred uploads take hours.
+- **Run every `tests/check_*.py` before a rule change is merged.** The skill says which check
+  covers which layer and how each must be run (some need the container, a scratch
+  `AUTH_DIR`, Ollama, or inputs outside the repo).
+- The baseline is `tests/baseline.json`, not a number in prose. `--update` merges; when a run
+  claims everything matches, reconcile its totals against the previous run before believing
+  it. A silent drop to 0 findings is gotcha #2 / #7; a plausible wrong finding is gotcha #22.
+- Timing claims need more than one run (gotcha #18). Validation fills the store:
+  `tools/prune_cases.py` (dry run first, `--keep-reviewed`).
 
-Real JSON captures live in `tests/samples/` (Entra sign-ins from Splunk
-attack_data, Apache-2.0, with a README of what each must produce);
-`python tests/check_parity.py tests/samples` checks them (gotcha #39).
+## Extending the rule engine (detail in the `add-detection-rule` skill)
 
-Two more checks, each for its own layer:
-- **Narrative** - `python tests/bench_llm.py <scratch> qwen3.5:9b --runs 3`
-  (needs Ollama on localhost:11434): grades the AI narrative against the
-  same ground truth - expected stages, unsupported stages, invented ATT&CK
-  ids, grounding warnings. Run it after touching `analysis.py`,
-  `grounding.py` or anything that feeds the prompt; with the schema and
-  seed in place the three runs should be byte-identical (gotcha #37).
-- **MCP server** - `tests/check_mcp.py` (all 19 tools, pivots, refusals, access log), run in the container
-  as its docstring shows, because the concurrent-writer check needs Linux
-  `flock` (gotcha #38).
-- **Job queue and manifests** - `tests/check_jobs.py` (45 checks, no DuckDB) and
-  `tests/check_manifest_atomic.py` (gotcha #48); run in the container or on the host.
-- **Finding workflow and Overview** - `tests/check_workflow.py <scratch> --repo /app`
-  (~110 checks: threshold, ids, source events, related findings, the Findings page
-  and its decision filter, every refusal and both close paths of the lifecycle API,
-  Customers - open while a suggestion is not decided -, the Overview figures against
-  the cases (undecided, the case a card opens, the whole-span trend, an account's
-  computers and sources), a forged custody log); needs the container (`static/`).
-  Run it in a throwaway container with `AUTH_DIR` on a scratch path - in the live
-  one its test accounts land in the real `users.json`. Gotchas #49 / #50 / #73.
-- **Report drafts** - `tests/check_report.py [repo] [--scratch DIR]` (gotcha #83, 67 checks): the
-  skeleton's refusals, the gate, a draft's every section from the confirmed groups only (no other
-  customer's data), the attack path PNG + SVG twin, versions kept, finals, the summary check - a
-  skeleton built in code and a stand-in model, no Ollama. `tests/bench_report_summary.py <case>` measures
-  the real model's Thai summary on a project in the store (~12 s, runs identical).
-- **Sign in with Google** - `tests/check_google_login.py [repo]` (gotcha #82): PKCE / state / nonce,
-  every ID-token check, the domain, `sub` binding, who is made and as what, the audit lines - against a
-  stand-in for Google's token endpoint, so no network and no Google account; needs `static/`.
-- **Authorisation** - `tests/check_authz.py [repo]` (ADR-3, gotcha #51, IAI-14): the permission
-  table per role, every case route answering 403 exactly where `authz.can` says no, the Users
-  routes, wrong-typed account changes refused; deleting a case and a customer (gotcha #74).
-- **Projects** - `tests/check_projects.py [repo] [--scratch DIR]` (gotcha #75): a project required
-  on upload, close / reopen and its gate, a Closed project refused for upload and merge, the
-  Overview and Findings per project, the customer's project rows against each project's own
-  Overview, rename / move / delete, the timeline and the joined graph across cases (empty while
-  a suggestion is not decided, the rejected one left out once all are).
-- **Customer isolation** - `tests/check_customer_isolation.py <scratch>
-  --repo /app` (31 checks, gotchas #40/#41, and projects); run it in the container the same
-  way as check_mcp. Run it after touching `storage.py`, any path helper or
-  a route that lists or merges cases.
-- **Log identification** - `tests/check_identify.py [--corpus]` (gotcha #53, branch
-  IAI-92): each sample identified as its log source and no other, negatives
-  unrecognised; `--corpus` adds the real customer files. No store, no network.
-- **Behaviour profiles** - `tests/check_profiles.py [--repo DIR]` (gotcha #57): windows and their
-  edges, ranks and the 20-address floor, n/a, bytes to public addresses; duckdb only.
-- **Windows event logs** - `tests/check_windows.py <scratch> --repo /app [--evtx D:/logtest/windows]`
-  (gotcha #60): event XML from the committed samples; with `--evtx` (lab folder outside the repo,
-  copied into the container) every .evtx record counted against its chunk header and compared item
-  by item with Windows' own `.ToXml()` rendering. Check Point Log Exporter: `tests/check_checkpoint_le.py`.
-  It failed from story 6 (2026-10-29) to 2026-10-30: the Winlogbeat sample holds a 1102 (the Security
-  log cleared), and SigmaHQ's "Security Eventlog Cleared" rightly fired beside WIN-BRUTE-1 + WIN-AUTH-1;
-  the check now asserts the in-house rules and SigmaHQ's apart. **Run every `tests/check_*.py` before a
-  rule change is merged** - story 6 ran the rule and flow checks but not this one.
-- **Detection accuracy** - `tests/gen_checkpoint_quarter.py <outdir>` (seeded): three months of
-  Check Point Log Exporter records with attacks I1-I6 buried in an office's traffic and a
-  `ground_truth.csv` for every non-benign row. Upload the zip, then score findings and the AI's
-  advice per incident against the ground truth (gotchas #62, #64). In git since 2026-10-26; the
-  scoring scripts are not.
-- **Firewall rules** - `tests/check_firewall_rules.py` (gotcha #62): Palo Alto and Check Point -
-  TRW, the measured line and the no-line case, each behaviour's non-events, service names where a
-  log has no port, Detect as neither verdict, no product's rule on another product's rows.
-- **Windows sign-in rules** - `tests/check_windows_rules.py <scratch>` (gotcha #65): one attempt per
-  4625 + 4771 / 4776, then `tests/gen_windows_domain.py` (seeded: a domain's three months, incidents
-  W1-W11 and look-alikes, `ground_truth.csv`) scored per incident - no plain or look-alike row may be
-  flagged - and the real PurpleSharp spray; the lateral-movement and host rules (gotcha #66) on the same
-  quarter and the real OTRF RDP / LSASS capture; story 5d (gotcha #68): W3 / W10 / W11, the CUSUM on a
-  known series, 4768 0x6, the OTRF reconnect; one suggestion per behaviour (gotcha #69); story 5e
-  (gotcha #70): a sprayer's own `...$`, a fleet-wide beacon; story 5f (gotcha #76): Defender detections
-  and their outcome (medium only when remediated), a lone 1011, turned off / back on, tamper protection,
-  exclusions vs a routine 5007; story 5g (gotcha #77): a deployment tool's two-day service not flagged - and with `--winevents "D:/logtest/window test/WinEvents.log"` the
-  user's file (3 suggestions, nothing else). Also the attack path (gotcha #80): W7 / W8 drawn from
-  `ws023` to `rds01` / `sql01`, WS023's address as WS023, every edge naming its account.
-- **A chain to look at** - `D:/mockup-logs/bruteforce-pivot/gen_bruteforce_pivot.py <outdir>` (outside
-  the repo; imports `tests/gen_windows_domain.py`'s writers, seed 20260917): three weeks of Mekong's
-  ordinary work and, on 2026-09-17, RDP guessing from 198.51.100.66 onto RDS01, the success, then RDP
-  to FS01 and PsExec to SQL01 from it - one zip (`out/bruteforce-pivot-2026-09.zip`, 21,801 events)
-  and `ground_truth.csv` (475 attack events). Measured: 13 suggestions, all the chain's (WIN-BRUTE-2,
-  WIN-AUTH-1, WIN-LAT-1 x2, WIN-LAT-2, WIN-LAT-4, 7 SigmaHQ high), nothing of the ordinary work; not
-  WIN-BRUTE-1 - the guesser tries five names, so it is a spray. Not in the parity baseline.
-- **The user's blind Windows quarter** - `D:\logtest\blind-windows` (`gen_windows_blind.py`, seed
-  20260401, Kinnaree Textiles, K1-K15, `out/answer_key/`). **Its key has been read** (gotcha #70): it
-  measures fixes now, not the rule set; a fair blind test needs another seed whose key nobody reads.
-  Its `answer_key/*.csv` and `evidence/COLLECTION.txt` show as NEW in the `D:/logtest` parity run -
-  not logs, never `--update` them.
-- **AI review of suggestions** - `tests/check_triage.py <scratch>` (gotchas #64, #71): the facts, the
-  schema's enums, the address and cross-citation checks, a model that cannot be reached; no cap (90
-  suggestions), every rule first, retry then one by one, Review again, the background queue; a fake
-  model, no Ollama - run it with `TRIAGE_ENABLED=1`.
-- **Products and periods** - `tests/check_products.py <scratch>` (gotcha #61): product per row, a
-  product rule on its rows only, periods and gaps, the n/a matrix, findings unchanged end to end.
-- **Case flow** - `tests/check_case_flow.py <scratch>` (gotcha #52): step states (Attack timeline
-  and Attack path wait for every decision; `/graph` empty until then, never a rejected group), and
-  every step citing a standard marked read in `docs/standards/SOURCES.md`.
-- **SigmaHQ** - `tests/check_sigma.py <scratch> --sigma <checkout> --dockerfile <Dockerfile>` (gotcha #79,
-  `specs/sigma_windows.md`): the bundle at `/opt/sigma` matches the Dockerfile's pin and attributes every
-  rule; SigmaHQ's 445 Windows regression samples through the pipeline, 439 exact and only the six named
-  differences; a failing SigmaHQ rule never fails a case. Needs a dev image built after story 6
-  (`--build`) and the pinned commit's `regression_data/` copied in (`D:/sigma-spike/sigma`); ~30 min.
-
-**`tests/check_parity.py` asserts it, so nobody has to read a table.** Until
-2026-09-15 every ingest change was validated by uploading files, curling
-`/api/cases` and eyeballing the counts - which is why the R2002/R2003 defect
-of gotcha #23 sat in plain sight in the anchor numbers for months. The script
-uploads, polls, and diffs per-file `rows / flagged / per-rule` counts against
-`tests/baseline.json`, printing every drift and exiting non-zero:
-
-```bash
-export FA_EMAIL=you@example.com FA_PASSWORD=...          # an account, see Login
-# uploads go to customer "Parity check" - FR-2.1 refuses a case without one
-python tests/gen_usecase.py /tmp/usecase
-python tests/check_parity.py /tmp/usecase                  # ground truth, ~5s
-python tests/check_parity.py "D:/forensic system/Logtest"  # full corpus, ~3min
-python tests/check_parity.py <dir> --update                # accept the change
-```
-
-stdlib only, so it runs without the app's dependencies. Three details worth
-keeping, each of which was a bug in the checker before it was a feature:
-
-- 0-byte files are reported as notes, not failures - the API rejects them
-  with 400 by design.
-- Results are keyed **name -> list of variants matched by md5**, because the
-  corpus contains two different files both called `log_30_.csv`. Keying by
-  name alone silently dropped one of them, so the first "PARITY OK" printed
-  was one file short. **When a run claims everything matches, reconcile its
-  totals against the previous number before believing it** - a 102-row
-  discrepancy is how that was caught.
-- `--update` **merges** and prints what it added, changed and left alone.
-  The first version rewrote the file from whatever the run covered, so a
-  `--update` pointed at one directory took the baseline from 70 entries to
-  67 and silently deleted the ground-truth pair and the Check Point
-  benchmark. A tool whose job is catching silent drift must not be able to
-  cause it; if `--update` ever reports 0 left untouched on a partial run,
-  something is wrong.
-
-The Check Point benchmark is in the baseline but is not under `Logtest`;
-check it with `python tests/check_parity.py D:/logtest` (gotcha #43).
-Since W2 that run also covers `D:/logtest/windows` (gotcha #60): `.evtx` is a parity suffix,
-and the 278 EVTX-ATTACK-SAMPLES files (GPL-3.0, so outside the repo) plus two exports from this
-PC are in the baseline - 279 names, 127,519 rows, 0 flagged at W2, before any Windows rule. That
-folder is gone; since 2026-10-29 the samples are re-cloned at `D:/logtest/internet/evtx-attack-samples`
-beside OTRF's host datasets (`otrf/`, zips - no parity suffix), and 5 of them flag now, as the Windows
-rules intend (gotcha #78). The clone's stray `.log` / `.txt` / `.json` files
-came in with them. W3 added `splunk-text/` (attack_data's account_lockout, 9,245 rows, R2000 24 /
-R2006 177 / R2008 3, and 54 files of the lab's Security events rendered in Splunk's layout by
-`tests/make_splunk_text.ps1`) and, in `tests/samples`, `windows-security.log` 0 -> 4 rows plus
-`windows-security-text-spray.log` (162 rows, R2000 20 / R2009 20 - since 2026-10-26 WIN-BRUTE-2
-40, and `windows-security-xml-spray.log` 50 -> WIN-BRUTE-2 100: each attempt is a 4625 + a 4776,
-both flagged now, gotcha #65; the lab's Windows entries were not re-run - the folder is gone;
-`otrf/rdp_interactive_taskmanager_lsass_dump.json` 0 -> WIN-LAT-3 1, gotcha #66, then WIN-LAT-1 0 -> 8 -
-the RDP reconnect, gotcha #68).
-W4 added `winlogbeat/` (Elastic's 105 test `.evtx` and the 113 JSON files Winlogbeat wrote from
-them) and `nxlog/` (7 OTRF datasets, 2 of them flat JSON kept as no_reader) - 225 entries, 0
-flagged - and `tests/samples/otrf/` (283 NXLog records, 0 flagged).
-
-**Real-world benchmark.** A Check Point export was analysed alongside the
-human SOC report written from the same data ("Firewall Port Scanning &
-Implied Rule Bypass", Jun 2026). The source file is **not** under
-`d:\forensic system\Logtest` and searching there for it (by name, or by
-grepping for `171.6.30.201`) finds nothing - it is at
-`D:/logtest/Logs_Jun_24__2026_11_09_44_102_AM_Logs_Table.csv` (since the
-store reset of 2026-10-14 the only copy; it used to be in the store's
-`raw/` too). The benchmark is reproducible; don't conclude it is lost.
-
-Every figure in that report reproduced
-exactly: 45,209 rows, 905 distinct services, 22,617 hits on the top service,
-one source IP (171.6.30.201), 42,071 drops + 135 IPS prevents + 17 rejects,
-2,978 accepted, and the accepted breakdown (https 1,022 / FW1_ica_services
-1,005 / http 910). `R2004` independently flagged exactly those 2,978 rows —
-rediscovering the report's central finding (Check Point's Implied Rule
-overriding an explicit drop) from a log-source-neutral rule that knows nothing
-about Check Point.
-
-What the tool could not produce, and a human analyst did: the OSINT pivot
-(the source is a compromised MikroTik RouterOS v6.45.3 on residential 3BB
-broadband, i.e. a botnet node), Check Point's own mechanism behind the bypass, and
-the reading that Check Point's "Key Install" action is an IKE Phase 1
-handshake rather than a successful compromise. The system quantifies and
-localises; interpretation still needs an analyst.
-
-## Extending the rule engine
-
-**A new rule is a product rule now** (`specs/per_product_rules.md`). Firewall products share
-`rules_firewall.build(product, prefix, service, unit)` - vertical / horizontal scan, allowed after
-probing, beaconing, feed matches - and add their own in `rules_<product>.py` (Palo Alto's PAN-DB
-category, Check Point's Threat Prevention verdict); `rules.py` appends each module's `RULES`,
-`PREPARE` (lines), `LEVEL`, `LABELS`, `FAMILY` (confidence family = the generic twin's),
-`EQUIVALENT` (the generic rule of the same behaviour, for escalations and VERIS) and
-`SUPERSEDES` (generic rules that stop on its rows). A product rule reads `product_events`; a
-line-drawing rule binds `$above` / `$minimum` / `$note` (`lines.evidence_line`, `lines.trw`); ids
-follow `RULE_ID_PATTERN`. Every rule needs its behaviour's document read (D14), a `RULE_META`
-entry, a place in `areas.py`, and a case in `tests/check_firewall_rules.py`.
-
-**SigmaHQ's rules are not written here** (`specs/sigma_windows.md`, gotcha #79). They are
-SigmaHQ's, converted at image build: `rules_sigma.py` hands the high / critical ones to
-`apply_rules` as `SIGMA-<uuid>` Windows product rules, `sigma.apply_marks` runs the rest as
-marks. A single Windows event that SigmaHQ covers is not a new in-house rule (W-D1) - unless it is
-a product's own verdict (WIN-MAL-2), in which case add SigmaHQ's twin to `sigma.TWINS`. **A new
-SigmaHQ commit is a new pin**: `SIGMA_COMMIT` and the archive's `--checksum` in the Dockerfile,
-then `tests/check_sigma.py` (its `KNOWN_DIFFER` re-measured, never widened silently) and the
-baseline's `sigma` sections re-taken and said so.
-
-The generic rules live in `rules.py` as `(rule_id, SQL)` pairs — each is one
-`INSERT INTO findings SELECT ...` over `raw_events`. Correlation rules join
-against a `GROUP BY ... HAVING` subquery. Conventions: `R1xxx` single-event
-host/auth, `R2xxx` correlation, `R3xxx` network/firewall. Insert `lvl` as
-`NULL`, declare the rule's Sigma level in `RULE_LEVEL` (gotcha #26), and
-always populate `mitre`. Two exceptions: a rule may write a *lower* weight when the
-event itself says so (`apply_rules` keeps `least(written, declared)` - WIN-MAL-2 when
-Defender remediated, WIN-HOST-3's blocked change; gotcha #76), and a product's own verdict
-that names no attacker behaviour carries no technique (CP-MAL-2's Anti-Virus, WIN-MAL-2).
-
-Adding a rule needs no engine changes — append to `RULES` and it runs. Add a
-`RULE_LEVEL` entry (a rule without one defaults to `low`) and a
-matching short entry to `RULE_LABELS` too: that is what names the rule's
-edges in the attack graph (`descr` is a full sentence with IPs in it, far too
-long for an edge). A rule with no label falls back to its bare id.
-
-**And a `RULE_META` entry in `rule_meta.py`** (gotcha #29): a fresh UUID v4,
-title, Sigma `status`, the ATT&CK techniques its SQL writes, logsource
-category, false positives and the ADS sections. `python
-tests/check_rule_meta.py` fails until the metadata exists and its
-techniques match the SQL - run it with the parity check.
-
-Current set (in-house; SigmaHQ's 1,492 high / critical Windows rules run beside them,
-`SIGMA-<uuid>`): **Palo Alto** PAN-SCAN-1..3, PAN-MAL-1..2, PAN-INTEL-1..3 · **Check Point**
-CP-SCAN-1..3, CP-MAL-1..2, CP-INTEL-1..3 (gotcha #62) · **Windows** WIN-BRUTE-1..3,
-WIN-AUTH-1 (gotcha #65), WIN-LAT-1..3, WIN-HOST-1..2 (gotcha #66), WIN-MAL-1, WIN-INTEL-1..2
-(gotcha #67), WIN-BRUTE-4, WIN-LAT-4 (gotcha #68), WIN-MAL-2 Defender detection, WIN-HOST-3 Defender
-turned off (gotcha #76) · **generic** (every other product's rows; superseded on Palo Alto /
-Check Point rows, and the sign-in ones on Windows rows, gotcha #63): R2000 brute-force burst · R2002
-port scan · R2003 service sweep · R2004 policy gap · R2005 spray (many sources, one account) ·
-R2006 multi-source logins within an hour · R2007 beaconing · R2008 login after brute force ·
-R2009 measured spray · R3001 large transfer (everywhere - no data-transfer rule yet) · R3002
-malware category · R3003-R3005 threat-intel matches. R1000-R1004, R2001, R3000 and R3006 left
-the set on 2026-10-20 (gotcha #56).
-
-Three things worth copying when writing new correlation rules:
-- **Get the MITRE tag right — it propagates.** `R2001` was originally tagged
-  `T1110` (Brute Force) when it actually detects repeated *blocked*
-  connections. The AI layer dutifully narrated port-scan denies as
-  "brute-force attempts". Retagging it `T1595` (Active Scanning) fixed the
-  narrative. The AI trusts the rule engine's labels.
-- **Guard aggregates against ordinary behaviour.** `R2004` ("allowed despite
-  many blocks") would fire on any user who hits a few blocked sites, so it
-  requires >=20 denies *and* denies >= 3x allows. Test new correlation rules
-  against `tests/gen_usecase.py`, whose benign rows exist precisely to catch
-  this.
-- **Write the outer `WHERE` too.** A correlation rule is a join against a
-  `GROUP BY ... HAVING` subquery, and it is easy to guard the *threshold* and
-  forget that without a `WHERE` on the outer query every row belonging to a
-  matching entity gets flagged - its benign rows included. That is exactly
-  how R2002/R2003 came to flag 18,972 allowed connections as a port scan
-  (gotcha #23). Ask of every new rule: *which rows are the evidence?* and
-  filter to those, not just to the entity.
-
-## Scale notes
-
-Verified on real customer data: 36 Palo Alto CSVs, 424,948 rows, 123,861
-findings — all 36 ingested in **~7 seconds** total (60MB of DuckDB vs 289MB
-of source files). The largest single file (45MB / 65,534 rows) takes ~1s.
-Upload returns in ~0.25s regardless of file size.
-
-For reference, the same workload took 3.5 minutes per large file before the
-DuckDB bulk-load fix, and ~38s total while decode was still Python-per-row.
-
-Any change to ingest or rules should be checked for **parity**, and the
-baseline to check against is `tests/baseline.json`, not this file - per-file
-`rows / flagged / per-rule` counts, **676 entries** since 2026-11-02 (re-taken on the dev
-container for the product rules - gotcha #63; the Elastic PAN-OS samples added; the user's
-WinEvents.log, 4 flagged - gotcha #76; this PC's own six exports, `D:/logtest/this-pc`, and its
-Security log since 2026-11-02 - 31,578 rows, WIN-BRUTE-1 12 / WIN-AUTH-1 36 on the owner's own
-mistyped passwords, no SigmaHQ suggestion (specs/sigma_windows.md); and a
-`sigma` section on 217 Windows entries - SigmaHQ's commit, flagged, rules and marks, kept apart so
-`flagged` / `rules` stay ours, gotcha #79; story 6d, 2026-11-02, moved five `sigma` sections only -
-4688 without Sysmon read by SigmaHQ's process creation rules: PurpleSharp's own 4688, attack_data's
-comsvcs lsass dump, and three EVTX-ATTACK-SAMPLES - RDP tunnel, ATSVC tasklist, MalSecLogon's lsass
-clone - gotcha #81), asserted by
-`tests/check_parity.py`. Run it against the dev container (`--url http://127.0.0.1:8092`) with
-the AI review off there (gotcha #64) - with it on, a hundred uploads take hours. A silent drop to 0 findings
-is exactly the failure mode gotcha #2 describes, and a *plausible* wrong
-finding is gotcha #22.
-
-The four anchors still worth knowing by heart, as of 2026-09-15:
-`log_13_.csv` 65534/11324 · `src10-8-3-215.csv` 25579/**18888** ·
-`log_22_.csv` 20530/14832 · `auth.log` 776/329. Two of those moved from the
-numbers recorded before that date and both moves are deliberate:
-`src10-8-3-215.csv` 25579 → 18888 from the R2002/R2003 deny restriction
-(gotcha #23), `log_22_.csv` 14514 → 14838 from `R3004` (+324), the
-threat-intel rule of gotcha #17, which postdates the original figure -
-and since the feed refresh of 2026-10-14 it is 14832 (R3004 318).
-
-The corpus behind the baseline: **98 cases / 988,818 rows** from
-`d:\forensic system\Logtest`, plus the Check Point export (in `raw/`, see
-*Real-world benchmark*) and the two `gen_usecase` files. `Logtest` holds 108
-log-shaped files; the other 10 are 0-byte and the API rejects them with 400,
-and 6 more are not logs at all (email headers, a placeholder, and two
-artefacts the ransomware itself dropped) which ingest as 0 findings. About a
-third of the corpus is duplicated content: `Data log Firewall paloalto/` (36
-files) and `Virus Dec28-2025/` (33) overlap, several byte-identical, and
-`log(30).csv` exists in two different versions under one name - so
-**dedupe before quoting a corpus total**, and expect 98 cases from 92 usable
-files. As of 2026-09-28 those folders sit under
-`Logtest/2026-01/2026 SUMMITGROUP info Virus/` (with `log esxi 131/log/`
-for `auth.log`), and the Azure sign-in export is
-`Logtest/2026-02/KM23 ITSupport_InteractiveSignIns_2026-06-04_2026-06-11.csv`.
-
-**Without Docker** the pipeline still runs on the host: `pip install duckdb`,
-set `DATA_DIR` to a scratch folder, then `storage.create_company(...)` once
-(a case needs a customer - gotcha #40), `storage.create_case(..., company_id=)` +
-`pipeline.process_case(case_id, Path(file), kind)` per file. That
-reproduces the baseline anchors exactly except the intel rules
-(`R3003`-`R3006`), because `DATA_DIR/intel/` is empty - so `log_22_.csv`
-gives 14514, not 14832. It is how gotcha #24 was measured while the Docker
-daemon was down.
-
-Zero-finding files are expected for ESXi system logs (not auth logs) and for
-Palo Alto exports whose every row is `allow`; check with the gotcha #7 query
-before assuming a mapping bug. The auth-on-CSV work of gotcha #11 was
-validated this way (92 of 93 files byte-identical, the 93rd being the Azure
-sign-in export going 0 → 79 findings), and it is what caught the Exchange
-false positive.
-
-**Timing claims need more than one run** (gotcha #18). Repeat runs of the
-unchanged corpus took 52s, 60s, 67s and 74s - that spread is host I/O for a
-hundred sequential uploads, not the pipeline. Re-processing all 211 cases
-already in the store, which skips upload entirely, takes **53s**.
-
-**Validating costs store space.** Since 2026-10-22 an admin or a manager can delete a case
-(`DELETE /api/cases/{id}`, specs/case_delete.md); duplicates are still pruned with the tool below.
-`check_parity.py` uploads the whole corpus on every run and a re-process
-replaces nothing, so a handful of validation runs took one store from ~99 to
-**619 cases** - 547 of them byte-identical re-uploads of 71 files, 4.8 GB on
-disk and a dashboard nobody can read. `tools/prune_cases.py` is the bulk cleanup, dry-run by
-default:
-
-```bash
-docker exec forensic-analyzer-forensic-analyzer-1 python tools/prune_cases.py
-docker exec forensic-analyzer-forensic-analyzer-1 python tools/prune_cases.py --apply --keep-reviewed
-```
-
-It groups cases by **md5 of the preserved raw file**, not by filename - the
-corpus has two different exports both called `log_30_.csv` - and keeps one
-per group, preferring a case with analyst decisions, then one with a cached
-analysis, then the newest. **That order matters and was learned the hard
-way**: keeping merely the newest meant keeping a fresh validation duplicate
-and deleting the older case that held the AI analysis, which destroyed 10
-cached analyses (each a Groq call under a ~1/minute budget). A duplicate has
-identical content by definition, so the copy worth keeping is the one with
-work attached. Always run it without `--apply` first, and pass
-`--keep-reviewed` unless you mean to delete audit logs - a case's
-`review/{case_id}.jsonl` goes with it.
-
-Remaining known ceiling: `.log`/JSON still decode in Python (~15k rows/sec).
-Only worth moving to SQL `regexp_extract` if large syslog files show up;
-CSV (the bulk of real data) already bypasses Python entirely. The 10 GB
-upload requirement makes this real: measured on the host, CSV ran at ~77 MB/s
-(45 MB in 0.59s, so ~2-3 min for 10 GB) and the Python path at ~21 MB/s on a
-28 MB file (~8 min or more for 10 GB). Neither was measured on a GB-sized
-file.
-
-~~Known, not investigated: the ESXi `auth.log` has no year in its timestamps~~ -
-**wrong, corrected 2026-10-14 (gotcha #42):** every line carries a full ISO
-8601 UTC timestamp, and the 2014-07-02 minimum is real - 138 monthly
-`vpxuser` password rotations by vCenter reach back to the host's install.
+A new rule is a **product rule** (`specs/per_product_rules.md`): `rules_<product>.py` (firewall
+products share `rules_firewall.build`), reading `product_events`, its line from `lines.py`, its
+behaviour's document read (D14), a `RULE_META` entry (`python tests/check_rule_meta.py`), a
+place in `areas.py` and a case in the product's check. **SigmaHQ's rules are not written here**
+- a single Windows event SigmaHQ covers is not an in-house rule, and a new SigmaHQ commit is a
+new pin (gotcha #79). Get the MITRE tag right - the AI trusts it - and give a correlation rule
+an outer `WHERE` on the evidence rows (gotcha #23). Load the skill before writing or changing
+any rule.

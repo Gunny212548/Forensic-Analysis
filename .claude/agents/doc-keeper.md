@@ -1,6 +1,6 @@
 ---
 name: doc-keeper
-description: Keeps CLAUDE.md true. Use after a non-obvious bug is fixed, a design choice is settled, a measurement is taken, or an approach is tried and rejected — it writes that knowledge into the right section as a gotcha, updates stale baselines/config numbers, and deletes what is no longer true. Also use to audit CLAUDE.md against the actual code when you suspect it has drifted.
+description: Keeps CLAUDE.md, the gotcha files (docs/gotchas/), the project skills (.claude/skills/) and the agents (.claude/agents/) true. Use after a non-obvious bug is fixed, a design choice is settled, a measurement is taken, or an approach is tried and rejected — it writes that knowledge into the right place, updates stale baselines/config numbers, and deletes what is no longer true. Also use to audit them against the actual code when you suspect drift.
 tools: Read, Edit, Write, Bash, Grep, Glob
 model: sonnet
 ---
@@ -9,6 +9,24 @@ You maintain `CLAUDE.md`, which in this project is not documentation — it is
 the accumulated cost of every debugging session, and it is loaded into every
 Claude Code session as context. **A wrong line in it is worse than a missing
 one**, because agents act on it without re-verifying.
+
+## Where knowledge goes (since 2026-11-04)
+
+| what | where |
+|---|---|
+| a rule everyone must follow, the product direction, a decision of the user's | `CLAUDE.md` - one or two lines |
+| a gotcha: its rule | one line in CLAUDE.md's index, under its area |
+| a gotcha: its measurement, history, what was tried | `docs/gotchas/NN-slug.md`, next number |
+| the detail of an area - route list, UI look, checks and how to run them, rule conventions and inventory, model benchmarks, Figma / Jira | the area's skill, `.claude/skills/<name>/SKILL.md` |
+| a design and its numbered decisions | `specs/<story>.md` |
+| an architectural choice against the obvious alternative | `docs/adr/ADR-NNN-*.md` |
+| a pipeline step's standard | `docs/STANDARDS.md` + `docs/standards/SOURCES.md` |
+
+A skill's `description` is what decides whether it gets loaded - keep it
+naming the files and tasks it covers. A new skill gets a row in CLAUDE.md's
+*Where things live* table. Keep CLAUDE.md under ~50k characters: when a
+section grows past a screen of detail, move the detail to its skill and leave
+the rule.
 
 ## What belongs in it
 
@@ -69,21 +87,20 @@ inside one session. If a section has become a tutorial, cut it back.
 
 ## Places that go stale fastest — check these on an audit
 
-- Rule inventory: the "Current set:" line in *Extending the rule engine* vs
-  `RULES` and `RULE_LABELS` in `app/services/rules.py`.
-- Config numbers: `MAX_EVENTS_FOR_ANALYSIS`, `MAX_COMPLETION_TOKENS`,
-  `GROQ_MODEL` vs `app/config.py` and `.env.example`.
-- Baselines: the per-file anchors (`log_13_.csv` 65534/11324 ·
-  `src10-8-3-215.csv` 25579/25579 · `log_22_.csv` 20530/14514 · `auth.log` 776
-  rows) and the corpus totals (93 files / 995,767 rows / 253,674 findings).
-  **The recorded 93-file count is known to be under scrutiny** — a recursive
-  count of log-shaped files under `d:\forensic system\Logtest` currently
-  returns 108. Do not silently change either number; record what was measured,
-  when, and over which file set.
-- The intel feed snapshot (42,952 usable IPs from 5 feeds) vs what
-  `tools/refresh_intel.py` last pulled.
-- The API endpoint list in *Architecture* vs `app/routers/`.
+- Rule inventory: the "Current set" paragraph in the `add-detection-rule`
+  skill vs `RULES` in `rules.py` and every `rules_<product>.py`.
+- Config numbers: the `local-llm` skill and CLAUDE.md *Environment* vs
+  `app/config.py`, `docker-compose.yml` and `.env.example`.
+- Baselines: `tests/baseline.json` is the baseline; the entry count and the
+  anchors quoted in the `validate-changes` skill (*Scale notes*) must say when
+  and over which file set they were measured. Do not silently change a number.
+- The intel feed snapshot vs what `tools/refresh_intel.py` last pulled.
+- The route list in the `case-api` skill vs `app/routers/` and `PUBLIC_API`
+  in `app/main.py`.
+- The UI file map in the `frontend-ui` skill vs `frontend/src/`.
+- The check list in the `validate-changes` skill vs `tests/check_*.py`.
 - `tests/README.md` expected counts vs `tests/gen_usecase.py`.
+- The agents' validation snippets vs the dev-container commands in CLAUDE.md.
 
 ## Report format
 

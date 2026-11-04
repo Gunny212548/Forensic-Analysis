@@ -6,10 +6,12 @@ model: opus
 ---
 
 You implement changes in a standalone forensic log analyzer (FastAPI +
-DuckDB, ~3k lines Python, vanilla-JS single page). **Read `CLAUDE.md` before
-touching anything** — its 20 numbered gotchas are real debugging sessions
-already paid for, and re-introducing one is the most expensive mistake you
-can make here.
+DuckDB, a Vite/React UI in `frontend/`). **Read `CLAUDE.md` before touching
+anything** — its gotcha index (the evidence in `docs/gotchas/NN-*.md`) is real
+debugging sessions already paid for, and re-introducing one is the most
+expensive mistake you can make here. Load the project skill for the area you
+change (`.claude/skills/`: case-api, frontend-ui, add-detection-rule,
+validate-changes, local-llm).
 
 ## How to write
 
@@ -24,9 +26,10 @@ can make here.
   graph, risk scores and source profiles are all SQL over `raw_events` on
   purpose. A Python loop over rows is almost always the wrong answer here.
 - **No new dependencies without saying why out loud.** pandas/pyarrow were
-  considered and rejected (tens of MB for no gain). `static/index.html` has
-  **no external JS at all** and no build step — a vis-network CDN dependency
-  was deliberately removed. Don't add a framework.
+  considered and rejected (tens of MB for no gain). The UI fetches **nothing
+  at runtime** - every asset bundled, dependencies pinned exactly, `static/`
+  generated and never edited by hand; a vis-network dependency was
+  deliberately removed and the attack graph stays a static SVG.
 - **Never use DuckDB `executemany()` to bulk-insert** (gotcha #1): ~300
   rows/sec, 20k rows = 65 seconds. Write a staging CSV and let DuckDB's CSV
   reader ingest it in one statement (~6s for the same file).
@@ -34,9 +37,10 @@ can make here.
   entirely, so a change in `decode.py` must also land in
   `pipeline._ingest_csv_sql` (`ip_expr`, `action_expr`, the verdict `CASE`) or
   it does nothing for real CSV data — which is the bulk of real data.
-- **A new rule needs three things**, not one: the `(rule_id, SQL)` entry in
-  `RULES`, a short `RULE_LABELS` entry (it names edges in the attack graph;
-  `descr` is a whole sentence and far too long), and a correct `mitre` tag.
+- **A new rule is a product rule** (the `add-detection-rule` skill): its
+  `RULES` entry, level, a short label (it names edges in the attack graph;
+  `descr` is a whole sentence and far too long), a `RULE_META` entry, a place
+  in `areas.py`, and a correct `mitre` tag.
   **The MITRE tag propagates into the AI narrative** — `R2001` tagged `T1110`
   made the model narrate port-scan denies as "brute-force". Also: no product or
   protocol name in `descr` unless the rule can only fire on that log source.
@@ -45,12 +49,11 @@ can make here.
   beaconing. An unguarded correlation rule is not finished — it is 16,599
   false positives waiting (that number is real: Windows Delivery Optimization
   peer-to-peer traffic).
-- **Don't spend the model's output budget** (gotcha #5). `MAX_COMPLETION_TOKENS
-  =950` with `MAX_EVENTS_FOR_ANALYSIS=15` is measured-optimal; lowering
-  max_tokens loses `recommendations` and `timeline` entirely. The requested
-  JSON schema order (`summary → attack_chain → recommendations → timeline`) is
-  a priority list because models emit keys in schema order — **don't reorder
-  it casually**. Input tokens are free; output tokens are the capped resource.
+- **The AI explains and never decides** (gotcha #72); every fact it gets is
+  computed in SQL first (gotcha #13), and its output is decoded inside a JSON
+  schema and grounding-checked (gotcha #37). The model is local Ollama
+  (`local-llm` skill); gotcha #5's token limits are Groq's only. Schema key
+  order is still a priority list - don't reorder it casually.
 - **Never ask the model for the attack graph** (gotcha #10). It is derived in
   SQL, exact, and free.
 - **Review state stays outside the case DuckDB** (gotcha #19) — `db.drop()`
@@ -66,21 +69,23 @@ can make here.
 Reporting an unverified change as done is the one thing you must not do.
 
 ```bash
-docker compose up -d --build --force-recreate
-python tests/gen_usecase.py /tmp/usecase
-curl -s -X POST http://localhost:8091/api/upload -F "file=@/tmp/usecase/nightfall-auth.log"
-curl -s -X POST http://localhost:8091/api/upload -F "file=@/tmp/usecase/nightfall-firewall.csv"
-curl -s http://localhost:8091/api/cases
-docker logs forensic-analyzer-forensic-analyzer-1 --tail 50
+# the dev container: its own store, port 8092, app/ tools/ tests/ mounted, AI review off
+docker compose -p forensic-dev -f docker-compose.yml -f docker-compose.dev.yml up -d
+export FA_EMAIL=... FA_PASSWORD=...      # an account on the dev store (tools/create_user.py)
+python tests/gen_usecase.py <scratch>/usecase
+python tests/check_parity.py <scratch>/usecase --url http://127.0.0.1:8092
+docker logs forensic-dev-forensic-analyzer-1 --tail 50
+cd frontend && npm run build             # after any UI change
 ```
 
-Expected, from `tests/README.md`: `nightfall-auth.log` 19 rows / 19 flagged
-(R1000:8 R2000:8 R1002:3 R1001:3 R1003:4 R1004:1); `nightfall-firewall.csv`
-26 rows / **21** flagged (R2002:15 R2001:15 R3000:6 R3001:2 R3002:1). The 5
-unflagged benign rows are the false-positive check — **if your change flags
-any of them, your change is wrong.** Host port 8091 (the older Wazuh-based
-app uses 8090 — don't collide). Prefix `docker exec`/`docker cp` with
-`MSYS_NO_PATHCONV=1` on Windows/git-bash.
+Expected, from `tests/README.md` (asserted against `tests/baseline.json`):
+`nightfall-auth.log` 19 rows / 12 flagged (R2000 8, R2009 11, R2008 1);
+`nightfall-firewall.csv` 26 rows / 18 flagged (PAN-SCAN-1 15, R3001 2,
+PAN-MAL-2 1). The unflagged benign rows are the false-positive check — **if
+your change flags any of them, your change is wrong.** Then the
+`tests/check_*.py` of the layer you touched - the `validate-changes` skill
+says which and how. Never test against the 8091 store. Prefix `docker
+exec`/`docker cp` with `MSYS_NO_PATHCONV=1` on Windows/git-bash.
 
 If your change could move counts on real log data, say so explicitly and
 recommend a corpus parity run — don't guess at the impact.
