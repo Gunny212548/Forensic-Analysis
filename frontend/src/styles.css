@@ -319,6 +319,12 @@
   .progress-row.err .progress-fill { background: var(--danger); }
   .progress-row.err .progress-text { color: var(--danger); }
   .format-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .format-group { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .format-group-label { flex: 0 0 120px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+  @media (max-width: 640px) {
+    .format-group { flex-direction: column; gap: 6px; }
+    .format-group-label { flex-basis: auto; }
+  }
   .chip {
     font-size: 12px; color: var(--text-2); background: var(--subtle);
     border: 1px solid var(--panel-border); border-radius: 999px; padding: 6px 16px;

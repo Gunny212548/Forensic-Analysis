@@ -41,22 +41,19 @@ function processingPct(m) {
   return m.progress?.pct || 0
 }
 
-// FR-2.6: the formats the decoder has actually been run against real exports
-// of (CLAUDE.md, "Formats exercised against real data"). Anything else is
-// still accepted and decoded heuristically - this list is what is known to
-// work, not a whitelist.
+// FR-2.6: the formats a file is identified as and read (app/services/ingest/identify.py,
+// logsources.py, winevent.py, checkpoint_le.py). Anything else is still accepted, but
+// kept as evidence and not analysed - no column is guessed (gotcha #53). Keep this list
+// in step with identify.py when a reader is added.
 const SUPPORTED_FORMATS = [
-  'VMware ESXi auth.log / shell.log',
-  'Linux syslog / auth.log (RFC 5424 / 3164)',
-  'Palo Alto CSV export',
-  'Check Point SmartConsole CSV',
-  'FortiGate traffic log',
-  'Microsoft Entra ID sign-in CSV / JSON',
-  'Exchange Online message trace CSV',
-  'Other CSV / JSON (columns guessed)',
+  { group: 'Firewall', items: ['Palo Alto PAN-OS traffic CSV', 'Check Point SmartConsole CSV',
+    'Check Point Log Exporter (in a ManageEngine export)', 'FortiGate traffic log'] },
+  { group: 'Windows', items: ['Security / Sysmon / System / Application, incl. Defender',
+    '.evtx', 'event XML', 'Winlogbeat / NXLog JSON', 'Splunk WinEventLog text'] },
+  { group: 'Linux / ESXi', items: ['OpenSSH sshd', 'Linux-PAM', 'VMware ESXi auth.log'] },
+  { group: 'Microsoft cloud', items: ['Entra ID sign-in CSV / JSON', 'Exchange Online message trace CSV'] },
   // FR-2.3: any of the above, compressed. A multi-file .zip becomes one case.
-  '.gz (streamed)',
-  '.zip (multi-file → one case)',
+  { group: 'Compressed', items: ['.gz', '.zip (every file in it -> one case)'] },
 ]
 
 /** FR-2.7: "my" uploads are the cases whose evidence this account acquired
@@ -229,7 +226,8 @@ export default function Upload({ user }) {
         <div>
           <h1>Upload Log File</h1>
           <div className="subtitle">
-            Start a new case by uploading any syslog, CSV or JSON log export
+            Start a new case by uploading a log file. A format not listed below is kept as evidence but
+            not analysed.
           </div>
         </div>
         <a className="btn-secondary" href="#/dashboard">
@@ -363,7 +361,7 @@ export default function Upload({ user }) {
               </>
             )}
             <div className="drop-hint">
-              syslog / auth.log · CSV firewall exports · JSON · .gz · .zip — max{' '}
+              Firewall CSV · Windows event logs · syslog · JSON · .gz · .zip — max{' '}
               {limits ? fmtBytes(limits.max_bytes) : '10 GB'} per file, uncompressed
             </div>
             <input type="file" ref={fileRef} onChange={(e) => pick(e.target.files)} />
@@ -398,13 +396,18 @@ export default function Upload({ user }) {
 
       <div>
         <div className="section-label">Supported formats</div>
-        <div className="format-chips">
-          {SUPPORTED_FORMATS.map((f) => (
-            <span className="chip" key={f}>
-              {f}
-            </span>
-          ))}
-        </div>
+        {SUPPORTED_FORMATS.map((g) => (
+          <div className="format-group" key={g.group}>
+            <span className="format-group-label">{g.group}</span>
+            <div className="format-chips">
+              {g.items.map((f) => (
+                <span className="chip" key={f}>
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="panel">
