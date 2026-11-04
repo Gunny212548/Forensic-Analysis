@@ -80,7 +80,11 @@ GET  /api/findings[?company_id=[&project_id=]] the Findings page: workflow findi
                                              across cases, counts, open_count;
                                              decision= / undecided_count (the badge,
                                              #73); status=open = not Resolved (#51)
-POST /api/cases/{id}/review                  one analyst decision (appended)
+POST /api/cases/{id}/review                  one analyst decision (appended); 409 while
+                                             the case's project is Closed
+POST /api/cases/{id}/review/batch            accept the ticked suggestions at once:
+                                             {finding_keys, action: "accept"}, all or
+                                             nothing, one log entry each (2026-11-04)
 GET  /api/cases/{id}/review-log              full decision history
 GET  /api/cases/{id}/custody                 evidence digest + chain of custody,
                                              hash chain checked on read
