@@ -80,7 +80,8 @@ def ingest_warnings(manifest: dict) -> list[str]:
     """What the Ingest step lists under itself. Warnings, never blocks (D8, D9)."""
     out = []
     if not investigation.answered(manifest):
-        out.append("No question recorded for this investigation - required before the report is approved")
+        # Not a gate since 2026-11-03 (the user; report.gate): the draft says "-" without one.
+        out.append("No question recorded for this investigation - the report draft will show '-' for it")
     if provenance.reprocess_needed(manifest):
         out.append("A declared time zone or clock offset has not been applied yet - re-process to apply it")
     for d in manifest.get("duplicate_of") or []:

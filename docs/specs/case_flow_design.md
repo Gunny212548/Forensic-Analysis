@@ -501,7 +501,9 @@ analysis repeat).
   thousands of events (a Palo Alto file: 18,888 flagged rows), so per-event-only is not
   workable.
 - **D8 (Q15) - the case question is required before the report.** Asked at Ingest, editable
-  any time, the report cannot be approved without it and opens with it.
+  any time, the report cannot be approved without it and opens with it. *Reversed on 2026-11-03
+  (the user, docs/specs/forensic_report.md): the question is not part of the report gate (`report.gate`);
+  a draft without one shows "-". The Ingest warning says so since 2026-11-04.*
 - **D9 (Q16) - provenance is optional.** Entered at upload or later in Ingest; a missing field
   is a warning, never a block, and is listed under the report's limitations.
 
