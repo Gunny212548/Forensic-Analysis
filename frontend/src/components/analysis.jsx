@@ -1,5 +1,5 @@
 import { SEV_CLASS, shortTs } from '../format.js'
-import { Empty, MitreTags } from './common.jsx'
+import { Empty, MitreTags, RuleTags } from './common.jsx'
 
 /** Horizontal stage flow, shown small on Overview and full on Attack Chain. */
 export function ChainFlow({ chain }) {
@@ -150,7 +150,7 @@ export function RiskTables({ risk }) {
                   <td className="risk-score">{i.score}</td>
                   <td className="risk-n">{i.findings}</td>
                   <td className="risk-rules">
-                    <MitreTags list={i.rules} />
+                    <RuleTags list={i.rules} />
                   </td>
                 </tr>
               ))}

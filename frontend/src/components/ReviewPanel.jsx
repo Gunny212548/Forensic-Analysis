@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { aiReviewAgain, getFindings, postReview } from '../api.js'
 import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
-import { Empty, MitreTags } from './common.jsx'
+import { Empty, FLAG_TEXT, MitreTags, RuleName } from './common.jsx'
 import FindingEvents from './FindingEvents.jsx'
 import RuleCard from './RuleCard.jsx'
 import { useAccess } from '../permissions.js'
@@ -223,27 +223,26 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
             </span>
           )}
           <span className="rv-status">{st}</span>
-          <span className={`rv-conf rv-conf-${f.confidence}`}>confidence: {f.confidence}</span>
-          {/* Admiralty Code (confidence.py): letter = how far the log
-              source as read can be trusted, number = how well-supported
-              the finding is. The reasons are on hover - one sentence
-              each, so the grade can be checked rather than believed. */}
-          {f.admiralty && (
-            <span
-              className="rv-admiralty"
-              title={
-                `${f.admiralty.reliability.grade} - ${f.admiralty.reliability.name}: ` +
-                `${f.admiralty.reliability.why.join('; ')}\n` +
-                `${f.admiralty.credibility.grade} - ${f.admiralty.credibility.name}: ` +
-                `${f.admiralty.credibility.why.join('; ')}\n(Admiralty Code / NATO 6x6)`
-              }
-            >
-              {f.admiralty.code}
-            </span>
-          )}
+          {/* Confidence in words; its Admiralty grade (confidence.py: letter = how far the
+              log source as read can be trusted, number = how well-supported the finding is)
+              and the reasons are on hover, so the grade can be checked rather than believed. */}
+          <span
+            className={`rv-conf rv-conf-${f.confidence}`}
+            title={
+              f.admiralty
+                ? `Admiralty grade ${f.admiralty.code} (NATO 6x6)\n` +
+                  `${f.admiralty.reliability.grade} - ${f.admiralty.reliability.name}: ` +
+                  `${f.admiralty.reliability.why.join('; ')}\n` +
+                  `${f.admiralty.credibility.grade} - ${f.admiralty.credibility.name}: ` +
+                  `${f.admiralty.credibility.why.join('; ')}`
+                : undefined
+            }
+          >
+            Confidence: {f.confidence}
+          </span>
           {(f.flags || []).map((x) => (
-            <span className="rv-flag" key={x}>
-              {x}
+            <span className="rv-flag" key={x} title={FLAG_TEXT[x]?.[1] || x}>
+              {FLAG_TEXT[x]?.[0] || x}
             </span>
           ))}
           <button
@@ -253,7 +252,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
             aria-expanded={openRule === f.key}
             onClick={() => setOpenRule(openRule === f.key ? '' : f.key)}
           >
-            {f.rid} {openRule === f.key ? '▴' : '▾'}
+<RuleName rid={f.rid} max={40} /> {openRule === f.key ? '▴' : '▾'}
           </button>
           <span className="rv-n">{fmtNum(f.cnt)} events</span>
         </div>
@@ -287,7 +286,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
                     href={relatedHref(r.key)}
                     title={`Open ${r.rid} ${r.srcip || r.username || ''}`}
                   >
-                    {r.rid} {r.srcip || r.username}
+                    <RuleName rid={r.rid} max={30} /> {r.srcip || r.username}
                   </a>
                 ) : (
                   <button
@@ -297,7 +296,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
                     title={`Go to ${r.rid} ${r.srcip || r.username || ''}`}
                     onClick={() => reveal(r.key)}
                   >
-                    {r.rid} {r.srcip || r.username}
+                    <RuleName rid={r.rid} max={30} /> {r.srcip || r.username}
                   </button>
                 )
               ))}
@@ -477,7 +476,7 @@ function ByArea({ findings, areas, item }) {
             <div key={r.rid}>
               <div className="rv-rule-chip">
                 <span className={`ui-badge tone-${LEVEL_TONE[LEVEL_RANK.find((l) => r.items.some((f) => f.level === l))] || 'muted'}`}>
-                  {r.rid} · {r.items.length}
+                  <RuleName rid={r.rid} /> · {r.items.length}
                 </span>
               </div>
               {r.items.map(item)}
