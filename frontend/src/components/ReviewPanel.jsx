@@ -137,11 +137,11 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
       {/* The export gate is no longer repeated here: the case summary above the steps
           counts what the analyst decided, the step box what is left, and the Report
           step states the gate (the user, 2026-10-27: said twice already). */}
-      {/* The AI explains every suggestion (specs/ai_review_coverage.md). How far it is
+      {/* The AI explains every suggestion (docs/specs/ai_review_coverage.md). How far it is
           stands in the case summary's "AI explained" (the user, 2026-10-27: no second
           count here); this line is only for the ones without an explanation - a failed
           call, or advice written before the AI stopped suggesting decisions
-          (specs/ai_triage_verdicts.md) - and the Review again that sends them. */}
+          (docs/specs/ai_triage_verdicts.md) - and the Review again that sends them. */}
       {(() => {
         const missing = (data.findings || []).filter((f) => !f.ai_review?.what_happened).length
         // A case processed before the review ran in the background has no `ai_review`: shown

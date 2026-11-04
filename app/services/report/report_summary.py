@@ -1,5 +1,5 @@
 """The report draft's Executive Summary and recommendations, drafted by the local model
-(specs/forensic_report.md R-D10). The recommendations (section 9) came from each case's AI
+(docs/specs/forensic_report.md R-D10). The recommendations (section 9) came from each case's AI
 narrative until 2026-11-03; that narrative read suggestions not decided and was made before the
 decisions, so the user chose to drop it from the case page and draft them here, from the same
 confirmed groups and under the same check.

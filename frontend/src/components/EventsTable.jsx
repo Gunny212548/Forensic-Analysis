@@ -146,7 +146,7 @@ function toLocalInput(ts) {
 }
 
 /** SigmaHQ rules that mark this event without making it a suggestion - medium and below,
- *  threat hunting, or the twin of one of our rules (specs/sigma_windows.md S-D4, S-D7).
+ *  threat hunting, or the twin of one of our rules (docs/specs/sigma_windows.md S-D4, S-D7).
  *  Each names its author, as the Detection Rule License 1.1 asks of every match.
  *  Beside the event type, on its line: every row of the list is one line high. */
 function SigmaMarks({ marks }) {

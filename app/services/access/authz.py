@@ -1,6 +1,6 @@
 """The one place that answers "may this account do this to this customer's data".
 
-Roles and what each may do (IAI-14, specs/IAI-14_rbac.md, approved Q56-Q60), from
+Roles and what each may do (IAI-14, docs/specs/IAI-14_rbac.md, approved Q56-Q60), from
 NIST SP 800-53 Rev. 5 AC-3 (enforced in the server), AC-5 (separation of duties)
 and AC-6 (least privilege):
 
@@ -32,8 +32,8 @@ PROVENANCE = "evidence:provenance"
 VERIFY = "evidence:verify"
 REPROCESS = "case:reprocess"
 MERGE = "case:merge"
-DELETE_CASE = "case:delete"         # the case and its evidence, for good (specs/case_delete.md)
-DELETE_CUSTOMER = "customer:delete"  # the customer and every case of it (specs/customer_delete.md)
+DELETE_CASE = "case:delete"         # the case and its evidence, for good (docs/specs/case_delete.md)
+DELETE_CUSTOMER = "customer:delete"  # the customer and every case of it (docs/specs/customer_delete.md)
 ANALYZE = "case:analyze"
 REVIEW = "finding:review"
 ASSIGN = "finding:assign"          # to anyone; an analyst may take an unassigned finding

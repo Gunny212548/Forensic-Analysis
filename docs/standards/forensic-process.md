@@ -1,6 +1,6 @@
 # The forensic process, as the standards describe it - and what it asks of this tool
 
-Review of 2026-10-20, written to design the case flow of `specs/case_flow_design.md`
+Review of 2026-10-20, written to design the case flow of `docs/specs/case_flow_design.md`
 (Ingest -> Timeline -> Attack events -> Attack timeline -> Attack path / graph -> Report).
 Every statement below cites a document that was **read** (`SOURCES.md`); quotes are
 verbatim. The tool starts *after* collection: it receives log files someone else exported.

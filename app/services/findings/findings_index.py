@@ -104,7 +104,7 @@ def listing(company_id: str | None = None, status: str | None = None, severity: 
             area: str | None = None, unassigned: bool = False, decision: str | None = None,
             project_id: str | None = None) -> dict:
     """Workflow findings for one customer, or for every customer - with `project_id`,
-    for one investigation of it (specs/projects.md P2). The counts in the header
+    for one investigation of it (docs/specs/projects.md P2). The counts in the header
     describe that scope, before the status / severity / text filters narrow the table."""
     rows = []
     for m in storage.list_manifests(company_id):

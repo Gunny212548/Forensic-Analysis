@@ -1,7 +1,7 @@
 # The other five areas: which behaviours a detection needs (sources read 2026-10-22)
 
 The companion of `brute-force-detection.md`, for the remaining areas of D12
-(`specs/per_product_rules.md`): Authentication, Scanning & policy, Malware & C2, Data transfer,
+(`docs/specs/per_product_rules.md`): Authentication, Scanning & policy, Malware & C2, Data transfer,
 Threat intelligence. Every line cites a document marked read in `SOURCES.md`; nothing is from
 memory. ATT&CK pages are content v20.0; their detection strategies (DET / AN ids) are all v1.0,
 last modified 12 May 2026.

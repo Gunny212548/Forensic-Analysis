@@ -1,4 +1,4 @@
-"""SigmaHQ's Windows rules in the app (specs/sigma_windows.md, story 6).
+"""SigmaHQ's Windows rules in the app (docs/specs/sigma_windows.md, story 6).
 
     python tests/check_sigma.py <scratch> --sigma <SigmaHQ checkout> [--repo DIR] [--dockerfile FILE]
 

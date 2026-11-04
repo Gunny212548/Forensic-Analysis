@@ -113,7 +113,7 @@ Two more checks, each for its own layer:
   and Attack path wait for every decision; `/graph` empty until then, never a rejected group), and
   every step citing a standard marked read in `docs/standards/SOURCES.md`.
 - **SigmaHQ** - `tests/check_sigma.py <scratch> --sigma <checkout> --dockerfile <Dockerfile>` (gotcha #79,
-  `specs/sigma_windows.md`): the bundle at `/opt/sigma` matches the Dockerfile's pin and attributes every
+  `docs/specs/sigma_windows.md`): the bundle at `/opt/sigma` matches the Dockerfile's pin and attributes every
   rule; SigmaHQ's 445 Windows regression samples through the pipeline, 439 exact and only the six named
   differences; a failing SigmaHQ rule never fails a case. Needs a dev image built after story 6
   (`--build`) and the pinned commit's `regression_data/` copied in (`D:/sigma-spike/sigma`); ~30 min.
@@ -215,7 +215,7 @@ baseline to check against is `tests/baseline.json`, not this file - per-file
 container for the product rules - gotcha #63; the Elastic PAN-OS samples added; the user's
 WinEvents.log, 4 flagged - gotcha #76; this PC's own six exports, `D:/logtest/this-pc`, and its
 Security log since 2026-11-02 - 31,578 rows, WIN-BRUTE-1 12 / WIN-AUTH-1 36 on the owner's own
-mistyped passwords, no SigmaHQ suggestion (specs/sigma_windows.md); and a
+mistyped passwords, no SigmaHQ suggestion (docs/specs/sigma_windows.md); and a
 `sigma` section on 217 Windows entries - SigmaHQ's commit, flagged, rules and marks, kept apart so
 `flagged` / `rules` stay ours, gotcha #79; story 6d, 2026-11-02, moved five `sigma` sections only -
 4688 without Sysmon read by SigmaHQ's process creation rules: PurpleSharp's own 4688, attack_data's
@@ -272,7 +272,7 @@ hundred sequential uploads, not the pipeline. Re-processing all 211 cases
 already in the store, which skips upload entirely, takes **53s**.
 
 **Validating costs store space.** Since 2026-10-22 an admin or a manager can delete a case
-(`DELETE /api/cases/{id}`, specs/case_delete.md); duplicates are still pruned with the tool below.
+(`DELETE /api/cases/{id}`, docs/specs/case_delete.md); duplicates are still pruned with the tool below.
 `check_parity.py` uploads the whole corpus on every run and a re-process
 replaces nothing, so a handful of validation runs took one store from ~99 to
 **619 cases** - 547 of them byte-identical re-uploads of 71 files, 4.8 GB on

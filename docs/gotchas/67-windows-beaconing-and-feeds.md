@@ -2,7 +2,7 @@
 
 **67. Windows beaconing and feed matches: a beacon sleeps when the host does**
 
-Story 5c of `specs/windows_rules.md` (2026-10-26): WIN-MAL-1 (beaconing per process, Sysmon 3),
+Story 5c of `docs/specs/windows_rules.md` (2026-10-26): WIN-MAL-1 (beaconing per process, Sysmon 3),
 WIN-INTEL-1 (a connection to a listed address), WIN-INTEL-2 (a sign-in attempt from one). They
 supersede R2007 / R3003 / R3004 / R3005 on Windows rows; R3001 / R3002 stay generic (Windows logs
 carry no bytes or category, so they never match there).

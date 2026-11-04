@@ -103,7 +103,7 @@ export function Detection({ detection }) {
   )
 }
 
-/** Which SigmaHQ rule set ran on this evidence and what could not (specs/sigma_windows.md):
+/** Which SigmaHQ rule set ran on this evidence and what could not (docs/specs/sigma_windows.md):
  *  a rule with no event of its log source here is not applicable, never a 0; one reading ETW
  *  or a channel the Sigma taxonomy does not name cannot be read; one pySigma could not convert
  *  is listed too (ADR-006 decision 3). High / critical rules are suggestions, the rest marks. */

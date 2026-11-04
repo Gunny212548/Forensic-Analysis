@@ -1,4 +1,4 @@
-"""SigmaHQ's Windows rules on a case's win_events (specs/sigma_windows.md).
+"""SigmaHQ's Windows rules on a case's win_events (docs/specs/sigma_windows.md).
 
 The rules arrive converted: the image's `sigma` build stage runs tools/sigma_build.py on a
 pinned SigmaHQ commit and leaves one JSON at SIGMA_RULES (S-D3). Nothing here imports

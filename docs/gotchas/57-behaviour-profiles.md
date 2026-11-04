@@ -7,7 +7,7 @@ accounts tried, the most failures and the most refusals in any 1, 10 and 60 minu
 first success after a failure and its gap, destinations, refused ports and services, bytes
 (and bytes to public addresses, over R2007's own ranges - `rules.IPV4_RE`,
 `NON_PUBLIC_IPV4_RE`, checked to stay verbatim in R2007's SQL), hours active. Design and
-decisions: `specs/behaviour_profiles.md` (Q27-Q29).
+decisions: `docs/specs/behaviour_profiles.md` (Q27-Q29).
 
 **Accounts too** (branch `esxi-auth-dedupe`): `profile_account`, per user name lower-cased
 ("Joe" and "joe" are one account): failures / successes / unknown-account attempts, sources

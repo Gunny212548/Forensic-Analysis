@@ -1,4 +1,4 @@
-"""Products and periods (specs/per_product_rules.md story 1: D11, D12, D15).
+"""Products and periods (docs/specs/per_product_rules.md story 1: D11, D12, D15).
 
     python tests/check_products.py <scratch> [--repo DIR]
 

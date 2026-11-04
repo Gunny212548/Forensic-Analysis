@@ -7,12 +7,12 @@ import { useAccess } from '../permissions.js'
 
 const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', informational: 'Info' }
 
-/** figma-export/Customers.svg: case load per customer (FR-6.1).
+/** docs/figma-export/Customers.svg: case load per customer (FR-6.1).
  *
  *  A customer is added only on the Upload page, where data enters the system
  *  (decided 2026-10-05), so this page has no "Add customer" button although the
  *  Figma shows one. Its one action is deleting a customer with every case it
- *  holds (admin, manager - specs/customer_delete.md), confirmed in a row under it.
+ *  holds (admin, manager - docs/specs/customer_delete.md), confirmed in a row under it.
  *
  *  "Open" follows the analyst's decisions since 2026-10-27 (it followed the
  *  status workflow, IAI-79, until nothing on screen could move a status): a case

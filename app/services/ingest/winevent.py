@@ -1,4 +1,4 @@
-"""Windows event logs - the core every container shares (W1, specs/windows_event_logs.md).
+"""Windows event logs - the core every container shares (W1, docs/specs/windows_event_logs.md).
 
 Every Windows format carries the same event (Microsoft's Event schema,
 `SystemPropertiesType` / `EventDataType`, read 2026-10-21): a `System` block -

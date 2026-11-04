@@ -174,7 +174,7 @@ def main() -> int:
         r = c.post("/api/cases/merge", json={"case_ids": [p1["case_id"], p2["case_id"]]})
         m = c.get(f"/api/cases/{r.json().get('case_id')}").json() if r.status_code == 200 else {}
         check(m.get("project_id") == pid, f"a merge of one project's cases stays in it ({r.status_code})")
-        # Every new case is in one project (specs/projects.md P1): a merge across
+        # Every new case is in one project (docs/specs/projects.md P1): a merge across
         # projects is refused rather than giving a case in none.
         r = c.post("/api/cases/merge", json={"case_ids": [p1["case_id"], auth_a]})
         check(r.status_code == 409, f"a merge across projects is refused ({r.status_code})")

@@ -54,7 +54,7 @@ Cases are its evidence; a customer's projects are its history of engagements.
   manifest's `project_id` / `project_name` change; a line goes to the case's chain of custody
   ("moved from project A to B, by, when") and to both projects' logs. Never across customers
   (gotcha #40: a case cannot leave its customer's store). Refused while the case is busy.
-- **Delete a project** with every case in it, as a customer is deleted (specs/customer_delete.md):
+- **Delete a project** with every case in it, as a customer is deleted (docs/specs/customer_delete.md):
   confirmation from the server, the project's name typed back, refused while a case is busy;
   the record - each case's evidence digest and FD ids, and the project's log - goes to the
   customer's own hash-chained `deleted/log.jsonl` (the customer remains, so its log does too).

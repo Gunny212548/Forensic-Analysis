@@ -9,7 +9,7 @@ Moved out of `CLAUDE.md` on 2026-11-04, word for word; `CLAUDE.md` keeps the one
 
 Then prove it with the `validate-changes` skill: the product's own check, `tests/check_rule_meta.py`, every `tests/check_*.py`, and parity.
 
-**A new rule is a product rule now** (`specs/per_product_rules.md`). Firewall products share
+**A new rule is a product rule now** (`docs/specs/per_product_rules.md`). Firewall products share
 `rules_firewall.build(product, prefix, service, unit)` - vertical / horizontal scan, allowed after
 probing, beaconing, feed matches - and add their own in `rules_<product>.py` (Palo Alto's PAN-DB
 category, Check Point's Threat Prevention verdict); `rules.py` appends each module's `RULES`,
@@ -20,7 +20,7 @@ line-drawing rule binds `$above` / `$minimum` / `$note` (`lines.evidence_line`, 
 follow `RULE_ID_PATTERN`. Every rule needs its behaviour's document read (D14), a `RULE_META`
 entry, a place in `areas.py`, and a case in `tests/check_firewall_rules.py`.
 
-**SigmaHQ's rules are not written here** (`specs/sigma_windows.md`, gotcha #79). They are
+**SigmaHQ's rules are not written here** (`docs/specs/sigma_windows.md`, gotcha #79). They are
 SigmaHQ's, converted at image build: `rules_sigma.py` hands the high / critical ones to
 `apply_rules` as `SIGMA-<uuid>` Windows product rules, `sigma.apply_marks` runs the rest as
 marks. A single Windows event that SigmaHQ covers is not a new in-house rule (W-D1) - unless it is

@@ -860,7 +860,7 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
             con, on_rule=lambda i, n: progress.set("rules", INTEL_END + (97 - INTEL_END) * i / n),
             lines=rule_lines, failures=sigma_failed)
         # SigmaHQ's other rules mark the events they match, and the case records which rule set
-        # ran and what could not (specs/sigma_windows.md S-D4, S-D9). Its high / critical rules
+        # ran and what could not (docs/specs/sigma_windows.md S-D4, S-D9). Its high / critical rules
         # ran above, among the product rules.
         sigma_record = sigma.apply_marks(con, on_rule=lambda i, n: progress.set("rules", 97 + 2 * i / n))
         if sigma_failed:
@@ -913,7 +913,7 @@ def process_case(case_id: str, path: Path, kind: str) -> None:
         custody.record(case_id, "processed", "system", rows=total_rows, flagged=flagged,
                        rules=matched, method=repro.record(mappings, time_applied))
         log.info("case %s ready: %s rows, %s flagged", case_id, total_rows, flagged)
-        # The AI reviews every suggestion, after the case is ready (specs/ai_review_coverage.md
+        # The AI reviews every suggestion, after the case is ready (docs/specs/ai_review_coverage.md
         # C-D1 / C-D2, Q101 - it was before, Q78): one review at a time in the background, the
         # count on the manifest's `ai_review`; never fails the case.
         from ..ai import triage

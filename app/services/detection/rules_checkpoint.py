@@ -1,4 +1,4 @@
-"""Check Point rules (specs/per_product_rules.md story 3, D11-D16).
+"""Check Point rules (docs/specs/per_product_rules.md story 3, D11-D16).
 
 Both Check Point readers feed these: Log Exporter records (checkpoint_le.py -
 `service` is the destination port, sk144192) and SmartConsole exports (no port

@@ -1,7 +1,7 @@
 # Gotcha #59
 
 **59. Check Point Log Exporter records arrive wrapped in a SIEM's export, and every
-connection is several rows (IAI-85, 2026-10-21).** Design: `specs/IAI-85_checkpoint_log_exporter.md`;
+connection is several rows (IAI-85, 2026-10-21).** Design: `docs/specs/IAI-85_checkpoint_log_exporter.md`;
 reader `app/services/ingest/checkpoint_le.py`.
 
 - The first real file was not from Check Point directly: a **ManageEngine EventLog Analyzer

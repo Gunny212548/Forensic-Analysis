@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { deleteCustomer, getCustomerDeletion } from '../api.js'
 import { fmtNum } from '../format.js'
 
-/** The confirmation of deleting a customer (specs/customer_delete.md), as a row
+/** The confirmation of deleting a customer (docs/specs/customer_delete.md), as a row
  *  under the customer's row on the Customers page: what goes - read from the
  *  server, not guessed from the table - the cases that block it now, and the
  *  customer's name typed back. Never a browser dialog. `colSpan` is the table's

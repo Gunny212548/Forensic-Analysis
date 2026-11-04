@@ -1,7 +1,7 @@
 # Gotcha #75
 
 **75. A project is one investigation of one customer (2026-10-28, the user: "ลูกค้า 1 ราย
-อาจมีการใช้งาน Forensic หลายครั้งจะจัดการยังไง"; design `specs/projects.md`, Q110-Q113 answered
+อาจมีการใช้งาน Forensic หลายครั้งจะจัดการยังไง"; design `docs/specs/projects.md`, Q110-Q113 answered
 (a) each).** Built in four stories, P1-P4; this file grows with each.
 
 ## P1 - status, and every new case in a project

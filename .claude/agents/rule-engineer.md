@@ -16,7 +16,7 @@ conventions, the current rule set and every check. Read the gotcha files a rule 
 
 ## What a rule is now
 
-- **A product rule** (`specs/per_product_rules.md`, gotchas #61-#63): it reads
+- **A product rule** (`docs/specs/per_product_rules.md`, gotchas #61-#63): it reads
   `product_events`, its id follows `RULE_ID_PATTERN` (`PAN-SCAN-1`, `CP-MAL-2`,
   `WIN-LAT-4`), and its module exports `RULES`, `PREPARE`, `LEVEL`, `LABELS`, `FAMILY`,
   `EQUIVALENT`, `SUPERSEDES`. A line-drawing rule takes its line from the case's own

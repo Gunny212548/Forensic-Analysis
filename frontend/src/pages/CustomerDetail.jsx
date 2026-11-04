@@ -18,7 +18,7 @@ const SEV_EN = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low
 /** One customer's profile, opened from the Customers list: who they are,
  *  since when, what they sent, their projects and every case - or, with
  *  `projectId`, one of those projects - an investigation, Open or Closed
- *  (specs/projects.md P1), which a manager closes and reopens here. */
+ *  (docs/specs/projects.md P1), which a manager closes and reopens here. */
 export default function CustomerDetail({ companyId, projectId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -220,7 +220,7 @@ function ProjectView({ customer, project, cases, onChange }) {
           scrolling past the timeline and the path below. */}
       <ReportPanel project={project} />
 
-      {/* The whole investigation (specs/projects.md P4): what every case's confirmed
+      {/* The whole investigation (docs/specs/projects.md P4): what every case's confirmed
           events add up to, read-only - decisions are made in each case's Attack events. */}
       <ProjectTimeline project={project} />
       <ProjectPath project={project} />

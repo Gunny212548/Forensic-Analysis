@@ -1,4 +1,4 @@
-"""Projects as investigations (specs/projects.md): P1 status and a required project.
+"""Projects as investigations (docs/specs/projects.md): P1 status and a required project.
 
     python tests/check_projects.py [repo dir] [--scratch DIR]
 

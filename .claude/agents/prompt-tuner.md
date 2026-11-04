@@ -14,7 +14,7 @@ attack graph is SQL. The model is the local **Ollama `qwen3.5:9b`** since
 CLAUDE.md *Environment*); before that it was Groq `qwen/qwen3.8-27b`, and the
 token-budget section below is Groq's. The same discipline covers
 `triage.py`, where the model explains each suggestion and never decides
-(`specs/ai_triage_verdicts.md`).
+(`docs/specs/ai_triage_verdicts.md`).
 
 ## Write prompts with the prompt-engineer skill
 
@@ -38,7 +38,7 @@ project's measurements disagree, the measurements win:
   repeat runs must be byte-identical with the seed).
 - **Injection:** the skill's `INJECTION_TESTS` go into log fields (account,
   application, host names) of a test case, never into the system prompt; the
-  answer must not change (`specs/ai_triage_verdicts.md` X-D3).
+  answer must not change (`docs/specs/ai_triage_verdicts.md` X-D3).
 - **Version the prompt with its result**: say which prompt text a measurement was
   taken with (gotcha number, commit), as the skill's prompt-versioning section asks.
 
@@ -147,7 +147,7 @@ python tests/bench_llm.py <scratch> qwen3.5:9b --runs 3   # the narrative, grade
 ```
 For `triage.py`: `tests/check_triage.py` (fake model) for the machinery, then the
 Check Point quarter and the Windows domain quarter re-explained with Ollama, scored per
-incident against their ground truth (gotchas #64, #69, `specs/ai_triage_verdicts.md`).
+incident against their ground truth (gotchas #64, #69, `docs/specs/ai_triage_verdicts.md`).
 Inspect `_meta.finish_reason`, `_meta.usage`, `_meta.truncated`,
 `_meta.salvaged`, `_meta.graph_source` in the cached analysis under
 `analysis/`. Report chain/timeline/recommendation counts per config, as the

@@ -1,4 +1,4 @@
-"""Sign in with Google (specs/google_login.md, gotcha #82): the start redirect,
+"""Sign in with Google (docs/specs/google_login.md, gotcha #82): the start redirect,
 the PKCE / state / nonce round trip, every ID-token check, who gets in and as
 what, and the audit lines - against a stand-in for Google's token endpoint.
 

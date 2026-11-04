@@ -404,7 +404,7 @@ def reset_password(actor: str, email: str, password: str) -> None:
         save_users(users)
 
 
-# --- Sign in with Google (specs/google_login.md) -----------------------------
+# --- Sign in with Google (docs/specs/google_login.md) -----------------------------
 
 GOOGLE_ACTOR = "google-sign-in"  # who the account log says made an account Google created
 _NO_PASSWORD = "!"  # not a scrypt$ hash: _check_hash refuses every password against it

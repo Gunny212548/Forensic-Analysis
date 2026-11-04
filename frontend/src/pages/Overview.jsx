@@ -125,7 +125,7 @@ export default function Overview({ companyId, projectId }) {
               </option>
             ))}
           </select>
-          {/* One investigation of the chosen customer (specs/projects.md P2). */}
+          {/* One investigation of the chosen customer (docs/specs/projects.md P2). */}
           {data.company_id && (
             <select
               className="ov-customer"

@@ -1,7 +1,7 @@
 # Gotcha #54
 
 **54. The product direction of 2026-10-20 - read before designing anything.** Decided by
-the user in one session; recorded in `specs/case_flow_design.md` revisions 1-4 (branch
+the user in one session; recorded in `docs/specs/case_flow_design.md` revisions 1-4 (branch
 `IAI-92-identify-logsource`) and on the page https://claude.ai/artifact/XDFqhbqPKE4ENX52t9MvdN.
 
 - **Purpose: forensic reconstruction from log files.** Identify each log, put every event

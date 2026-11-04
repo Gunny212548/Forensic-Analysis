@@ -1,7 +1,7 @@
 """The Overview page's numbers, across every case (interim, before the
 finding lifecycle).
 
-figma-export/Overview.svg is built around open findings with a status - open
+docs/figma-export/Overview.svg is built around open findings with a status - open
 findings, MTTC, an open-findings table - and that lifecycle (Open ->
 Investigating -> Contained -> Closed) does not exist until Sprint 3
 (IAI-45..49). Until then this fills the same layout with what the system does
@@ -270,7 +270,7 @@ def _coverage_row(company_id, customer, product, agg) -> dict:
 def build(company_id: str | None = None, project_id: str | None = None) -> dict:
     """The Overview page - of one customer when `company_id` is given (each
     read from that customer's own store), otherwise of all of them; with
-    `project_id` too, of that one investigation (specs/projects.md P2)."""
+    `project_id` too, of that one investigation (docs/specs/projects.md P2)."""
     manifests = storage.list_manifests(company_id)
     if project_id is not None:
         manifests = [m for m in manifests if m.get("project_id") == project_id]
@@ -559,7 +559,7 @@ def build(company_id: str | None = None, project_id: str | None = None) -> dict:
                           "customers": sorted(r["customers"], key=str.lower),
                           # The case holding most of its suggestions, opened on Attack events.
                           "case_id": r["cases"].most_common(1)[0][0]})
-    # One customer's projects (specs/projects.md P2): the choices of the project select,
+    # One customer's projects (docs/specs/projects.md P2): the choices of the project select,
     # and - on the customer's own Overview, no project chosen - one row each, Open first,
     # as the All customers view lists customers. Imported here: projects imports this module.
     project_rows = []

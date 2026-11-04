@@ -1,15 +1,15 @@
 # ADR-006: How Sigma rules are evaluated, and on which field names
 
-Status: **Accepted for Windows** (2026-10-29, `specs/sigma_windows.md` Q125: option C, built in
+Status: **Accepted for Windows** (2026-10-29, `docs/specs/sigma_windows.md` Q125: option C, built in
 stories 6a / 6b) - still Proposed for Entra / Linux. Was: Proposed (2026-10-20) - spike (a) of
-`specs/case_flow_design.md` revision 4. Built with one dialect fix spike (b) found (booleans compared
+`docs/specs/case_flow_design.md` revision 4. Built with one dialect fix spike (b) found (booleans compared
 as text) and the logsource map taken from the Sigma taxonomy appendix, because pySigma-pipeline-windows
 / -sysmon pin pysigma<2.
 **Scope changed by revision 5 (the user, same day):** the in-house rules stay as the
 primary detection and SigmaHQ rules run *beside* them. Decisions 1-4 below apply to the
 SigmaHQ rules only; the correlation part of decision 1 is not needed (R2000 / R2005 /
 R2006 remain) and Q11 is closed.
-Not built. Spike scripts: `specs/spike-sigma/` (run with a venv holding `pySigma==2.0.1`,
+Not built. Spike scripts: `docs/specs/spike-sigma/` (run with a venv holding `pySigma==2.0.1`,
 `pySigma-backend-sqlite==2.1.1`, `duckdb==1.5.6`; the app pins the same DuckDB).
 Measured on SigmaHQ commit `f083329` (2026-10-19, 3,776 rules) and the Sigma
 specification commit `ba9251a` (correlation rules v2.1.0).

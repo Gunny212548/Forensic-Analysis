@@ -1,6 +1,6 @@
 """Behaviour profiles: layer C facts about each source address of a case.
 
-specs/behaviour_profiles.md (the user, 2026-10-20). A rule compares a count
+docs/specs/behaviour_profiles.md (the user, 2026-10-20). A rule compares a count
 with a fixed number, and a number taken from one customer's data misfires on a
 customer with more traffic. A profile describes instead - how often, how fast,
 how widely, when - and ranks each address against the other addresses of the

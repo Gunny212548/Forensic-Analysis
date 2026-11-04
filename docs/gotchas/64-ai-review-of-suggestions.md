@@ -1,7 +1,7 @@
 # Gotcha #64
 
 **64. The AI reviews every suggestion while the case is processed, before the findings show
-(`triage.py`, `specs/ai_triage.md`, the user's Q78-Q80 of 2026-10-22).**
+(`triage.py`, `docs/specs/ai_triage.md`, the user's Q78-Q80 of 2026-10-22).**
 
 - **When**: in `pipeline.process_case`, after the rules, escalations, profiles and FD ids, before
   `status=ready`; the manifest's progress reads stage `ai` (the Upload page says "AI reviewing the

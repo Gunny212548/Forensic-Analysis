@@ -1,4 +1,4 @@
-"""The forensic report (specs/forensic_report.md, IAI-72 / IAI-73).
+"""The forensic report (docs/specs/forensic_report.md, IAI-72 / IAI-73).
 
 Settings: the skeleton an administrator uploads (R-D11). A project: its report gate, the
 drafts the system made and the finals the analysts uploaded back (R-D2, R-D4). Drafts are

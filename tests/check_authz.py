@@ -1,4 +1,4 @@
-"""Roles and permissions (IAI-14, specs/IAI-14_rbac.md): the matrix, the
+"""Roles and permissions (IAI-14, docs/specs/IAI-14_rbac.md): the matrix, the
 lifecycle rules, and every route answering 403 / 200 by role over HTTP.
 
     python tests/check_authz.py [repo dir] [--scratch DIR]
@@ -40,7 +40,7 @@ def check(name: str, ok: bool) -> None:
     failures += 0 if ok else 1
 
 
-print("the matrix (specs/IAI-14_rbac.md)")
+print("the matrix (docs/specs/IAI-14_rbac.md)")
 A, M, N = authz.ADMIN, authz.MANAGER, authz.ANALYST
 TABLE = {
     authz.READ: {A, M, N}, authz.UPLOAD: {A, M, N}, authz.CUSTOMERS: {A, M}, authz.QUESTION: {A, M},
@@ -130,7 +130,7 @@ check("a new customer: admin and manager 200, analyst 403",
 
 
 def upload(c: TestClient, **form) -> int:
-    if "project_id" not in form:  # every case is in a project (specs/projects.md P1)
+    if "project_id" not in form:  # every case is in a project (docs/specs/projects.md P1)
         form.setdefault("project_name", "Existing project")
     return c.post("/api/upload", data=form,
                   files={"file": ("t.log", io.BytesIO(b"Oct 1 00:00:00 h sshd[1]: x\n"), "text/plain")}).status_code
@@ -236,7 +236,7 @@ check("the same key stripped is another key, and not found",
 check("an empty or blank key is refused (400)",
       admin.post(f"/api/cases/{spaced}/review", json={"finding_key": "  ", "action": "accept"}).status_code == 400)
 
-print("deleting a case (specs/case_delete.md)")
+print("deleting a case (docs/specs/case_delete.md)")
 from app.services.case import case_delete  # noqa: E402
 
 auth.create_account("check", "manager3@x.test", "Deleter", M, PW)
@@ -269,7 +269,7 @@ check("the deletion log is hash-chained and intact",
       hashchain.verify(case_delete.log_path(co["company_id"])).get("intact"))
 check("a deleted case cannot be deleted twice (404)", manager.delete(f"/api/cases/{gone}").status_code == 404)
 
-print("deleting a customer (specs/customer_delete.md)")
+print("deleting a customer (docs/specs/customer_delete.md)")
 from app.services.case import customer_delete  # noqa: E402
 from app.services.findings import finding_ids  # noqa: E402
 

@@ -1,5 +1,5 @@
 """Which product an evidence item came from, and what each product's rules
-cover (specs/per_product_rules.md, D10-D12, story 1).
+cover (docs/specs/per_product_rules.md, D10-D12, story 1).
 
 Every file is identified before it is read (identify.py) as one documented log
 source profile. A profile belongs to one product, and a product is one of the
@@ -54,7 +54,7 @@ NOT_APPLICABLE: dict[tuple[str, str], str] = {
     ("paloalto", "account-attacks"):
         "A Palo Alto Traffic log records sessions, not sign-ins (Q61); needs a GlobalProtect "
         "or Authentication log",
-    # specs/windows_rules.md: the Security and Sysmon logs record no refused
+    # docs/specs/windows_rules.md: the Security and Sysmon logs record no refused
     # connection (the Filtering Platform's 5157 would - not read yet) and no byte count.
     ("windows", "scanning-policy"):
         "Windows Security and Sysmon logs record no refused connection (the Filtering Platform's "

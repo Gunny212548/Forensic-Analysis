@@ -1,7 +1,7 @@
 # Story 1 - the case page follows the revised flow
 
 Status: **approved and built** (2026-10-20; Q22 and Q23 as proposed). Branch `case-flow-steps` off `main`.
-Source of the requirement: `specs/case_flow_design.md` revisions 2-3 (built since only as
+Source of the requirement: `docs/specs/case_flow_design.md` revisions 2-3 (built since only as
 design) and the user, 2026-10-20: "why does Triage still have an assignee dropdown, and
 why is Respond still there?"
 

@@ -1,11 +1,11 @@
-"""A case as six steps, and where it stands on each (specs/case_flow_design.md).
+"""A case as six steps, and where it stands on each (docs/specs/case_flow_design.md).
 
 The steps are revision 3's forensic flow - Ingest, Timeline, Attack events,
 Attack timeline, Attack path, Report - in the order of NIST SP 800-86's
 process: Collection, Examination, Analysis, Reporting. Respond (containment,
 Contained / Resolved, MTTC) is not one of them since the user removed it on
 2026-10-20; the separate AI step went with revision 2 - the AI narrative is
-part of the Report. Story 1 (specs/story1_case_flow_steps.md) built the steps
+part of the Report. Story 1 (docs/specs/story1_case_flow_steps.md) built the steps
 from what exists; a step not built in full says which story builds it.
 
 Every state here is computed from records the case already has - manifest,
@@ -199,7 +199,7 @@ def _report(findings: list[dict], unreviewed: list[dict], step: dict, manifest: 
         step.update(state=ACTIVE, reason="Gate open - the written report is made per project; "
                                          "move this case into one to make it")
     else:
-        # The draft is the project's (specs/forensic_report.md R-D1); imported here, report.py
+        # The draft is the project's (docs/specs/forensic_report.md R-D1); imported here, report.py
         # reads this module's STEPS.
         from ..report import report
         made = report.drafts(manifest["company_id"], manifest["project_id"])

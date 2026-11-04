@@ -1,4 +1,4 @@
-"""The forensic report draft (specs/forensic_report.md, IAI-72 / IAI-73).
+"""The forensic report draft (docs/specs/forensic_report.md, IAI-72 / IAI-73).
 
     python tests/check_report.py [repo dir] [--scratch DIR]
 

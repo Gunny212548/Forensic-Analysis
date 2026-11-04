@@ -1,4 +1,4 @@
-"""Behaviour profiles (app/services/detection/profiles.py, specs/behaviour_profiles.md).
+"""Behaviour profiles (app/services/detection/profiles.py, docs/specs/behaviour_profiles.md).
 
     python tests/check_profiles.py [--repo DIR]
 

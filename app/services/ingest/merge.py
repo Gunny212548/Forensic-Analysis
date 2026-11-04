@@ -129,7 +129,7 @@ async def merge_cases(body: dict, actor: str) -> dict:
         raise MergeRefused(404, "Company not found")
     company_name = company["name"]
     # Sources from one project stay in it. Since every new case is in a project
-    # (specs/projects.md P1), sources from different projects are refused rather than
+    # (docs/specs/projects.md P1), sources from different projects are refused rather than
     # giving a case in none; old cases all in no project still merge into none.
     project_ids = {m.get("project_id") for m in sources}
     if len(project_ids) != 1:

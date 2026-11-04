@@ -2,7 +2,7 @@
 
 **83. Report drafts: a Word skeleton can fetch other people's pictures, out-of-order XML hangs Word, and the AI's summary is checked, not trusted**
 
-`specs/forensic_report.md`, IAI-72 / IAI-73, 2026-11-03 (the user: the system writes an editable
+`docs/specs/forensic_report.md`, IAI-72 / IAI-73, 2026-11-03 (the user: the system writes an editable
 draft, the analyst finishes it in Word; the provider's template, never in git).
 
 The traps:

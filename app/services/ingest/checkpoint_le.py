@@ -1,5 +1,5 @@
 r"""Check Point Log Exporter records, read from a ManageEngine EventLog Analyzer
-search export (IAI-85, specs/IAI-85_checkpoint_log_exporter.md).
+search export (IAI-85, docs/specs/IAI-85_checkpoint_log_exporter.md).
 
 The record is documented; the wrapper around it is not.
 

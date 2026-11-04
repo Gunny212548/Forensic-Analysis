@@ -37,7 +37,7 @@ GET  .../projects/{pj}/timeline | graph      the investigation across its cases:
                                              both empty, with `undecided`, while any
                                              suggestion of its cases is not decided
 GET  .../projects/{pj}/report                the report gate, drafts and finals with
-                                             their SHA-256 (specs/forensic_report.md)
+                                             their SHA-256 (docs/specs/forensic_report.md)
 POST .../projects/{pj}/report/draft          a Word draft (case:analyze): only when every
                                              suggestion is decided (the question is not
                                              required); the AI's Thai summary, the attack
@@ -66,7 +66,7 @@ GET  /api/cases/{id}/findings                collapsed findings + computed
                                              area (the area list in its order too)
 DELETE /api/cases/{id}                       admin / manager: every file of the
                                              case, recorded in the customer's
-                                             deleted/log.jsonl (specs/case_delete.md)
+                                             deleted/log.jsonl (docs/specs/case_delete.md)
 GET  /api/companies/{id}/deletion            admin / manager: what deleting the
 DELETE /api/companies/{id}                   customer removes, then the customer with
                                              every case, recorded in the shared
@@ -156,7 +156,7 @@ anything. The page and its bundle stay public; they hold no data.
   ends their sessions at once**; what logout cannot do is revoke a copy of
   the cookie taken before it expires - but a password reset does end them (gotcha #47).
   Failed sign-ins are throttled and every sign-in event is audit-logged (gotcha #47).
-- **Roles since IAI-14 (2026-10-22, `specs/IAI-14_rbac.md`):** admin (everything the others may, plus
+- **Roles since IAI-14 (2026-10-22, `docs/specs/IAI-14_rbac.md`):** admin (everything the others may, plus
   accounts - Q56's "accounts + read only" superseded by the user the same day),
   manager (case work + customers and projects - create, close / reopen, rename, move a case -,
   merge, assign, close / reopen findings, delete a case, a project or a customer), analyst (case
@@ -165,7 +165,7 @@ anything. The page and its bundle stay public; they hold no data.
   through `/api/auth/me` (`frontend/src/permissions.js`) but the server is the gate. Accounts are
   managed on the Users page (admin only, `routers/users.py`), every change hash-chained to
   `AUTH_DIR/audit/accounts.jsonl`; the last admin cannot be removed or demoted.
-- **Sign in with Google since 2026-11-02 (`specs/google_login.md`, gotcha #82)**, beside the
+- **Sign in with Google since 2026-11-02 (`docs/specs/google_login.md`, gotcha #82)**, beside the
   password, not instead of it: OpenID Connect code flow + PKCE run by the server (stdlib, no
   dependency, nothing loaded from Google by the page). Anyone whose ID token's `hd` claim is in
   `GOOGLE_ALLOWED_DOMAINS` may sign in, and gets an analyst account (no password) the first time -

@@ -4,7 +4,7 @@ import { fmtNum } from '../format.js'
 import { Empty } from './common.jsx'
 
 /** The behaviour profile of a source address or an account
- *  (specs/behaviour_profiles.md): what it did, how fast and how widely,
+ *  (docs/specs/behaviour_profiles.md): what it did, how fast and how widely,
  *  ranked against the others of its kind in the same evidence. Facts, not a
  *  verdict - nothing here is a finding. */
 export default function ProfilePanel({ caseId, kind, value, onClose }) {

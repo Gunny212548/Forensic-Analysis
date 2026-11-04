@@ -2,7 +2,7 @@
 
 **68. Windows story 5d: low-and-slow needs the paper's whole cleaning, a reconnect is the session's own id**
 
-Story 5d of `specs/windows_rules.md` (2026-10-26, Q88-Q92 as recommended): WIN-BRUTE-4 (B5,
+Story 5d of `docs/specs/windows_rules.md` (2026-10-26, Q88-Q92 as recommended): WIN-BRUTE-4 (B5,
 Javed & Paxson's CUSUM), 4768 0x6 counted as a failed attempt, the RDP reconnect (4778) in
 WIN-LAT-1, ADMIN$ / C$ in WIN-LAT-2 and the new WIN-LAT-4 (a file written to the share, then run).
 

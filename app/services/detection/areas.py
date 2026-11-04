@@ -28,7 +28,7 @@ AREAS: list[dict] = [
     {"id": "data-apps", "name": "Data transfer",
      "about": "Large outbound transfers",
      "rids": ("R3001",)},
-    # Host areas (specs/windows_rules.md W-D3, Q83): what a host's own log shows.
+    # Host areas (docs/specs/windows_rules.md W-D3, Q83): what a host's own log shows.
     {"id": "lateral-movement", "name": "Lateral movement",
      "about": "Uncommon RDP followed by commands, remote services and tasks, files copied to admin shares "
               "and run, NTLM logons without Kerberos",
@@ -43,7 +43,7 @@ AREAS: list[dict] = [
 ]
 
 AREA_OF: dict[str, str] = {rid: a["id"] for a in AREAS for rid in a["rids"]}
-# SigmaHQ's rules by their first tactic (specs/sigma_windows.md S-D6) - in AREA_OF only, not in
+# SigmaHQ's rules by their first tactic (docs/specs/sigma_windows.md S-D6) - in AREA_OF only, not in
 # the cards' rule lists: those are copied onto every case's detection matrix, and 1,498 ids
 # would say nothing a reader can use there.
 from .rules_sigma import AREAS as _SIGMA_AREAS  # noqa: E402

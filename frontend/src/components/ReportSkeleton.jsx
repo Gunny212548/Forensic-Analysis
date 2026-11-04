@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getReportSkeleton, uploadReportSkeleton } from '../api.js'
 import { fmtBytes, fmtTime } from '../format.js'
 
-/** Settings - the report skeleton (specs/forensic_report.md R-D11): the provider's Word
+/** Settings - the report skeleton (docs/specs/forensic_report.md R-D11): the provider's Word
  *  layout every report draft is filled into. An administrator downloads it, edits it in
  *  Word and uploads it again; every version is kept and the newest is used. The server
  *  refuses a skeleton that misses a tag, uses an unknown one or links anything outside

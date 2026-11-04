@@ -6,7 +6,7 @@ import AttackGraph from './AttackGraph.jsx'
 import { Section } from './cards.jsx'
 import { exportSvg } from './svgExport.js'
 
-/** The project's forensic report (specs/forensic_report.md, IAI-72 / IAI-73).
+/** The project's forensic report (docs/specs/forensic_report.md, IAI-72 / IAI-73).
  *  The system makes a draft - a Word file the analyst finishes in Word - only once every
  *  suggestion of the project is decided (R-D2; no question required). Each draft is
  *  a new version with its SHA-256; the analyst's final may be uploaded back (R-D4).

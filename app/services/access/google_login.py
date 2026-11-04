@@ -1,4 +1,4 @@
-"""Sign in with Google (specs/google_login.md, gotcha #82). Standard library only.
+"""Sign in with Google (docs/specs/google_login.md, gotcha #82). Standard library only.
 
 OpenID Connect Core 1.0's authorization code flow (§3.1) with PKCE (RFC 7636,
 S256), run by the server - the page loads nothing from Google, it only links to

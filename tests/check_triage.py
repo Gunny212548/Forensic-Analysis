@@ -1,4 +1,4 @@
-"""The AI's review of each suggestion (app/services/ai/triage.py, specs/ai_triage.md).
+"""The AI's review of each suggestion (app/services/ai/triage.py, docs/specs/ai_triage.md).
 
     python tests/check_triage.py <scratch> [--repo DIR]
 
@@ -9,9 +9,9 @@ a one-host upload), the schema's enums (only this batch's suggestion and fact
 ids), the grounding check, the file kept with the case and deleted with it, a
 model that cannot be reached leaving the case ready, and the AI's advice kept
 on the analyst's review line (Q80). The model's own accuracy is measured on the
-synthetic Check Point quarter, not here. Since specs/ai_review_coverage.md: no cap, every rule
+synthetic Check Point quarter, not here. Since docs/specs/ai_review_coverage.md: no cap, every rule
 first, retries then one by one, Review again, the review queued after the case is ready. Since
-specs/ai_triage_verdicts.md: no verdict in the schema or on the review line, the explanation's
+docs/specs/ai_triage_verdicts.md: no verdict in the schema or on the review line, the explanation's
 parts citing facts, values the log wrote quoted and cut, old advice still read.
 """
 
@@ -200,7 +200,7 @@ def main() -> int:
           f"each of the 13 suggestions listed with its error; review_case does not raise ({len(res.get('failed') or {})})")
     check(counts[-1] == (0, 13, 13), f"failed suggestions counted in the progress ({counts[-1:]})")
 
-    print("specs/ai_review_coverage.md: every suggestion, every rule first, retries, Review again")
+    print("docs/specs/ai_review_coverage.md: every suggestion, every rule first, retries, Review again")
     cid2 = storage.create_case("many.csv", "csv", 1, company_id=co)["case_id"]
     con = db.init(cid2)
     n = 0

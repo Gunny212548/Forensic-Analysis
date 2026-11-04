@@ -1,4 +1,4 @@
-"""The case flow (IAI-89, then story 1 - specs/story1_case_flow_steps.md), end to
+"""The case flow (IAI-89, then story 1 - docs/specs/story1_case_flow_steps.md), end to
 end through the API.
 
     python tests/check_case_flow.py <scratch dir> [--repo DIR]

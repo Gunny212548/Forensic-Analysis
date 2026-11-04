@@ -1,7 +1,7 @@
 # Gotcha #62
 
 **62. Palo Alto rules draw their lines from the evidence's legitimate members, or by TRW (story 2
-of `specs/per_product_rules.md`, branch `rules-per-product`, 2026-10-22).**
+of `docs/specs/per_product_rules.md`, branch `rules-per-product`, 2026-10-22).**
 
 - `rules_paloalto.py`: PAN-SCAN-1 vertical scan, PAN-SCAN-2 horizontal scan (TRW), PAN-SCAN-3
   allowed after refusals, PAN-MAL-1 beaconing, PAN-MAL-2 malicious PAN-DB category,

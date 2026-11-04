@@ -64,13 +64,13 @@ def ingest_view(case_id: str, manifest: dict) -> dict:
         "reprocess_needed": provenance.reprocess_needed(manifest),
         "duplicate_of": manifest.get("duplicate_of") or [],
         "method": method,
-        # D15 / D11 (specs/per_product_rules.md): the period each item covers
+        # D15 / D11 (docs/specs/per_product_rules.md): the period each item covers
         # and what each product's areas run; absent on a case processed before.
         "periods": manifest.get("periods"),
         "detection": manifest.get("detection"),
         # D16: where each line-drawing rule put its line on this evidence.
         "lines": manifest.get("lines"),
-        # specs/sigma_windows.md: which SigmaHQ rule set ran, and per rule what could not.
+        # docs/specs/sigma_windows.md: which SigmaHQ rule set ran, and per rule what could not.
         "sigma": manifest.get("sigma"),
         "warnings": ingest_warnings(manifest),
     }
@@ -140,7 +140,7 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
         else:
             f["lifecycle"] = {"tracked": False}
         # The AI's advice on this suggestion (triage.py), if it was reviewed; else whether it is
-        # still to come or failed (specs/ai_review_coverage.md C-D2 / C-D4).
+        # still to come or failed (docs/specs/ai_review_coverage.md C-D2 / C-D4).
         f["ai_review"] = ai_items.get(f["key"])
         f["ai_state"] = triage.state_of(case_id, manifest, f["key"], ai_items, ai_failed)
         f["ai_error"] = ai_failed.get(f["key"]) if f["ai_state"] == "failed" else None

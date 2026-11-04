@@ -1,4 +1,4 @@
-# Windows detection rules - design (story 5 of `specs/per_product_rules.md`)
+# Windows detection rules - design (story 5 of `docs/specs/per_product_rules.md`)
 
 Status: **Approved 2026-10-26** - Q81-Q84 and Q86 as recommended; Q85 yes, over **three months**
 (the user: "3 เดือน"). The user: "เริ่ม design กฎของ Windows

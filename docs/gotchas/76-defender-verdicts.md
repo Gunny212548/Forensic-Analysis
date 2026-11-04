@@ -1,7 +1,7 @@
 # Gotcha #76
 
 **76. An endpoint product's own verdict is read like a firewall's - and Defender names its items
-differently in every event (2026-10-28, `specs/windows_defender_rules.md`, Q114-Q119 as
+differently in every event (2026-10-28, `docs/specs/windows_defender_rules.md`, Q114-Q119 as
 recommended).**
 
 **What was missed.** The user's `WinEvents.log` (NXLog JSON, D:/logtest/window test) was ready with

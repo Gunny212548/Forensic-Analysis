@@ -35,7 +35,7 @@ EVENT_TZ_SUFFIX = "+07:00"
 # in AUTH_DIR so sessions survive a container restart.
 SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "12"))
 # Failed sign-ins allowed per account, and across every account together, in
-# one window (specs/login_hardening_design.md). Per account, not per address:
+# one window (docs/specs/login_hardening_design.md). Per account, not per address:
 # behind Docker the server sees the bridge gateway as every client (CLAUDE.md
 # gotcha #28), so an address limit would throttle everyone as one.
 LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "5"))
@@ -54,7 +54,7 @@ MTTC_TARGET_HOURS = float(os.environ.get("MTTC_TARGET_HOURS", "4"))
 # helpdesk URL. Empty shows the instruction without a link.
 IT_CONTACT_URL = os.environ.get("IT_CONTACT_URL", "")
 
-# Sign in with Google (specs/google_login.md, gotcha #82): OpenID Connect's
+# Sign in with Google (docs/specs/google_login.md, gotcha #82): OpenID Connect's
 # authorization code flow with PKCE, the server talking to Google itself. Off
 # unless all four are set. PUBLIC_URL is the address analysts open (no trailing
 # slash) - the redirect URI registered at Google is PUBLIC_URL +
@@ -189,9 +189,9 @@ ANALYSIS_OTPM_BUDGET = int(os.environ.get("ANALYSIS_OTPM_BUDGET", "1000"))
 
 
 # The AI's review of each suggestion while a case is processed (triage.py,
-# specs/ai_triage.md). Off only where no model is wanted at all.
+# docs/specs/ai_triage.md). Off only where no model is wanted at all.
 TRIAGE_ENABLED = os.environ.get("TRIAGE_ENABLED", "1").strip().lower() not in ("0", "false", "no", "")
-# Suggestions per model call (specs/ai_review_coverage.md C-D5: measured, see gotcha #71).
+# Suggestions per model call (docs/specs/ai_review_coverage.md C-D5: measured, see gotcha #71).
 TRIAGE_BATCH = max(1, int(os.environ.get("TRIAGE_BATCH", "5")))
 
 # --- effective per-provider settings ---------------------------------------

@@ -1,7 +1,7 @@
 # Gotcha #60
 
 **60. Windows events: one core for every container, the event kept as Windows wrote it
-(W1, 2026-10-21).** Design and the W2-W5 plan: `specs/windows_event_logs.md`; core
+(W1, 2026-10-21).** Design and the W2-W5 plan: `docs/specs/windows_event_logs.md`; core
 `app/services/ingest/winevent.py`; check `tests/check_windows.py`.
 
 - **Two tables, two jobs.** `win_events` holds the event as written - System values plus every

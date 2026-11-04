@@ -2,7 +2,7 @@
 
 **65. Windows sign-in rules: one attempt, however many events record it**
 
-Story 5a of `specs/windows_rules.md` (approved 2026-10-26, Q81-Q86): `app/services/detection/rules_windows.py`,
+Story 5a of `docs/specs/windows_rules.md` (approved 2026-10-26, Q81-Q86): `app/services/detection/rules_windows.py`,
 WIN-BRUTE-1 (B1 guessing), WIN-BRUTE-2 (B2 spray, TRW over accounts), WIN-BRUTE-3 (B3 one account
 from many sources), WIN-AUTH-1 (B4 success after flagged failures). They supersede R2000 / R2005 /
 R2006 / R2008 / R2009 on Windows rows (`RULE_SUPERSEDED`, gotcha #63).

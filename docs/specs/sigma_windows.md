@@ -2,12 +2,12 @@
 
 Status: **Approved 2026-10-29 - Q124-Q133 as recommended** (the user: "ok"), Q133 included: a
 Windows export of this PC may be used to measure the noise. Branch `sigma-windows`.
-Spike (b) scripts: `specs/spike-sigma/win_run.py` (convert / run / regress) and the DuckDB
+Spike (b) scripts: `docs/specs/spike-sigma/win_run.py` (convert / run / regress) and the DuckDB
 dialect of spike (a), `duck_dialect.py`, with one fix found here (booleans, S-D2).
 
 ## Why
 
-Revision 5 of `specs/case_flow_design.md` and W-D1 (Q81) split detection: in-house rules for
+Revision 5 of `docs/specs/case_flow_design.md` and W-D1 (Q81) split detection: in-house rules for
 sequences and counts, SigmaHQ for single events. The Windows rules (stories 5a-5g) are built;
 the single events are not. On the Kinnaree quarter five of fifteen incidents had no
 suggestion at all - K1 web shell, K6 WMI, K8 DCSync, K9 pass-the-hash, K11 an RDP-to-cloud

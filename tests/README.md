@@ -44,7 +44,7 @@ findings** — they're the false-positive check.
 
 ## Expected results
 
-`nightfall-auth.log` — 19 rows, **12** flagged (since 2026-10-20, `specs/rules_review.md`):
+`nightfall-auth.log` — 19 rows, **12** flagged (since 2026-10-20, `docs/specs/rules_review.md`):
 
 | rule | meaning | count |
 |---|---|---|
@@ -65,7 +65,7 @@ ones and the 3 ordinary high-risk-app sessions):
 | R3001 | large outbound transfer (no Palo Alto data-transfer rule yet) | 2 |
 | PAN-MAL-2 | PAN-DB category `malware` (was R3002) | 1 |
 
-Since story 4 of `specs/per_product_rules.md` (2026-10-22) the generic R2002 / R3002 do not
+Since story 4 of `docs/specs/per_product_rules.md` (2026-10-22) the generic R2002 / R3002 do not
 run on Palo Alto rows: the Palo Alto rules (`rules_paloalto.py`, gotcha #62) match the same
 behaviours there. PAN-SCAN-2 (TRW) decides nothing here - the attacker reached one host only.
 

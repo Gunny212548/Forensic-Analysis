@@ -2,7 +2,7 @@
 
 The user's question (2026-10-22): what theory says a failed sign-in is part of a brute force,
 and which behaviours a rule must look for. Every line below cites a document marked read in
-`SOURCES.md`; nothing is from memory. Used by `specs/per_product_rules.md` (D14).
+`SOURCES.md`; nothing is from memory. Used by `docs/specs/per_product_rules.md` (D14).
 
 ## The attacks being told apart
 
@@ -42,7 +42,7 @@ defined time window", "short window". What is published:
 
 So a fixed count in a fixed window catches the fast attack and misses the slow one by design.
 Behaviours 6-10 and a window long enough for the slow case are what the sources offer instead;
-choosing the numbers is Q62 of `specs/per_product_rules.md`.
+choosing the numbers is Q62 of `docs/specs/per_product_rules.md`.
 
 ## Javed & Paxson 2013 (CCS) - stealthy, distributed SSH brute forcing
 

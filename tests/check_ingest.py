@@ -1,4 +1,4 @@
-"""Ingest finished (story 3, specs/story3_ingest.md), end to end through the API.
+"""Ingest finished (story 3, docs/specs/story3_ingest.md), end to end through the API.
 
     python tests/check_ingest.py <scratch dir> [--repo DIR]
 
@@ -101,7 +101,7 @@ def main() -> int:
         M = upload(scratch / "mixed.log", "Ingest Co", "Night shift")["case_id"]
         A = upload(uc / "nightfall-auth.log", "Ingest Co", "Night shift")["case_id"]
         L = upload(uc / "nightfall-firewall.csv", "Ingest Co", "Firewall")["case_id"]
-        # A case from before a project was required (specs/projects.md Q112): no project.
+        # A case from before a project was required (docs/specs/projects.md Q112): no project.
         storage.update_case(L, project_id=None, project_name=None)
         jobs.wait_idle(180)
         first = times(M)

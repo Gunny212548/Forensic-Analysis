@@ -126,7 +126,7 @@ RULE_META: dict[str, dict] = {
             "validation": "ESXi auth.log and the Entra ID export in the corpus; nightfall-auth.log "
                           "expects 8 (tests/README.md).",
             "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A): every failed sign-in is shown on the event; R2000, R2005 and R2009 count them "
-                        "(specs/rules_review.md).",
+                        "(docs/specs/rules_review.md).",
         },
     },
     "R1001": {
@@ -144,7 +144,7 @@ RULE_META: dict[str, dict] = {
                            "what credential-compromise (severity.py) and R2006 are for.",
             "validation": "ESXi and Entra ID corpus files; nightfall-auth.log expects 3.",
             "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A); the login after an attack is R2008 "
-                        "(specs/rules_review.md).",
+                        "(docs/specs/rules_review.md).",
         },
     },
     "R1002": {
@@ -162,7 +162,7 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "Every log source except sshd.",
             "validation": "Synthetic only (nightfall-auth.log expects 3); no hit in the real corpus.",
             "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A); R2009 counts non-existent accounts as part of a spray "
-                        "(specs/rules_review.md).",
+                        "(docs/specs/rules_review.md).",
         },
     },
     "R1003": {
@@ -180,7 +180,7 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "sshd only.",
             "validation": "ESXi auth.log; nightfall-auth.log expects 4.",
             "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A) "
-                        "(specs/rules_review.md).",
+                        "(docs/specs/rules_review.md).",
         },
     },
     "R1004": {
@@ -200,7 +200,7 @@ RULE_META: dict[str, dict] = {
             "validation": "ESXi auth.log: 138 rows, every one the vpxuser service account's "
                           "rotation; nightfall-auth.log expects 1.",
             "response": "Deprecated 2026-10-20 - no longer a finding; now an event type (layer A) "
-                        "(specs/rules_review.md).",
+                        "(docs/specs/rules_review.md).",
         },
     },
     "R2000": {
@@ -237,7 +237,7 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "Sources the firewall allowed.",
             "validation": "Palo Alto corpus; nightfall-firewall.csv expects 15.",
             "response": "Deprecated 2026-10-20 - no longer a finding; now a context fact (layer C): the events table shows how often a source was refused "
-                        "(specs/rules_review.md).",
+                        "(docs/specs/rules_review.md).",
         },
     },
     "R2002": {
@@ -412,7 +412,7 @@ RULE_META: dict[str, dict] = {
             "validation": "Palo Alto corpus; fires alone on ordinary hosts, which is why it is "
                           "medium (gotcha #24). nightfall-firewall.csv expects 6.",
             "response": "Deprecated 2026-10-20 - no longer a finding; now a context fact (layer C): the events table shows the vendor's application risk "
-                        "(specs/rules_review.md).",
+                        "(docs/specs/rules_review.md).",
         },
     },
     "R3001": {
@@ -514,10 +514,10 @@ RULE_META: dict[str, dict] = {
             "blind_spots": "None that matter for an alert.",
             "validation": "Not separately measured on the current corpus.",
             "response": "Deprecated 2026-10-20 - no longer a finding; now a context fact (layer C): the events table shows the threat-intel listing "
-                        "(specs/rules_review.md).",
+                        "(docs/specs/rules_review.md).",
         },
     },
-    # ---- Palo Alto (rules_paloalto.py, specs/per_product_rules.md story 2) ----
+    # ---- Palo Alto (rules_paloalto.py, docs/specs/per_product_rules.md story 2) ----
     "PAN-SCAN-2": {
         "id": "6016da59-0b4f-45e0-89bd-f4242047308d",
         "title": "Palo Alto: horizontal scan (TRW)",
@@ -738,7 +738,7 @@ RULE_META["CP-MAL-2"] = {
     },
 }
 
-# Windows (specs/windows_rules.md, story 5a): sign-ins from the Security log, one attempt however
+# Windows (docs/specs/windows_rules.md, story 5a): sign-ins from the Security log, one attempt however
 # many events record it (rules_windows.py).
 WINDOWS_SOURCES = ["windows-event-xml", "windows-evtx", "windows-splunk-text", "windows-winlogbeat-json",
                    "windows-nxlog-json"]
@@ -1107,7 +1107,7 @@ RULE_META.update({
     },
 })
 
-# Story 5f (specs/windows_defender_rules.md): Microsoft Defender Antivirus's own events.
+# Story 5f (docs/specs/windows_defender_rules.md): Microsoft Defender Antivirus's own events.
 _DEFENDER_SOURCES = ["windows-event-xml", "windows-evtx", "windows-nxlog-json"]
 _DEFENDER_FORMS = ("Read from Defender's EventData item names, which differ by event (the provider's "
                    "templates): 1006 / 1015 Path Found and Domain + User, 1007 / 1008 Cleaning Action, "
@@ -1293,7 +1293,7 @@ def problems() -> list[str]:
     return out
 
 
-# SigmaHQ's suggesting rules (specs/sigma_windows.md S-D6): metadata from the rule itself. Their
+# SigmaHQ's suggesting rules (docs/specs/sigma_windows.md S-D6): metadata from the rule itself. Their
 # finding's tactics are its rule's own tags (attack.credential-access -> credential_access,
 # finding_tactics). For the technique-wide table (the Navigator layer, the narrative's stage check)
 # a technique takes the tactic of the SigmaHQ rules that tag it and one tactic only - a pair no

@@ -1,7 +1,7 @@
 # Gotcha #63
 
 **63. A generic rule stops running on the rows of a product whose own rules match the same
-behaviour (story 4 of `specs/per_product_rules.md`, branch `rules-per-product`, 2026-10-22).**
+behaviour (story 4 of `docs/specs/per_product_rules.md`, branch `rules-per-product`, 2026-10-22).**
 
 D13 said the generic R-rules are converted and retired. They are retired **per product**, not
 deleted: R2002, R2003, R2004, R2007, R3003, R3004, R3005 no longer run on Palo Alto or Check

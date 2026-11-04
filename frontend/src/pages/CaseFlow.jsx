@@ -19,7 +19,7 @@ import DeleteCase from '../components/DeleteCase.jsx'
 import ReportPanel from '../components/ReportPanel.jsx'
 import { RiskTables } from '../components/analysis.jsx'
 
-/** The case page: one case as six steps (specs/case_flow_design.md), at
+/** The case page: one case as six steps (docs/specs/case_flow_design.md), at
  *  #/case/<id>/<step>. It replaced the Reports / Attack Graph / Timeline pages,
  *  whose links redirect here (App.jsx). Each step shows the components those
  *  pages had, moved rather than rewritten; what a step's state is comes from
@@ -416,7 +416,7 @@ function StepBody({ step, caseId, manifest, ready, reload }) {
       // The step issues the report (the user, 2026-11-03): the draft first, the exports fold
       // underneath. The case's AI narrative left the page the same day (the user chose "A"): it
       // repeated the report's summary and the attack timeline, and read suggestions not decided;
-      // the report's AI now drafts the recommendations too (specs/forensic_report.md R-D10).
+      // the report's AI now drafts the recommendations too (docs/specs/forensic_report.md R-D10).
       return <ReportStep caseId={caseId} manifest={manifest} />
     default:
       return null
@@ -507,7 +507,7 @@ function GraphAndRisk({ caseId }) {
 }
 
 /** The Report step issues the report (the user, 2026-11-03). One report per investigation
- *  (specs/forensic_report.md R-D1), so the draft made here is the project's, from every case
+ *  (docs/specs/forensic_report.md R-D1), so the draft made here is the project's, from every case
  *  in it - the same one the project page shows. Its gate (every suggestion of every case
  *  decided, the question written) is ReportPanel's; the case's exports fold below it. */
 function ReportStep({ caseId, manifest }) {

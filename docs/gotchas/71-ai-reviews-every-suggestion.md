@@ -2,7 +2,7 @@
 
 **71. The AI reviews every suggestion - after the case is ready, and a bigger batch is slower**
 
-`specs/ai_review_coverage.md` (2026-10-26). The user: every finding found must be reviewed by the AI
+`docs/specs/ai_review_coverage.md` (2026-10-26). The user: every finding found must be reviewed by the AI
 (Q100: no advice inherited from a similar suggestion), the case ready after the rules (Q101 a).
 
 **What changed.** `triage.MAX_SUGGESTIONS` (80) is gone. `pipeline.process_case` sets the case `ready`

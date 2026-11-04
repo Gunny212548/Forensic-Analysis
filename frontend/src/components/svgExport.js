@@ -1,4 +1,4 @@
-// The attack path as pictures for the report draft (specs/forensic_report.md R-D9): the SVG
+// The attack path as pictures for the report draft (docs/specs/forensic_report.md R-D9): the SVG
 // the page draws, made to stand alone, and a PNG of it for Word versions that show no SVG.
 //
 // The page's SVG takes its colours from CSS (.ag-* rules over theme tokens), which a Word

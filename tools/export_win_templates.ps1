@@ -1,5 +1,5 @@
 # Export Windows event providers' message templates for the Splunk-text reader
-# (W3, specs/windows_event_logs.md, gotcha #60).
+# (W3, docs/specs/windows_event_logs.md, gotcha #60).
 #
 #   pwsh -File tools/export_win_templates.ps1 [-Provider <name>, <name>...]
 #

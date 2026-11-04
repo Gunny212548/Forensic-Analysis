@@ -18,7 +18,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- stage 2: SigmaHQ's Windows rules, converted to SQL ---------------------
-# specs/sigma_windows.md S-D3. A pinned SigmaHQ commit's archive, checked by its SHA-256
+# docs/specs/sigma_windows.md S-D3. A pinned SigmaHQ commit's archive, checked by its SHA-256
 # (two downloads, 2026-10-29, gave the same bytes; if GitHub ever re-packs it the build
 # fails here instead of converting other rules), converted by pySigma into the SQL the app
 # runs. Fetching by git hash was tried first: BuildKit's fetch of the repository failed

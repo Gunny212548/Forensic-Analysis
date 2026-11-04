@@ -1,4 +1,4 @@
-"""Palo Alto Networks rules (specs/per_product_rules.md story 2, D11-D16).
+"""Palo Alto Networks rules (docs/specs/per_product_rules.md story 2, D11-D16).
 
 Written on the PAN-OS Traffic log as the customer's exports carry it (fields:
 PAN-OS 11.0 Traffic Log Fields, read 2026-10-22). The scanning, beaconing and

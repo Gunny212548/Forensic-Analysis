@@ -50,7 +50,7 @@ function Warnings({ r }) {
 }
 
 /** Advice written before 2026-10-27, when the AI still gave a verdict - shown as it was
- *  written (specs/ai_triage_verdicts.md X-D4) until the case is reviewed again. */
+ *  written (docs/specs/ai_triage_verdicts.md X-D4) until the case is reviewed again. */
 function OldAdvice({ r }) {
   const facts = r.facts || {}
   return (
@@ -78,7 +78,7 @@ function OldAdvice({ r }) {
   )
 }
 
-/** The AI's explanation of one suggestion (app/services/ai/triage.py, specs/ai_triage_verdicts.md):
+/** The AI's explanation of one suggestion (app/services/ai/triage.py, docs/specs/ai_triage_verdicts.md):
  *  what happened, why the rule fired, the facts on each side - each citing the facts it was
  *  given (hover a fact id to read it) - what the facts do not show and where to look next.
  *  It never says accept or reject: the analyst decides. */

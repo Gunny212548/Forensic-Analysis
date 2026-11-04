@@ -1,4 +1,4 @@
-"""Where a product rule draws its line (specs/per_product_rules.md, D16, Q66-Q70).
+"""Where a product rule draws its line (docs/specs/per_product_rules.md, D16, Q66-Q70).
 
 Two methods, both read (docs/standards/SOURCES.md), and a third for what neither can see
 (CUSUM over the site's failures, below - Javed & Paxson §4.1, gotcha #68):

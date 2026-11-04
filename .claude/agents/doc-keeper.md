@@ -18,7 +18,7 @@ one**, because agents act on it without re-verifying.
 | a gotcha: its rule | one line in CLAUDE.md's index, under its area |
 | a gotcha: its measurement, history, what was tried | `docs/gotchas/NN-slug.md`, next number |
 | the detail of an area - route list, UI look, checks and how to run them, rule conventions and inventory, model benchmarks, Figma / Jira | the area's skill, `.claude/skills/<name>/SKILL.md` |
-| a design and its numbered decisions | `specs/<story>.md` |
+| a design and its numbered decisions | `docs/specs/<story>.md` |
 | an architectural choice against the obvious alternative | `docs/adr/ADR-NNN-*.md` |
 | a pipeline step's standard | `docs/STANDARDS.md` + `docs/standards/SOURCES.md` |
 

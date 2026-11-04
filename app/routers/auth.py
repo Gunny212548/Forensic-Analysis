@@ -88,7 +88,7 @@ async def me(request: Request):
     return _session_view(request.state.user)
 
 
-# --- Sign in with Google (specs/google_login.md) -----------------------------
+# --- Sign in with Google (docs/specs/google_login.md) -----------------------------
 # Both routes are open without a session (main.PUBLIC_API) and answer with a
 # redirect, never a page: the browser navigates here, it does not fetch.
 

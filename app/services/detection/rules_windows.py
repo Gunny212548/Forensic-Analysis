@@ -1,4 +1,4 @@
-"""Microsoft Windows rules (specs/windows_rules.md, stories 5a sign-ins, 5b lateral movement and host activity).
+"""Microsoft Windows rules (docs/specs/windows_rules.md, stories 5a sign-ins, 5b lateral movement and host activity).
 
 Read from the Security log as Windows writes it (`win_events.data`, the event's
 own items - winevent.py), not from the timeline columns: a sign-in's outcome is
@@ -42,7 +42,7 @@ event belongs to the latest 4624 of that id on that host before it (ASOF JOIN).
 Each sequence is an ATT&CK analytic's (SOURCES.md, read 2026-10-26); none needs a
 window or a number.
 
-Story 5d (specs/windows_rules.md W-D5..W-D9): low-and-slow guessing (B5) by Javed &
+Story 5d (docs/specs/windows_rules.md W-D5..W-D9): low-and-slow guessing (B5) by Javed &
 Paxson's CUSUM over the site's failures per 100 attempts, then who took part
 (WIN-BRUTE-4); an RDP reconnect (4778) starts a session for WIN-LAT-1; ADMIN$ / C$
 opened (5140) in WIN-LAT-2's session, and a file written there (5145) then run
@@ -803,7 +803,7 @@ RULES += [
     """),
 ]
 
-# Story 5f (specs/windows_defender_rules.md, Q114-Q119): Microsoft Defender Antivirus's own
+# Story 5f (docs/specs/windows_defender_rules.md, Q114-Q119): Microsoft Defender Antivirus's own
 # verdicts, read like a firewall's (W-D12) - single events, so no line. Event ids, names and
 # fields from Microsoft's "Review event logs and error codes ... Microsoft Defender Antivirus"
 # (SOURCES.md, read 2026-10-28); item names as Defender writes them in its EventData.
@@ -933,7 +933,7 @@ RULES += [
     """),
 ]
 
-# The rules that name their finding's entity - what each decided on (specs/finding_entities.md
+# The rules that name their finding's entity - what each decided on (docs/specs/finding_entities.md
 # E-D1): a source, an account, or both; WIN-MAL-1 / WIN-INTEL-1 are one process on one host and
 # keep the row's own. Defender's rules name the host it ran on (and the detection's account).
 ENTITY = ("WIN-BRUTE-1", "WIN-BRUTE-2", "WIN-BRUTE-3", "WIN-BRUTE-4", "WIN-AUTH-1", "WIN-LAT-1",

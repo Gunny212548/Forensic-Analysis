@@ -74,7 +74,7 @@ export default function Users() {
   }
   if (!data) return <div className="empty">{error ? `Could not load the accounts: ${error}` : 'Loading...'}</div>
 
-  // Sign in with Google (specs/google_login.md): who may, and how each account does.
+  // Sign in with Google (docs/specs/google_login.md): who may, and how each account does.
   const domains = data.google_domains || []
   const inGoogleDomain = (email) => domains.some((d) => email.toLowerCase().endsWith('@' + d))
   const signsIn = (u) =>

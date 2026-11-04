@@ -1,4 +1,4 @@
-"""Windows sign-in rules (app/services/detection/rules_windows.py, specs/windows_rules.md story 5a).
+"""Windows sign-in rules (app/services/detection/rules_windows.py, docs/specs/windows_rules.md story 5a).
 
     python tests/check_windows_rules.py <scratch> [--repo DIR]
 
@@ -16,7 +16,7 @@ Story 5d adds: a refused TGT for an unknown name (4768 0x6) counted, a revoked o
 CUSUM of WIN-BRUTE-4 (lines.py) on a known series; W3 (low-and-slow), W10 (an RDP session taken
 over by a reconnect), W11 (Kerberos user-name enumeration) and W8's ADMIN$ copy on the quarter;
 OTRF's reconnect found through the session's own logon id.
-specs/finding_entities.md adds: one suggestion per behaviour (the entity a rule names), no
+docs/specs/finding_entities.md adds: one suggestion per behaviour (the entity a rule names), no
 IPv4-mapped address in the timeline column, the account's history among the AI's facts.
 Story 5g adds: a remote service / copied file seen on two days is expected, on one day flagged; an
 lsass handle without PROCESS_VM_READ is not a dump.
@@ -369,7 +369,7 @@ def main() -> int:
     share = con.execute("SELECT count(*) FROM findings WHERE rid = 'WIN-LAT-2' AND descr LIKE '%opened%ADMIN$%'"
                         ).fetchone()[0]
     check(share >= 1, f"WIN-LAT-2 names the ADMIN$ opened in W8's session ({share})")
-    # specs/finding_entities.md: a rule names who its finding is about, so one behaviour is one
+    # docs/specs/finding_entities.md: a rule names who its finding is about, so one behaviour is one
     # suggestion (E-D1); a DC's ::ffff: address is IPv4 in the timeline (E-D3); the account's
     # history is a fact for the AI (E-D2).
     con.close()
@@ -440,7 +440,7 @@ def main() -> int:
     check("WIN-HOST-2" not in got, "the dump without an access event is not found (a blind spot, said so)")
     con.close()
 
-    # Story 5f (specs/windows_defender_rules.md): Defender's own verdicts, item names as the
+    # Story 5f (docs/specs/windows_defender_rules.md): Defender's own verdicts, item names as the
     # provider's templates write them (1116-1119 Detection User / Action Name; 1006 Domain + User,
     # Path Found; 1007 Cleaning Action).
     print("story 5f: Microsoft Defender's detections and Defender turned off")

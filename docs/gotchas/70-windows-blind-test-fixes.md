@@ -2,7 +2,7 @@
 
 **70. The blind test: a sprayer's own computer account, and a beacon the whole fleet makes**
 
-Story 5e of `specs/windows_rules.md` (2026-10-26, Q98 yes, Q99 a). The user wrote a blind Windows
+Story 5e of `docs/specs/windows_rules.md` (2026-10-26, Q98 yes, Q99 a). The user wrote a blind Windows
 quarter (`D:\logtest\blind-windows`, `gen_windows_blind.py` seed 20260401: Kinnaree Textiles, K1-K15,
 an answer key "not to be shown to whoever writes or tunes the rules") and uploaded it to 8091. Scored
 once with the rules unchanged: 59,143 rows flagged, **43,523 of them not attacks**.

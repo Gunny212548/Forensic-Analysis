@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS findings (
   lvl    INTEGER,
   descr  VARCHAR,
   mitre  VARCHAR[],
-  -- Who the finding is about, when its rule names it (specs/finding_entities.md E-D1):
+  -- Who the finding is about, when its rule names it (docs/specs/finding_entities.md E-D1):
   -- '' = none on that side; both NULL = the rule names none and the row's own
   -- srcip / username key it, as before. Read through entity_sql().
   entity_src  VARCHAR,
@@ -361,7 +361,7 @@ def finding_rows(case_id: str, key: str, limit: int, offset: int = 0) -> dict:
         con.close()
 
 
-# Layer A (specs/rules_review.md, D12): what an event is, named from the
+# Layer A (docs/specs/rules_review.md, D12): what an event is, named from the
 # `action` its log source profile wrote. The one place these words live - the
 # events table and the MCP tools both read `event` from here. An action not
 # listed is shown as written.
@@ -536,7 +536,7 @@ def _events(con, cond: str, params: list, order: str, limit: int, offset: int) -
 
 
 def _sigma_marks(con, row_ids: list[int]) -> dict[int, list[dict]]:
-    """row_id -> the SigmaHQ rules that mark it (specs/sigma_windows.md S-D4): medium and below,
+    """row_id -> the SigmaHQ rules that mark it (docs/specs/sigma_windows.md S-D4): medium and below,
     threat hunting, an in-house rule's twin. Each names its author (DRL 1.1). A case processed
     before SigmaHQ ran has no marks."""
     if not row_ids or not con.execute("SELECT count(*) FROM duckdb_tables() "

@@ -18,7 +18,7 @@ Rule id conventions:
   R2xxx  correlation / aggregate
   R3xxx  single-event, network/firewall
 
-What is a rule and what is not (specs/rules_review.md, the user's D12/D13 of
+What is a rule and what is not (docs/specs/rules_review.md, the user's D12/D13 of
 2026-10-20). A rule answers "does this fit a known attack pattern?" - layer B.
 "What is this event?" (layer A) is the event's own `action` / `verdict`,
 written by the log source profile; the former R1000-R1004 named exactly that
@@ -486,13 +486,13 @@ RULE_LEVEL: dict[str, str] = {
 
 
 # What a rule id looks like: a generic R-rule (R2000) or a product rule
-# (PAN-SCAN-1, <PRODUCT>-<AREA>-<n>, specs/per_product_rules.md). For checking
+# (PAN-SCAN-1, <PRODUCT>-<AREA>-<n>, docs/specs/per_product_rules.md). For checking
 # the shape of input; whether the rule exists is rule_meta's to say.
-# A SigmaHQ rule is SIGMA- and the rule's whole UUID (specs/sigma_windows.md S-D6).
+# A SigmaHQ rule is SIGMA- and the rule's whole UUID (docs/specs/sigma_windows.md S-D6).
 RULE_ID_PATTERN = (r"(?:R\d{4}|[A-Z]{2,4}-[A-Z]{3,5}-\d{1,3}"
                    r"|SIGMA-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
 
-# The product a rule is written for (specs/per_product_rules.md, D11). Such a
+# The product a rule is written for (docs/specs/per_product_rules.md, D11). Such a
 # rule reads `product_events` - the rows of its product only - instead of
 # raw_events, so it can never match another product's rows; it is skipped when
 # the case holds none. A rule absent here is generic and reads every row: the
@@ -546,7 +546,7 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
     `on_rule(done, total)` is called after each rule, for progress (FR-2.5).
     `lines`, when given, receives each line-drawing rule's record.
     `failures`, when given, receives {rule_id: error} of the SigmaHQ rules that failed: one of
-    SigmaHQ's rules failing is listed on the case and the others run (specs/sigma_windows.md
+    SigmaHQ's rules failing is listed on the case and the others run (docs/specs/sigma_windows.md
     S-D9); one of ours failing is a bug and fails the case, as before.
     `rules` / `rule_product` / `rule_superseded` replace the module's (tests)."""
     rules = RULES if rules is None else rules
@@ -572,7 +572,7 @@ def apply_rules(con: duckdb.DuckDBPyConnection, on_rule=None, rules=None,
             sql = sql.replace("raw_events", "generic_events")
         if rid not in RULE_ENTITY:
             # A rule that names no entity writes the five columns it always has; the row's own
-            # srcip / username key its finding (specs/finding_entities.md E-D1).
+            # srcip / username key its finding (docs/specs/finding_entities.md E-D1).
             sql = sql.replace("INSERT INTO findings", "INSERT INTO findings (row_id, rid, lvl, descr, mitre)", 1)
         params = None
         if rid in RULE_PREPARE:

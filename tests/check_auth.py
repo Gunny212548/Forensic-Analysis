@@ -3,7 +3,7 @@
     python tests/check_auth.py <scratch dir> [--repo DIR]
 
 Builds a throwaway store in <scratch dir> with throwaway accounts and drives
-the real app through fastapi's TestClient (specs/login_hardening_design.md,
+the real app through fastapi's TestClient (docs/specs/login_hardening_design.md,
 acceptance criteria 1-7 and 9's sign-in half; the Login page is by hand).
 The window is shortened to 3 seconds so "after the window it works again" is
 tested rather than assumed. stdlib + the app's own dependencies; no network.

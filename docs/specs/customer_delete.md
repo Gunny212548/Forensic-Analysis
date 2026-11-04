@@ -8,7 +8,7 @@ Requirement (the user, 2026-10-28): "ทำให้ลบ Customer ได้" -
 - A customer is its own store, `customers/<company_id>/` (gotcha #40): `customer.json`,
   `projects/`, every case's files (`cases/ db/ raw/ analysis/ review/ custody/ jobs/`), the
   hash-chained FD-id registry `findings/ids.jsonl` and the hash-chained record of the cases
-  deleted from it, `deleted/log.jsonl` (specs/case_delete.md).
+  deleted from it, `deleted/log.jsonl` (docs/specs/case_delete.md).
 - A case can be deleted (admin, manager); its deletion is recorded in that customer's
   `deleted/log.jsonl`. Deleting the customer would take that record with it.
 

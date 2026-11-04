@@ -1,8 +1,8 @@
 # Gotcha #56
 
 **56. A rule answers "does this fit a known attack pattern?" - nothing else (branch
-`rules-layers`, 2026-10-20).** Decided with the user (`specs/rules_review.md`,
-`specs/case_flow_design.md` D12/D13 on that branch): what the system knows about an
+`rules-layers`, 2026-10-20).** Decided with the user (`docs/specs/rules_review.md`,
+`docs/specs/case_flow_design.md` D12/D13 on that branch): what the system knows about an
 event comes in three layers.
 
 | Layer | Question | Where it lives |

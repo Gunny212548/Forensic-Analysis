@@ -14,7 +14,7 @@ const SEVERITIES = ['critical', 'high']
 const SEV_TONE = { critical: 'danger', high: 'warn' }
 const PAGE = 50
 
-/** figma-export/Incidents.svg, which the console calls Findings (FR-4.4): every
+/** docs/figma-export/Incidents.svg, which the console calls Findings (FR-4.4): every
  *  high and critical finding (each has an FD id), across cases, with the
  *  analyst's decision on it. The rest stay on their case page, and the footnote
  *  says so rather than letting the table read as "all of them".
@@ -35,7 +35,7 @@ export default function Findings({ param }) {
   // A link from a customer-scoped Overview carries the customer, so the list
   // opens on the findings the number that was clicked counted.
   const [companyId, setCompanyId] = useState(init.companyId || '')
-  // One investigation of that customer (specs/projects.md P2).
+  // One investigation of that customer (docs/specs/projects.md P2).
   const [projectId, setProjectId] = useState(init.projectId || '')
   const [projects, setProjects] = useState([])
   const [decision, setDecision] = useState(init.decision || '')

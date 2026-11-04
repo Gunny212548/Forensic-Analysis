@@ -28,7 +28,7 @@ Labels in ground_truth.csv:
                     scanner authenticating over NTLM, OneDrive syncing on a timer) - a
                     finding on it is a false positive
 
-Incidents (each event the specs/windows_rules.md rule names should find):
+Incidents (each event the docs/specs/windows_rules.md rule names should find):
   W1 Jul 14  Kerberos password spray from a guest-network device against every account,
              one password; one account falls (4771 0x18 / 0x6 on DC01, then a 4768)
   W2 Jul 22  RDP brute force from the internet against RDS01's administrator, 800 tries,

@@ -5,7 +5,7 @@ of the whole design.** Nothing is built; the skeleton exists only as a preview o
 Requirement: the user's report template (a PDF supplied 2026-11-03, kept outside the repo and
 **not to be copied into it or used for anything but its layout** - the user's instruction).
 This spec names its parts by structure only; no text, name or figure of it is reproduced.
-Builds on `specs/case_flow_design.md` revision 6 step 6 and `docs/standards/forensic-process.md`
+Builds on `docs/specs/case_flow_design.md` revision 6 step 6 and `docs/standards/forensic-process.md`
 §3.5. Replaces the "final written report is not built yet (IAI-72, IAI-73)" line of the Report step.
 
 ## What the template is

@@ -58,7 +58,7 @@ export async function logout() {
 /** Everything the Overview page shows, aggregated server-side over all cases
  *  (app/services/case/overview.py). */
 /** All customers, or one customer's store when `companyId` is given - and one
- *  project of it with `projectId` (specs/projects.md P2). */
+ *  project of it with `projectId` (docs/specs/projects.md P2). */
 export async function getOverview(companyId, projectId) {
   const p = new URLSearchParams()
   if (companyId) p.set('company_id', companyId)
@@ -429,7 +429,7 @@ export async function getAccountAudit() {
   return jsonOrThrow(await fetch('/api/users/audit'), 'Could not load the account history')
 }
 
-// --- The forensic report (specs/forensic_report.md, IAI-72 / IAI-73) ---------
+// --- The forensic report (docs/specs/forensic_report.md, IAI-72 / IAI-73) ---------
 
 /** The report skeleton on Settings (admin): current, history, the tags it may use. */
 export async function getReportSkeleton() {

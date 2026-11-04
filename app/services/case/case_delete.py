@@ -1,4 +1,4 @@
-"""Deleting a case (specs/case_delete.md, the user's Q72-Q75 of 2026-10-22).
+"""Deleting a case (docs/specs/case_delete.md, the user's Q72-Q75 of 2026-10-22).
 
 An administrator or a manager deletes a case for good: its manifest, DuckDB,
 raw evidence, AI analysis, review and lifecycle log, chain of custody and job

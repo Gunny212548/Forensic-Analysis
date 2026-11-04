@@ -1,12 +1,12 @@
 # Gotcha #74
 
 **74. Deleting a customer (2026-10-28, the user: "ทำให้ลบ Customer ได้"; design
-`specs/customer_delete.md`, D1-D4 approved the same day).** An admin or a manager deletes a
+`docs/specs/customer_delete.md`, D1-D4 approved the same day).** An admin or a manager deletes a
 customer from its row on the Customers page, with every case it holds, its projects and its
 evidence - the whole `customers/<id>/` store (gotcha #40).
 
 - **The record cannot live in the store.** A case's deletion is recorded in its customer's
-  `deleted/log.jsonl` (specs/case_delete.md), and the FD-id registry is there too; deleting the
+  `deleted/log.jsonl` (docs/specs/case_delete.md), and the FD-id registry is there too; deleting the
   customer takes both. So the customer's deletion goes to the shared, hash-chained
   `DATA_DIR/deleted/customers.jsonl` - who, when, the customer, its projects, each case's file,
   evidence SHA-256, rows, flagged rows and FD ids - and **carries the customer's earlier case

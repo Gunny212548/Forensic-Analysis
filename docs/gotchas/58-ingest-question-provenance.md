@@ -1,7 +1,7 @@
 # Gotcha #58
 
 **58. Ingest records the question, each file's provenance and the method; a declared time
-applies only on re-process (story 3, 2026-10-21).** Design: `specs/story3_ingest.md`.
+applies only on re-process (story 3, 2026-10-21).** Design: `docs/specs/story3_ingest.md`.
 
 - **Question** (`investigation.py`): on the *project* - one investigation, D6 - with every
   change in its own hash-chained `projects/<pj>.log.jsonl`; a case with no project keeps it

@@ -57,7 +57,7 @@ def _post_file(url: str, path: Path) -> dict:
         f"--{boundary}\r\n".encode(),
         b'Content-Disposition: form-data; name="company_name"\r\n\r\n',
         f"{PARITY_CUSTOMER}\r\n".encode(),
-        # And a project (specs/projects.md P1), likewise one fixed name.
+        # And a project (docs/specs/projects.md P1), likewise one fixed name.
         f"--{boundary}\r\n".encode(),
         b'Content-Disposition: form-data; name="project_name"\r\n\r\n',
         f"{PARITY_PROJECT}\r\n".encode(),
@@ -131,7 +131,7 @@ def collect(url: str, files: list[Path]) -> tuple[dict, list[str]]:
             # Keyed by name -> list, never name -> one result: the corpus
             # holds two different files both called log_30_.csv, and a plain
             # assignment silently dropped one of them from the check.
-            # SigmaHQ's counts apart from ours (specs/sigma_windows.md S-D8): `flagged` and `rules`
+            # SigmaHQ's counts apart from ours (docs/specs/sigma_windows.md S-D8): `flagged` and `rules`
             # stay the in-house rules', comparable with every entry taken before SigmaHQ ran.
             matched = m.get("rules_matched") or {}
             origin = m.get("flagged_by_origin")

@@ -1,4 +1,4 @@
-"""The firewall rules every firewall product shares (specs/per_product_rules.md, D11-D16).
+"""The firewall rules every firewall product shares (docs/specs/per_product_rules.md, D11-D16).
 
 A firewall log records connections and the decision on each, whatever the
 product: the scanning, beaconing and feed-match behaviours of

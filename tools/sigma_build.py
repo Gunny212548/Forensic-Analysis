@@ -1,4 +1,4 @@
-"""Convert SigmaHQ's Windows rules into the SQL the app runs on win_events (specs/sigma_windows.md).
+"""Convert SigmaHQ's Windows rules into the SQL the app runs on win_events (docs/specs/sigma_windows.md).
 
     python tools/sigma_build.py <sigma-repo> <out.json> --commit <sha>
 

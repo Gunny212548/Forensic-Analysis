@@ -2,7 +2,7 @@
 
 **66. Windows lateral movement and host rules: link by the session, and what a real capture missed**
 
-Story 5b of `specs/windows_rules.md` (2026-10-26): WIN-LAT-1 (uncommon RDP, then commands),
+Story 5b of `docs/specs/windows_rules.md` (2026-10-26): WIN-LAT-1 (uncommon RDP, then commands),
 WIN-LAT-2 (remote service or task in a network logon), WIN-LAT-3 (NTLM network logon without
 Kerberos), WIN-HOST-1 (Kerberoasting), WIN-HOST-2 (LSASS read, then a file written), in two new
 detection areas, *Lateral movement* and *Host activity* (Q83 - the Overview has eight cards, two

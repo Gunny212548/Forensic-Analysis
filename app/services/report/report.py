@@ -1,4 +1,4 @@
-"""The forensic report draft of a project (specs/forensic_report.md, IAI-72 / IAI-73).
+"""The forensic report draft of a project (docs/specs/forensic_report.md, IAI-72 / IAI-73).
 
 The system writes a **draft** - an editable Word file the analyst finishes in Word (R-D0,
 R-D3). One per project (R-D1), made only when every suggestion of every case is decided

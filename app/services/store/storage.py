@@ -363,7 +363,7 @@ def find_company_by_name(name: str) -> dict | None:
 # A project is one investigation for one customer, grouping the cases
 # uploaded for it. It is kept in that customer's store, so it can never
 # hold another customer's case. Required for a new case since 2026-10-28
-# (specs/projects.md P1); one from before may still be in "No project".
+# (docs/specs/projects.md P1); one from before may still be in "No project".
 
 # A project is Open until it is closed, and may be reopened (projects.py). One
 # written before statuses existed has none, and is Open.

@@ -21,7 +21,7 @@ function processingText(m) {
 }
 
 /** " · AI reviewing 15 of 526 (qwen3.5:9b)" - the AI reviews every suggestion after the case
- *  is ready (triage.py, specs/ai_review_coverage.md), so a ready case can still be moving.
+ *  is ready (triage.py, docs/specs/ai_review_coverage.md), so a ready case can still be moving.
  *  Empty when there is nothing to say. */
 function aiText(m) {
   const a = m?.ai_review
@@ -66,7 +66,7 @@ function myRecent(cases, email) {
   return cases.filter((m) => m.evidence?.recorded_by === email).slice(0, RECENT_LIMIT)
 }
 
-/** Laid out as figma-export/Upload.svg: customer first (FR-2.1), then the
+/** Laid out as docs/figma-export/Upload.svg: customer first (FR-2.1), then the
  *  drop area (FR-2.2) and the supported formats (FR-2.6). */
 export default function Upload({ user }) {
   const fileRef = useRef(null)
@@ -290,7 +290,7 @@ export default function Upload({ user }) {
               <option value="" disabled>
                 Select a project
               </option>
-              {/* A closed investigation takes no new evidence (specs/projects.md Q111):
+              {/* A closed investigation takes no new evidence (docs/specs/projects.md Q111):
                   listed so it is not mistaken for missing, but not selectable. */}
               {projects.map((p) => (
                 <option value={p.project_id} key={p.project_id} disabled={p.status === 'closed'}>

@@ -23,20 +23,20 @@ decided is not proven) - build the attack timeline, the attack path and a graph 
 command, from which host, to which host. Flow: **Ingest -> Timeline -> Attack
 events -> Attack timeline -> Attack path / graph -> Report**; the Respond step
 (lifecycle, MTTC) is to be removed. **Detection rules are per product since 2026-10-22**
-(`specs/per_product_rules.md`, D10-D16; gotchas #61-#63): logs are Firewall or OS, each
+(`docs/specs/per_product_rules.md`, D10-D16; gotchas #61-#63): logs are Firewall or OS, each
 product has its own rules over six areas, every rule names its behaviour and the document
 saying why it is a finding, and its line comes from the case's own evidence (legitimate
 members only) or TRW - no number set on one customer applied to another. Palo Alto and Check
 Point have theirs, Windows its sign-in, lateral-movement, host, beaconing and feed rules (gotchas
-#65-#70, #77, #78, `specs/windows_rules.md` stories 5a-5g) and Microsoft Defender's own verdicts (gotcha #76,
-`specs/windows_defender_rules.md` story 5f - a product's verdict is an in-house rule, any other single
+#65-#70, #77, #78, `docs/specs/windows_rules.md` stories 5a-5g) and Microsoft Defender's own verdicts (gotcha #76,
+`docs/specs/windows_defender_rules.md` story 5f - a product's verdict is an in-house rule, any other single
 event is SigmaHQ's). **SigmaHQ's Windows rules run beside ours since 2026-10-29** (story 6,
-`specs/sigma_windows.md`, gotcha #79): a pinned commit converted at image build, high / critical as
+`docs/specs/sigma_windows.md`, gotcha #79): a pinned commit converted at image build, high / critical as
 suggestions naming their author (DRL 1.1), the rest as marks on the timeline. The generic R-rules
 still run on every other product's rows. A suggestion is keyed on the entity its rule decided on (gotcha #69). **The AI
 explains every suggestion and never decides** (gotcha #72), **no cap** - in the background once the case is ready (gotchas #64,
 #71; the user, 2026-10-26: "ทุก Finding ที่เจอต้องได้รับการ review จาก AI"). **Every step must cite a
-standard that was actually read** (`docs/standards/SOURCES.md`). Design: `specs/case_flow_design.md`
+standard that was actually read** (`docs/standards/SOURCES.md`). Design: `docs/specs/case_flow_design.md`
 (on `main` since IAI-92 was merged; the case page is its six steps, gotcha #52).
 
 Formats exercised against real data so far: VMware ESXi `auth.log`,
@@ -86,21 +86,23 @@ tools/            operator scripts: create_user, refresh_intel, prune_cases,
                   build_measurement_doc, export_win_templates.ps1
 docs/             gotchas/NN-*.md (one per gotcha), adr/, standards/ (SOURCES.md
                   and the documents read), STANDARDS.md (pipeline step -> standard)
-specs/            one design per story, with its numbered decisions (Q.., D..);
+  specs/          one design per story, with its numbered decisions (Q.., D..);
                   spike-sigma/ holds the SigmaHQ spike's scripts (ADR-006)
-figma-export/     the SENTRY-IR screens (SVG, text outlined)
+  figma-export/   the SENTRY-IR screens (SVG, text outlined)
+  requirements/   the FR and backlog PDFs (not in git)
 .claude/agents/   subagents - each names the skills it preloads
 .claude/skills/   project skills: the detail this file points to (below)
 ```
 
 Not in git, on this PC only: `.env`, `static/`, `logtest/` (the Lotus Freight Check Point
 quarter, `tests/gen_checkpoint_quarter.py logtest` rebuilds it byte for byte), the FR and
-backlog PDFs, `.archify/`. Test corpora live outside the repo: `D:/forensic system/Logtest`,
+backlog PDFs in `docs/requirements/`, `.archify/`. Test corpora live outside the repo: `D:/forensic system/Logtest`,
 `D:/logtest`, `D:/mockup-logs`. **Paths are not moved to tidy up** beyond the one move the user
-asked for on 2026-11-04: `app/services/*.py` went into the eight category folders above, and every
-path in the docs, specs, skills, agents, tests and code comments was rewritten with it. Commit
-messages before that date still say `app/services/<module>.py`: the module kept its name, so look it
-up in the table above. A gotcha that names a bare module (`decode.py`, `db.build_graph()`) means the
+asked for on 2026-11-04. `app/services/*.py` went into the eight category folders above. `specs/`,
+`figma-export/` and the PDFs went from the root into `docs/`. Every path in the docs, specs,
+skills, agents, tests and code comments was rewritten with it. Commit
+messages before that date still say `app/services/<module>.py` and `specs/...`. Each module kept its
+name, so find it in the table above. Read `specs/...` as `docs/specs/...`. A gotcha that names a bare module (`decode.py`, `db.build_graph()`) means the
 same module. A new service module goes in the folder of its category. A module in one folder imports
 a module in another with `from ..store import db`, and one in its own folder with `from . import x`.
 Code outside `services/` imports `from app.services.store import db`, never
@@ -280,9 +282,9 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #44 Syslog envelope per RFC 5424 / 3164; an RFC 3164 year is inferred and flagged `year-inferred`.
 - #45 A FortiGate session that ended normally (`close`, `timeout`, ...) is `allow`.
 - #46 A UTF-16 "Unicode Text" PAN-OS export: encoding from the BOM; a `.txt` with a documented header is read as that table.
-- #76 Defender's own verdicts (story 5f, `specs/windows_defender_rules.md`): a product's verdict is an in-house rule (Q114, beside W-D1); WIN-MAL-2 one detection per host + Detection ID, medium when remediated, no technique, no generic twin (R3002 would make it a Downloader); WIN-HOST-3 turned off / tampered (T1685); item names differ per event - read the provider's templates; a rule may write a *lower* `lvl` (`least`).
+- #76 Defender's own verdicts (story 5f, `docs/specs/windows_defender_rules.md`): a product's verdict is an in-house rule (Q114, beside W-D1); WIN-MAL-2 one detection per host + Detection ID, medium when remediated, no technique, no generic twin (R3002 would make it a Downloader); WIN-HOST-3 turned off / tampered (T1685); item names differ per event - read the provider's templates; a rule may write a *lower* `lvl` (`least`).
 - #70 The user's blind Windows quarter (`D:\logtest\blind-windows`, now read - no longer blind): WIN-AUTH-1's spray branch leaves out computer accounts (the sprayer's own `web01$`), WIN-MAL-1 leaves out a (process, destination) beaconing on more than half the Sysmon hosts, named on the line record (ESET's timer, 40,725 rows) - only from 20 hosts up, else one host's evidence hid every beacon (Q105); not-attack rows 43,523 -> 2,567; K1 / K6 / K8 / K9 / K11 still missed.
-- #79 SigmaHQ on Windows (story 6, `specs/sigma_windows.md`): converted at image build into `/opt/sigma` (pySigma never at runtime), high / critical are `SIGMA-<uuid>` product rules, the rest marks on events (`sigma_marks`); pySigma's Windows pipelines pin `pysigma<2` (taxonomy map instead), booleans as text, the whole UUID as id, a `Data` field shadows `data`, one SigmaHQ rule's error never fails a case.
+- #79 SigmaHQ on Windows (story 6, `docs/specs/sigma_windows.md`): converted at image build into `/opt/sigma` (pySigma never at runtime), high / critical are `SIGMA-<uuid>` product rules, the rest marks on events (`sigma_marks`); pySigma's Windows pipelines pin `pysigma<2` (taxonomy map instead), booleans as text, the whole UUID as id, a `Data` field shadows `data`, one SigmaHQ rule's error never fails a case.
 - #81 SigmaHQ's process creation rules also read Security 4688 (story 6d): SigmaHQ's own thor.yml map (Image <- NewProcessName, ParentImage <- ParentProcessName, CommandLine), an empty item NULL, a `NOT COALESCE` rule only on a 4688 holding every field it uses (1,220 of 1,425 run, 205 listed), 4688 read only where the host's Sysmon 1 does not cover that time.
 - #78 Public Windows data (`D:/logtest/internet`: EVTX-ATTACK-SAMPLES, OTRF): WIN-HOST-2 needs PROCESS_VM_READ (`GrantedAccess & 0x10`, W-D17) - svchost's 0x3000 Prefetch write fired on 6 datasets; the dev image without `--build` had no `evtx` library (every .evtx one row); never run a script beside a data folder named like a library; 43 OTRF flat-JSON datasets have no reader.
 - #77 Story 5g: WIN-LAT-2 / -4 flag a (source, account, service / task / file) seen on one day of the evidence only - two days or more is expected (AN1468 UserContext, AN1185 allowlists; Veeam / PDQ 2,560 rows -> 8, attacks kept); join the day count with `IS NOT DISTINCT FROM`; lower `%SystemRoot%` before replacing it - a 4697 never matched the written file.
@@ -292,7 +294,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #65 Windows sign-in rules (`rules_windows.py`): one attempt however many events record it - a DC's 4771 / 4776 within 1 s of a host's 4625 joins it, its address kept; 4771 / 4776 counted (Q84 reverses Q41); WIN-BRUTE-1..3 / WIN-AUTH-1 supersede R2000 / R2005 / R2006 / R2008 / R2009 on Windows rows; measured on `tests/gen_windows_domain.py`.
 - #63 Generic rules are superseded per product (`RULE_SUPERSEDED`: not on Palo Alto / Check Point rows, nor the sign-in, beaconing and feed rules on Windows rows (#65, #67); still on FortiGate, ESXi, sshd, Entra); escalations and VERIS count behaviours via `RULE_EQUIVALENT` / `generic_sql`; baseline re-taken (668 entries).
 - #62 Firewall rules (`rules_firewall.py` shared, `rules_paloalto.py`, `rules_checkpoint.py`): lines from the legitimate members only (TRW-benign sources) or TRW (`lines.py`) - a percentile over everyone is raised by the attackers; rule ids are `RULE_ID_PATTERN`, families `RULE_FAMILY`; both rule sets run until story 4 - do not deploy story 2 alone.
-- #61 Every row carries its product (`products.py`, written after ingest - readers insert positionally); a product rule (`rules.RULE_PRODUCT`) reads `product_events` only; n/a per product and area with its reason; the period each evidence item covers (`period.py`). Story 1 of `specs/per_product_rules.md`.
+- #61 Every row carries its product (`products.py`, written after ingest - readers insert positionally); a product rule (`rules.RULE_PRODUCT`) reads `product_events` only; n/a per product and area with its reason; the period each evidence item covers (`period.py`). Story 1 of `docs/specs/per_product_rules.md`.
 - #60 Windows events (`winevent.py`): event XML read whole (an event spans lines), the event as written in `win_events` (MAP of its own item names, for SigmaHQ), the timeline row in `raw_events`; 4625/4624 feed the sign-in rules. W2 .evtx via the `evtx` library: records counted against the chunk headers (it drops damage silently), GUID/FILETIME/SYSTEMTIME values put in Windows' form from the record's Binary XML types; W3 Splunk WinEventLog text: items named from Windows' own message templates (`app/data/windows`, `tools/export_win_templates.ps1`), values as rendered. W4 Winlogbeat / NXLog JSON (`json_shape`): Winlogbeat writes rendered values and leaves out empty items; NXLog's own fields set aside by its documented list, but a template-named item always kept.
 - #59 Check Point Log Exporter records inside a ManageEngine EventLog Analyzer search export (`checkpoint_le.py`): record documented, wrapper observed; fields via `regexp_extract_all`; update logs sharing a `loguid` are `log_update` rows with no verdict; epoch `time` states its zone.
 - #53 Every file is identified before it is read, in Sigma logsource terms (`identify.py`); no column is guessed; a format without a reader, or none, is kept as evidence and not analysed. A file's name proves nothing - JSON-lines arrive as `.log`, exports start with a blank line.
@@ -325,8 +327,8 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #50 The Overview redesign, and the designs the user rejected - **do not re-propose them**.
 - #51 `#/result` retired (Reports / Attack Graph / Timeline / finding page); Sprint 3 review fixes; ADR-3/4; branches and worktrees; testing in a container; scripted-edit traps.
 - #73 The analyst's decision replaced the status workflow on screen (the user, 2026-10-27): its buttons left with Respond, so every status stayed Open; Findings filters and counts by decision (badge = high / critical not decided), no assignee, no MTTC on the Overview; a case is open while a suggestion is not decided (the report gate). `lifecycle.py` and its API stay for the audit trail.
-- #74 A customer is deleted with every case (admin / manager, the Customers page, specs/customer_delete.md): its store is renamed out of `customers/` in one step, then removed; the record goes to the shared hash-chained `deleted/customers.jsonl`, carrying its earlier case deletions; refused while a case is busy. A case without a `product` column must not break the Overview.
-- #75 A project is one investigation (specs/projects.md, Q110-Q113): every new case is in one (the API refuses none - check_parity, check_authz and every upload script name one); Open / Closed, closing gated on every case processed and every suggestion decided, a Closed project refused for upload and merge; status changes in the project's hash-chained log, written under `storage.PROJECT_LOCK` with its question; a merge across projects is refused. `tests/check_projects.py`.
+- #74 A customer is deleted with every case (admin / manager, the Customers page, docs/specs/customer_delete.md): its store is renamed out of `customers/` in one step, then removed; the record goes to the shared hash-chained `deleted/customers.jsonl`, carrying its earlier case deletions; refused while a case is busy. A case without a `product` column must not break the Overview.
+- #75 A project is one investigation (docs/specs/projects.md, Q110-Q113): every new case is in one (the API refuses none - check_parity, check_authz and every upload script name one); Open / Closed, closing gated on every case processed and every suggestion decided, a Closed project refused for upload and merge; status changes in the project's hash-chained log, written under `storage.PROJECT_LOCK` with its question; a merge across projects is refused. `tests/check_projects.py`.
 - #52 The case page is six steps at `#/case/<id>/<step>` (IAI-89); `GET /flow` computes each step's state on the server and names its standards; old case links redirect. `sprint/4` merges Sprint 3's two branches.
 
 **Evidence, storage, jobs and access** (`custody.py`, `storage.py`, `jobs.py`, `auth.py`, `mcp_server.py`)
@@ -335,7 +337,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 - #40 One store per customer under `customers/<id>/`; `case_dir()` is the only answer to "where is this case"; cross-customer merge is 409.
 - #41 Login accounts live in `AUTH_DIR`, apart from customer data; docker-compose deliberately does not set it.
 - #47 Sign-in throttled per account (not per address), audit-logged, and bound to the password hash.
-- #82 Sign in with Google (specs/google_login.md): the `hd` claim not the parameter, bound to `sub` not the email, redirect URI from `PUBLIC_URL`, the ID token straight from Google's token endpoint (OIDC §3.1.3.7 step 6); the whole domain may sign in, so removing an account is not a ban - disable is.
+- #82 Sign in with Google (docs/specs/google_login.md): the `hd` claim not the parameter, bound to `sub` not the email, redirect URI from `PUBLIC_URL`, the ID token straight from Google's token endpoint (OIDC §3.1.3.7 step 6); the whole domain may sign in, so removing an account is not a ban - disable is.
 - #48 Work is queued, durable and bounded (`jobs.py`); manifests are written atomically. **One process only.**
 - #58 Ingest: question on the project (hash-chained log), provenance / declared time off the screen since 2026-10-27 (the user: too much, then not needed; `PUT /provenance` still takes them), a declared zone / clock offset applied only on re-process (`POST /reprocess`), a method record on every `processed` line, duplicates named within a customer.
 
@@ -353,7 +355,7 @@ on 2026-10-20 because this file had passed Claude Code's 150k-character limit.
 **Exports**
 - #32 ATT&CK Navigator layer (format 4.5).
 - #34 STIX 2.1 bundle (and why `stix2-validator` rejects every bundle).
-- #83 Report drafts (specs/forensic_report.md, IAI-72/73): the system writes an editable Word draft per project from an uploaded skeleton; a skeleton's `INCLUDEPICTURE` fields fetched another organisation's logos - every linked field / external relationship refused; an element out of ECMA-376 order hangs Word on a hidden repair dialog; the AI's Thai summary is checked (address, machine, dotted account, time against its cited `F<n>`), not trusted.
+- #83 Report drafts (docs/specs/forensic_report.md, IAI-72/73): the system writes an editable Word draft per project from an uploaded skeleton; a skeleton's `INCLUDEPICTURE` fields fetched another organisation's logos - every linked field / external relationship refused; an element out of ECMA-376 order hangs Word on a hidden repair dialog; the AI's Thai summary is checked (address, machine, dotted account, time against its cited `F<n>`), not trusted.
 
 **Method**
 - #18 Measure before optimising: time a stage first; corpus wall-clock spread is host I/O.
@@ -465,7 +467,7 @@ Unix-style paths in `docker exec`/`docker cp` need `MSYS_NO_PATHCONV=1`.
 
 ## Extending the rule engine (detail in the `add-detection-rule` skill)
 
-A new rule is a **product rule** (`specs/per_product_rules.md`): `rules_<product>.py` (firewall
+A new rule is a **product rule** (`docs/specs/per_product_rules.md`): `rules_<product>.py` (firewall
 products share `rules_firewall.build`), reading `product_events`, its line from `lines.py`, its
 behaviour's document read (D14), a `RULE_META` entry (`python tests/check_rule_meta.py`), a
 place in `areas.py` and a case in the product's check. **SigmaHQ's rules are not written here**

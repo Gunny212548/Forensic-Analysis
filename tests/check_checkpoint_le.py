@@ -1,5 +1,5 @@
 """Check Point Log Exporter records in an EventLog Analyzer export (IAI-85,
-app/services/ingest/checkpoint_le.py, specs/IAI-85_checkpoint_log_exporter.md).
+app/services/ingest/checkpoint_le.py, docs/specs/IAI-85_checkpoint_log_exporter.md).
 
     python tests/check_checkpoint_le.py <scratch dir> [--repo DIR] [--real FILE]
 

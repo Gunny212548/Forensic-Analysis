@@ -2,7 +2,7 @@
 
 **69. A finding is keyed on what its rule decided on, not on each row - and the AI needs the account's history**
 
-`specs/finding_entities.md` (2026-10-26, Q93-Q97 as recommended), after the synthetic Windows quarter
+`docs/specs/finding_entities.md` (2026-10-26, Q93-Q97 as recommended), after the synthetic Windows quarter
 was uploaded to 8091 and checked.
 
 **One behaviour was hundreds of suggestions.** The review unit is `rid|srcip|username` (gotcha #19),

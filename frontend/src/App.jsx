@@ -19,7 +19,7 @@ const MENU = NAV_GROUPS.flatMap((g) => g.items)
 const LEGACY = ['result', 'reports', 'timeline', 'attack-graph']
 const PAGES = [...MENU.map((it) => it.route), 'case', 'finding', ...LEGACY]
 
-// Where each tab of the old Reports page lives now (specs/case_flow_design.md R13).
+// Where each tab of the old Reports page lives now (docs/specs/case_flow_design.md R13).
 const REPORTS_TAB_STEP = {
   overview: 'report',
   chain: 'report',
@@ -30,7 +30,7 @@ const REPORTS_TAB_STEP = {
 }
 
 // Revision 1's case steps (IAI-89) -> the step holding their content since
-// story 1 (specs/story1_case_flow_steps.md).
+// story 1 (docs/specs/story1_case_flow_steps.md).
 const OLD_STEPS = {
   triage: 'attack-events',
   investigate: 'attack-path',

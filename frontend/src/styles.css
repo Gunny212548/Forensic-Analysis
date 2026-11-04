@@ -1,4 +1,4 @@
-/* Palette and type from the SENTRY-IR Figma (figma-export/), sampled from
+/* Palette and type from the SENTRY-IR Figma (docs/figma-export/), sampled from
    the rendered frames: a light console, amber as the one action colour,
    IBM Plex Sans for text and IBM Plex Mono for the brand, ids and numbers.
 
@@ -109,7 +109,7 @@
   .dropzone .filename { color: var(--accent); font-weight: 600; margin-top: 6px; }
   .dropzone .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
-  /* Overview (interim), per figma-export/Overview.svg. */
+  /* Overview (interim), per docs/figma-export/Overview.svg. */
   .ov { display: flex; flex-direction: column; gap: 18px; }
   .ov .actions { gap: 8px; align-items: center; }
   .ov .actions button { padding: 9px 18px; }
@@ -147,7 +147,7 @@
   .fill-none { background: var(--ok); }
   .fill-pending { background: var(--panel-border); }
   .ov-table-head h2 { margin-bottom: 12px; }
-  /* Customers, per figma-export/Customers.svg. */
+  /* Customers, per docs/figma-export/Customers.svg. */
   .cust-table td { padding: 16px 8px; }
   .cust-name { font-weight: 600; }
   .cust-open { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--text-2); }
@@ -293,7 +293,7 @@
     .cp-head { flex-wrap: wrap; }
   }
 
-  /* Upload page (FR-2.x), per figma-export/Upload.svg. */
+  /* Upload page (FR-2.x), per docs/figma-export/Upload.svg. */
   .upload-page { display: flex; flex-direction: column; gap: 22px; }
   .upload-form { gap: 18px; }
   .dropzone-panel { padding: 14px; }
@@ -905,7 +905,7 @@ button.danger-outline { color: var(--danger); border-color: var(--danger-border)
 .ai-fact { display: inline-block; margin-left: 2px; padding: 0 4px; border-radius: 4px; background: var(--panel-border);
   font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: help; }
 .ai-warn { color: var(--danger); }
-/* Both sides of an explanation side by side, neither coloured as the answer (specs/ai_triage_verdicts.md). */
+/* Both sides of an explanation side by side, neither coloured as the answer (docs/specs/ai_triage_verdicts.md). */
 .ai-sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 16px; }
 
 /* Attack timeline stages (CaseFlow.jsx AttackTimeline): chevrons, one per ATT&CK tactic reached. */

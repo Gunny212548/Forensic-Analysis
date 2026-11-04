@@ -1,4 +1,4 @@
-"""SigmaHQ's high / critical Windows rules as product rules (specs/sigma_windows.md S-D4).
+"""SigmaHQ's high / critical Windows rules as product rules (docs/specs/sigma_windows.md S-D4).
 
 The same interface as rules_windows.py, so rules.apply_rules runs them and everything that
 follows a finding - review, the AI's explanation, FD ids, the attack timeline and graph -

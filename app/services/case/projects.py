@@ -1,4 +1,4 @@
-"""A project is one investigation of one customer (specs/projects.md, the user's
+"""A project is one investigation of one customer (docs/specs/projects.md, the user's
 Q110-Q113 of 2026-10-28): the unit an engagement is opened, worked and closed in.
 
 P1: a project is Open or Closed. It closes only when every suggestion in its cases
@@ -12,7 +12,7 @@ P3: a project is renamed (its name is copied onto each case's manifest, so both
 change), a case is moved to another project of the same customer - never across
 customers (gotcha #40), never into or out of a Closed project, never while it is
 processed - and a project is deleted with every case in it, as a customer is
-(specs/customer_delete.md); deletion is `customer:delete`.
+(docs/specs/customer_delete.md); deletion is `customer:delete`.
 
 P4: the picture of the whole investigation, read-only, built from the analyst's
 decisions in each case: the attack timeline of every confirmed group of every case,

@@ -1,5 +1,5 @@
 """Firewall rules: Palo Alto and Check Point (rules_firewall.py, rules_paloalto.py,
-rules_checkpoint.py; specs/per_product_rules.md stories 2-3).
+rules_checkpoint.py; docs/specs/per_product_rules.md stories 2-3).
 
     python tests/check_firewall_rules.py [--repo DIR]
 

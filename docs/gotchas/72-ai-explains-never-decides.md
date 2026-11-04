@@ -2,7 +2,7 @@
 
 **72. The AI explains each suggestion and never decides - one schema per suggestion, an attack side never empty**
 
-`specs/ai_triage_verdicts.md` (2026-10-27). The user: the model does not tell the analyst to accept or
+`docs/specs/ai_triage_verdicts.md` (2026-10-27). The user: the model does not tell the analyst to accept or
 reject; it explains, from the logged events, what happened and why the system found it, so the analyst
 can check it more easily (Q106-Q109 yes).
 

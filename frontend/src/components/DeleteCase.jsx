@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { deleteCase } from '../api.js'
 import { useAccess } from '../permissions.js'
 
-/** Delete the case and its evidence for good (specs/case_delete.md): admin and
+/** Delete the case and its evidence for good (docs/specs/case_delete.md): admin and
  *  manager. Inline confirmation - the case id typed back - never a browser
  *  dialog. After it `onDeleted(caseId)` (the Cases list drops the row), or,
  *  without one, the customer's page. */

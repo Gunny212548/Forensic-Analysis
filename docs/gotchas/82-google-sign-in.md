@@ -2,7 +2,7 @@
 
 **82. Sign in with Google: the `hd` claim, `sub` not email, PUBLIC_URL not the request, and removal is not a ban**
 
-`specs/google_login.md`, 2026-11-02 (the user: the whole Workspace domain may sign in, password kept).
+`docs/specs/google_login.md`, 2026-11-02 (the user: the whole Workspace domain may sign in, password kept).
 
 The traps:
 

@@ -34,7 +34,7 @@ def on_startup():
               "GOOGLE_ALLOWED_DOMAINS": config.GOOGLE_ALLOWED_DOMAINS, "PUBLIC_URL": config.PUBLIC_URL}
     missing = [k for k, v in google.items() if not v]
     if missing and len(missing) < len(google):
-        # Half set up is off, not a guess at the rest (specs/google_login.md).
+        # Half set up is off, not a guess at the rest (docs/specs/google_login.md).
         logging.getLogger("forensic").warning(
             "Sign in with Google is off: %s not set", ", ".join(missing))
     legacy = storage.ensure_root()
@@ -51,7 +51,7 @@ def on_startup():
     if not legacy:
         jobs.start()
         # And the AI reviews a stop cut short: only what has no advice yet is sent again
-        # (services/ai/triage.py, specs/ai_review_coverage.md C-D4).
+        # (services/ai/triage.py, docs/specs/ai_review_coverage.md C-D4).
         from .services.ai import triage
         triage.resume()
 
@@ -89,7 +89,7 @@ app.include_router(report_router.router)
 # itself calls. The page and its bundle stay public - they hold no data, and
 # the login form is part of them.
 # Sign in with Google's two steps are the browser's way in, so they are open too
-# (routers/auth.py; specs/google_login.md).
+# (routers/auth.py; docs/specs/google_login.md).
 PUBLIC_API = {"/api/health", "/api/auth/login", "/api/auth/config",
               "/api/auth/google/start", "/api/auth/google/callback"}
 # What a signed-in account may call whatever its role: who it is, and signing out.
@@ -150,7 +150,7 @@ def _refuse_oversized_body(path: str, length: str) -> JSONResponse | None:
 # Only what is certain to be safe for this bundle: no framing (the review and
 # lifecycle buttons must not sit under an attacker's page), no MIME sniffing,
 # no referrer to other sites. A script-src CSP is not here - it has not been
-# tried against the built bundle in a browser (specs/login_hardening_design.md).
+# tried against the built bundle in a browser (docs/specs/login_hardening_design.md).
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",

@@ -1,4 +1,4 @@
-"""Deleting a customer (specs/customer_delete.md, the user's D1-D4 of 2026-10-28).
+"""Deleting a customer (docs/specs/customer_delete.md, the user's D1-D4 of 2026-10-28).
 
 An administrator or a manager deletes a customer for good, with every case it
 holds, its projects and its evidence - the customer's whole store (gotcha #40).

@@ -2,7 +2,7 @@
 
 **79. SigmaHQ on Windows: converted at build, high / critical suggest, the rest mark; five traps**
 
-Story 6 (`specs/sigma_windows.md`, Q124-Q133, 2026-10-29). SigmaHQ's Windows rules run beside ours on
+Story 6 (`docs/specs/sigma_windows.md`, Q124-Q133, 2026-10-29). SigmaHQ's Windows rules run beside ours on
 `win_events`: the image's `sigma` build stage converts a pinned commit (`05d1031f`) with pySigma
 2.0.1 through ADR-006's DuckDB dialect into `/opt/sigma/windows_rules.json`; the app runs the SQL and
 never imports pySigma. High / critical rules of `rules` and `rules-emerging-threats` are product rules

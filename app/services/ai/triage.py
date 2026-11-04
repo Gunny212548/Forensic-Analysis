@@ -1,4 +1,4 @@
-"""The AI's review of each suggestion, before the analyst decides (specs/ai_triage.md).
+"""The AI's review of each suggestion, before the analyst decides (docs/specs/ai_triage.md).
 
 The user (2026-10-22): before the analyst accepts or rejects a suggestion, an AI
 says why the finding fired and what caused it, as advice that makes the
@@ -20,7 +20,7 @@ How it is kept honest - the lessons of the narrative (gotchas #13, #37):
 - **A check.** An address in a reason that none of the suggestion's facts holds
   is listed as ungrounded and shown.
 
-**It explains; it never decides** (the user, 2026-10-27, specs/ai_triage_verdicts.md): no
+**It explains; it never decides** (the user, 2026-10-27, docs/specs/ai_triage_verdicts.md): no
 accept / reject, no "likely attack" - what happened, why the rule fired, the facts that fit an
 attack and those that fit an ordinary cause, what the facts do not show, where to look next.
 Values the log wrote reach the prompt quoted and cut: an attacker can write them (X-D3).
@@ -143,7 +143,7 @@ def facts(con, f: dict) -> list[str]:
         GROUP BY f.rid ORDER BY 2 DESC, 1""", [src, rid, src]).fetchall()
     out.append("Other findings of this source: "
                + (", ".join(f"{r} ({RULE_LABELS.get(r, r)}) x{c}" for r, c in other) or "none") + ".")
-    # The account's history, every source (specs/finding_entities.md E-D2): a session or a dump
+    # The account's history, every source (docs/specs/finding_entities.md E-D2): a session or a dump
     # by an account that was guessed and then signed in is not an administrator's habit, and the
     # source's own findings cannot say so when the rows have no source.
     if user:
@@ -230,7 +230,7 @@ def _prompt(batch: list[tuple[str, list[str], list[str]]]) -> str:
 
 
 def is_explanation(review: dict) -> bool:
-    """Written in this schema - not an older answer with a verdict (specs/ai_triage_verdicts.md)."""
+    """Written in this schema - not an older answer with a verdict (docs/specs/ai_triage_verdicts.md)."""
     return isinstance(review.get("what_happened"), dict)
 
 
@@ -266,7 +266,7 @@ async def _review_batch(client, batch) -> list[dict]:
 
 
 def _order(findings: list[dict]) -> list[dict]:
-    """Every rule first, then round by round (specs/ai_review_coverage.md C-D3, Q102): the first
+    """Every rule first, then round by round (docs/specs/ai_review_coverage.md C-D3, Q102): the first
     batches cover every kind of behaviour instead of one rule's volume. Within a rule, and among
     the rules, highest level first, then the most events."""
     def rank(f):
@@ -454,7 +454,7 @@ def enqueue(case_id: str, again: bool = False) -> None:
 
 
 def _work() -> None:
-    # One review at a time: one model on this machine (specs/ai_review_coverage.md C-D5).
+    # One review at a time: one model on this machine (docs/specs/ai_review_coverage.md C-D5).
     while True:
         case_id, run = _queue.get()
         try:

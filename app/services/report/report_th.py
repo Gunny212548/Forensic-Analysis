@@ -1,6 +1,6 @@
 """The report draft's own words in Thai (the user, 2026-11-03: "ยังมีการ ผสม ภาษาอยู่").
 
-The draft is a Thai document for readers with no IT background (specs/forensic_report.md R-D8).
+The draft is a Thai document for readers with no IT background (docs/specs/forensic_report.md R-D8).
 What the system writes into it - tactic names, rule titles, step and area names, product and
 format names, reasons - came out in English. Here each gets its Thai, with the standard's own
 English term in brackets where there is one (the user's choice: "Thai + English in brackets"),

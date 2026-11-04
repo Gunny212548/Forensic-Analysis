@@ -99,7 +99,7 @@ async def upload_log(
         raise HTTPException(400, "A customer is required - every case belongs to exactly one customer")
 
     # Every new case is in a project - one investigation of the customer
-    # (specs/projects.md P1) - refused here as the customer is, because scripts
+    # (docs/specs/projects.md P1) - refused here as the customer is, because scripts
     # call this too. A project is one of the chosen customer's - an id from any
     # other customer is refused, never filed under this one.
     if project_id:

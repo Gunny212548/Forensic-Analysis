@@ -52,7 +52,7 @@ def _may_delete(request: Request, company_id: str) -> None:
 
 
 # What deleting the customer would remove, for the confirmation, and the cases
-# that block it now (specs/customer_delete.md D1). Sync: it opens case DuckDBs.
+# that block it now (docs/specs/customer_delete.md D1). Sync: it opens case DuckDBs.
 @router.get("/{company_id}/deletion")
 def deletion_preview(company_id: str, request: Request):
     _may_delete(request, company_id)
@@ -64,7 +64,7 @@ def deletion_preview(company_id: str, request: Request):
 
 @router.delete("/{company_id}")
 async def delete_company(company_id: str, request: Request):
-    """Delete the customer with every case it holds, for good (specs/customer_delete.md):
+    """Delete the customer with every case it holds, for good (docs/specs/customer_delete.md):
     admin and manager; refused while one of its cases is processed or analysed. The
     deletion is recorded, hash-chained, in DATA_DIR/deleted/customers.jsonl."""
     _may_delete(request, company_id)
@@ -77,7 +77,7 @@ async def delete_company(company_id: str, request: Request):
     return {"deleted": company_id, "record": record}
 
 
-# Each project with its status and what its cases hold (specs/projects.md P1), Open
+# Each project with its status and what its cases hold (docs/specs/projects.md P1), Open
 # first. Sync: it reads case DuckDBs (cached, overview._case_facts).
 @router.get("/{company_id}/projects")
 def list_projects(company_id: str):
@@ -103,7 +103,7 @@ async def _project_change(request: Request, action: str, company_id: str, change
         raise HTTPException(400, str(exc))
 
 
-# Close or reopen a project (specs/projects.md P1, Q110 / Q113): manager and admin;
+# Close or reopen a project (docs/specs/projects.md P1, Q110 / Q113): manager and admin;
 # closing is refused while a case of it is not processed or a suggestion not decided.
 @router.post("/{company_id}/projects/{project_id}/close")
 async def close_project(company_id: str, project_id: str, request: Request):

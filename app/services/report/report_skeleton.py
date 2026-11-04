@@ -1,4 +1,4 @@
-"""The report skeleton: the provider's Word layout the drafts are filled into (specs/forensic_report.md R-D11).
+"""The report skeleton: the provider's Word layout the drafts are filled into (docs/specs/forensic_report.md R-D11).
 
 Uploaded by an administrator on the Settings page, never committed (it carries the provider's
 letterhead and the repository is pushed). Kept in the shared part of DATA_DIR - provider
@@ -9,7 +9,7 @@ the skeleton it was built from, so a draft can be rebuilt (ACPO principle 3).
 A skeleton is refused, with every reason named, when it is not a .docx, too big, misses a
 required tag or uses one the drafts do not fill, holds a tag that does not parse, links
 anything outside the file (an INCLUDEPICTURE field fetched another organisation's logos
-into the first skeleton - specs/forensic_report.md "The .docx"), or fails a test render.
+into the first skeleton - docs/specs/forensic_report.md "The .docx"), or fails a test render.
 """
 from __future__ import annotations
 

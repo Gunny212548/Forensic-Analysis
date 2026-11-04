@@ -194,7 +194,7 @@ async def verify_evidence(case_id: str, request: Request):
 
 @router.delete("/{case_id}")
 async def delete_case(case_id: str, request: Request):
-    """Delete the case and its evidence for good (specs/case_delete.md): admin
+    """Delete the case and its evidence for good (docs/specs/case_delete.md): admin
     and manager only; refused while it is processed or analysed. The deletion
     is recorded, hash-chained, in the customer's deleted/log.jsonl."""
     manifest = storage.load_manifest(case_id)
@@ -281,7 +281,7 @@ async def reprocess(case_id: str, request: Request, body: dict = Body(default={}
 @router.post("/{case_id}/ai-review")
 async def ai_review_again(case_id: str, request: Request):
     """Send the suggestions that have no AI advice yet - a failed call, a review cut short - to
-    the model again (specs/ai_review_coverage.md C-D4, Q103). Nothing else is re-sent."""
+    the model again (docs/specs/ai_review_coverage.md C-D4, Q103). Nothing else is re-sent."""
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
@@ -447,7 +447,7 @@ async def get_case_findings(case_id: str):
         "findings": findings,
         "count": len(findings),
         "review_summary": counts,
-        # The AI review's own state (specs/ai_review_coverage.md): queued / running / done /
+        # The AI review's own state (docs/specs/ai_review_coverage.md): queued / running / done /
         # failed / off, with how many suggestions it has advised on.
         "ai_review": manifest.get("ai_review"),
         "lifecycle_summary": lifecycle.summary(findings, case_views.created_at(case_id, manifest)),

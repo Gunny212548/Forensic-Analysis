@@ -561,7 +561,7 @@ user's approval as revision 6 did.
   the two.
 - **Q32 - where it lands.** Proposed: temporal proximity and rare values in story 3 (data
   timeline, IAI-60); unknown features with story 5 (confirmed events); the matrix with step 4;
-  edge labels in story 7 (`specs/story7_attack_path_mcp.md`); Casey with the report story.
+  edge labels in story 7 (`docs/specs/story7_attack_path_mcp.md`); Casey with the report story.
 
 ## Open questions
 

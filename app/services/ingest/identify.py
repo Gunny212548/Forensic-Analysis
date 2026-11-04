@@ -4,7 +4,7 @@ Every upload is identified automatically and nothing is guessed: a file is
 either a documented format this tool reads, a format it recognises but has no
 reader for yet, or unrecognised. Only the first is analysed; the other two
 are kept as evidence (digest, custody) and the case says which - the user's
-call (specs/case_flow_design.md, revision 2, Q8).
+call (docs/specs/case_flow_design.md, revision 2, Q8).
 
 The answer is given in the Sigma logsource taxonomy (v2.1.0): category /
 product / service where the taxonomy defines them, and a `custom` product

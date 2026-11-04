@@ -1,5 +1,5 @@
 """Windows event logs, W1-W4: the core, event XML, .evtx, Splunk's WinEventLog text and JSON
-(app/services/ingest/winevent.py, specs/windows_event_logs.md).
+(app/services/ingest/winevent.py, docs/specs/windows_event_logs.md).
 
     python tests/check_windows.py <scratch dir> [--repo DIR] [--evtx D:/logtest/windows]
 
@@ -94,7 +94,7 @@ def _event(channel: str, provider: str, event_id: int, when: str, host: str, dat
 
 
 def check_sigma_4688(scratch: Path, run, query) -> None:
-    """Story 6d (specs/sigma_windows.md S-D10..S-D13): SigmaHQ's process creation rules on Security 4688
+    """Story 6d (docs/specs/sigma_windows.md S-D10..S-D13): SigmaHQ's process creation rules on Security 4688
     where the host's Sysmon 1 is not - the map, the unknown fields, Sysmon first, the case's record."""
     from app.services.detection import sigma
     print("SigmaHQ process creation on Security 4688 (story 6d)")
@@ -332,7 +332,7 @@ def check_json(lab: Path | None, scratch: Path, run, win, query) -> None:
     check(ours == {"WIN-BRUTE-1": 12, "WIN-AUTH-1": 1},
           f"12 failures then a sign-in from one address: WIN-BRUTE-1, WIN-AUTH-1 ({ours})")
     # The sample's 1102 (mallory clears the Security log) is SigmaHQ's "Security Eventlog Cleared"
-    # (specs/sigma_windows.md) - a single event, not an in-house rule's (W-D1).
+    # (docs/specs/sigma_windows.md) - a single event, not an in-house rule's (W-D1).
     sigma = {r: n for r, n in (m.get("rules_matched") or {}).items() if r.startswith("SIGMA-")}
     check(sigma == {"SIGMA-d99b79d2-0a6f-4f46-ad8b-260b6e17f982": 1},
           f"...and the cleared Security log is SigmaHQ's Security Eventlog Cleared ({sigma})")

@@ -35,7 +35,7 @@ FIREWALL = {"category": "firewall"}
 CASES = [
     ("Cisco ASA syslog", S / "attack-data/cisco_asa_generic_logs.log", "log", "no_reader", FIREWALL, "cisco_asa"),
     ("Cisco FTD eStreamer JSON", S / "attack-data/ftd_connection_events.log", "log", "no_reader", FIREWALL, "cisco_ftd"),
-    # Read since W1 / W3 (winevent.py, specs/windows_event_logs.md).
+    # Read since W1 / W3 (winevent.py, docs/specs/windows_event_logs.md).
     ("Windows Security (Splunk text)", S / "attack-data/windows-security.log", "log", "supported",
      {"product": "windows", "service": "security"}, None),
     ("Windows Sysmon event XML", S / "attack-data/windows-sysmon.log", "log", "supported",

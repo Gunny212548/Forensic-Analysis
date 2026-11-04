@@ -7,7 +7,7 @@ description: The SENTRY-IR console requirements: the Figma export and how to ren
 
 Moved out of `CLAUDE.md` on 2026-11-04, word for word; `CLAUDE.md` keeps the one-line rules and the gotcha index. **Before changing code a gotcha names, read `docs/gotchas/NN-*.md`.** If this file and the code disagree, the code is the fact - fix this file (doc-keeper).
 
-The target UI is `figma-export/` (10 screens: login, Upload, Overview,
+The target UI is `docs/figma-export/` (10 screens: login, Upload, Overview,
 Incidents (= the Findings page, see *Decisions*), Timeline, Customers,
 Attack-graph, Attck-map, Reports, Settings).
 Its text is **outlined to paths**, so `grep` finds nothing; render each SVG
@@ -16,8 +16,8 @@ image. Use the SVG's own height - `Overview.svg` is 2346px tall and a
 1117px window silently cuts off its bottom half. On Windows pass the output
 and `file:///` paths with forward slashes (`cygpath -m`); backslashes are
 eaten on the way to Chrome and it renders "file couldn't be accessed". The
-agreed functional spec is `AI-Incident-Analysis-Reporting-FR.pdf`
-in the repo root (59 items, FR-0..FR-12); its HTML source was generated, not
+agreed functional spec is `docs/requirements/AI-Incident-Analysis-Reporting-FR.pdf`
+(not in git; 59 items, FR-0..FR-12); its HTML source was generated, not
 kept in the repo.
 
 ## Jira
@@ -60,7 +60,7 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
   (customer -> project -> case). Chosen on the Upload page under the
   customer ("+ Add new project..." creates one, idempotent by name within
   the customer, like customers); **required since 2026-10-28** (gotcha #75,
-  specs/projects.md P1 - the API refuses an upload naming none, so every
+  docs/specs/projects.md P1 - the API refuses an upload naming none, so every
   script names one); cases from before stay "No project". Stored in the customer's own store
   (`customers/<id>/projects/<pj-id>.json`), so a project can only hold that
   customer's cases: an upload naming another customer's project id is 409
@@ -70,7 +70,7 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
   takes no new case while Closed. Shown on the customer profile (Projects panel + a Project column),
   on its own page `#/customers/<id>/projects/<pj-id>`, on the case header
   and under the customer in the Overview / recent-uploads tables. Also
-  (specs/projects.md, gotcha #75): an Overview and a Findings filter per project
+  (docs/specs/projects.md, gotcha #75): an Overview and a Findings filter per project
   (P2), rename / move a case / delete a project (P3), and on the project page the
   attack timeline and attack path across its cases (P4).
 - Not yet: **IAI-24 resumable chunked
@@ -91,7 +91,7 @@ was retired (gotcha #51) and are steps of a case now; Settings is the Users page
   workflow. Grouping survives only as **related findings** (IAI-43/44), and
   the old opening threshold decides which findings enter the workflow
   (IAI-42). The brand line is "Finding Response Console"; ids are
-  `FD-YYYY-seq`. File names that say Incident (`figma-export/Incidents.svg`,
+  `FD-YYYY-seq`. File names that say Incident (`docs/figma-export/Incidents.svg`,
   the FR PDF) are left as they are.
 - **Every datum comes from an upload.** No "New finding" button, no live
   feed, no EDR/SIEM/email integrations, no ingest API key. The Figma's

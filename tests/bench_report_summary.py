@@ -1,4 +1,4 @@
-"""Measure the report's AI Executive Summary on a real project (specs/forensic_report.md R-D10).
+"""Measure the report's AI Executive Summary on a real project (docs/specs/forensic_report.md R-D10).
 
 Runs report_summary.draft on the project's confirmed groups N times and prints each run's
 paragraphs, the grounding refusals, the time and the tokens. Reads the store; writes nothing.

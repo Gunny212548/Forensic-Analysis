@@ -2,7 +2,7 @@
 
 **81. SigmaHQ's process creation rules on Security 4688: SigmaHQ's own map, unknown is NULL, Sysmon first**
 
-Story 6d (`specs/sigma_windows.md`, Q134-Q137, 2026-11-02). The Sigma taxonomy maps `process_creation`
+Story 6d (`docs/specs/sigma_windows.md`, Q134-Q137, 2026-11-02). The Sigma taxonomy maps `process_creation`
 to Sysmon 1 only, so until 6d a host that audits process creation (4688) and runs no Sysmon - the usual
 customer export - had none of SigmaHQ's 1,425 process creation rules. They now also read 4688
 (`sigma.py`: `MAP_4688`, `scope_4688`, the temp table `sigma_4688`).

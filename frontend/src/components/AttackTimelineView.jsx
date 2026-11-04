@@ -6,7 +6,7 @@ import { LEVEL_EN, fmtNum } from '../format.js'
  *  2026-10-22 - and below, every group in the order its first event happened. A stage
  *  filters the list. `rows` come sorted by first event; `findingHref(f)` opens one.
  *  With `showCase`, each row names the case it is in - a project's timeline spans its
- *  cases (specs/projects.md P4). Shared by a case's Attack timeline step and a
+ *  cases (docs/specs/projects.md P4). Shared by a case's Attack timeline step and a
  *  project's. */
 export default function AttackTimelineView({ rows, tacticOrder, findingHref, showCase = false }) {
   const [stage, setStage] = useState('')

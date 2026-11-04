@@ -2,7 +2,7 @@
 
 Status: **approved 2026-10-27** (Q106-Q109 yes), revision 2; built on branch `ai-explains`
 (gotcha #72). Builds on
-`specs/ai_triage.md` (gotcha #64) and `specs/ai_review_coverage.md` (gotcha #71).
+`docs/specs/ai_triage.md` (gotcha #64) and `docs/specs/ai_review_coverage.md` (gotcha #71).
 
 **The user, 2026-10-27:** "ตัว LLM จะไม่บอกให้ Analyze ว่าควร reject หรือ Accept แค่บอกเหตุผลว่า
 จากเหตุการณ์ที่เกิดจาก Event log เกิดอะไรขึ้นทำไมระบบถึงเจอแบบนี้คือการให้เหตุผลเพื่อให้ Analyze

@@ -28,7 +28,7 @@ async def list_findings(
     analyst's decision rather than the status workflow (2026-10-27)."""
     if company_id is not None and storage.load_company(company_id) is None:
         raise HTTPException(404, "Customer not found")
-    # One investigation (specs/projects.md P2): a project is a customer's.
+    # One investigation (docs/specs/projects.md P2): a project is a customer's.
     if project_id is not None and (company_id is None or storage.load_project(company_id, project_id) is None):
         raise HTTPException(404, "Project not found for this customer")
     if status is not None and status not in (*lifecycle.STATES, findings_index.OPEN_FILTER):

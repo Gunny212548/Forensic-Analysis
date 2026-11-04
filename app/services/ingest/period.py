@@ -1,4 +1,4 @@
-"""How much time each evidence item covers (specs/per_product_rules.md, D15).
+"""How much time each evidence item covers (docs/specs/per_product_rules.md, D15).
 
 An export may hold six months to a year of events, and a rule counts a
 behaviour inside a time window, never over the whole file - so the case must

@@ -1,7 +1,7 @@
 # Gotcha #61
 
 **61. Every row carries its product; every evidence item says what period it covers (story 1 of
-`specs/per_product_rules.md`, branch `rules-per-product`, 2026-10-22).**
+`docs/specs/per_product_rules.md`, branch `rules-per-product`, 2026-10-22).**
 
 - **Product** (`products.py`, D10-D11): each identification profile belongs to one product, and a
   product is a `firewall` or an `os` (D10). Entra ID and Exchange Online are neither, so their

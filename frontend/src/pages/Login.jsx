@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getLoginConfig, login } from '../api.js'
 
-/** FR-1, laid out as figma-export/login.svg: email + password, a way to reach
+/** FR-1, laid out as docs/figma-export/login.svg: email + password, a way to reach
  *  IT, and the internal-use notice. Accounts are made by an administrator
  *  (tools/create_user.py), so there is deliberately no sign-up or
  *  self-service reset here - the IT link is the path for anyone locked out. */
@@ -21,7 +21,7 @@ const GOOGLE_REFUSED = {
   off: 'Sign in with Google is not set up on this server',
 }
 
-/** Sign in with Google (specs/google_login.md): a plain link - the server runs
+/** Sign in with Google (docs/specs/google_login.md): a plain link - the server runs
  *  the whole OpenID Connect exchange, so nothing is loaded from Google here. */
 function GoogleButton() {
   return (

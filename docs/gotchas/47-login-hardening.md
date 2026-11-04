@@ -1,7 +1,7 @@
 # Gotcha #47
 
 **47. Sign-in is throttled, audited and bound to the password (2026-10-19,
-`specs/login_hardening_design.md`).** `tests/check_auth.py` (45 checks) is
+`docs/specs/login_hardening_design.md`).** `tests/check_auth.py` (45 checks) is
 the proof.
 - **Throttle is per account, not per address.** Behind Docker the server
   sees the bridge gateway as every client (gotcha #28), so an address limit

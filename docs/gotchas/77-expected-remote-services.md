@@ -2,7 +2,7 @@
 
 **77. A deployment tool's routine is not lateral movement; Windows writes `%SystemRoot%` in mixed case**
 
-Story 5g of `specs/windows_rules.md` (2026-10-29, Q120-Q122). Every rule was scored on the three
+Story 5g of `docs/specs/windows_rules.md` (2026-10-29, Q120-Q122). Every rule was scored on the three
 ground-truth quarters with story 5f's code (Lotus Check Point, Mekong Windows, Kinnaree Windows): Mekong
 flagged no plain or look-alike event, but on Kinnaree 2,560 of the 2,567 not-attack rows were WIN-LAT-2
 / WIN-LAT-4 - a backup product's guest helper (`svc_veeam`, `VeeamGuestHelper`, on **91 of 91 days**)
