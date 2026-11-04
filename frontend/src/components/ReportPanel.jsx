@@ -26,6 +26,11 @@ const PEOPLE = [
 
 function aiLine(d) {
   const s = d.summary || {}
+  // The model not reachable reads as what to do, not as the exception (UX audit, 2026-11-04);
+  // the stored error keeps the exception, and the line's hover shows it.
+  if (s.error && /Connect(Error|Timeout)|connection attempts failed|ConnectionRefused/i.test(s.error)) {
+    return 'AI did not draft: the local AI model (Ollama) is not running - write the Executive Summary in Word'
+  }
   if (s.error) return `AI did not draft: ${s.error}`
   const parts = [`${s.kept ?? 0} summary paragraphs` + (s.refused ? ` (${s.refused} cut by the check)` : '')]
   if (s.recommendations != null) {
@@ -173,7 +178,28 @@ export default function ReportPanel({ project, fromCase = false }) {
           <div className="empty">{error ? '' : 'Loading...'}</div>
         ) : (
           <>
-            {!gate.open && <div className="rv-gate blocked">A draft waits for: {gate.reasons.join('; ')}.</div>}
+            {!gate.open && (
+              <div className="rv-gate blocked">
+                A draft waits for:{' '}
+                {gate.reasons.map((r, i) => (
+                  <span key={r}>
+                    {i > 0 && '; '}
+                    {/* The skeleton is an administrator's (Settings): a way there for one, who to ask
+                        for anyone else - not a dead end (UX audit, 2026-11-04). */}
+                    {r.startsWith('no report skeleton') ? (
+                      can('account:manage') ? (
+                        <>no report skeleton yet - <a href="#/settings">upload one in Settings</a></>
+                      ) : (
+                        'no report skeleton yet - an administrator uploads it in Settings'
+                      )
+                    ) : (
+                      r
+                    )}
+                  </span>
+                ))}
+                .
+              </div>
+            )}
 
             {latest ? (
               <div className="rp-latest">
@@ -184,7 +210,7 @@ export default function ReportPanel({ project, fromCase = false }) {
                 </div>
                 {/* Not the typed "what changed": it is the Thai draft's change-log text, and the
                     page is English (the user, 2026-11-03) - it is in the file's change log. */}
-                <div className="cell-sub">{aiLine(latest)}</div>
+                <div className="cell-sub" title={latest.summary?.error || undefined}>{aiLine(latest)}</div>
                 <div className="lc-actions rp-actions">
                   <a className="btn-primary" href={reportFileUrl(co, pj, latest.file)} download>
                     Download {latest.version} (.docx)
@@ -213,7 +239,7 @@ export default function ReportPanel({ project, fromCase = false }) {
                          placeholder={latest ? 'e.g. corrected after review' : 'e.g. first draft for review'} />
                 </label>
                 <button type="submit" disabled={!gate.open || !mayMake || !!busy}
-                        title={!mayMake ? why('case:analyze') : !gate.open ? 'Every suggestion must be decided first' : undefined}>
+                        title={!mayMake ? why('case:analyze') : !gate.open ? `Waiting for: ${gate.reasons.join('; ')}` : undefined}>
                   {busy === 'draft' ? 'Making - the AI is writing (about 30 s)...' : `Make draft ${data.next_version}`}
                 </button>
               </div>
