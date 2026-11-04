@@ -122,8 +122,18 @@ export function Timeline({ items, onCite }) {
  *  thousands of findings, which a per-rule list never does. The score is
  *  computed in SQL with a log-dampened per-rule term (db.risk_scores), so a
  *  busy host does not outrank a quiet one implicated by several rules. */
+/** An account's name without its domain: MEKONG\adm.hd, adm.hd@mekong.local and adm.hd all read
+ *  "adm.hd". Only for a note - a local Administrator and DOMAIN\Administrator share the name and
+ *  are two accounts, so rows are never merged on it (the user, 2026-11-04). */
+const bareAccount = (a) => String(a).split('\\').pop().split('@')[0].toLowerCase()
+
 export function RiskTables({ risk }) {
   if (!risk) return null
+  // The other spellings of each account's name among the ranked accounts.
+  const spellings = {}
+  for (const i of risk.accounts || []) (spellings[bareAccount(i.entity)] ||= []).push(i.entity)
+  const alsoAs = (key, entity) =>
+    key === 'accounts' ? (spellings[bareAccount(entity)] || []).filter((e) => e !== entity) : []
   const ROLES = [
     ['sources', 'Sources'],
     ['destinations', 'Destinations'],
@@ -146,7 +156,15 @@ export function RiskTables({ risk }) {
               </tr>
               {risk[key].slice(0, 6).map((i) => (
                 <tr key={i.entity}>
-                  <td className="risk-entity">{i.entity}</td>
+                  <td className="risk-entity">
+                    {i.entity}
+                    {alsoAs(key, i.entity).length > 0 && (
+                      <div className="cell-sub"
+                           title="The same name with another domain - the same person or not, the logs do not say">
+                        also seen as {alsoAs(key, i.entity).join(', ')}
+                      </div>
+                    )}
+                  </td>
                   <td className="risk-score">{i.score}</td>
                   <td className="risk-n">{i.findings}</td>
                   <td className="risk-rules">
