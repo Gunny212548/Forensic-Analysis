@@ -78,5 +78,13 @@ difference between rounds is the change, not chance):
 - Time moves 12-17 s a suggestion between cases and rounds with no pattern; ~14 s is the planning figure
   (kinnaree's 567: ~130 minutes).
 - Still seen: `check_next` sometimes lists fact ids ("S27.f2 and S27.f4") instead of a place to look.
+- 2026-11-04, the UX audit: the prose read "Rule SIGMA-1228c958-... triggers on ..." and "(S9.f4)".
+  The model copied the UUID because the facts named a SigmaHQ rule as `SIGMA-<uuid> (SIGMA-<uuid>)`.
+  Its rules had no label. `triage.rule_name` now hands over the rule's title. Fact ids are written into
+  the sentences although the claim's `facts` list holds them; 600 of them in kinnaree's 526 reviews.
+  `triage.readable_review` cleans the prose for display only, in `case_views`, so the MCP server
+  sees it too: a UUID becomes its title, ids in brackets go, a bare id reads "the evidence". The stored
+  review keeps the model's words. Old cases read clean without a re-run. The prompt was not changed
+  (gotcha #13).
 
 Check: `tests/check_triage.py`.

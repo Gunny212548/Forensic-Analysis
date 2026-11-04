@@ -141,7 +141,9 @@ def findings_view(case_id: str, manifest: dict, assign_ids: bool = True) -> list
             f["lifecycle"] = {"tracked": False}
         # The AI's advice on this suggestion (triage.py), if it was reviewed; else whether it is
         # still to come or failed (docs/specs/ai_review_coverage.md C-D2 / C-D4).
-        f["ai_review"] = ai_items.get(f["key"])
+        # The prose as the analyst reads it (a SigmaHQ id as its title, fact ids left out of the
+        # sentences); the stored review keeps the model's own words.
+        f["ai_review"] = triage.readable_review(ai_items.get(f["key"]))
         f["ai_state"] = triage.state_of(case_id, manifest, f["key"], ai_items, ai_failed)
         f["ai_error"] = ai_failed.get(f["key"]) if f["ai_state"] == "failed" else None
         # Its ATT&CK tactics, in ATT&CK's order - the Attack timeline's stages.

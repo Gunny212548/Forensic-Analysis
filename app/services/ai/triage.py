@@ -100,6 +100,56 @@ def _field_sql(name: str) -> str:
     return f"nullif(regexp_extract(raw, '{name}:\"+([^\";]*)', 1), '')"
 
 
+def rule_name(rid: str) -> str:
+    """A rule as the AI is to name it. Ours: the id and its label (WIN-AUTH-1 (login after
+    failures)). SigmaHQ's id is a UUID with no label - handed over as itself, the model copied
+    "Rule SIGMA-1228c958-..." into the explanation (2026-11-04) - so its own title instead."""
+    meta = rule_meta.RULE_META.get(rid, {})
+    if meta.get("origin") == "SigmaHQ":
+        return f'"{meta.get("title") or rid}" (SigmaHQ)'
+    return f"{rid} ({RULE_LABELS.get(rid, rid)})"
+
+
+_SIGMA_ID = re.compile(r"\bSIGMA-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
+# A fact id written into the prose - "(S9.f4)", "(S11.f1, S11.f3)", "(S9, S10.f5)" - although the
+# claim's `facts` list already carries it and the page shows it as a chip.
+_CITED_LABEL = re.compile(r"\bS\d+\.f\d+\s*\(([^()]*)\)")   # "S13.f6 (Other findings ...)" -> the words
+_CITE_GROUP = re.compile(r"\s*\(\s*(?:(?:S\d+(?:\.f\d+)?|f\d+)\s*(?:[,;]|and)?\s*)+\)")
+_CITE_BARE = re.compile(r"\bS\d+\.f\d+\b")
+
+
+def readable(text: str) -> str:
+    """The AI's prose as the analyst reads it: a SigmaHQ id as its rule's title, fact ids that
+    were written into the sentence left out. Display only - the stored review keeps the model's
+    own words (gotcha #72)."""
+    if not isinstance(text, str) or not text:
+        return text
+    text = _SIGMA_ID.sub(lambda m: f'"{rule_meta.RULE_META.get(m.group(0), {}).get("title") or m.group(0)}"',
+                         text)
+    text = _CITED_LABEL.sub(r"\1", text)
+    text = _CITE_GROUP.sub("", text)
+    # Inside the sentence a bare id is a noun ("the command list from S10.f3"): left out, the
+    # sentence ends "from."; the facts themselves are the chips beside it.
+    text = _CITE_BARE.sub("the evidence", text)
+    text = re.sub(r"\s+([.,;:])", r"\1", re.sub(r"[ \t]{2,}", " ", text))
+    return text.strip()
+
+
+def readable_review(review: dict | None) -> dict | None:
+    """A copy of one stored explanation with every prose field through readable()."""
+    if not isinstance(review, dict) or not is_explanation(review):
+        return review
+    out = dict(review)
+    for k in ("what_happened", "why_it_fired"):
+        if isinstance(out.get(k), dict):
+            out[k] = {**out[k], "text": readable(out[k].get("text"))}
+    for k in ("points_to_attack", "points_to_ordinary_cause"):
+        out[k] = [{**c, "text": readable(c.get("text"))} if isinstance(c, dict) else c for c in out.get(k) or []]
+    out["not_shown"] = [readable(x) for x in out.get("not_shown") or []]
+    out["check_next"] = readable(out.get("check_next"))
+    return out
+
+
 def facts(con, f: dict) -> list[str]:
     """The facts of one suggestion (a collapsed finding: rid, srcip, username)."""
     rid, src, user = f["rid"], f.get("srcip"), f.get("username")
@@ -108,7 +158,7 @@ def facts(con, f: dict) -> list[str]:
     where = f"f.rid = ? AND {k_src} IS NOT DISTINCT FROM ? AND {k_user} IS NOT DISTINCT FROM ?"
     args = [rid, src, user]
     out = [
-        f"Rule {rid} ({RULE_LABELS.get(rid, rid)}): {meta.get('ads', {}).get('goal', '')} "
+        f"Rule {rule_name(rid)}: {meta.get('ads', {}).get('goal', '')} "
         f"ATT&CK: {', '.join(f.get('mitre') or []) or 'none'}. Level {f.get('level')}.",
         "Documented false positives of this rule: "
         + ("; ".join(meta.get("falsepositives") or []) or "none listed") + ".",
@@ -142,7 +192,7 @@ def facts(con, f: dict) -> list[str]:
         WHERE {k_src} IS NOT DISTINCT FROM ? AND f.rid <> ? AND ? IS NOT NULL
         GROUP BY f.rid ORDER BY 2 DESC, 1""", [src, rid, src]).fetchall()
     out.append("Other findings of this source: "
-               + (", ".join(f"{r} ({RULE_LABELS.get(r, r)}) x{c}" for r, c in other) or "none") + ".")
+               + (", ".join(f"{rule_name(r)} x{c}" for r, c in other) or "none") + ".")
     # The account's history, every source (docs/specs/finding_entities.md E-D2): a session or a dump
     # by an account that was guessed and then signed in is not an administrator's habit, and the
     # source's own findings cannot say so when the rows have no source.
@@ -164,7 +214,7 @@ def facts(con, f: dict) -> list[str]:
                 days = (here - t0).total_seconds() / 86400
                 when = (f", {abs(days):.0f} days {'before' if days > 0 else 'after'} this suggestion"
                         if abs(days) >= 1 else ", the same day as this suggestion")
-            items.append(f"{r} ({RULE_LABELS.get(r, r)}) from {_addr(s_) if s_ else 'no source'}, {n} events "
+            items.append(f"{rule_name(r)} from {_addr(s_) if s_ else 'no source'}, {n} events "
                          f"{str(t0)[:19]} - {str(t1)[:19]}{when}")
         out.append(f"Other findings of account {_q(user)}, any source, earliest first: "
                    + ("; ".join(items) or "none") + ".")

@@ -288,6 +288,36 @@ def main() -> int:
           and any(p.name.endswith(".triage.json") for p in storage.case_files(storage.customer_dir(co), cid)),
           "the review file is one of the case's files - deleted with it")
 
+    print("\nThe explanation in words an analyst reads (2026-11-04)")
+    from app.services.detection import rule_meta
+    sig = next((r for r, m in rule_meta.RULE_META.items() if m.get("origin") == "SigmaHQ"), None)
+    if sig:
+        title = rule_meta.RULE_META[sig]["title"]
+        check(triage.rule_name(sig) == f'"{title}" (SigmaHQ)' and sig not in triage.rule_name(sig),
+              "a SigmaHQ rule is handed to the AI by its title, not its UUID")
+        check(triage.readable(f"Rule {sig} fired on RDS01.") == f'Rule "{title}" fired on RDS01.',
+              "a SigmaHQ id the AI wrote reads as the rule's title")
+    else:
+        print("  (no SigmaHQ bundle at /opt/sigma - the SigmaHQ name checks are skipped)")
+    check(triage.rule_name("WIN-AUTH-1").startswith("WIN-AUTH-1 ("), "our rules keep their id and label")
+    for raw, want in (
+            ("Source 198.51.100.66 is external (S9.f4), per the rule (S9.f3).",
+             "Source 198.51.100.66 is external, per the rule."),
+            ("Persists across reboots (S11.f1, S11.f3).", "Persists across reboots."),
+            ("From the same IP (S9, S10.f5), so likely.", "From the same IP, so likely."),
+            ("S13.f6 (Other findings of source 10.20.0.40) to see more.", "Other findings of source 10.20.0.40 to see more."),
+            ("Review the command list from S10.f3.", "Review the command list from the evidence."),
+            ("On host (RDS01) with T1059 and 10.0.0.1.", "On host (RDS01) with T1059 and 10.0.0.1.")):
+        check(triage.readable(raw) == want, f"fact ids out of the prose: {raw!r} -> {triage.readable(raw)!r}")
+    stored = {"what_happened": {"text": "Seen (S1.f3).", "facts": ["S1.f3"]}, "why_it_fired": {"text": "x", "facts": []},
+              "points_to_attack": [{"text": "A (S1.f1).", "facts": ["S1.f1"]}], "points_to_ordinary_cause": [],
+              "not_shown": ["B (S1.f2)."], "check_next": "C from S1.f4."}
+    shown = triage.readable_review(stored)
+    check(shown["what_happened"] == {"text": "Seen.", "facts": ["S1.f3"]} and shown["points_to_attack"][0]["text"] == "A."
+          and shown["not_shown"] == ["B."] and shown["check_next"] == "C from the evidence.",
+          "every prose field of an explanation is cleaned, its cited facts kept")
+    check(stored["what_happened"]["text"] == "Seen (S1.f3).", "the stored review keeps the model's own words")
+
     print("\nTRIAGE OK" if not FAILED else f"\n{len(FAILED)} FAILED")
     return 1 if FAILED else 0
 
