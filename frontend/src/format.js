@@ -79,6 +79,15 @@ export function shortTs(ts) {
   return String(ts).replace('T', ' ').slice(0, 16)
 }
 
+/** An event time to the second, its zone kept: "2026-09-17 02:04:13.907856+07:00" reads
+ *  "2026-09-17 02:04:13 +07:00". Only the display is trimmed - put the full value in the
+ *  element's title, since sub-second order can matter in evidence (UX audit, 2026-11-04). */
+export function eventTs(ts) {
+  if (!ts) return ''
+  const m = String(ts).replace('T', ' ').match(/^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)(?:\.\d+)?\s*(Z|[+-]\d\d:?\d\d)?$/)
+  return m ? `${m[1]}${m[2] ? ` ${m[2]}` : ''}` : String(ts)
+}
+
 /** "14 min ago" - the Figma's relative times, in English like the shell. */
 export function ago(iso) {
   if (!iso) return ''

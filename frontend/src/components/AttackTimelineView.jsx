@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LEVEL_EN, fmtNum } from '../format.js'
+import { LEVEL_EN, eventTs, fmtNum } from '../format.js'
 
 /** Confirmed finding groups as an attack timeline: the ATT&CK tactics they reach as
  *  a row of stages, in ATT&CK's order - only the tactics found, the user's choice of
@@ -66,8 +66,10 @@ export default function AttackTimelineView({ rows, tacticOrder, findingHref, sho
           <tbody>
             {shown.map((f) => (
               <tr key={`${f.case_id || ''}|${f.key}`}>
-                <td className="mono">{f.ts_first || ''}</td>
-                <td className="mono">{f.ts_last && f.ts_last !== f.ts_first ? f.ts_last : ''}</td>
+                <td className="mono" title={f.ts_first || undefined}>{eventTs(f.ts_first)}</td>
+                <td className="mono" title={f.ts_last || undefined}>
+                  {f.ts_last && f.ts_last !== f.ts_first ? eventTs(f.ts_last) : ''}
+                </td>
                 <td>{stagesOf(f).map((t) => names[t] || 'Not mapped').join(', ')}</td>
                 <td>
                   <a className="table-link" href={findingHref(f)}>

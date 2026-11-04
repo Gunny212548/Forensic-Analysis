@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { aiReviewAgain, getFindings, postReview } from '../api.js'
-import { LEVEL_EN, REVIEW_CLASS, fmtNum, shortTs } from '../format.js'
+import { LEVEL_EN, REVIEW_CLASS, eventTs, fmtNum, shortTs } from '../format.js'
 import { Empty, FLAG_TEXT, MitreTags, RuleName } from './common.jsx'
 import FindingEvents from './FindingEvents.jsx'
 import RuleCard from './RuleCard.jsx'
@@ -320,9 +320,10 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
             )}
           </div>
         ))}
-        <div className="rv-meta">
-          {f.ts_first || ''}
-          {f.ts_last && f.ts_last !== f.ts_first ? ` → ${f.ts_last}` : ''}
+        <div className="rv-meta"
+             title={[f.ts_first, f.ts_last !== f.ts_first ? f.ts_last : null].filter(Boolean).join(' → ')}>
+          {eventTs(f.ts_first)}
+          {f.ts_last && f.ts_last !== f.ts_first ? ` → ${eventTs(f.ts_last)}` : ''}
         </div>
         {f.review.actor && (
           <div className="rv-who">
