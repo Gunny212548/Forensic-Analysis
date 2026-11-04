@@ -230,7 +230,7 @@ export default function Upload({ user }) {
             not analysed.
           </div>
         </div>
-        <a className="btn-secondary" href="#/dashboard">
+        <a className="btn-secondary" href="#/cases">
           View cases
         </a>
       </div>

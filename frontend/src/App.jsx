@@ -90,7 +90,8 @@ function useOpenFindings(user, page, param) {
     if (!user) return undefined
     let dead = false
     listFindings({ limit: 1 })
-      .then((r) => !dead && setOpen(r.undecided_count))
+      // Nothing waiting is no badge, not a red 0: the badge is a call to act (UX audit, 2026-11-04).
+      .then((r) => !dead && setOpen(r.undecided_count || null))
       .catch(() => !dead && setOpen(null))
     return () => {
       dead = true
