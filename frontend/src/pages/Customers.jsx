@@ -40,9 +40,11 @@ export default function Customers() {
 
   if (error && !data) return <div className="panel empty">Could not load customers: {error}</div>
   if (!data) return <div className="empty">Loading...</div>
-  // The same open / closed the table shows per customer, added up.
+  // The same open / decided the table shows per customer, added up. A case is Open or Decided;
+  // only a project is Closed (the user, 2026-11-04: one word for one state on every page). The
+  // API field keeps its name `closed`.
   const open = data.customers.reduce((n, c) => n + (c.open || 0), 0)
-  const closed = data.customers.reduce((n, c) => n + (c.closed || 0), 0)
+  const decided = data.customers.reduce((n, c) => n + (c.closed || 0), 0)
 
   return (
     <section className="page ov">
@@ -65,7 +67,7 @@ export default function Customers() {
         <StatTile icon="customers" tone="info" value={fmtNum(data.accounts)} label="Customers" />
         <StatTile icon="cases" tone="muted" value={fmtNum(data.total_cases)} label="Cases" />
         <StatTile icon="findings" tone={open ? 'danger' : 'ok'} value={fmtNum(open)} label="Open cases" />
-        <StatTile icon="check" tone="ok" value={fmtNum(closed)} label="Closed cases" />
+        <StatTile icon="check" tone="ok" value={fmtNum(decided)} label="Decided cases" />
       </div>
 
       <div className="panel">
@@ -81,7 +83,7 @@ export default function Customers() {
               <tr>
                 <th>Customer</th>
                 <th>Open cases</th>
-                <th>Closed</th>
+                <th>Decided</th>
                 <th>Highest open severity</th>
                 <th>Last activity</th>
                 <th aria-label="Actions" />
@@ -143,8 +145,9 @@ export default function Customers() {
           </table>
         </div>
         <div className="field-hint cust-note">
-          A case is open while any suggestion in it is not decided yet, and closed once the analyst has
-          decided every one - when its report can be issued. Highest open severity is the worst suggestion
+          A case is Open while any suggestion in it is not decided yet, and Decided once the analyst has
+          decided every one. Only a project is Closed - on its own page, when the investigation ends.
+          Highest open severity is the worst suggestion
           not decided. Cases still processing or failed count only towards the total. Last activity is the latest upload or review decision.
         </div>
       </div>

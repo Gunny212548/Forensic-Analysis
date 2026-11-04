@@ -41,7 +41,8 @@ Built in Sprint 1 (verified in Docker, 2026-09-29):
 - **IAI-18/19 Customers** - a customer is added on the Upload page only
   (see *Decisions*); the Customers page's one action is deleting a customer
   (admin / manager, gotcha #74) and it shows, per
-  customer, open cases of total / closed /
+  customer, open cases of total / decided (the API's `closed`; since 2026-11-04 only a
+  project is called Closed on screen) /
   highest open severity / last activity. FR-6.1 defines "open": since
   2026-10-27 a case is open while a suggestion in it is not decided (gotcha #73;
   from Sprint 3 it was "a high or critical finding not Resolved", IAI-79). Cases without a customer (pre-FR-2.1) are a "No customer" row

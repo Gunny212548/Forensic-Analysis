@@ -20,7 +20,8 @@ GET  /api/auth/config                        login + config + health are the
 GET  /api/upload/check?size=                 FR-2.2 pre-flight: 413/507 before
                                              a byte is sent (gotcha #25)
 GET/POST /api/companies                      customers (FR-2.1 requires one)
-GET  /api/companies/summary                  Customers page: open/closed cases,
+GET  /api/companies/summary                  Customers page: open/closed cases (shown as
+                                             Open / Decided),
                                              highest open severity, last
                                              activity (overview.customers())
 GET  /api/companies/{id}/projects            the customer's projects with status and
