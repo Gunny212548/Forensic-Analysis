@@ -65,7 +65,9 @@ frontend/src/
   format.js            fmtBytes/fmtTime/shortTs + the status & severity maps
   theme.js             light / dark, kept per browser in localStorage fa_theme
   pages/               Overview (#/dashboard[/<co>[/<pj>]], three levels) ·
-                       Upload · Cases · CaseFlow (one
+                       Upload · Cases · Reports (#/reports, every project's
+                       report files to download; #/reports/<case> still
+                       redirects) · CaseFlow (one
                        case as six steps, #/case/<id>/<step>, gotcha #52) ·
                        Findings · FindingDetail · Customers (Delete per row) ·
                        CustomerDetail (also a project's page: close / reopen,

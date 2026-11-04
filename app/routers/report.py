@@ -77,6 +77,13 @@ def skeleton_download(sha256: str, request: Request):
     return FileResponse(path, media_type=DOCX, filename=entry.get("file") or f"skeleton-{sha256[:12]}.docx")
 
 
+# ---------------------------------------------------------------- every report
+@router.get("/api/reports")
+def reports_all():
+    """The Reports page: every draft and final of every project, newest first (`data:read`)."""
+    return {"files": report.all_files()}
+
+
 # ---------------------------------------------------------------- a project's report
 @router.get("/api/companies/{company_id}/projects/{project_id}/report")
 def report_listing(company_id: str, project_id: str):

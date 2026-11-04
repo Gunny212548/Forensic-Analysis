@@ -7,6 +7,7 @@ import Findings from './pages/Findings.jsx'
 import CustomerDetail from './pages/CustomerDetail.jsx'
 import CaseFlow from './pages/CaseFlow.jsx'
 import Cases from './pages/Cases.jsx'
+import Reports from './pages/Reports.jsx'
 import FindingDetail from './pages/FindingDetail.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import Login from './pages/Login.jsx'
@@ -50,9 +51,9 @@ function parseHash() {
 
 /** Hash routing, kept rather than swapped for a router library: it needs no
  *  dependency and no server rewrite rule. A case is #/case/<case_id>/<step>;
- *  every older case address (#/result, #/reports, #/timeline, #/attack-graph)
+ *  every older case address (#/result, #/reports/<case>, #/timeline, #/attack-graph)
  *  redirects to its step, so links an analyst pasted into a ticket still open
- *  the same case. */
+ *  the same case. #/reports alone is the Reports menu page since 2026-11-04. */
 function useHashRoute() {
   const [route, setRoute] = useState(parseHash)
   useEffect(() => {
@@ -144,7 +145,7 @@ export default function App() {
       else if (findingKey) go(`#/finding/${caseId}/${encodeURIComponent(findingKey)}`)
       else go(`#/case/${caseId}`)
     }
-    if (page === 'reports' || page === 'timeline' || page === 'attack-graph') {
+    if ((page === 'reports' && param) || page === 'timeline' || page === 'attack-graph') {
       const [caseId, tab] = param.split('/')
       const step =
         page === 'reports' ? REPORTS_TAB_STEP[tab] : page === 'timeline' ? 'timeline' : 'attack-path'
@@ -194,6 +195,7 @@ export default function App() {
           <CustomerDetail companyId={param.split('/')[0]} projectId={param.split('/')[2]} key={param} />
         )}
         {page === 'cases' && <Cases />}
+        {page === 'reports' && !param && <Reports />}
         {page === 'case' && param && (
           // #/case/<case>/<step>. Keyed by the case only, so moving between
           // steps keeps the page - and a running analysis - in place.

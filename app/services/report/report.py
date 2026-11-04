@@ -563,3 +563,28 @@ def listing(company_id: str, project_id: str) -> dict:
                                                 "skeleton_sha256", "details", "summary")} for e in d],
             "finals": [{k: e.get(k) for k in ("ts", "actor", "version", "file", "original_name", "sha256", "bytes")}
                        for e in f]}
+
+
+def all_files() -> list[dict]:
+    """The Reports page: every draft and final of every project of every customer, newest
+    first - each row a file to download (its URL is the project's own report/files route)."""
+    rows = []
+    for company in storage.list_companies():
+        co = company.get("company_id")
+        if not storage.valid_company_id(co or ""):
+            continue
+        for project in storage.list_projects(co):
+            pj = project.get("project_id")
+            if not storage.valid_project_id(pj or ""):
+                continue
+            where = {"company_id": co, "company_name": company.get("name"), "project_id": pj,
+                     "project_name": project.get("name"), "project_status": storage.project_status(project)}
+            for e in _entries(co, pj):
+                kind = {"report_draft": "draft", "report_final": "final"}.get(e.get("action"))
+                if kind:
+                    rows.append({**where, "kind": kind,
+                                 **{k: e.get(k) for k in ("ts", "actor", "actor_name", "version", "file",
+                                                          "original_name", "sha256", "bytes")}})
+    # Newest first; the file name breaks a tie (a draft and its final in the same second).
+    rows.sort(key=lambda r: (r.get("ts") or "", r.get("file") or ""), reverse=True)
+    return rows

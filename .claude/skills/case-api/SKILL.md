@@ -45,6 +45,8 @@ POST .../projects/{pj}/report/draft          a Word draft (case:analyze): only w
 POST .../projects/{pj}/report/final          the analyst's final back (.docx / .pdf),
                                              never required, also on a Closed project
 GET  .../projects/{pj}/report/files/{name}   download a draft or a final
+GET  /api/reports                            every draft and final of every project,
+                                             newest first - the Reports menu page
 GET/POST /api/settings/report-skeleton[/{sha}] admin: the Word skeleton drafts are filled
                                              into; refused if it links outside the file
 GET  /api/cases[?company_id=] | /{id}        the case list (manifests) | one manifest

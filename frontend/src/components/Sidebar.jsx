@@ -11,7 +11,9 @@ import Icon from './icons.jsx'
  *  pasted into tickets before the rename still land there. */
 export const NAV_GROUPS = [
   // In the order of the work (docs/specs/case_flow_design.md, D4): Timeline, Attack
-  // Graph, ATT&CK Map and Reports are steps of a case now, not menu pages.
+  // Graph and ATT&CK Map are steps of a case now, not menu pages. Reports came back on
+  // 2026-11-04 as the list of every project's report files to download (the user);
+  // a draft is still made on its project's page.
   {
     label: 'Work',
     tone: 'accent',
@@ -20,6 +22,7 @@ export const NAV_GROUPS = [
       { route: 'upload', label: 'Upload' },
       { route: 'cases', label: 'Cases' },
       { route: 'findings', label: 'Findings' },
+      { route: 'reports', label: 'Reports' },
     ],
   },
   {

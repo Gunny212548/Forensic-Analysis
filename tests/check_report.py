@@ -365,6 +365,24 @@ for bad in ("../x", "0.1-draft.docx.tmp", "x.docx", "0.9-draft.docx"):
 check("another customer's project is 404 here",
       analyst.get(f"/api/companies/{CO}/projects/{zpj['project_id']}/report").status_code == 404)
 
+print("The Reports page: every project's drafts and finals in one list")
+r = analyst.get("/api/reports")
+every = r.json()["files"] if r.status_code == 200 else []
+mine = [f for f in every if f["project_id"] == PJ]
+check(f"GET /api/reports answers every role ({r.status_code}, admin {admin.get('/api/reports').status_code})",
+      r.status_code == 200 and admin.get("/api/reports").status_code == 200)
+check("it lists the project's 2 drafts and 3 finals, each named by customer and project",
+      sorted((f["kind"], f["file"]) for f in mine) == [("draft", "0.1-draft.docx"), ("draft", "0.2-draft.docx"),
+                                                         ("final", "0.1-final-2.pdf"), ("final", "0.1-final.pdf"),
+                                                         ("final", "0.2-final.docx")]
+      and all(f["company_id"] == CO and f["company_name"] and f["project_name"] for f in mine))
+check("newest first", [f["ts"] for f in every] == sorted((f["ts"] for f in every), reverse=True))
+check("every listed file downloads through its project's route",
+      all(analyst.get(f"/api/companies/{f['company_id']}/projects/{f['project_id']}/report/files/{f['file']}")
+          .status_code == 200 for f in mine))
+check("a project with no report adds no row", not any(f["project_id"] == zpj["project_id"] for f in every))
+check("signed out, it is refused", TestClient(app).get("/api/reports").status_code == 401)
+
 print("R-D10: the summary check (report_summary.ground)")
 groups = [{"rid": "R2000", "srcip": "198.51.100.66", "username": "adm.hd", "ts_first": "2026-09-17 02:04:13+07:00",
            "ts_last": "2026-09-17 02:30:40+07:00", "cnt": 420, "descr": "brute force"},

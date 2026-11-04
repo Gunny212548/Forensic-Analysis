@@ -482,6 +482,11 @@ export async function uploadReportFinal(companyId, projectId, version, file) {
     'Could not upload the final')
 }
 
+/** Every draft and final of every project, newest first - the Reports page. */
+export async function listReports() {
+  return jsonOrThrow(await fetch('/api/reports'), 'Could not load the reports')
+}
+
 export function reportFileUrl(companyId, projectId, name) {
   return projectUrl(companyId, projectId, `/report/files/${encodeURIComponent(name)}`)
 }
