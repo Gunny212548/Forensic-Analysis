@@ -14,8 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.services import rule_meta  # noqa: E402
-from app.services.rules import RULES  # noqa: E402
+from app.services.detection import rule_meta  # noqa: E402
+from app.services.detection.rules import RULES  # noqa: E402
 
 
 def main() -> int:

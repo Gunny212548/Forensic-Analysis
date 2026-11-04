@@ -60,7 +60,7 @@ def main() -> int:
     from fastapi.testclient import TestClient
 
     from app.main import app
-    from app.services import jobs
+    from app.services.store import jobs
 
     c = TestClient(app)
     with c:
@@ -84,7 +84,7 @@ def main() -> int:
                     m = c.post("/api/upload", files={"file": (name, fh)},
                                data={"company_id": co["company_id"], "project_name": "Isolation"}).json()
                 cases[co["company_id"]].append(m["case_id"])
-        # Uploads are queued (services/jobs.py): wait for the pipeline.
+        # Uploads are queued (services/store/jobs.py): wait for the pipeline.
         check(jobs.wait_idle(120), "the job queue drained")
         for co_id, ids in cases.items():
             for cid in ids:

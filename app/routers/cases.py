@@ -7,17 +7,22 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Requ
 from fastapi.responses import JSONResponse
 
 from .. import config
-from ..services import (analysis, analysis_jobs, attack_layer, auth, case_delete, case_flow, case_views, custody,
-                        db, authz, investigation, jobs, lifecycle, merge, profiles, provenance, review,
-                        stix_export, storage, triage, veris)
-from ..services import areas, rule_meta
-from ..services.rules import RULE_ID_PATTERN
+from ..services.access import auth, authz
+from ..services.ai import analysis, analysis_jobs, triage
+from ..services.case import case_delete, case_flow, case_views, investigation
+from ..services.detection import profiles
+from ..services.findings import lifecycle, review
+from ..services.ingest import merge, provenance
+from ..services.report import attack_layer, stix_export, veris
+from ..services.store import custody, db, jobs, storage
+from ..services.detection import areas, rule_meta
+from ..services.detection.rules import RULE_ID_PATTERN
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
 
 def _authorize(request: Request, action: str, company_id: str | None = None) -> None:
-    """Ask the authz seam (services/authz.py); a refusal is a 403."""
+    """Ask the authz seam (services/access/authz.py); a refusal is a 403."""
     try:
         authz.require(request.state.user, action, company_id)
     except authz.Forbidden as exc:
@@ -104,7 +109,7 @@ def _raw_file(case_id: str):
 @router.get("/{case_id}/attack-layer")
 async def get_attack_layer(case_id: str):
     """The case's techniques as an ATT&CK Navigator layer (format 4.5),
-    served as a download (services/attack_layer.py)."""
+    served as a download (services/report/attack_layer.py)."""
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
@@ -122,7 +127,7 @@ async def get_attack_layer(case_id: str):
 @router.get("/{case_id}/stix")
 async def get_stix(case_id: str):
     """The case as a STIX 2.1 bundle, served as a download
-    (services/stix_export.py). Ready cases only, as the layer export."""
+    (services/report/stix_export.py). Ready cases only, as the layer export."""
     manifest = storage.load_manifest(case_id)
     if manifest is None:
         raise HTTPException(404, "Case not found")
@@ -138,7 +143,7 @@ async def get_stix(case_id: str):
 
 @router.get("/{case_id}/veris")
 async def get_veris(case_id: str):
-    """The case as a VERIS 1.4 incident record (services/veris.py), as a
+    """The case as a VERIS 1.4 incident record (services/report/veris.py), as a
     download. 409 unless the case is ready and has high/critical findings."""
     manifest = storage.load_manifest(case_id)
     if manifest is None:
@@ -295,7 +300,7 @@ async def ai_review_again(case_id: str, request: Request):
 @router.post("/merge")
 async def merge_cases_route(request: Request, body: dict = Body(...)):
     """Concatenate several already-ingested line-log cases into one new case
-    and run the normal pipeline over it (rules in services/merge.py)."""
+    and run the normal pipeline over it (rules in services/ingest/merge.py)."""
     _authorize(request, authz.MERGE)
     try:
         return await merge.merge_cases(body, request.state.user["email"])

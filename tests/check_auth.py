@@ -53,7 +53,8 @@ def main() -> int:
 
     from app import config
     from app.main import app
-    from app.services import auth, hashchain
+    from app.services.access import auth
+    from app.services.store import hashchain
 
     def login(c, email, password):
         return c.post("/api/auth/login", json={"email": email, "password": password})

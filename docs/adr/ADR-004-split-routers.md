@@ -1,6 +1,6 @@
 # ADR-004: Transport, merge and analysis jobs leave `analysis.py` and `routers/cases.py`
 
-Status: Accepted (2026-10-19) · Code: `services/llm.py`, `merge.py`, `analysis_jobs.py`
+Status: Accepted (2026-10-19) · Code: `services/ai/llm.py`, `merge.py`, `analysis_jobs.py`
 
 ## Decision
 

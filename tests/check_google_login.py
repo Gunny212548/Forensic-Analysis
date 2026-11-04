@@ -38,7 +38,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app import config  # noqa: E402
 from app.main import app  # noqa: E402
-from app.services import auth, google_login, hashchain  # noqa: E402
+from app.services.access import auth, google_login  # noqa: E402
+from app.services.store import hashchain  # noqa: E402
 
 CID = os.environ["GOOGLE_CLIENT_ID"]
 PW = "correct horse battery"

@@ -56,7 +56,9 @@ def main() -> int:
     sys.path.insert(0, args.repo)
     import duckdb
     import yaml
-    from app.services import areas, db, pipeline, rule_meta, rules, sigma, storage
+    from app.services.detection import areas, rule_meta, rules, sigma
+    from app.services.ingest import pipeline
+    from app.services.store import db, storage
 
     print("the bundle")
     b = sigma.bundle()

@@ -8,7 +8,8 @@ hash-chained line in AUTH_DIR/audit/accounts.jsonl, written before the change
 from fastapi import APIRouter, Body, HTTPException, Request
 
 from .. import config
-from ..services import auth, authz, google_login, hashchain
+from ..services.access import auth, authz, google_login
+from ..services.store import hashchain
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 

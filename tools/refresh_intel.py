@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.services import intel  # noqa: E402
+from app.services.detection import intel  # noqa: E402
 
 FEEDS = {
     # abuse.ch Feodo Tracker - botnet C2 servers, with malware family.

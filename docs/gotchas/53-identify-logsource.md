@@ -4,7 +4,7 @@
 (2026-10-20, IAI-92; branch `IAI-92-identify-logsource`, not merged).** The user's rule:
 the system must not guess what a log is - every file has its product's format.
 
-- **`app/services/identify.py`** answers in the Sigma logsource taxonomy v2.1.0 (read):
+- **`app/services/ingest/identify.py`** answers in the Sigma logsource taxonomy v2.1.0 (read):
   category / product / service where it defines them; where it does not - it has no
   firewall vendor, no ESXi, no CrowdStrike (verified) - `custom` names the product and the
   case says it is not a Sigma value. `logsources.LOGSOURCE` holds the mapping per profile.

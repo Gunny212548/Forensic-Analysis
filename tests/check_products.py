@@ -33,7 +33,9 @@ def check(ok: bool, what: str) -> None:
 def unit() -> None:
     import duckdb
 
-    from app.services import db, period, pipeline, products, rules
+    from app.services.detection import rules
+    from app.services.ingest import period, pipeline, products
+    from app.services.store import db
 
     con = duckdb.connect()
     con.execute(db.SCHEMA)
@@ -132,7 +134,9 @@ def end_to_end(scratch: Path) -> None:
     import duckdb
 
     os.environ["DATA_DIR"] = str(scratch / "store")
-    from app.services import db, intel, pipeline, rules, storage
+    from app.services.detection import intel, rules
+    from app.services.ingest import pipeline
+    from app.services.store import db, storage
 
     print("end to end: gen_usecase's two files in one zip")
     company = storage.create_company("Products Co")

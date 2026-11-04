@@ -1,6 +1,6 @@
 # ADR-002: Case manifest writes are atomic
 
-Status: Accepted (2026-10-19) · Code: `app/services/storage.py` · Tests: `tests/check_manifest_atomic.py`
+Status: Accepted (2026-10-19) · Code: `app/services/store/storage.py` · Tests: `tests/check_manifest_atomic.py`
 
 ## Context
 

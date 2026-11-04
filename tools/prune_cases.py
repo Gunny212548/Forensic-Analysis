@@ -110,7 +110,7 @@ def main() -> int:
                     "store": data,
                     "uploaded_at": manifest.get("uploaded_at") or "",
                     # A case still queued or processing is never pruned: a worker
-                    # would go on to run the deleted case (services/jobs.py).
+                    # would go on to run the deleted case (services/store/jobs.py).
                     "busy": manifest.get("status") in ("queued", "processing"),
                     "reviewed": (data / "review" / f"{case_id}.jsonl").exists(),
                     "analysed": (data / "analysis" / f"{case_id}.json").exists(),

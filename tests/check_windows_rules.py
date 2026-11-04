@@ -1,4 +1,4 @@
-"""Windows sign-in rules (app/services/rules_windows.py, specs/windows_rules.md story 5a).
+"""Windows sign-in rules (app/services/detection/rules_windows.py, specs/windows_rules.md story 5a).
 
     python tests/check_windows_rules.py <scratch> [--repo DIR]
 
@@ -74,7 +74,8 @@ def main() -> int:
     os.environ["AUTH_DIR"] = str(scratch / "auth")
     os.environ["TRIAGE_ENABLED"] = "0"
     sys.path.insert(0, args.repo)
-    from app.services import db, pipeline, storage
+    from app.services.ingest import pipeline
+    from app.services.store import db, storage
 
     co = storage.create_company("Windows rules")["company_id"]
     # A feed for the feed-match rules (story 5c): one public address for a connection, and the
@@ -122,7 +123,7 @@ def main() -> int:
     con.close()
     # The attempts table is a temp table of the rules' run: build it again on a copy.
     import duckdb
-    from app.services import rules_windows
+    from app.services.detection import rules_windows
     mem = duckdb.connect()
     mem.execute(f"ATTACH '{db.db_path(cid).as_posix()}' AS c (READ_ONLY)")
     mem.execute("CREATE TEMP VIEW product_events AS SELECT * FROM c.raw_events WHERE product = 'windows'")
@@ -147,7 +148,7 @@ def main() -> int:
     con.close()
 
     print("CUSUM (Javed & Paxson §4.1) on known series")
-    from app.services import lines as ln
+    from app.services.detection import lines as ln
     import random
     rng = random.Random(7)
     normal = [sum(rng.random() < 0.008 for _ in range(100)) for _ in range(400)]
@@ -372,7 +373,7 @@ def main() -> int:
     # suggestion (E-D1); a DC's ::ffff: address is IPv4 in the timeline (E-D3); the account's
     # history is a fact for the AI (E-D2).
     con.close()
-    from app.services import triage
+    from app.services.ai import triage
     sugg = db.collapsed_findings(cid)
     per = defaultdict(list)
     for f in sugg:
@@ -412,9 +413,9 @@ def main() -> int:
     check(all(e["accounts"] for e in graph["edges"]) and "adm.backup" in
           next(e for e in graph["edges"] if e["to"] == "rds01.mekong.local")["accounts"],
           "each edge names the account it used")
-    from app.services import products
+    from app.services.ingest import products
     fw = {d["product"]: {a["area"]: a for a in d["areas"]} for d in products.matrix(
-        ["paloalto"], __import__("app.services.rules", fromlist=["RULE_PRODUCT"]).RULE_PRODUCT)}
+        ["paloalto"], __import__("app.services.detection.rules", fromlist=["RULE_PRODUCT"]).RULE_PRODUCT)}
     check(fw["paloalto"]["lateral-movement"]["status"] == "n/a" and fw["paloalto"]["host-activity"]["status"] == "n/a",
           "a firewall shows the host areas as n/a, with a reason")
 
@@ -504,7 +505,7 @@ def main() -> int:
     sugg = {(rid, src, usr): (lvl, n) for rid, src, usr, lvl, n in con.execute(
         f"SELECT f.rid, {ent_src}, {ent_user}, max(f.lvl), count(*) FROM findings f JOIN raw_events r USING (row_id) "
         "GROUP BY ALL").fetchall()}
-    from app.services.severity import WEIGHT
+    from app.services.detection.severity import WEIGHT
     med, high = WEIGHT["medium"], WEIGHT["high"]
     # PC1's 1011 joins nothing - its threat was detected there, so it is not a suggestion of its own.
     expect = {("WIN-MAL-2", "PC1", "leo"): (med, 2), ("WIN-MAL-2", "PC2", "leo"): (high, 1),

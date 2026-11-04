@@ -22,7 +22,7 @@ supersedes the `#/result` links and the caching notes below. Tested end to end b
   `related_count`, `chain`): chained only through **pivot hosts** over the whole
   case, and by account for R2005 / R2006; a shared final target is not a relation.
   A finding lists at most 12; an auth log alone has none (no destination column).
-- **The Findings page** (`#/findings`, `services/findings_index.py`):
+- **The Findings page** (`#/findings`, `services/findings/findings_index.py`):
   `GET /api/findings?company_id&status&severity&area&unassigned&q&limit&offset`
   returns rows, counts per severity and status, `open_count` (the menu badge,
   IAI-78) and the area list; rows are cached per case on the DuckDB, review-log
@@ -34,6 +34,6 @@ supersedes the `#/result` links and the caching notes below. Tested end to end b
 - **Two places where Jira and the code differ, on purpose:** Jira says *Closed*,
   the code says *Resolved* (NIST CSF); IAI-42 says "Critical or 2 groups", the code
   admits **high and critical** (gotcha #33, the user's decision) - the Jira text is stale.
-- **`services/case_views.py`** now holds what routers/cases.py had (`findings_view`,
+- **`services/case/case_views.py`** now holds what routers/cases.py had (`findings_view`,
   `custody_view`, `created_at`, `veris_line`) plus `source_file`, `log_type` and
   `finding_sources`; `mcp_server.py` imported a FastAPI router to get a findings list.

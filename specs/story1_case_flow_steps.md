@@ -52,8 +52,8 @@ first. Nothing is deleted: the lifecycle log stays readable, as an audit record.
 
 | File | Change |
 |---|---|
-| `app/services/case_flow.py` | `STEPS` becomes the six steps above, each citing read standards (SP 800-86 phases; SP 800-92 §3.2 and IR 8354 §4.7.1 for the timeline; FIRST 5.2 and CSF RS.MA-02 for attack events; SP 800-86 §6.4.3 for the attack timeline; SP 800-86 §3.3 and ATT&CK for the path; SP 800-86 Reporting, ACPO 6.3-6.5, STIX, Navigator, VERIS, AI 600-1 for the report). States from the same records as today; Respond and Investigate logic removed. |
-| `app/services/db.py`, `routers/cases.py` | `list_raw(..., order="time")` for the Timeline step: `ORDER BY ts NULLS LAST, row_id` |
+| `app/services/case/case_flow.py` | `STEPS` becomes the six steps above, each citing read standards (SP 800-86 phases; SP 800-92 §3.2 and IR 8354 §4.7.1 for the timeline; FIRST 5.2 and CSF RS.MA-02 for attack events; SP 800-86 §6.4.3 for the attack timeline; SP 800-86 §3.3 and ATT&CK for the path; SP 800-86 Reporting, ACPO 6.3-6.5, STIX, Navigator, VERIS, AI 600-1 for the report). States from the same records as today; Respond and Investigate logic removed. |
+| `app/services/store/db.py`, `routers/cases.py` | `list_raw(..., order="time")` for the Timeline step: `ORDER BY ts NULLS LAST, row_id` |
 | `frontend/src/pages/CaseFlow.jsx` | `StepBody` for the six ids; Analyse's narrative moves into Report; Respond / TrackedFindings removed |
 | `frontend/src/components/ReviewPanel.jsx` | `Lifecycle` no longer rendered |
 | `frontend/src/components/EventsTable.jsx` | an `order` prop |

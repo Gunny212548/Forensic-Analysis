@@ -35,8 +35,10 @@ from docx import Document  # noqa: E402
 from docx.opc.constants import RELATIONSHIP_TYPE as RT  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.services import (auth, authz, db, hashchain, investigation, report, report_skeleton,  # noqa: E402
-                          report_summary, storage)
+from app.services.access import auth, authz  # noqa: E402
+from app.services.case import investigation  # noqa: E402
+from app.services.report import report, report_skeleton, report_summary  # noqa: E402
+from app.services.store import db, hashchain, storage  # noqa: E402
 
 failures = 0
 
@@ -439,7 +441,8 @@ check("facts that cannot fit are not sent: the draft says why instead",
       out["error"] and "do not fit" in out["error"] and not out["paragraphs"])
 
 print("The draft's own words in Thai, the English term in brackets (the user, 2026-11-03)")
-from app.services import report_th, rule_meta  # noqa: E402
+from app.services.detection import rule_meta  # noqa: E402
+from app.services.report import report_th  # noqa: E402
 plain = html.unescape(txt)
 check("an '&' in a value survives the render (MITRE ATT&CK came out 'MITRE ATT')",
       "MITRE ATT&CK" in plain and "ATTCK" not in plain)
@@ -458,10 +461,10 @@ check("every in-house rule has its Thai title",
 check("every ATT&CK tactic has its Thai name",
       all(tid in report_th.TACTIC for tid, _t, _n in rule_meta.TACTIC_ORDER))
 check("every step and detection area has its Thai name",
-      all(st["title"] in report_th.STEP for st in __import__("app.services.case_flow", fromlist=["x"]).STEPS)
-      and all(a["name"] in report_th.AREA for a in __import__("app.services.areas", fromlist=["x"]).AREAS))
+      all(st["title"] in report_th.STEP for st in __import__("app.services.case.case_flow", fromlist=["x"]).STEPS)
+      and all(a["name"] in report_th.AREA for a in __import__("app.services.detection.areas", fromlist=["x"]).AREAS))
 check("every reason an area has no rule has its Thai",
-      all(r in report_th.NOT_APPLICABLE for r in __import__("app.services.products", fromlist=["x"]).NOT_APPLICABLE.values()))
+      all(r in report_th.NOT_APPLICABLE for r in __import__("app.services.ingest.products", fromlist=["x"]).NOT_APPLICABLE.values()))
 check("a file's format reads Thai", report_th.read_as("Windows event log (event XML)") == "บันทึกเหตุการณ์ Windows (event XML)"
       and report_th.read_as("unknown format") == "unknown format")
 check("the AI's failure reads Thai, its technical cause kept",
@@ -470,7 +473,7 @@ check("the AI's failure reads Thai, its technical cause kept",
 check("the draft gives the in-house rule's Thai title", report_th.RULE["R2000"] in plain)
 
 print("Tactics: a SigmaHQ finding takes its rule's own tactics (2026-11-03)")
-from app.services import rule_meta, rules_sigma, sigma  # noqa: E402
+from app.services.detection import rule_meta, rules_sigma, sigma  # noqa: E402
 by_rid = sigma.by_rid()
 multi = next((rid for rid in rules_sigma.ENTITY
               if len({t.lower().split(".")[0] for t in by_rid[rid]["techniques"]}) > 1

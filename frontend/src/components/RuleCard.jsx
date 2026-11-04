@@ -3,7 +3,7 @@ import { getRule } from '../api.js'
 import { LEVEL_EN } from '../format.js'
 
 /** One detection rule's documentation, opened from a finding: the Sigma
- *  metadata and the ADS sections (app/services/rule_meta.py). An analyst
+ *  metadata and the ADS sections (app/services/detection/rule_meta.py). An analyst
  *  deciding accept/reject needs exactly this - what the rule looks for, what
  *  else produces the same signal, and what it cannot see. A SigmaHQ rule is
  *  shown as SigmaHQ wrote it, with its author, link and licence (DRL 1.1). */

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
 from .. import config
-from ..services import auth, authz, google_login
+from ..services.access import auth, authz, google_login
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

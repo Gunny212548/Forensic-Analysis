@@ -1,5 +1,5 @@
 // Every call the UI makes. Thin on purpose: the server already collapses,
-// ranks and scores everything (see app/services/db.py), so the client's job
+// ranks and scores everything (see app/services/store/db.py), so the client's job
 // is to render what it is handed, never to recompute it.
 
 /** Any 401 means the session is gone (expired, logged out in another tab,
@@ -56,7 +56,7 @@ export async function logout() {
 }
 
 /** Everything the Overview page shows, aggregated server-side over all cases
- *  (app/services/overview.py). */
+ *  (app/services/case/overview.py). */
 /** All customers, or one customer's store when `companyId` is given - and one
  *  project of it with `projectId` (specs/projects.md P2). */
 export async function getOverview(companyId, projectId) {
@@ -142,7 +142,7 @@ export async function deleteProject(companyId, projectId) {
     'Could not delete the project')
 }
 
-/** FR-6.1: case load per customer (app/services/overview.py customers()). */
+/** FR-6.1: case load per customer (app/services/case/overview.py customers()). */
 export async function getCustomerSummary() {
   return jsonOrThrow(await fetch('/api/companies/summary'), 'Could not load customers')
 }

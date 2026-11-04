@@ -10,7 +10,9 @@ import asyncio
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
-from ..services import authz, report, report_skeleton, storage
+from ..services.access import authz
+from ..services.report import report, report_skeleton
+from ..services.store import storage
 
 router = APIRouter(tags=["report"])
 

@@ -87,9 +87,9 @@ Not computable now, and said so rather than faked:
 
 | Where | What |
 |---|---|
-| `app/services/profiles.py` (new) | the SQL that builds the three tables; `get(case, kind, value)`; `top(case, kind, by, n)` |
-| `app/services/pipeline.py` | build profiles after the rules; progress stage `profiles` |
-| `app/services/db.py` | `_events` adds the source's profile line to `context` |
+| `app/services/detection/profiles.py` (new) | the SQL that builds the three tables; `get(case, kind, value)`; `top(case, kind, by, n)` |
+| `app/services/ingest/pipeline.py` | build profiles after the rules; progress stage `profiles` |
+| `app/services/store/db.py` | `_events` adds the source's profile line to `context` |
 | routes | `GET /cases/{id}/profiles/{kind}/{value}`, `GET /cases/{id}/profiles/{kind}?by=` |
 | `app/mcp_server.py` | `get_profile`, `list_unusual` |
 | `frontend` | a profile panel opened from any address / account; context line |

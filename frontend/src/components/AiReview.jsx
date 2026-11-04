@@ -78,7 +78,7 @@ function OldAdvice({ r }) {
   )
 }
 
-/** The AI's explanation of one suggestion (app/services/triage.py, specs/ai_triage_verdicts.md):
+/** The AI's explanation of one suggestion (app/services/ai/triage.py, specs/ai_triage_verdicts.md):
  *  what happened, why the rule fired, the facts on each side - each citing the facts it was
  *  given (hover a fact id to read it) - what the facts do not show and where to look next.
  *  It never says accept or reject: the analyst decides. */

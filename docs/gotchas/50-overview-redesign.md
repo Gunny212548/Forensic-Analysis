@@ -11,7 +11,7 @@ customer** - the 2026-10-15 requirement stands - Refresh, Upload) -> a thin
 (Open findings, mean time to contain against `MTTC_TARGET_HOURS`, default 4,
 Open cases, Customers) -> **Detection areas** (six cards) -> findings per day
 + severity + top affected -> most urgent findings + recent activity.
-- **Areas** (`services/areas.py`): every one of the 20 rules belongs to exactly
+- **Areas** (`services/detection/areas.py`): every one of the 20 rules belongs to exactly
   one of six areas (Authentication, Brute force & spraying, Scanning & policy,
   Malware & C2, Data & applications, Threat intelligence); `check_workflow.py`
   fails when a rule is not placed. The number on a card is workflow findings

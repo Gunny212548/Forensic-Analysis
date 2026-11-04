@@ -1,6 +1,6 @@
 ---
 name: decoder-doctor
-description: Use when a log file ingests but produces wrong or empty structured data — "ready with 0 findings", a file identified as the wrong log source or not at all, a column mapped to the wrong canonical field, a new log source that needs support (identify.py + a profile in app/services/logsources.py, or a reader such as winevent.py / checkpoint_le.py), or a suspected false positive caused by a bad mapping. Owns identify.py, logsources.py, decode.py, parsers.py, the readers and the CSV fast path in pipeline.py. Do NOT use for rule logic/severity/MITRE (that's rule-engineer).
+description: Use when a log file ingests but produces wrong or empty structured data — "ready with 0 findings", a file identified as the wrong log source or not at all, a column mapped to the wrong canonical field, a new log source that needs support (identify.py + a profile in app/services/ingest/logsources.py, or a reader such as winevent.py / checkpoint_le.py), or a suspected false positive caused by a bad mapping. Owns identify.py, logsources.py, decode.py, parsers.py, the readers and the CSV fast path in pipeline.py. Do NOT use for rule logic/severity/MITRE (that's rule-engineer).
 tools: Read, Edit, Write, Bash, Grep, Glob
 skills:
   - validate-changes
@@ -12,7 +12,7 @@ job is to get every log source's columns onto one canonical schema so the rule
 engine — which knows nothing about log sources — can fire. Say "log source"
 (the product that wrote the log, Sigma's `logsource`), never "vendor": the
 user found it misleading. A log source with a format document and a real
-sample gets a profile in `app/services/logsources.py` (CLAUDE.md gotcha #27).
+sample gets a profile in `app/services/ingest/logsources.py` (CLAUDE.md gotcha #27).
 **Every file is identified before it is read** (`identify.py`, gotcha #53): a
 documented format is read through its profile, anything else is kept as
 evidence and not analysed - **no column is guessed**. A file's name proves

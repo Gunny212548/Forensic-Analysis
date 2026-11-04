@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
 /** The signed-in account and what its role may do (IAI-14,
- *  app/services/authz.py). The server decides every action; the page only
+ *  app/services/access/authz.py). The server decides every action; the page only
  *  reflects it - a control the role may not use is shown disabled with the
  *  role it needs, never hidden (no hidden state, the keep-UX-simple rule). */
 export const UserContext = createContext(null)

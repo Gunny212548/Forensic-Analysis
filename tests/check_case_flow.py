@@ -54,7 +54,7 @@ def read_sources(repo: Path) -> list[str]:
 
 def unit_standards(repo: Path) -> None:
     sys.path.insert(0, str(repo))
-    from app.services import case_flow
+    from app.services.case import case_flow
 
     print("steps and their standards")
     check([s["id"] for s in case_flow.STEPS] == ORDER, "six steps, in the order of the design")
@@ -88,7 +88,8 @@ def main() -> int:
     from fastapi.testclient import TestClient
 
     from app.main import app
-    from app.services import areas, custody, jobs
+    from app.services.detection import areas
+    from app.services.store import custody, jobs
 
     c = TestClient(app)
     with c:

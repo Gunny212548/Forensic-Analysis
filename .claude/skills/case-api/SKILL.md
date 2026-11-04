@@ -51,7 +51,7 @@ GET  /api/cases[?company_id=] | /{id}        the case list (manifests) | one man
 GET  /api/cases/{id}/flow                    the six steps and each one's state,
                                              computed on the server (gotcha #52)
 POST /api/cases/merge                        several line-log cases into one new case
-                                             (services/merge.py; refused across
+                                             (services/ingest/merge.py; refused across
                                              customers or projects)
 GET  /api/cases/{id}/analysis                poll point for the narrative job
 GET  /api/cases/{id}/profiles/{kind}[/{value}] behaviour profiles, layer C facts
@@ -123,7 +123,7 @@ GET  /api/overview[?company_id=[&project_id=]] one customer, one project of it (
                                              coverage + attention_files, tactics (all
                                              15), top_rules (10, with decisions);
                                              MTTC still returned, not shown
-                                             (services/overview.py; per-case facts
+                                             (services/case/overview.py; per-case facts
                                              cached on a fingerprint of DuckDB, review
                                              log, custody log and id registry;
                                              gotchas #50, #51, #73)

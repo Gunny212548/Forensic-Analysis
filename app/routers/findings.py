@@ -2,7 +2,9 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..services import areas, findings_index, lifecycle, storage
+from ..services.detection import areas
+from ..services.findings import findings_index, lifecycle
+from ..services.store import storage
 
 router = APIRouter(prefix="/api/findings", tags=["findings"])
 

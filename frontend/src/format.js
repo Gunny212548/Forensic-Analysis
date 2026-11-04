@@ -30,7 +30,7 @@ export const SEV_CLASS = {
   informational: 'sev-informational',
 }
 
-// Sigma levels (app/services/severity.py), worst first.
+// Sigma levels (app/services/detection/severity.py), worst first.
 export const LEVEL_EN = {
   critical: 'Critical',
   high: 'High',

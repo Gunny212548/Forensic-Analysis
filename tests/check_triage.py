@@ -1,4 +1,4 @@
-"""The AI's review of each suggestion (app/services/triage.py, specs/ai_triage.md).
+"""The AI's review of each suggestion (app/services/ai/triage.py, specs/ai_triage.md).
 
     python tests/check_triage.py <scratch> [--repo DIR]
 
@@ -40,7 +40,10 @@ def main() -> int:
     os.environ["AUTH_DIR"] = str(scratch / "auth")
     os.environ["LLM_PROVIDER"] = "ollama"
     sys.path.insert(0, args.repo)
-    from app.services import case_views, db, llm, review, storage, triage
+    from app.services.ai import llm, triage
+    from app.services.case import case_views
+    from app.services.findings import review
+    from app.services.store import db, storage
 
     co = storage.create_company("Triage Co")["company_id"]
     cid = storage.create_case("t.csv", "csv", 1, company_id=co)["case_id"]

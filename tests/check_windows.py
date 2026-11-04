@@ -1,5 +1,5 @@
 """Windows event logs, W1-W4: the core, event XML, .evtx, Splunk's WinEventLog text and JSON
-(app/services/winevent.py, specs/windows_event_logs.md).
+(app/services/ingest/winevent.py, specs/windows_event_logs.md).
 
     python tests/check_windows.py <scratch dir> [--repo DIR] [--evtx D:/logtest/windows]
 
@@ -96,7 +96,7 @@ def _event(channel: str, provider: str, event_id: int, when: str, host: str, dat
 def check_sigma_4688(scratch: Path, run, query) -> None:
     """Story 6d (specs/sigma_windows.md S-D10..S-D13): SigmaHQ's process creation rules on Security 4688
     where the host's Sysmon 1 is not - the map, the unknown fields, Sysmon first, the case's record."""
-    from app.services import sigma
+    from app.services.detection import sigma
     print("SigmaHQ process creation on Security 4688 (story 6d)")
     comsvcs = "SIGMA-646ea171-dded-4578-8a4d-65e9822892e3"   # Process Memory Dump Via Comsvcs.DLL (high)
     svchost = "SIGMA-01d2e2a1-5f09-44f7-9fc1-24faa7479b6d"   # Uncommon Svchost Parent Process (medium)
@@ -164,7 +164,7 @@ def check_evtx(lab: Path, run, win, query) -> None:
     """W2 on the lab folder (Q43 - kept outside the repo): EVTX-ATTACK-SAMPLES
     (GPL-3.0) and this machine's System log exported twice, as .evtx (`wevtutil
     epl`) and as Windows' own event XML of that file (`Get-WinEvent ... .ToXml()`)."""
-    from app.services import identify, winevent
+    from app.services.ingest import identify, winevent
 
     print(".evtx - every EVTX-ATTACK-SAMPLES file")
     samples = sorted((lab / "EVTX-ATTACK-SAMPLES").rglob("*.evtx"))
@@ -300,7 +300,7 @@ def _winlogbeat(n: int, event_id: int, data: dict, when: str, **extra) -> dict:
 def check_json(lab: Path | None, scratch: Path, run, win, query) -> None:
     """W4: Windows events as Winlogbeat / Elastic JSON and NXLog JSON."""
     import json
-    from app.services import identify, winevent
+    from app.services.ingest import identify, winevent
 
     print("JSON - Winlogbeat (synthetic, Elastic's winlog fields)")
     recs = [_winlogbeat(i, 4625, {"TargetUserName": "alice", "IpAddress": "203.0.113.7", "LogonType": "3",
@@ -416,7 +416,7 @@ def check_json(lab: Path | None, scratch: Path, run, win, query) -> None:
 def check_splunk(lab: Path | None, scratch: Path, run, win, query) -> None:
     """W3: Splunk's classic WinEventLog text, items named from Windows' message
     templates (app/data/windows, tools/export_win_templates.ps1)."""
-    from app.services import identify, winevent
+    from app.services.ingest import identify, winevent
 
     print("Splunk WinEventLog text - PurpleSharp spray (attack_data)")
     spray = SAMPLES / "windows-security-text-spray.log"
@@ -454,7 +454,7 @@ def check_splunk(lab: Path | None, scratch: Path, run, win, query) -> None:
     syn.write_text(SPLUNK_SYNTHETIC, encoding="utf-8")
     m = run(syn)
     w = win(m)
-    raw = [e["raw"] for e in __import__("app.services.db", fromlist=["db"]).list_raw(m["case_id"], 10, 0)]
+    raw = [e["raw"] for e in __import__("app.services.store.db", fromlist=["db"]).list_raw(m["case_id"], 10, 0)]
     check((w.get("rows"), w.get("events"), w.get("unreadable"), w.get("unmatched_messages")) == (3, 1, 2, 1)
           and any(x.startswith("[not a Splunk WinEventLog record] junk") for x in raw)
           and any(x.startswith("[unreadable Splunk WinEventLog record]") for x in raw),
@@ -527,7 +527,8 @@ def main() -> int:
     (scratch / "store").mkdir(parents=True)
     os.environ["DATA_DIR"] = str(scratch / "store")
     sys.path.insert(0, args.repo)
-    from app.services import db, identify, pipeline, storage
+    from app.services.ingest import identify, pipeline
+    from app.services.store import db, storage
 
     print("identification")
     for name, service in (("windows-sysmon.log", "sysmon"), ("windows-security-xml-spray.log", "security")):

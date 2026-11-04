@@ -61,10 +61,22 @@ even for formats it does support, real-world testing found it silently
 ```
 app/              FastAPI app - main.py (session middleware, static mount), config.py,
                   routers/ (one per area: auth, upload, cases, companies, findings,
-                  overview, report, rules, users), services/ (pipeline, identify,
-                  logsources, decode, parsers, winevent, rules + rules_<product>,
-                  sigma, lines, db, triage, analysis, report, storage, jobs, ...),
-                  data/windows (Windows message templates), mcp_server.py
+                  overview, report, rules, users), services/ (one folder per
+                  category, below), data/windows (Windows message templates),
+                  mcp_server.py
+  services/ingest/     archive identify logsources parsers decode pipeline winevent
+                       checkpoint_le products period provenance repro merge
+  services/detection/  rules rules_firewall rules_paloalto rules_checkpoint
+                       rules_windows rules_sigma sigma rule_meta lines areas severity
+                       intel profiles confidence
+  services/findings/   review lifecycle finding_ids findings_index related
+  services/case/       case_flow case_views overview projects investigation
+                       case_delete customer_delete
+  services/ai/         llm analysis analysis_jobs triage grounding
+  services/report/     report report_skeleton report_summary report_th stix_export
+                       attack_layer veris
+  services/access/     auth authz google_login
+  services/store/      db storage custody hashchain filestamp jobs
 frontend/         Vite + React source; `npm run build` writes static/ (generated)
 tests/            check_*.py - one per layer; gen_*.py - seeded synthetic data with
                   ground truth; bench_*.py - the local model; baseline.json - parity;
@@ -84,8 +96,15 @@ figma-export/     the SENTRY-IR screens (SVG, text outlined)
 Not in git, on this PC only: `.env`, `static/`, `logtest/` (the Lotus Freight Check Point
 quarter, `tests/gen_checkpoint_quarter.py logtest` rebuilds it byte for byte), the FR and
 backlog PDFs, `.archify/`. Test corpora live outside the repo: `D:/forensic system/Logtest`,
-`D:/logtest`, `D:/mockup-logs`. **Paths are not moved to tidy up**: 83 gotchas, the specs,
-the tests and commit messages cite them.
+`D:/logtest`, `D:/mockup-logs`. **Paths are not moved to tidy up** beyond the one move the user
+asked for on 2026-11-04: `app/services/*.py` went into the eight category folders above, and every
+path in the docs, specs, skills, agents, tests and code comments was rewritten with it. Commit
+messages before that date still say `app/services/<module>.py`: the module kept its name, so look it
+up in the table above. A gotcha that names a bare module (`decode.py`, `db.build_graph()`) means the
+same module. A new service module goes in the folder of its category. A module in one folder imports
+a module in another with `from ..store import db`, and one in its own folder with `from . import x`.
+Code outside `services/` imports `from app.services.store import db`, never
+`from app.services import db`, because `app/services` holds only the folders.
 
 **Project skills** (`.claude/skills/<name>/SKILL.md`, loaded when the task needs them). The
 rules stay in this file; the measurements, tables and how-tos are in the skills:
@@ -111,12 +130,12 @@ this file, the gotchas and the skills true).
 POST /api/upload
   → size + disk refused from Content-Length first (gotcha #25)
   → stream file to disk in 1MB chunks (never held in memory)
-    .gz / .zip kept compressed in raw/ (services/archive.py, FR-2.3)
+    .gz / .zip kept compressed in raw/ (services/ingest/archive.py, FR-2.3)
   → manifest status=queued, return case_id immediately
   → jobs.submit(): a job file + a bounded worker pool run pipeline.process_case
-    (services/jobs.py, gotcha #48; queued work survives a restart)
+    (services/store/jobs.py, gotcha #48; queued work survives a restart)
 
-pipeline.process_case  (services/pipeline.py)
+pipeline.process_case  (services/ingest/pipeline.py)
   CSV  → fast path: DuckDB reads + decodes the file itself. The column
          mapping is resolved once from the header - from the log source
          profile identify.py matched (logsources.py, gotcha #27; a file no

@@ -28,7 +28,8 @@ sys.path.insert(0, args.repo)
 from fastapi.testclient import TestClient  # noqa: E402
 os.environ.setdefault("TRIAGE_ENABLED", "0")  # rules are measured here, not the AI review (triage.py)
 
-from app.services import auth, authz, hashchain, storage  # noqa: E402
+from app.services.access import auth, authz  # noqa: E402
+from app.services.store import hashchain, storage  # noqa: E402
 
 failures = 0
 
@@ -218,7 +219,7 @@ check("the log holds no password", PW not in auth.accounts_audit_path().read_tex
 check("the chain verifies on disk", hashchain.verify(auth.accounts_audit_path()).get("intact"))
 
 print("a finding key is used exactly as it is (a user name ending in a space)")
-from app.services import db  # noqa: E402
+from app.services.store import db  # noqa: E402
 
 spaced = storage.create_case("cp.csv", "csv", 1, company_id=co["company_id"])["case_id"]
 con = db.init(spaced)
@@ -236,7 +237,7 @@ check("an empty or blank key is refused (400)",
       admin.post(f"/api/cases/{spaced}/review", json={"finding_key": "  ", "action": "accept"}).status_code == 400)
 
 print("deleting a case (specs/case_delete.md)")
-from app.services import case_delete  # noqa: E402
+from app.services.case import case_delete  # noqa: E402
 
 auth.create_account("check", "manager3@x.test", "Deleter", M, PW)
 manager = client("manager3@x.test")  # the accounts section above ended the first one's sessions
@@ -269,7 +270,8 @@ check("the deletion log is hash-chained and intact",
 check("a deleted case cannot be deleted twice (404)", manager.delete(f"/api/cases/{gone}").status_code == 404)
 
 print("deleting a customer (specs/customer_delete.md)")
-from app.services import customer_delete, finding_ids  # noqa: E402
+from app.services.case import customer_delete  # noqa: E402
+from app.services.findings import finding_ids  # noqa: E402
 
 doomed = storage.create_company("Doomed Co")
 did = doomed["company_id"]

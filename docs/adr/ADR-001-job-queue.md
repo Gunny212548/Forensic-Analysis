@@ -1,7 +1,7 @@
 # ADR-001: Pipeline jobs run in a bounded, durable queue
 
 Status: Accepted (2026-10-19), revised after code review the same day
-Code: `app/services/jobs.py` · Tests: `tests/check_jobs.py`
+Code: `app/services/store/jobs.py` · Tests: `tests/check_jobs.py`
 
 ## Context
 

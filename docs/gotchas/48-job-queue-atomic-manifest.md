@@ -8,7 +8,7 @@ not merged to main).** Found by reading the code, then reproduced:
   rule). `storage.update_case` was load-modify-save with no lock and one shared
   `.json.tmp`, so concurrent writers (progress, the CSV estimator, status) lost each
   other's keys, put an older `status` back, and raised `PermissionError` on Windows.
-- **`services/jobs.py`:** one file per case, `customers/<id>/jobs/<case>.json`
+- **`services/store/jobs.py`:** one file per case, `customers/<id>/jobs/<case>.json`
   (`state` receiving|queued, `attempts`, `running`, `suspect`), written when the case is
   created (`begin()` in upload and merge - while the evidence is still being written -,
   then `submit()`), deleted when the work ends. `JOB_WORKERS` (default 2) threads.

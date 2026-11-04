@@ -4,7 +4,7 @@ import { putQuestion } from '../api.js'
 import { fmtTime } from '../format.js'
 
 /** The question the investigation answers, its time window and known leads
- *  (app/services/investigation.py). Kept on the project when the case is in
+ *  (app/services/case/investigation.py). Kept on the project when the case is in
  *  one - every case of it shows the same question - else on the case. Every
  *  change is a hash-chained line with who and when; nothing here blocks a
  *  step (D8: the report needs it, story 8). */

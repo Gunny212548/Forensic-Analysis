@@ -1,5 +1,5 @@
 """Check Point Log Exporter records in an EventLog Analyzer export (IAI-85,
-app/services/checkpoint_le.py, specs/IAI-85_checkpoint_log_exporter.md).
+app/services/ingest/checkpoint_le.py, specs/IAI-85_checkpoint_log_exporter.md).
 
     python tests/check_checkpoint_le.py <scratch dir> [--repo DIR] [--real FILE]
 
@@ -53,7 +53,8 @@ def main() -> int:
     store.mkdir(parents=True)
     os.environ["DATA_DIR"] = str(store)
     sys.path.insert(0, args.repo)
-    from app.services import checkpoint_le, db, identify, pipeline, storage
+    from app.services.ingest import checkpoint_le, identify, pipeline
+    from app.services.store import db, storage
 
     print("record grammar")
     f = checkpoint_le.parse_body('11241 - [a:"1"; tag:"x=1;y=2[z\\]"; q:"say \\"hi\\" \\\\ end"; b:""]')

@@ -5,7 +5,7 @@
 Format: Check Point Log Exporter records (default syslog format) inside a
 ManageEngine EventLog Analyzer search export - the layout of the customer's real
 export (D:/logtest/Check point/, gotcha #59), read by
-app/services/checkpoint_le.py. EventLog Analyzer writes the newest row first,
+app/services/ingest/checkpoint_le.py. EventLog Analyzer writes the newest row first,
 and so does this. One file per month, and a zip of the three, which is one case
 - so rules and the timeline see the whole quarter at once.
 

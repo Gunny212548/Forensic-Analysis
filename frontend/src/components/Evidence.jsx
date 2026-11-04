@@ -4,7 +4,7 @@ import { fmtBytes, fmtTime } from '../format.js'
 import { Empty } from './common.jsx'
 import { useAccess } from '../permissions.js'
 
-/** Evidence integrity + chain of custody (app/services/custody.py).
+/** Evidence integrity + chain of custody (app/services/store/custody.py).
  *  The digest is what makes every finding on this case citable: it shows the
  *  file analysed is the file that was handed over. */
 

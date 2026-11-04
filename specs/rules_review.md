@@ -2,7 +2,7 @@
 
 Review of 2026-10-20, at the user's request ("develop our own rules so they make sense"),
 against the three layers of `case_flow_design.md` D12 (A event type, B known pattern,
-C context) and the code as it stands (`app/services/rules.py`, `severity.py`). Nothing is
+C context) and the code as it stands (`app/services/detection/rules.py`, `severity.py`). Nothing is
 changed yet; the proposals below need the user's decisions.
 
 ## What a rule that makes sense looks like

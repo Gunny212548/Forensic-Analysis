@@ -1,4 +1,4 @@
-/** What a file was identified as (app/services/identify.py) and how its
+/** What a file was identified as (app/services/ingest/identify.py) and how its
  *  columns were read (logsources.py): from the log source's own format
  *  documentation, or not at all - nothing is guessed since IAI-92; cases
  *  processed before it can still show a guessed mapping, as a warning.

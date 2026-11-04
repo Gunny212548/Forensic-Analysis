@@ -12,8 +12,8 @@ customer logs. Run it inside the container so it writes the same AUTH_DIR
 
 `add` on an existing email updates its name/role and resets its password.
 The password is prompted for; pass --password-stdin to pipe it in instead.
-Removing an account ends its sessions at once (see app/services/auth.py).
-Roles: admin, manager, analyst (app/services/authz.py, IAI-14). Every change
+Removing an account ends its sessions at once (see app/services/access/auth.py).
+Roles: admin, manager, analyst (app/services/access/authz.py, IAI-14). Every change
 goes through auth.py like the Users page does - checked the same way (the last
 administrator stays one) and written to the hash-chained account audit log,
 with the actor `cli:<operating-system user>`.
@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.services import auth, authz  # noqa: E402
+from app.services.access import auth, authz  # noqa: E402
 
 
 def main() -> int:

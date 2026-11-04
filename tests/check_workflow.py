@@ -52,7 +52,8 @@ def check(ok: bool, what: str) -> None:
 
 def unit_related() -> None:
     sys.path.insert(0, str(REPO))
-    from app.services import db, related
+    from app.services.findings import related
+    from app.services.store import db
 
     print("related findings: the grouping rules")
 
@@ -94,7 +95,9 @@ def unit_fixes() -> None:
     sys.path.insert(0, str(REPO))
     import tempfile
     from datetime import datetime, timezone
-    from app.services import case_views, filestamp, finding_ids
+    from app.services.case import case_views
+    from app.services.findings import finding_ids
+    from app.services.store import filestamp
 
     print("review fixes: log type, cache fingerprint, id year")
     line = {"file_kind": "log", "mapping": {"line_profiles": [{"name": "OpenSSH sshd"}]}}
@@ -125,7 +128,7 @@ def unit_fixes() -> None:
         os.utime(f, ns=(mt, mt))
         check(filestamp.of(f) != two, "a longer file differs even when its mtime did not move")
 
-    import app.services.custody as custody_mod
+    import app.services.store.custody as custody_mod
     real = custody_mod.created_at
     try:
         custody_mod.created_at = lambda cid, m=None: "2026-12-31T18:00:00+00:00"
@@ -161,7 +164,8 @@ def main() -> int:
     from fastapi.testclient import TestClient
 
     from app.main import app
-    from app.services import jobs, lifecycle, storage
+    from app.services.findings import lifecycle
+    from app.services.store import jobs, storage
 
     c = TestClient(app)
     with c:
@@ -255,7 +259,9 @@ def main() -> int:
               "the log type is a log source, not the file kind: " + ", ".join(sorted({x["log_type"] for x in t["rows"]})))
         # A reader in another process (the MCP server) must not write the id
         # registry: it shows the ids that exist and never calls ensure().
-        from app.services import case_views, finding_ids, storage
+        from app.services.case import case_views
+        from app.services.findings import finding_ids
+        from app.services.store import storage
         real_ensure = finding_ids.ensure
 
         def no_writes(*a, **k):
@@ -389,7 +395,7 @@ def main() -> int:
         check(auth_row["open"] >= 1, "the other customer is untouched")
 
         print("Overview detection areas")
-        from app.services import areas as areas_mod, rules as rules_mod
+        from app.services.detection import areas as areas_mod, rules as rules_mod
         # Ours are listed on exactly one card; SigmaHQ's are placed by their tactic in AREA_OF only
         # (specs/sigma_windows.md S-D6) - every rule is counted somewhere on the Overview.
         check(all(len([a for a in areas_mod.AREAS if rid in a["rids"]]) == 1
@@ -452,7 +458,8 @@ def main() -> int:
               "worst suggestion not decided first")
 
         print("Overview: evidence coverage, ATT&CK tactics, top rules")
-        from app.services import overview as overview_mod, rule_meta as rule_meta_mod
+        from app.services.case import overview as overview_mod
+        from app.services.detection import rule_meta as rule_meta_mod
         cov = ov["coverage"]
         check({r["company_id"] for r in cov} >= {W, OTHER}, "every customer has a coverage row")
         read = [r for r in cov if r["product"] is not None]
@@ -494,7 +501,7 @@ def main() -> int:
               "not decided as the cases say")
 
         print("Overview: top affected accounts name their computers and sources")
-        from app.services import db as db_mod
+        from app.services.store import db as db_mod
         tops = c.get("/api/overview").json()["top_entities"]
         accts = [e for e in tops if e["role"] == "accounts"]
         check(all(e["hosts"] == [] and e["sources"] == [] for e in tops if e["role"] != "accounts"),
@@ -513,7 +520,7 @@ def main() -> int:
         check(any(e["sources"] for e in accts), "(the usecase's accounts came from a recorded address)")
 
         print("Overview: attention, KPIs, urgent findings")
-        from app.services import custody as custody_mod
+        from app.services.store import custody as custody_mod
         ov = c.get("/api/overview").json()
         t0 = ov["totals"]
         check(t0["last_upload"] is not None and t0["ready"] == 4, "last upload and processed files are reported")

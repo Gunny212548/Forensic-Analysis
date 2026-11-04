@@ -13,16 +13,17 @@ import json
 import sys
 
 sys.path.insert(0, "/app")
-from app.services import projects, storage  # noqa: E402
+from app.services.case import projects  # noqa: E402
+from app.services.store import storage  # noqa: E402
 
 
 def load(path):
     if not path:
-        from app.services import report_summary
+        from app.services.report import report_summary
         return report_summary
-    spec = importlib.util.spec_from_file_location("app.services.report_summary", path)
+    spec = importlib.util.spec_from_file_location("app.services.report.report_summary", path)
     mod = importlib.util.module_from_spec(spec)
-    mod.__package__ = "app.services"
+    mod.__package__ = "app.services.report"
     spec.loader.exec_module(mod)
     return mod
 

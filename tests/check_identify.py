@@ -1,4 +1,4 @@
-"""What each log file is identified as (IAI-92, app/services/identify.py).
+"""What each log file is identified as (IAI-92, app/services/ingest/identify.py).
 
     python tests/check_identify.py [--corpus]
 
@@ -25,7 +25,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-from app.services import identify  # noqa: E402
+from app.services.ingest import identify  # noqa: E402
 
 FAILED: list[str] = []
 S = REPO / "tests" / "samples"

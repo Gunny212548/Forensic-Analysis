@@ -1,6 +1,6 @@
 /** Stroke icons drawn in currentColor on a 24-unit grid - inline SVG, nothing
  *  fetched (the air-gap rule in CLAUDE.md). Keyed by what they stand for:
- *  a menu route, a detection area id (services/areas.py) or a plain name. */
+ *  a menu route, a detection area id (services/detection/areas.py) or a plain name. */
 export const ICON = {
   // menu
   dashboard: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',

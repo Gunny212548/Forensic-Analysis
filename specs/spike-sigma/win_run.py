@@ -141,7 +141,8 @@ def regress(rules_json, repo, scratch):
     os.environ["DATA_DIR"] = str(scratch / "data"); os.environ["AUTH_DIR"] = str(scratch / "auth")
     os.environ["TRIAGE_ENABLED"] = "0"
     sys.path.insert(0, "/app")
-    from app.services import db, pipeline, storage
+    from app.services.ingest import pipeline
+    from app.services.store import db, storage
     rules = {r["id"]: r for r in json.loads(pathlib.Path(rules_json).read_text(encoding="utf-8"))}
     co = storage.create_company("Sigma regression")["company_id"]
     for info in sorted((repo / "regression_data" / "rules" / "windows").rglob("info.yml")):

@@ -3,7 +3,7 @@
     python tests/check_jobs.py <scratch dir>
 
 Uses a fake runner in place of pipeline.process_case, so it needs no DuckDB
-and takes a few seconds. Checks (services/jobs.py, docs/adr/ADR-001):
+and takes a few seconds. Checks (services/store/jobs.py, docs/adr/ADR-001):
 
 - at most JOB_WORKERS jobs run at once, however many are submitted, and every
   one runs exactly once; a finished job leaves no job file;
@@ -50,7 +50,7 @@ def main() -> int:
     scratch.mkdir(parents=True, exist_ok=True)
     os.environ["DATA_DIR"] = str(scratch / "data")
     sys.path.insert(0, str(REPO))
-    from app.services import custody, jobs, storage
+    from app.services.store import custody, jobs, storage
 
     storage.ensure_root()
     company = storage.create_company("Jobs check")

@@ -3,7 +3,9 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..services import authz, customer_delete, overview, projects, storage
+from ..services.access import authz
+from ..services.case import customer_delete, overview, projects
+from ..services.store import storage
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
 

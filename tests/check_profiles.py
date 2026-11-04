@@ -1,4 +1,4 @@
-"""Behaviour profiles (app/services/profiles.py, specs/behaviour_profiles.md).
+"""Behaviour profiles (app/services/detection/profiles.py, specs/behaviour_profiles.md).
 
     python tests/check_profiles.py [--repo DIR]
 
@@ -30,7 +30,8 @@ def main() -> int:
     sys.path.insert(0, ap.parse_args().repo)
     import duckdb
 
-    from app.services import db, profiles, rules
+    from app.services.detection import profiles, rules
+    from app.services.store import db
 
     print("public-address ranges are R2007's")
     r2007 = dict(rules.RULES)["R2007"]

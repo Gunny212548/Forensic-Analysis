@@ -23,8 +23,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.services import confidence, lifecycle, rule_meta, severity  # noqa: E402
-from app.services.rules import RULE_LABELS, RULE_LEVEL, RULES  # noqa: E402
+from app.services.detection import confidence, rule_meta, severity  # noqa: E402
+from app.services.findings import lifecycle  # noqa: E402
+from app.services.detection.rules import RULE_LABELS, RULE_LEVEL, RULES  # noqa: E402
 
 OUT_HTML = ROOT / "docs" / "measurement-method-th.html"
 OUT_PDF = ROOT / "docs" / "measurement-method-th.pdf"

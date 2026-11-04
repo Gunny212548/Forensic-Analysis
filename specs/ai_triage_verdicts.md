@@ -91,8 +91,8 @@ Check Point quarter, the Windows domain quarter and kinnaree (Ollama, dev contai
 
 ## Files
 
-`app/services/triage.py` (`SYSTEM`, `_schema()`, `facts()` quoting, `assessment_of()`),
-`app/services/review.py` (the `ai` field), `frontend/src/components/AiReview.jsx` + `styles.css`
+`app/services/ai/triage.py` (`SYSTEM`, `_schema()`, `facts()` quoting, `assessment_of()`),
+`app/services/findings/review.py` (the `ai` field), `frontend/src/components/AiReview.jsx` + `styles.css`
 (the six parts; old advice still shown), `tests/check_triage.py`, `docs/gotchas/72-*.md` + one line
 in CLAUDE.md, `docs/standards/SOURCES.md` (the paper and the blog, with what was not read),
 `docs/STANDARDS.md` (Triage row).

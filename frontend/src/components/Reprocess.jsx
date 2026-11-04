@@ -6,7 +6,7 @@ import { useAccess } from '../permissions.js'
  *  record of the last run. The Ingest step's Provenance / Source time section
  *  that held this button left the screen on 2026-10-27 (the user: not needed -
  *  Windows events state their zone; a declared zone stays applicable through
- *  the API, app/services/provenance.py). */
+ *  the API, app/services/ingest/provenance.py). */
 
 export default function Reprocess({ caseId, ingest, onReprocessed }) {
   const [confirm, setConfirm] = useState(false)
@@ -61,7 +61,7 @@ export default function Reprocess({ caseId, ingest, onReprocessed }) {
   )
 }
 
-/** The reproducibility record of the last run (app/services/repro.py). */
+/** The reproducibility record of the last run (app/services/ingest/repro.py). */
 export function Method({ method }) {
   if (!method) {
     return <div className="muted">No record yet - this case was last processed before records were kept; re-process it to get one.</div>

@@ -1,7 +1,7 @@
 # Gotcha #57
 
 **57. Behaviour profiles describe; they never decide (branch `behaviour-profiles`,
-2026-10-20).** `app/services/profiles.py` builds `profile_source` in each case DuckDB at
+2026-10-20).** `app/services/detection/profiles.py` builds `profile_source` in each case DuckDB at
 ingest, after the rules: per source address, sign-in failures / successes / unknown accounts,
 accounts tried, the most failures and the most refusals in any 1, 10 and 60 minutes, the
 first success after a failure and its gap, destinations, refused ports and services, bytes

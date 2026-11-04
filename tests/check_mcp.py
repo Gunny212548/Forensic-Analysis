@@ -261,7 +261,7 @@ def main() -> int:
     check(login is not None, "the planted root login is a finding (R2008)")
     if login:
         subprocess.run([sys.executable, "-c",
-                        "import sys; sys.path.insert(0, sys.argv[1]); from app.services import review; "
+                        "import sys; sys.path.insert(0, sys.argv[1]); from app.services.findings import review; "
                         "review.record_review(sys.argv[2], sys.argv[3], 'accept', sys.argv[4])",
                         str(repo), case_id, login["finding_key"], EMAIL], env=env, check=True)
         err, r = c.call("list_confirmed", case_id=case_id)
@@ -275,7 +275,7 @@ def main() -> int:
         # Reject every other suggestion: the path is then the confirmed login alone.
         rest = [f["finding_key"] for f in findings if f["finding_key"] != login["finding_key"]]
         subprocess.run([sys.executable, "-c",
-                        "import sys; sys.path.insert(0, sys.argv[1]); from app.services import review\n"
+                        "import sys; sys.path.insert(0, sys.argv[1]); from app.services.findings import review\n"
                         "for k in sys.argv[4:]:\n"
                         "    review.record_review(sys.argv[2], k, 'reject', sys.argv[3],"
                         " reason_code='insufficient_evidence')",
@@ -315,7 +315,7 @@ def main() -> int:
     print("access log")
     sys.path.insert(0, str(repo))
     os.environ["DATA_DIR"] = env["DATA_DIR"]
-    from app.services import hashchain  # noqa: E402
+    from app.services.store import hashchain  # noqa: E402
     log = store / "mcp" / "access.jsonl"
     entries = hashchain.entries(log)
     check(len(entries) == calls, f"one access entry per tools/call ({len(entries)} vs {calls})")

@@ -6,7 +6,7 @@ import { getLoginConfig, login } from '../api.js'
  *  (tools/create_user.py), so there is deliberately no sign-up or
  *  self-service reset here - the IT link is the path for anyone locked out. */
 // Why a Google sign-in came back refused. The server sends only one of these
-// codes (services/google_login.py REASONS) and the page words it - nothing
+// codes (services/access/google_login.py REASONS) and the page words it - nothing
 // from Google or from the address bar is shown as typed.
 const GOOGLE_REFUSED = {
   cancelled: 'Google sign-in was cancelled',

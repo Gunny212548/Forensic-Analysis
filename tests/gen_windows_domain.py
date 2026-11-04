@@ -3,7 +3,7 @@
     python tests/gen_windows_domain.py <outdir> [--seed N]
 
 Format: Windows event XML, one `<Event>` per line - what `wevtutil qe /f:xml` and
-`Get-WinEvent .ToXml()` write, read by app/services/winevent.py (W1). One file per
+`Get-WinEvent .ToXml()` write, read by app/services/ingest/winevent.py (W1). One file per
 host and channel, as an analyst collecting each machine's logs would have them, and
 a zip of all of them, which is one case - so a rule sees the domain controller's
 Kerberos events beside the member server's logons.

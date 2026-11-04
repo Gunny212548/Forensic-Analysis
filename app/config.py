@@ -30,7 +30,7 @@ EVENT_TZ_OFFSET_HOURS = 7
 # analyst, or the model writing the narrative - has to guess the zone.
 EVENT_TZ_SUFFIX = "+07:00"
 
-# Login (FR-1, app/services/auth.py). A session lasts one working shift;
+# Login (FR-1, app/services/access/auth.py). A session lasts one working shift;
 # SESSION_SECRET signs the cookie and, when unset, is generated once and kept
 # in AUTH_DIR so sessions survive a container restart.
 SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "12"))
@@ -42,7 +42,7 @@ LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "5"))
 LOGIN_GLOBAL_MAX_FAILURES = int(os.environ.get("LOGIN_GLOBAL_MAX_FAILURES", "60"))
 LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "900"))
 
-# How many cases the pipeline processes at once (services/jobs.py). More wait
+# How many cases the pipeline processes at once (services/store/jobs.py). More wait
 # in a queue: each ingest holds a DuckDB and a file stream, and ten at once is
 # an out-of-memory kill rather than ten times the speed.
 JOB_WORKERS = max(1, int(os.environ.get("JOB_WORKERS", "2")))

@@ -1,6 +1,6 @@
 # ADR-003: One authorisation seam, allowing everything for now
 
-Status: Accepted (2026-10-19) · Code: `app/services/authz.py` · Tests: `tests/check_authz.py`
+Status: Accepted (2026-10-19) · Code: `app/services/access/authz.py` · Tests: `tests/check_authz.py`
 
 ## Context
 

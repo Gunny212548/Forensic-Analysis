@@ -71,7 +71,7 @@ Navigation (D4)
 
 ### Backend
 
-`app/services/case_flow.py` (new, read-only)
+`app/services/case/case_flow.py` (new, read-only)
 - `STEPS`: the six steps, each `{id, title, standards: [...]}` - the single place the UI and
   `docs/STANDARDS.md` read the standards from. `tests/` fails if a step has no standard.
 - `build(case_id, manifest) -> {"steps": [...], "recommended": id}`; each step

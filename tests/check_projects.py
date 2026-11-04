@@ -29,7 +29,9 @@ sys.path.insert(0, args.repo)
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.services import auth, authz, db, hashchain, projects, storage  # noqa: E402
+from app.services.access import auth, authz  # noqa: E402
+from app.services.case import projects  # noqa: E402
+from app.services.store import db, hashchain, storage  # noqa: E402
 
 failures = 0
 
@@ -149,7 +151,7 @@ check(f"cases of different projects are not merged (409, {r.status_code})",
       r.status_code == 409 and "different projects" in r.json()["detail"])
 
 print("P2: a dashboard per project")
-from app.services import jobs  # noqa: E402
+from app.services.store import jobs  # noqa: E402
 
 jobs.wait_idle(120)  # the uploads above are processed, so every count below is settled
 whole = manager.get("/api/overview", params={"company_id": CO}).json()
@@ -175,7 +177,8 @@ check("and a project without its customer is 404",
       manager.get("/api/findings", params={"project_id": PJ}).status_code == 404)
 
 print("P3: rename")
-from app.services import case_delete, custody  # noqa: E402
+from app.services.case import case_delete  # noqa: E402
+from app.services.store import custody  # noqa: E402
 
 check("an analyst may not rename (403)",
       analyst.put(f"/api/companies/{CO}/projects/{PJ}", json={"name": "x"}).status_code == 403)

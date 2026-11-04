@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.services import custody, storage  # noqa: E402
+from app.services.store import custody, storage  # noqa: E402
 
 ACTOR = "system:tools/backfill_custody.py"
 

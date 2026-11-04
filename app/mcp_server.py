@@ -40,10 +40,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import config
-from .services import (auth, authz, case_flow, case_views, custody, db, hashchain, investigation, profiles,
-                       review, rule_meta, storage, veris)
-from .services.rules import RULE_ID_PATTERN, RULE_LABELS
-from .services.severity import LEVELS, WEIGHT
+from .services.access import auth, authz
+from .services.case import case_flow, case_views, investigation
+from .services.detection import profiles, rule_meta
+from .services.findings import review
+from .services.report import veris
+from .services.store import custody, db, hashchain, storage
+from .services.detection.rules import RULE_ID_PATTERN, RULE_LABELS
+from .services.detection.severity import LEVELS, WEIGHT
 
 SERVER_NAME = "forensic-analyzer"
 SERVER_VERSION = "1.0.0"
@@ -227,8 +231,8 @@ def _finding_summary(f: dict) -> dict:
 
 def tool_list_findings(args: dict) -> dict:
     # Imported here so the MCP server loads it only when this tool is called;
-    # it is the exact view the UI and the exports share (services/case_views.py).
-    from .services.case_views import findings_view as _findings_view
+    # it is the exact view the UI and the exports share (services/case/case_views.py).
+    from .services.case.case_views import findings_view as _findings_view
     m = _case(args.get("case_id"))
     _ready(m)
     min_level = args.get("min_level") or "informational"
@@ -298,7 +302,7 @@ def tool_get_escalations(args: dict) -> dict:
 
 
 def tool_get_veris(args: dict) -> dict:
-    from .services.case_views import findings_view as _findings_view
+    from .services.case.case_views import findings_view as _findings_view
     m = _case(args.get("case_id"))
     _ready(m)
     record = veris.build(m["case_id"], m, _findings_view(m["case_id"], m, assign_ids=False))
@@ -390,7 +394,7 @@ def tool_get_timeline(args: dict) -> dict:
 
 
 def tool_list_confirmed(args: dict) -> dict:
-    from .services.case_views import findings_view as _findings_view
+    from .services.case.case_views import findings_view as _findings_view
     m = _case(args.get("case_id"))
     _ready(m)
     findings = _findings_view(m["case_id"], m, assign_ids=False)

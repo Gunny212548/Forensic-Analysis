@@ -48,14 +48,14 @@ review fixes `04fcd99`) -> `arch/split-routers` (ADR-4, ADR-3) and, separately,
   - Not fixed: a pivot host relates every finding that targets it (review #9, measured
     only on synthetic data); a `|` inside a username makes its source events 400 (#11);
     `check_workflow` iterates `RULE_LABELS`, not `rules.RULES`.
-- **ADR-4** (`docs/adr/ADR-004-split-routers.md`, a pure move): `services/llm.py`
+- **ADR-4** (`docs/adr/ADR-004-split-routers.md`, a pure move): `services/ai/llm.py`
   (provider switch, `_chat`, Ollama mapping, `_OtpmPacer`, the errors - re-exported by
-  `analysis.py`), `services/merge.py` (refusals are `MergeRefused(status, message)`, so no
-  service imports FastAPI), `services/analysis_jobs.py` (job state + map-reduce worker).
+  `analysis.py`), `services/ingest/merge.py` (refusals are `MergeRefused(status, message)`, so no
+  service imports FastAPI), `services/ai/analysis_jobs.py` (job state + map-reduce worker).
   `routers/cases.py` 664 -> ~400 lines. Verified: check_mcp, check_workflow,
   check_customer_isolation, check_jobs, check_manifest_atomic, and `bench_llm` x3
   byte-identical, 0 unsupported stages / ids. Still open: `on_event` -> lifespan.
-- **ADR-3** (`docs/adr/ADR-003-authz-seam.md`): `services/authz.py` `can(user, action,
+- **ADR-3** (`docs/adr/ADR-003-authz-seam.md`): `services/access/authz.py` `can(user, action,
   company_id)` returns True until IAI-14; review, lifecycle, verify and merge ask it
   (`cases._authorize` -> 403). `tests/check_authz.py`. Reads, upload and analyze do not.
 - **Testing in a container without touching production:** `docker build -t fa-x .` in a

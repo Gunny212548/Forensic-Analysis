@@ -1,6 +1,6 @@
 ---
 name: prompt-tuner
-description: Use when writing or changing a prompt the app sends to its LLM, or when the AI output is wrong, incomplete, truncated, or mis-tagged — the narrative in app/services/analysis.py (_build_prompt, the requested JSON schema, _salvage_json, MAX_EVENTS_FOR_ANALYSIS, MAX_COMPLETION_TOKENS) and the SQL context feeders db.source_profiles() / db.risk_scores(); also the AI explanation of each suggestion in app/services/triage.py (SYSTEM, _schema, facts). Works with the prompt-engineer skill. Do NOT use for detection logic (rule-engineer) or column mapping (decoder-doctor).
+description: Use when writing or changing a prompt the app sends to its LLM, or when the AI output is wrong, incomplete, truncated, or mis-tagged — the narrative in app/services/ai/analysis.py (_build_prompt, the requested JSON schema, _salvage_json, MAX_EVENTS_FOR_ANALYSIS, MAX_COMPLETION_TOKENS) and the SQL context feeders db.source_profiles() / db.risk_scores(); also the AI explanation of each suggestion in app/services/ai/triage.py (SYSTEM, _schema, facts). Works with the prompt-engineer skill. Do NOT use for detection logic (rule-engineer) or column mapping (decoder-doctor).
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
 skills:
   - fullstack-dev-skills:prompt-engineer

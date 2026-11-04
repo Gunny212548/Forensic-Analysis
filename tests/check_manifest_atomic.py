@@ -38,7 +38,7 @@ def main() -> int:
     scratch.mkdir(parents=True, exist_ok=True)
     os.environ["DATA_DIR"] = str(scratch / "data")
     sys.path.insert(0, str(REPO))
-    from app.services import storage
+    from app.services.store import storage
 
     storage.ensure_root()
     company = storage.create_company("Atomic check")

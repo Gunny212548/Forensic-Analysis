@@ -106,7 +106,7 @@ list; then the events table as today.
 
 ### Files
 
-`services/investigation.py` (new), `services/repro.py` (new), `storage.py` (project question),
+`services/case/investigation.py` (new), `services/ingest/repro.py` (new), `storage.py` (project question),
 `pipeline.py` (declared time, method on custody), `routers/cases.py`, `routers/companies.py`,
 `routers/upload.py`, `case_flow.py` (warnings), `authz.py` (`reprocess`), `mcp_server.py`
 (`get_case` serves question, provenance, method - read-only as ever); frontend `api.js`,

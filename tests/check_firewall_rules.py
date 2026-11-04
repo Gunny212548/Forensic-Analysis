@@ -28,7 +28,8 @@ def check(ok: bool, what: str) -> None:
 
 
 def build(con, benign: int):
-    from app.services import db, intel
+    from app.services.detection import intel
+    from app.services.store import db
 
     con.execute(db.SCHEMA)
     intel.create_table(con)
@@ -115,7 +116,7 @@ def main() -> int:
     sys.path.insert(0, ap.parse_args().repo)
     import duckdb
 
-    from app.services import lines, rules
+    from app.services.detection import lines, rules
 
     print("the line arithmetic")
     check(abs(lines.TRW_UPPER - 4.595) < 0.001 and abs(lines.LLR_FAILURE - 1.386) < 0.001,
@@ -161,14 +162,14 @@ def main() -> int:
           f"Threat Prevention verdicts: Anti-Bot (T1071), IPS from outside (T1190), not URL Filtering's Detect ({mal})")
     lvl = dict(con.execute("SELECT r.verdict, f.lvl FROM findings f JOIN raw_events r USING (row_id) "
                            "WHERE f.rid = 'CP-MAL-2'").fetchall())
-    from app.services.severity import WEIGHT
+    from app.services.detection.severity import WEIGHT
     check(lvl == {"prevent": WEIGHT["medium"], "detect": WEIGHT["high"]},
           "a Prevent is capped at medium, a Detect (it passed) stays high")
     check(not findings(con, "CP-SCAN-2") and rec["CP-SCAN-2"]["sources"]["scanner"] == 0,
           "six Detect verdicts are no scan: neither refusals nor accepts")
     check(findings(con, "R2002") == {"203.0.113.60"},
           f"the generic port scan runs only where no product rule replaces it ({findings(con, 'R2002')})")
-    from app.services import products
+    from app.services.ingest import products
     cells = {c["area"]: c for c in products.matrix(["paloalto", "fortigate"], rules.RULE_PRODUCT,
                                                    rules.RULE_SUPERSEDED)[0]["areas"]}
     check(cells["scanning-policy"]["rules"] == ["PAN-SCAN-1", "PAN-SCAN-2", "PAN-SCAN-3"]

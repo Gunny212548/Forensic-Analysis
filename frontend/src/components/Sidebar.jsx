@@ -84,7 +84,7 @@ export default function Sidebar({ active, counts = {}, user, onLogout }) {
       </nav>
 
       {/* FR-0.3. The role decides what the account may do (IAI-14,
-          app/services/authz.py). */}
+          app/services/access/authz.py). */}
       <div className="sidebar-user">
         <div className="avatar" aria-hidden="true">{initials(user.name)}</div>
         <div>

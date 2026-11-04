@@ -3,7 +3,7 @@
 Before 2026-10-14 every case of every customer lived side by side in
 DATA_DIR/{cases,db,raw,analysis,review,custody} and customers in
 DATA_DIR/companies. Now each customer has DATA_DIR/customers/<company_id>/
-(app/services/storage.py). This moves each case's files into the store of
+(app/services/store/storage.py). This moves each case's files into the store of
 the customer its manifest names - and nothing else:
 
     python tools/migrate_to_customers.py            # dry run: print the plan
@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import config  # noqa: E402
-from app.services import custody, storage  # noqa: E402
+from app.services.store import custody, storage  # noqa: E402
 
 LEGACY = ("cases", "db", "raw", "analysis", "review", "custody")
 

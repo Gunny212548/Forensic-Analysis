@@ -71,7 +71,7 @@ def main() -> int:
 
     from app import mcp_server
     from app.main import app
-    from app.services import custody, hashchain, jobs, storage
+    from app.services.store import custody, hashchain, jobs, storage
 
     c = TestClient(app)
     with c:

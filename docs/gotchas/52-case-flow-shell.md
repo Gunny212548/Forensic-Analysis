@@ -8,7 +8,7 @@
   `app/routers/cases.py`, a whole-file conflict because ADR-4 had turned its CRLF into LF;
   resolved by taking split-routers' file and re-applying fd-detail's 3-line change
   (finding events open on an integrity-refused case). IAI-89 and IAI-92 are stacked on it.
-- **`app/services/case_flow.py`** - `STEPS` (id, title, standards) and
+- **`app/services/case/case_flow.py`** - `STEPS` (id, title, standards) and
   `build(case_id, manifest)`: per step `state` (done / active / blocked / not_started /
   optional), `remaining`, `total`, `reason`; `recommended` = the first step not done or
   optional. Computed from manifest, custody, review log, registry and analysis cache only;

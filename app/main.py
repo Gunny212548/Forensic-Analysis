@@ -17,7 +17,9 @@ from .routers import rules as rules_router
 from .routers import upload as upload_router
 from .routers import users as users_router
 from . import config
-from .services import auth, authz, jobs, report, report_skeleton, storage
+from .services.access import auth, authz
+from .services.report import report, report_skeleton
+from .services.store import jobs, storage
 
 
 def on_startup():
@@ -44,19 +46,19 @@ def on_startup():
             "shown; adding customers or cases is refused until you run: "
             "python tools/migrate_to_customers.py --apply", legacy)
     # Start the pipeline workers, and queue again whatever a previous run
-    # left unfinished (services/jobs.py). Not while the store is in the
+    # left unfinished (services/store/jobs.py). Not while the store is in the
     # old layout: those cases are not visible to it.
     if not legacy:
         jobs.start()
         # And the AI reviews a stop cut short: only what has no advice yet is sent again
-        # (services/triage.py, specs/ai_review_coverage.md C-D4).
-        from .services import triage
+        # (services/ai/triage.py, specs/ai_review_coverage.md C-D4).
+        from .services.ai import triage
         triage.resume()
 
 
 def on_shutdown():
     # A deliberate stop (deploy, reboot): running jobs give their attempt back, so
-    # only a stop nobody announced counts against a file (services/jobs.py).
+    # only a stop nobody announced counts against a file (services/store/jobs.py).
     jobs.stop()
 
 

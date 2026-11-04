@@ -1,7 +1,7 @@
 # Login / session hardening - design
 
 Status: **implemented** (approved Q1 as proposed, Q3 yes). Differences from the draft are marked *built:*. Scope: `app/routers/auth.py`,
-`app/services/auth.py`, the middleware in `app/main.py`, `frontend/src/pages/Login.jsx`.
+`app/services/access/auth.py`, the middleware in `app/main.py`, `frontend/src/pages/Login.jsx`.
 Out of scope: roles/RBAC (IAI-14, deferred by the user), MFA, a sign-up page (none on purpose).
 
 ## What was read (current behaviour)

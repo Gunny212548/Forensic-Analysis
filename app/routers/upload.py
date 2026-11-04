@@ -6,13 +6,15 @@ import zlib
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from .. import config
-from ..services import archive, authz, custody, jobs, storage
+from ..services.access import authz
+from ..services.ingest import archive
+from ..services.store import custody, jobs, storage
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
 
 def _authorize(user: dict, action: str) -> None:
-    """Ask the authz seam (services/authz.py); a refusal is a 403."""
+    """Ask the authz seam (services/access/authz.py); a refusal is a 403."""
     try:
         authz.require(user, action)
     except authz.Forbidden as exc:
@@ -125,7 +127,7 @@ async def upload_log(
     )
     case_id = manifest["case_id"]
     # Until the whole file is on disk a restart must fail this case, not leave it
-    # `queued` for ever (services/jobs.py).
+    # `queued` for ever (services/store/jobs.py).
     jobs.begin(case_id)
     # The raw copy keeps the analyst's bytes as uploaded - compressed stays
     # compressed; the pipeline reads it through gzip/zip itself.
