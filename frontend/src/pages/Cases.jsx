@@ -96,8 +96,8 @@ export default function Cases() {
             <table className="ov-table">
               <thead>
                 <tr>
-                  <th>File</th>
                   <th>Customer · project</th>
+                  <th>File</th>
                   <th>Uploaded</th>
                   <th>Status</th>
                   <th>Current step</th>
@@ -111,14 +111,14 @@ export default function Cases() {
                   return (
                     <tr key={m.case_id}>
                       <td>
+                        {m.company_name || <span className="muted">No customer</span>}
+                        {m.project_name && <div className="cell-sub">{m.project_name}</div>}
+                      </td>
+                      <td>
                         <a className="table-link" href={stepHref(m.case_id, fl?.recommended || 'ingest')}>
                           {m.original_filename}
                         </a>
                         <div className="cell-sub mono">{m.case_id}</div>
-                      </td>
-                      <td>
-                        {m.company_name || <span className="muted">No customer</span>}
-                        {m.project_name && <div className="cell-sub">{m.project_name}</div>}
                       </td>
                       <td>{fmtTime(m.uploaded_at)}</td>
                       <td><StatusBadge status={m.status} error={m.error} /></td>
