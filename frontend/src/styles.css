@@ -1052,7 +1052,14 @@ button.ui-chevron:focus-visible { outline: 2px solid var(--accent); outline-offs
 .case-firstseen-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10.5px; color: var(--muted); }
 .ui-section + .ui-section { margin-top: 12px; }
 .rv-area-body { padding: 4px 20px 12px; }
-.rv-rule-chip { padding: 12px 0 8px; }
+.rv-rule-chip { padding: 12px 0 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+/* Ticking suggestions to accept together (ReviewPanel, 2026-11-04). */
+.rv-pick { margin: 0; cursor: pointer; }
+.rv-pick-all { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2);
+  cursor: pointer; }
+.rv-bulk { position: sticky; bottom: 12px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center;
+  gap: 12px; margin: 12px 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: 8px; box-shadow: 0 6px 20px var(--shadow); font-size: 13px; }
 .rv-area-body .rv-item { border-radius: 0 8px 8px 0; }
 
 /* Step 5 (2026-10-27): the list pages' tables head on a tinted row, like the

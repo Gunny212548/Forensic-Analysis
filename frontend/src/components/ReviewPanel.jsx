@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { aiReviewAgain, getFindings, postReview } from '../api.js'
+import { acceptReviewBatch, aiReviewAgain, getFindings, postReview } from '../api.js'
 import { LEVEL_EN, REVIEW_CLASS, eventTs, fmtNum, shortTs } from '../format.js'
 import { Empty, FLAG_TEXT, MitreTags, RuleName } from './common.jsx'
 import FindingEvents from './FindingEvents.jsx'
@@ -20,7 +20,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [rejecting, setRejecting] = useState(null) // finding key awaiting a reason
-  // Reviewing is an analyst's or a manager's (IAI-14); an admin reads only.
+  // Reviewing is every role's case work (IAI-14, authz._CASE_WORK); the server is the gate.
   const { can, why } = useAccess()
   const mayReview = can('finding:review')
   const [reasonCode, setReasonCode] = useState('')
@@ -28,6 +28,30 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
   const [busyKey, setBusyKey] = useState('')
   const [openRule, setOpenRule] = useState('') // finding key whose rule card is open
   const [openEvents, setOpenEvents] = useState(onlyKey || '') // finding key whose source events are open
+  // Suggestions ticked to accept together (the user, 2026-11-04). Only ones not decided yet can be
+  // ticked, so a tick never overturns an earlier decision.
+  const [picked, setPicked] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const togglePick = (keys, on) =>
+    setPicked((prev) => {
+      const next = new Set(prev)
+      for (const k of keys) (on ? next.add(k) : next.delete(k))
+      return next
+    })
+  async function acceptPicked() {
+    setBulkBusy(true)
+    setError('')
+    try {
+      await acceptReviewBatch(caseId, [...picked])
+      setPicked(new Set())
+      await load()
+      onChanged?.()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setError('')
@@ -128,6 +152,21 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
   // case-wide gate, history banner and workflow totals around it.
   const single = onlyKey != null
   const shown = single ? findings.filter((f) => f.key === onlyKey) : findings
+  // A suggestion can be ticked when the analyst may decide it now and has not yet.
+  const canPick = (f) => !single && mayReview && !data.decisions_locked && f.review.status === 'Unreviewed'
+  const pickedNow = findings.filter((f) => picked.has(f.key) && canPick(f)).map((f) => f.key)
+  // The tick on a rule's head: every suggestion of it not decided yet.
+  const ruleTools = (items) => {
+    const open = items.filter(canPick).map((f) => f.key)
+    if (open.length < 2) return null
+    const all = open.every((k) => picked.has(k))
+    return (
+      <label className="rv-pick-all">
+        <input type="checkbox" checked={all} onChange={(e) => togglePick(open, e.target.checked)} />
+        Select the {open.length} not decided
+      </label>
+    )
+  }
   if (single && !shown.length) return <Empty>This finding is not in the case (it may have been re-processed away).</Empty>
 
   return (
@@ -195,7 +234,23 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
 
       {error && <Empty>{error}</Empty>}
 
-      {single ? shown.map(item) : <ByArea findings={shown} areas={data.areas || []} item={item} />}
+      {single ? shown.map(item) : <ByArea findings={shown} areas={data.areas || []} item={item} ruleTools={ruleTools} />}
+
+      {/* What is ticked and the one thing done with it - shown only while something is ticked.
+          After the list, so `sticky; bottom` keeps it on screen while the analyst scrolls it. */}
+      {pickedNow.length > 0 && (
+        <div className="rv-bulk" role="region" aria-label="Selected suggestions">
+          <span>
+            <strong>{fmtNum(pickedNow.length)}</strong> selected
+          </span>
+          <button type="button" className="rv-btn rv-accept" disabled={bulkBusy} onClick={acceptPicked}>
+            {bulkBusy ? 'Accepting...' : `Accept ${fmtNum(pickedNow.length)} selected`}
+          </button>
+          <button type="button" className="rv-btn" disabled={bulkBusy} onClick={() => setPicked(new Set())}>
+            Clear
+          </button>
+        </div>
+      )}
     </>
   )
 
@@ -209,6 +264,10 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
         key={f.key}
       >
         <div className="rv-head">
+          {canPick(f) && (
+            <input type="checkbox" className="rv-pick" aria-label="Select to accept with others"
+                   checked={picked.has(f.key)} onChange={(e) => togglePick([f.key], e.target.checked)} />
+          )}
           {f.fd && (
             <span className="rv-fd" title="Finding id (FD-year-number, numbered per customer)">
               {f.fd}
@@ -445,7 +504,7 @@ const LEVEL_RANK = ['critical', 'high', 'medium', 'low', 'informational']
  *  suggestions comes first. Each suggestion keeps its whole card (the AI's
  *  explanation and the decision buttons): a section folds, a suggestion never
  *  hides behind a click. A rule outside every area goes under "Other rules". */
-function ByArea({ findings, areas, item }) {
+function ByArea({ findings, areas, item, ruleTools = () => null }) {
   const order = [...areas, { id: null, name: 'Other rules', about: 'Rules that belong to no detection area' }]
   return order.map((a) => {
     const fs = findings.filter((f) => (f.area ?? null) === a.id)
@@ -481,6 +540,7 @@ function ByArea({ findings, areas, item }) {
                 <span className={`ui-badge tone-${LEVEL_TONE[LEVEL_RANK.find((l) => r.items.some((f) => f.level === l))] || 'muted'}`}>
                   <RuleName rid={r.rid} /> · {r.items.length}
                 </span>
+                {ruleTools(r.items)}
               </div>
               {r.items.map(item)}
             </div>

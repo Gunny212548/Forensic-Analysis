@@ -106,7 +106,24 @@ check(f"closing with suggestions not decided is refused (409, {r.status_code})",
 busy = storage.create_case("b.log", "log", 1, company_id=CO, project=pj)["case_id"]
 storage.raw_path(busy, "log").write_text("Oct 1 00:00:01 h sshd[1]: y\n", encoding="utf-8")
 storage.update_case(busy, status="processing")
-for key in [f["key"] for f in db.collapsed_findings(c1)]:
+print("Accepting several ticked suggestions at once (2026-11-04)")
+keys = [f["key"] for f in db.collapsed_findings(c1)]
+B = f"/api/cases/{c1}/review/batch"
+check("a batch that rejects is refused (400) - a rejection needs its reason",
+      manager.post(B, json={"finding_keys": keys, "action": "reject"}).status_code == 400)
+r = manager.post(B, json={"finding_keys": keys + ["R0|no|such"], "action": "accept"})
+check(f"one unknown key refuses the whole batch (404, {r.status_code})", r.status_code == 404)
+check("and nothing of it was recorded",
+      all(f["review"]["status"] == "Unreviewed" for f in manager.get(f"/api/cases/{c1}/findings").json()["findings"]))
+r = analyst.post(B, json={"finding_keys": keys + keys[:1], "action": "accept"})
+check(f"an analyst accepts them all in one request ({r.status_code}, {r.json().get('recorded')})",
+      r.status_code == 200 and r.json()["recorded"] == len(keys))
+log = manager.get(f"/api/cases/{c1}/review-log").json()
+check("one hash-chained entry per suggestion, a key ticked twice once, each by the signed-in analyst",
+      len([e for e in log["entries"] if e.get("action") == "accept"]) == len(keys)
+      and all(e.get("actor") == "analyst@x.test" for e in log["entries"] if e.get("action") == "accept")
+      and log["chain"]["intact"])
+for key in keys:
     manager.post(f"/api/cases/{c1}/review", json={"finding_key": key, "action": "accept"})
 r = manager.post(f"/api/companies/{CO}/projects/{PJ}/close")
 check(f"a case still processing blocks it too (409, {r.status_code})",

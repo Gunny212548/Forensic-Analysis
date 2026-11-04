@@ -569,6 +569,44 @@ async def record_review(case_id: str, request: Request, body: dict = Body(...)):
     return entry
 
 
+BATCH_REVIEW_MAX = 2000
+
+
+@router.post("/{case_id}/review/batch")
+async def record_review_batch(case_id: str, request: Request, body: dict = Body(...)):
+    """Accept several suggestions the analyst ticked, in one request (the user, 2026-11-04: on a
+    case of 526 suggestions, one click each was too many). Accept only - a rejection needs its
+    reason, and Modified says something changed. All or nothing: every key is checked before
+    any is recorded. The review log still holds one hash-chained entry per suggestion, each
+    with the signed-in actor, exactly as one at a time would write it."""
+    manifest = storage.load_manifest(case_id)
+    if manifest is None:
+        raise HTTPException(404, "Case not found")
+    _authorize(request, authz.REVIEW, manifest.get("company_id"))
+    if (body.get("action") or "").strip() != "accept":
+        raise HTTPException(400, "only 'accept' is taken for several suggestions at once")
+    keys = body.get("finding_keys")
+    if not isinstance(keys, list) or not keys or not all(isinstance(k, str) and k.strip() for k in keys):
+        raise HTTPException(400, "finding_keys must be a non-empty list of keys")
+    if len(keys) > BATCH_REVIEW_MAX:
+        raise HTTPException(400, f"at most {BATCH_REVIEW_MAX} suggestions at once")
+    keys = list(dict.fromkeys(keys))  # a key ticked twice is recorded once
+    known = {f["key"] for f in db.collapsed_findings(case_id)}
+    missing = [k for k in keys if k not in known]
+    if missing:
+        raise HTTPException(404, f"No finding '{missing[0]}' in this case" +
+                            (f" (and {len(missing) - 1} more)" if len(missing) > 1 else ""))
+    with storage.PROJECT_LOCK:
+        closed = projects.closed_reason(manifest)
+        if closed:
+            raise HTTPException(409, closed)
+        entries = [review.record_review(case_id, finding_key=k, action="accept",
+                                        actor=request.state.user["email"],
+                                        ai=triage.explanation_of(case_id, k))
+                   for k in keys]
+    return {"recorded": len(entries), "entries": entries}
+
+
 @router.get("/{case_id}/review-log")
 async def get_review_log(case_id: str):
     """The full decision history for this case, oldest first (audit trail)."""

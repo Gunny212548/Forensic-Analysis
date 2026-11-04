@@ -354,6 +354,16 @@ export async function postReview(caseId, body) {
   return jsonOrThrow(resp, 'Could not save the review decision')
 }
 
+/** Accept several ticked suggestions at once - all or nothing, one log entry each. */
+export async function acceptReviewBatch(caseId, keys) {
+  const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}/review/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ finding_keys: keys, action: 'accept' }),
+  })
+  return jsonOrThrow(resp, 'Could not accept the selected suggestions')
+}
+
 /** FR-2.2 pre-flight. With no size: the limits, for display. With a size:
  *  throws the server's reason (413 too large / 507 no disk) before a byte of
  *  the file is sent - the upload itself can only refuse after the fact. */
