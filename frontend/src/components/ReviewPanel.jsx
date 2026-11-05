@@ -48,9 +48,14 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
       await load()
       onChanged?.()
     } catch (err) {
-      setBulkError(err.message)
-      // Someone may have decided one meanwhile (409): reloading drops it from the ticks.
+      // Someone may have decided one meanwhile, or closed the project (409): reloading drops
+      // what can no longer be ticked, so the bar says so instead of asking for a reload.
       await load()
+      setBulkError(
+        err.status === 409
+          ? `${err.message[0].toUpperCase()}${err.message.slice(1)}. The list was refreshed.`
+          : err.message,
+      )
     } finally {
       setBulkBusy(false)
     }

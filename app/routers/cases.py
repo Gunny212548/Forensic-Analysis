@@ -609,7 +609,7 @@ async def record_review_batch(case_id: str, request: Request, body: dict = Body(
         if decided:
             raise HTTPException(409, f"'{decided[0]}' was decided meanwhile" +
                                 (f" (and {len(decided) - 1} more)" if len(decided) > 1 else "") +
-                                " - reload the page; nothing was recorded")
+                                "; nothing was recorded")
         entries = review.accept_many(case_id, keys, request.state.user["email"], ai)
     return {"recorded": len(entries), "entries": entries}
 

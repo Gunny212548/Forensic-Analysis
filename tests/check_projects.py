@@ -127,6 +127,8 @@ n_log = len(log["entries"])
 r = manager.post(B, json={"finding_keys": keys, "action": "accept"})
 check(f"a batch naming one already decided is refused (409, {r.status_code}) and records nothing",
       r.status_code == 409 and len(manager.get(f"/api/cases/{c1}/review-log").json()["entries"]) == n_log)
+check(f"and says which was decided, not to reload - the page reloads itself ({r.json().get('detail')!r})",
+      "decided meanwhile" in r.json().get("detail", "") and "reload" not in r.json().get("detail", ""))
 for key in keys:
     manager.post(f"/api/cases/{c1}/review", json={"finding_key": key, "action": "accept"})
 r = manager.post(f"/api/companies/{CO}/projects/{PJ}/close")
