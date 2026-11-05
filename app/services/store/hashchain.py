@@ -67,6 +67,14 @@ def append(path: Path, entry: dict) -> dict:
     Locked: the chain is read-then-append, and two writers at once would
     both link to the same previous entry. One process-wide lock is enough -
     the app runs one uvicorn worker."""
+    return append_many(path, [entry])[0]
+
+
+def append_many(path: Path, new: list[dict]) -> list[dict]:
+    """Append several entries, each chained to the one before it, exactly as
+    that many append() calls would - but the file is read once and written
+    once, under one hold of the lock. A batch of N decisions one append() at
+    a time re-read the whole log N times."""
     with _lock:
         raw = _lines(path)
         # A file whose last line lacks its newline gets one first, and the
@@ -83,16 +91,20 @@ def append(path: Path, entry: dict) -> dict:
             prev = SEAL + hashlib.sha256(b"".join(raw)).hexdigest()
         else:
             prev = GENESIS
-        entry = {"ts": now(), **entry}
-        entry["seq"] = len(prior) + 1
-        entry["prev"] = prev
-        entry["hash"] = digest(entry)
+        out = []
+        for i, entry in enumerate(new):
+            entry = {"ts": now(), **entry}
+            entry["seq"] = len(prior) + 1 + i
+            entry["prev"] = prev
+            entry["hash"] = prev = digest(entry)
+            out.append(entry)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "ab") as fh:
             if missing_newline:
                 fh.write(b"\n")
-            fh.write((json.dumps(entry, ensure_ascii=False, default=str) + "\n").encode())
-    return entry
+            fh.write(b"".join((json.dumps(e, ensure_ascii=False, default=str) + "\n").encode()
+                              for e in out))
+    return out
 
 
 def verify(path: Path) -> dict:

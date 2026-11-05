@@ -123,6 +123,10 @@ check("one hash-chained entry per suggestion, a key ticked twice once, each by t
       len([e for e in log["entries"] if e.get("action") == "accept"]) == len(keys)
       and all(e.get("actor") == "analyst@x.test" for e in log["entries"] if e.get("action") == "accept")
       and log["chain"]["intact"])
+n_log = len(log["entries"])
+r = manager.post(B, json={"finding_keys": keys, "action": "accept"})
+check(f"a batch naming one already decided is refused (409, {r.status_code}) and records nothing",
+      r.status_code == 409 and len(manager.get(f"/api/cases/{c1}/review-log").json()["entries"]) == n_log)
 for key in keys:
     manager.post(f"/api/cases/{c1}/review", json={"finding_key": key, "action": "accept"})
 r = manager.post(f"/api/companies/{CO}/projects/{PJ}/close")

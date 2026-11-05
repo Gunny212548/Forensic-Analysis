@@ -32,6 +32,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
   // ticked, so a tick never overturns an earlier decision.
   const [picked, setPicked] = useState(() => new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkError, setBulkError] = useState('') // said in the bar, where the analyst is looking
   const togglePick = (keys, on) =>
     setPicked((prev) => {
       const next = new Set(prev)
@@ -40,14 +41,16 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
     })
   async function acceptPicked() {
     setBulkBusy(true)
-    setError('')
+    setBulkError('')
     try {
       await acceptReviewBatch(caseId, [...picked])
       setPicked(new Set())
       await load()
       onChanged?.()
     } catch (err) {
-      setError(err.message)
+      setBulkError(err.message)
+      // Someone may have decided one meanwhile (409): reloading drops it from the ticks.
+      await load()
     } finally {
       setBulkBusy(false)
     }
@@ -249,6 +252,7 @@ export default function ReviewPanel({ caseId, focus, onlyKey = null, relatedHref
           <button type="button" className="rv-btn" disabled={bulkBusy} onClick={() => setPicked(new Set())}>
             Clear
           </button>
+          {bulkError && <span className="rv-bulk-error">{bulkError}</span>}
         </div>
       )}
     </>

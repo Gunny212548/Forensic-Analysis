@@ -596,14 +596,21 @@ async def record_review_batch(case_id: str, request: Request, body: dict = Body(
     if missing:
         raise HTTPException(404, f"No finding '{missing[0]}' in this case" +
                             (f" (and {len(missing) - 1} more)" if len(missing) > 1 else ""))
+    ai = triage.explanations_of(case_id, keys)
     with storage.PROJECT_LOCK:
         closed = projects.closed_reason(manifest)
         if closed:
             raise HTTPException(409, closed)
-        entries = [review.record_review(case_id, finding_key=k, action="accept",
-                                        actor=request.state.user["email"],
-                                        ai=triage.explanation_of(case_id, k))
-                   for k in keys]
+        # Only suggestions not decided yet: a page left open while someone else decided one
+        # must not overturn that decision. One at a time (POST /review) can still change it.
+        state = review.current(case_id)
+        decided = [k for k in keys if (state.get(k) or {}).get("status", review.UNREVIEWED)
+                   != review.UNREVIEWED]
+        if decided:
+            raise HTTPException(409, f"'{decided[0]}' was decided meanwhile" +
+                                (f" (and {len(decided) - 1} more)" if len(decided) > 1 else "") +
+                                " - reload the page; nothing was recorded")
+        entries = review.accept_many(case_id, keys, request.state.user["email"], ai)
     return {"recorded": len(entries), "entries": entries}
 
 

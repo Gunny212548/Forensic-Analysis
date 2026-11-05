@@ -110,6 +110,22 @@ def record_review(case_id: str, finding_key: str, action: str, actor: str,
     })
 
 
+def accept_many(case_id: str, keys: list[str], actor: str, ai: dict[str, dict | None]) -> list[dict]:
+    """Accept several suggestions at once: one hash-chained line per key, the same line
+    record_review(action="accept") writes, appended in one go (hashchain.append_many)."""
+    storage.require_owner(case_id)
+    return hashchain.append_many(review_path(case_id), [{
+        "kind": "review",
+        "finding_key": k,
+        "action": "accept",
+        "status": ACTIONS["accept"],
+        "actor": actor or "unknown",
+        "reason_code": "",
+        "note": "",
+        **({"ai": ai[k]} if ai.get(k) else {}),
+    } for k in keys])
+
+
 def summary(case_id: str, keys: list[str]) -> dict[str, int]:
     """Counts per review status over the findings that currently exist.
 

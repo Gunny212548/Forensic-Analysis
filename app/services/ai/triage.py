@@ -582,8 +582,12 @@ def state_of(case_id: str, manifest: dict, key: str, items: dict, failed: dict) 
 def explanation_of(case_id: str, key: str) -> dict | None:
     """That the AI's explanation of one suggestion was there when the analyst decided, for the
     review line (X-D4, Q109): the model and when - there is no verdict to have followed."""
+    return explanations_of(case_id, [key])[key]
+
+
+def explanations_of(case_id: str, keys: list[str]) -> dict[str, dict | None]:
+    """explanation_of for several suggestions, the triage file read once."""
     data = load(case_id)
-    r = (data.get("items") or {}).get(key)
-    if not r:
-        return None
-    return {"model": data.get("model"), "reviewed_at": data.get("created_at")}
+    items = data.get("items") or {}
+    seen = {"model": data.get("model"), "reviewed_at": data.get("created_at")}
+    return {k: (dict(seen) if items.get(k) else None) for k in keys}
