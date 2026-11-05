@@ -84,7 +84,9 @@ POST /api/cases/{id}/review                  one analyst decision (appended); 40
                                              the case's project is Closed
 POST /api/cases/{id}/review/batch            accept the ticked suggestions at once:
                                              {finding_keys, action: "accept"}, all or
-                                             nothing, one log entry each (2026-11-04)
+                                             nothing, one log entry each (2026-11-04);
+                                             409 if a key is already decided (a stale
+                                             page must not overturn a decision)
 GET  /api/cases/{id}/review-log              full decision history
 GET  /api/cases/{id}/custody                 evidence digest + chain of custody,
                                              hash chain checked on read
