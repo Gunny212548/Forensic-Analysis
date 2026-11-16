@@ -235,9 +235,12 @@ numbers recorded before that date and both moves are deliberate:
 threat-intel rule of gotcha #17, which postdates the original figure -
 and since the feed refresh of 2026-10-14 it is 14832 (R3004 318).
 
-The corpus behind the baseline: **98 cases / 988,818 rows** from
-`d:\forensic system\Logtest`, plus the Check Point export (in `raw/`, see
-*Real-world benchmark* above) and the two `gen_usecase` files. `Logtest` holds 108
+The corpus behind the baseline: **98 cases / 819,197 rows / 4,029 flagged** from
+`d:\forensic system\Logtest` (67 distinct names; measured 2026-11-16 on the dev container,
+PARITY OK, and reconciled by md5 against the baseline's own entries for those files, which
+sum to the same - the 988,818 rows written here before was not reproduced), plus the Check
+Point export (`D:/logtest`, see *Real-world benchmark* above) and the four `gen_usecase`
+files. `Logtest` holds 108
 log-shaped files; the other 10 are 0-byte and the API rejects them with 400,
 and 6 more are not logs at all (email headers, a placeholder, and two
 artefacts the ransomware itself dropped) which ingest as 0 findings. About a
