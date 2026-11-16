@@ -226,6 +226,35 @@ that fails at run time is listed with its error on the case, the rest go on.
   account had signed in from this source before the failures began (likely the owner)". With 8
   legitimate episodes the rule draws no line (under 20 members, Q67), so every episode of two or more
   failures goes to the analyst - as designed.
+- **This PC's Sysmon log (noise round 2, 2026-11-10)**: Sysmon 15.22 with the SwiftOnSecurity
+  configuration, 410,251 events over eight days (2026-11-02 16:54 - 11-10 09:43; process creation
+  261,473, network 65,323, file creation 63,382, DNS 9,218). One standalone workstation, its owner
+  the only user - a developer's PC running AI coding agents (Claude Code, Codex), which is close to
+  the worst benign case for command-line rules. 2,056 of the 2,842 runnable rules had events of their
+  logsource. 320 s for the case (one run).
+  **17 SigmaHQ rules fired, 17 suggestions** (one host, one account - S-D5), on 12,375 events. Every
+  match was checked against the rule's text: each is a true match of the rule as written, none is
+  the dialect's. By cause:
+
+  | cause | rules | events |
+  |---|---|---|
+  | PowerShell 7 installed from the Microsoft Store runs from `C:\Program Files\WindowsApps\Microsoft.PowerShell_...\pwsh.exe`; *System File Execution Location Anomaly* excludes `Program Files\PowerShell\7` and the Store's `Microsoft.PowerShellPreview`, not the Store's release package | 1 | 11,479 |
+  | the coding agents' shells: `bash -c` / `pwsh -EncodedCommand` lines holding a whole script (curl ... -o ... &, emoji and `→` in text, base64, `irm ... \| iex` of an installer); events counted once - *Curl Download And Execute Combination* 340, *PowerShell Base64 Encoded FromBase64String* 191, three *Emoji Usage In CommandLine* rules 162, *Script Interpreter Execution From Suspicious Folder* 46, *Suspicious Curl.EXE Download* 16 (cookie files in `AppData\Local\Temp`, to localhost), *Powershell Token Obfuscation* 12, *Ping/Del Command Combination* 5, four encoded-PowerShell rules 1 each, *PowerShell Download and Execution Cradles* 1 | 14 | 725 |
+  | Discord's clock sync to `time.cloudflare.com`; *Dead Drop Resolver Domain* lists `cloudflare.com` and excludes Discord only for `discord.com` | 1 | 156 |
+  | Logitech G HUB's updater starting its crash handler as SYSTEM, its Sentry upload URL holding `/minidump/` - the rule's `MiniDump` keyword (*Suspicious SYSTEM User Process Creation*) | 1 | 16 |
+
+  SigmaHQ's master of 2026-11-10 (d7c9da1) has the same text for the four rules read (the two
+  filters above, the curl combination, the SYSTEM rule): a newer pin changes none of this.
+  Marks: 74 rules on 39,040 events (9.5% of the log) - *Non Interactive PowerShell Process Spawned*
+  21,963 (the Store PowerShell 11,446, ASUS Armoury's framework 10,234) and *PSScriptPolicyTest
+  Creation By Uncommon Process* 11,479 (the Store PowerShell).
+  In-house: one suggestion, WIN-MAL-1 on 5,294 connections - Discord 5,018 and claude.exe 125 to
+  Google Cloud addresses at a regular interval. Beaconing by the rule's own test; one host is under
+  the 20 the fleet exclusion needs (gotcha #70, Q105).
+  The same log zipped with the Security log exported with it (one case, 442,041 events, 321 s):
+  the same 17 SigmaHQ suggestions on the same 12,375 events - the Security log adds none, only two
+  informational marks; no 4688 in it, so nothing for story 6d to read. In-house WIN-BRUTE-1 and
+  WIN-AUTH-1 again on the owner's own mistyped passwords (46 and 62 events).
 
 ## Not in this story
 
@@ -366,3 +395,49 @@ time in `sigma.py`).
   Recommended: yes.
 - **Q137 - on the case (S-D13).** The 4688 counts and the 205 rules on the SigmaHQ record, two
   figures on the Ingest step? Recommended: yes.
+
+## Story 6e - a filter of ours on a SigmaHQ rule (2026-11-10)
+
+Status: **Approved 2026-11-10 - Q138, the user chose option 1**; built on branch `sigma-noise-2` (gotcha #84).
+
+**Why.** Noise round 2 (above): on a real workstation's Sysmon log one rule made 11,479 of SigmaHQ's
+12,375 suggested events - *System File Execution Location Anomaly* on PowerShell 7 installed from the
+Microsoft Store. Its own `filter_main_powershell` leaves out PowerShell 7 under `Program
+Files\PowerShell\7` and the Store's `Microsoft.PowerShellPreview` package, not the Store's release
+package `Microsoft.PowerShell_<version>`. SigmaHQ's master of 2026-11-10 has the same text, so a new pin
+does not help. The options put to the user: (1) a filter of ours for a gap that can be shown, (2) change
+nothing, (3) lower the loud rules to marks - (3) would set one customer's noise on every other (D10-D16).
+
+**S-D14 - a local filter (Q138).** `sigma.LOCAL_FILTERS`: SigmaHQ rule id -> the fields it reads, a
+filter in SQL, what it leaves out and why. `sigma.condition` appends `AND NOT COALESCE(filter, FALSE)`,
+so suggestions, marks and the 4688 scope all see it. It is kept apart from SigmaHQ's text (the bundle and
+its SHA-256 are unchanged), named on the rule's card ("Filter added here") and on the case's SigmaHQ
+record (`local_filters`). The rule for adding one:
+- the rule's own filter states the intent and misses a case measured benign on real data - never to
+  quiet a behaviour the rule means to catch (the other 16 rules of round 2 stay as written: an agent's
+  shell line with `curl ... -o ... &` or base64 is what those rules look for, and the event alone does
+  not tell it from an attack);
+- the filter reads only fields the rule already reads, and is as narrow as the evidence: here the
+  package directory under `C:\Program Files\WindowsApps` (TrustedInstaller's), **not** the per-user
+  alias under `AppData\Local\Microsoft\WindowsApps`, which the user can write to - SigmaHQ's Preview
+  filter does allow that alias; ours does not copy it;
+- each one is a decision of the user's, with its measurement in the entry.
+
+One filter today: `e4a6b256-3e47-40fc-89d2-7a477edd6915`, `Image` starting `c:\program
+files\windowsapps\microsoft.powershell_` and ending `\pwsh.exe`.
+
+### Build and checks (6e)
+- `sigma.py`: `LOCAL_FILTERS`, `condition`, `local_filter`; `scope_4688` reads the filtered condition;
+  `apply_marks` adds `local_filters` to the record. `rule_meta._describe_sigma`: `local_filter`.
+  `RuleCard.jsx`: the line on the card.
+- `tests/check_sigma.py`: every filter names a runnable rule, reads only its fields, says what and why;
+  the Store's `pwsh.exe` is left out while the user-writable alias, another folder and another binary
+  in the package folder still match; only that rule's card says so; the regression samples as before.
+- `check_sigma.py` (2026-11-10): SIGMA OK, 439 of 445 samples exact, the same six known differences.
+- Round 2's Sysmon log again, through the pipeline: **16 SigmaHQ suggestions on 897 events** (from
+  17 on 12,375); *System File Execution Location Anomaly* none; marks unchanged (39,040 events); the case's record
+  lists the filtered rule (`local_filters`). 334 s (one run).
+
+### Question (6e)
+- **Q138 - the noise of round 2.** A filter of ours only for a gap that can be shown (the Store's
+  PowerShell 7), the other rules as SigmaHQ wrote them? The user: option 1.

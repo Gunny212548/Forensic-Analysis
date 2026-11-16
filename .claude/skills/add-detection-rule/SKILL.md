@@ -24,7 +24,10 @@ entry, a place in `areas.py`, and a case in `tests/check_firewall_rules.py`.
 SigmaHQ's, converted at image build: `rules_sigma.py` hands the high / critical ones to
 `apply_rules` as `SIGMA-<uuid>` Windows product rules, `sigma.apply_marks` runs the rest as
 marks. A single Windows event that SigmaHQ covers is not a new in-house rule (W-D1) - unless it is
-a product's own verdict (WIN-MAL-2), in which case add SigmaHQ's twin to `sigma.TWINS`. **A new
+a product's own verdict (WIN-MAL-2), in which case add SigmaHQ's twin to `sigma.TWINS`. A SigmaHQ
+rule's text is never edited: a filter of ours goes in `sigma.LOCAL_FILTERS` (S-D14, gotcha #84) -
+only for a gap the rule's own filter shows, measured on real data, reading only the rule's fields,
+decided by the user; it shows on the rule's card and the case's `sigma.local_filters`. **A new
 SigmaHQ commit is a new pin**: `SIGMA_COMMIT` and the archive's `--checksum` in the Dockerfile,
 then `tests/check_sigma.py` (its `KNOWN_DIFFER` re-measured, never widened silently) and the
 baseline's `sigma` sections re-taken and said so.

@@ -1199,7 +1199,8 @@ def _plain(text: str) -> str:
 
 
 def _describe_sigma(rid: str) -> dict:
-    """A SigmaHQ rule as SigmaHQ wrote it: its author, link and licence (DRL 1.1), no ADS of ours."""
+    """A SigmaHQ rule as SigmaHQ wrote it: its author, link and licence (DRL 1.1), no ADS of ours;
+    a filter of ours on it is named apart (S-D14)."""
     r = sigma.by_rid()[rid]
     prov = sigma.bundle()["provenance"] or {}
     return {
@@ -1210,7 +1211,7 @@ def _describe_sigma(rid: str) -> dict:
         "tags": r.get("tags") or [], "falsepositives": r.get("falsepositives") or [],
         "origin": "SigmaHQ", "url": r["url"], "commit": prov.get("commit"),
         "license": prov.get("license"), "license_url": prov.get("license_url"),
-        "ads": None,
+        "ads": None, "local_filter": sigma.local_filter(r),
     }
 
 

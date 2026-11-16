@@ -84,6 +84,27 @@ def main() -> int:
     check(all(re.fullmatch(rules.RULE_ID_PATTERN, r["rid"]) for r in b["rules"]),
           "every SIGMA- id has the rule id shape")
 
+    print("a filter of ours on a SigmaHQ rule (S-D14)")
+    by_id = {r["id"]: r for r in b["rules"]}
+    check(all(uid in by_id and sigma.runnable(by_id[uid]) and set(f["fields"]) <= set(by_id[uid]["fields"])
+              and f["what"] and f["why"] for uid, f in sigma.LOCAL_FILTERS.items()),
+          f"names a runnable rule, reads only fields the rule reads, says what and why ({len(sigma.LOCAL_FILTERS)})")
+    anomaly = by_id["e4a6b256-3e47-40fc-89d2-7a477edd6915"]
+    con = duckdb.connect()
+    con.execute('CREATE TABLE logs ("Image" VARCHAR)')
+    con.execute("INSERT INTO logs VALUES (?), (?), (?), (?), (NULL)", [
+        r"C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.9.0_x64__8wekyb3d8bbwe\pwsh.exe",  # the Store's release
+        r"C:\Users\a\AppData\Local\Microsoft\WindowsApps\Microsoft.PowerShell_8wekyb3d8bbwe\pwsh.exe",  # user-writable
+        r"C:\Users\Public\pwsh.exe",
+        r"C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.9.0_x64__8wekyb3d8bbwe\svchost.exe"])
+    got = sorted(x[0] for x in con.execute(f'SELECT "Image" FROM logs WHERE {sigma.condition(anomaly)}').fetchall())
+    con.close()
+    check(len(got) == 3 and not any(g.startswith("C:\\Program Files\\WindowsApps") and g.endswith("pwsh.exe") for g in got),
+          f"the Store's PowerShell 7 is left out, the user-writable alias and any other path still match ({len(got)} of 4)")
+    cards = {r["id"]: rule_meta.describe(r["rid"])["local_filter"] for r in sugg}
+    check({uid for uid, f in cards.items() if f} == set(sigma.LOCAL_FILTERS) & set(cards),
+          "the rule's card says so, and no other card does")
+
     print("SigmaHQ's regression samples, through the pipeline")
     rid_of = {r["id"]: r["rid"] for r in b["rules"]}
     co = storage.create_company("Sigma regression")["company_id"]

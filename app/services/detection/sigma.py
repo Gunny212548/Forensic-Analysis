@@ -27,6 +27,28 @@ TWINS = {
     "686c0b4b-9dd3-4847-9077-d6c1bbe36fcb": "WIN-HOST-3",  # Windows Defender Virus Scanning Feature Disabled (5012)
     "49e5bc24-8b86-49f1-b743-535f332c2856": "WIN-HOST-3",  # Microsoft Defender Tamper Protection Trigger (5013)
 }
+# S-D14 (Q138, the user 2026-11-10): a filter of ours on a SigmaHQ rule, kept apart from SigmaHQ's
+# text and named on the rule's card and the case's record. Only where the rule's own filter states
+# the intent and misses a path measured benign on real data (noise round 2) - never to quiet a
+# behaviour the rule means to catch. `filter` is SQL over `fields`, which the rule must already
+# read (tests/check_sigma.py); case-insensitive, as Sigma compares. An unknown field filters
+# nothing (NOT COALESCE(..., FALSE), the dialect's own form).
+LOCAL_FILTERS = {
+    # System File Execution Location Anomaly: its filter_main_powershell lets PowerShell 7 run from
+    # Program Files\PowerShell\7 and from the Store's Preview package, not the Store's release
+    # package. Only the package directory under Program Files\WindowsApps (TrustedInstaller's);
+    # the per-user alias under AppData\Local\Microsoft\WindowsApps is user-writable and stays.
+    "e4a6b256-3e47-40fc-89d2-7a477edd6915": {
+        "fields": ["Image"],
+        "filter": r"""starts_with(lower("Image"), 'c:\program files\windowsapps\microsoft.powershell_') """
+                  r"""AND ends_with(lower("Image"), '\pwsh.exe')""",
+        "what": r"pwsh.exe run from C:\Program Files\WindowsApps\Microsoft.PowerShell_... is left out",
+        "why": "PowerShell 7 installed from the Microsoft Store runs from there. The rule already leaves out "
+               r"PowerShell 7 under Program Files\PowerShell\7 and the Store's Preview package; on a real "
+               "workstation's Sysmon log the release package alone was 11,479 of the rule's 11,479 matches "
+               "in eight days (2026-11-10). SigmaHQ's rule is otherwise as its author wrote it.",
+    },
+}
 # win_events' own columns under the names Sigma rules use; any other field is an item of data.
 COLUMNS = {"EventID": "CAST(w.event_id AS VARCHAR)", "Channel": "w.channel",
            "Provider_Name": "w.provider", "Computer": "w.computer"}
@@ -103,7 +125,7 @@ def scope_4688(r: dict) -> str | None:
     if (r.get("logsource") or {}).get("category") != PROCESS_CREATION or not runnable(r):
         return None
     fields = r.get("fields") or []
-    if not _NOT_THREE_VALUED.search(" ".join(r["conditions"])):
+    if not _NOT_THREE_VALUED.search(condition(r)):
         return ""
     if any(f not in MAP_4688 for f in fields):
         return None
@@ -143,7 +165,16 @@ def logs_cte(r: dict) -> str:
 
 
 def condition(r: dict) -> str:
-    return " OR ".join(f"({c})" for c in r["conditions"])
+    """The rule's condition, less what a filter of ours leaves out (S-D14)."""
+    cond = " OR ".join(f"({c})" for c in r["conditions"])
+    local = LOCAL_FILTERS.get(r["id"])
+    return f"({cond}) AND NOT COALESCE({local['filter']}, FALSE)" if local else cond
+
+
+def local_filter(r: dict) -> dict | None:
+    """What a filter of ours leaves out of this rule and why, for its card (S-D14)."""
+    f = LOCAL_FILTERS.get(r["id"])
+    return {"what": f["what"], "why": f["why"]} if f else None
 
 
 def author(r: dict) -> str:
@@ -214,7 +245,9 @@ def apply_marks(con, on_rule=None) -> dict:
                                      "GROUP BY 1").fetchall())
     record = {"status": "ran", "provenance": b["provenance"], "sha256": b["sha256"], "rules": len(rules),
               "suggesting_rules": sum(1 for r in rules if suggests(r)), **counts,
-              "suggestions": suggested, "marks": marked, "errors": errors}
+              "suggestions": suggested, "marks": marked, "errors": errors,
+              # S-D14: the SigmaHQ rules that ran with a filter of ours.
+              "local_filters": sorted(r["rid"] for r in rules if r["id"] in LOCAL_FILTERS)}
     events_4688 = con.execute("SELECT count(*) FROM win_events WHERE lower(channel) = 'security' "
                               "AND event_id = 4688").fetchone()[0] if has_events else 0
     if events_4688:

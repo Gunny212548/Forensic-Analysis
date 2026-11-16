@@ -99,6 +99,15 @@ function SigmaBody({ rule }) {
         <dd>{[ls.product, ls.category, ls.service].filter(Boolean).join(' / ')}</dd>
         <dt>False positives</dt>
         <dd>{rule.falsepositives.length ? rule.falsepositives.join(' · ') : 'none listed'}</dd>
+        {/* S-D14: a filter of ours on SigmaHQ's rule is said apart from SigmaHQ's own text. */}
+        {rule.local_filter && (
+          <>
+            <dt>Filter added here</dt>
+            <dd>
+              {rule.local_filter.what}. {rule.local_filter.why}
+            </dd>
+          </>
+        )}
         <dt>Tags</dt>
         <dd>{rule.tags.join(' · ')}</dd>
         <dt>References</dt>
