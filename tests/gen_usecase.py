@@ -134,8 +134,10 @@ def nested(r):
 lines = [json.dumps(nested(r)) for r in rows]
 lines.insert(5, "### exporter restarted ###")
 lines.insert(12, '{"timestamp": "2026-02-14T22:30:00+07:00", "src": {"ip": ')  # cut off
-with gzip.open(out / "nightfall-firewall-nested.jsonl.gz", "wt", encoding="utf-8") as fh:
-    fh.write("\n".join(lines) + "\n")
+# mtime=0: gzip.open stamps the header with the current time, so every run gave the file
+# a new md5 and check_parity reported it as a version the baseline does not have.
+(out / "nightfall-firewall-nested.jsonl.gz").write_bytes(
+    gzip.compress(("\n".join(lines) + "\n").encode("utf-8"), mtime=0))
 
 print(f"auth.log lines : {len(auth)}")
 print(f"firewall rows  : {len(rows)}  (+ the same as .json and as nested .jsonl.gz)")

@@ -3943,6 +3943,12 @@
  "nightfall-firewall-nested.jsonl.gz": [
   {
    "flagged": 0,
+   "md5": "53e1ac5491997071f6d903943fd0d957",
+   "rows": 0,
+   "rules": {}
+  },
+  {
+   "flagged": 0,
    "md5": "fcf5828a60a6e8de74537f5089fc735e",
    "rows": 0,
    "rules": {}
